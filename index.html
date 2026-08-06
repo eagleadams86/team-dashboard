@@ -14,6 +14,12 @@
   fails silently in production and works fine on localhost. The frame-src entry
   is the project's authDomain — it has to match FIREBASE_CONFIG or the Google
   sign-in popup is blocked.
+
+  Expected console noise: Google's auth iframe fires a telemetry beacon at
+  apis.google.com/js/gen_204, and connect-src blocks it. That is deliberate and
+  does NOT affect sign-in — gen_204 is fire-and-forget logging. Don't "fix" it by
+  adding apis.google.com to connect-src: privacy.html says the app sends no
+  analytics, and this is the line that makes that true.
 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://teamdashboard-6723f.firebaseapp.com; base-uri 'none'; form-action 'self'">
 <!--

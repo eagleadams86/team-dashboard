@@ -146,6 +146,11 @@ A Content-Security-Policy `<meta>` at the top of `index.html` restricts the page
 scripts plus Firebase's CDN, and network access to the handful of Firebase endpoints sync
 uses. **Any new external endpoint has to be added there too**, or it fails only in production.
 
+One piece of expected console noise: Google's auth iframe fires a telemetry beacon at
+`apis.google.com/js/gen_204` and the policy blocks it. Sign-in is unaffected — it's
+fire-and-forget logging — and the block is what makes the privacy policy's "no analytics"
+claim true, so don't allow it through.
+
 ## Tests
 
 `tests.html` pins the pure functions by loading the real `index.html` in a hidden iframe — no
