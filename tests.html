@@ -420,6 +420,97 @@ function run(TD, win) {
      dLabel.titles.quality);
 
   /* ══════════════════════════════════════════════════════════
+     Column detection. A real Jira export leads with an issue key and orders
+     the dates however it likes, so the columns are worked out from the data.
+     Getting this wrong silently corrupts every metric.
+     ══════════════════════════════════════════════════════════ */
+  group('detectColumns — finding the right columns in a real export');
+
+  const cols = s => TD.parsePastedRows(s, 'auto').columns;
+
+  is(cols(['Completed Date\tStart Date\tType',
+           '2015-01-21\t2015-01-14\t',
+           '2015-01-26\t2015-01-14\tDefect',
+           '2015-01-26\t2015-01-21\tDefect'].join('\n')),
+     { completed: 0, started: 1, type: 2 }, 'the plain three-column workbook layout still works');
+
+  is(cols(['Key\tResolved\tIn Progress\tIssue Type',
+           'DAE-1\t5/11/2026\t4/27/2026\tStory',
+           'DAE-2\t6/22/2026\t4/28/2026\tStory'].join('\n')),
+     { completed: 1, started: 2, type: 3 }, 'a leading issue-key column is skipped (header names)');
+
+  is(cols(['DAE-1064\t5/11/2026\t4/27/2026\tStory',
+           'DAE-1062\t6/22/2026\t4/28/2026\tStory',
+           'DAE-1060\t5/11/2026\t4/27/2026\tBug',
+           'DAE-1054\t5/19/2026\t4/29/2026\tStory'].join('\n')),
+     { completed: 1, started: 2, type: 3 }, 'a leading issue-key column is skipped with no header at all');
+
+  is(cols(['DAE-1\t4/27/2026\t5/11/2026\tStory',
+           'DAE-2\t4/28/2026\t6/22/2026\tStory',
+           'DAE-3\t4/27/2026\t5/11/2026\tBug',
+           'DAE-4\t4/29/2026\t5/19/2026\tStory'].join('\n')),
+     { completed: 2, started: 1, type: 3 },
+     'start-before-completed is detected by which date is later, not by position');
+
+  is(cols(['Issue Type\tKey\tResolved\tIn Progress',
+           'Story\tDAE-1\t5/11/2026\t4/27/2026',
+           'Bug\tDAE-2\t6/22/2026\t4/28/2026'].join('\n')),
+     { completed: 2, started: 3, type: 0 }, 'header names win over position');
+
+  is(cols(['AAA-1\t5/11/2026\t4/27/2026\tStory',
+           'AAA-2\t6/22/2026\t4/28/2026\tStory',
+           'AAA-3\t5/11/2026\t4/27/2026\tStory',
+           'AAA-4\t5/19/2026\t4/29/2026\tBug'].join('\n')).type, 3,
+     'the type column is told from the key column by repetition, not a ratio');
+
+  is(cols(['AAA-1\tFix the login page\t5/11/2026\t4/27/2026\tStory',
+           'AAA-2\tAdd export button\t6/22/2026\t4/28/2026\tStory',
+           'AAA-3\tTidy the footer\t5/11/2026\t4/27/2026\tStory',
+           'AAA-4\tCache the results\t5/19/2026\t4/29/2026\tBug'].join('\n')),
+     { completed: 2, started: 3, type: 4 }, 'a free-text summary column is not mistaken for the type');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('Work in progress — started but not finished');
+
+  const wip = TD.parsePastedRows([
+    'Key\tResolved\tIn Progress\tType',
+    'A-1\t2015-02-12\t2015-02-09\tStory',
+    'A-2\t\t2015-02-10\tStory',
+    'A-3\t\t2015-02-11\tStory',
+    'A-4\t2015-02-20\t2015-02-16\tStory',
+    'A-5\t\t\tStory'
+  ].join('\n'), 'auto');
+
+  is(wip.rows.length, 4, 'rows with no completion are kept; only a row with neither date is dropped');
+  is(wip.unfinished, 2, 'the in-progress ones are counted and reported');
+  is(wip.badCompleted.length, 0, 'an empty completion date is NOT an error — it is work in progress');
+
+  /* Needs the header, or the detector quite reasonably reads the one column that
+     does hold a date as the completion and there is no bad cell to find. */
+  is(TD.parsePastedRows(['Key\tResolved\tIn Progress\tType',
+                         'A-1\tnot-a-date\t2015-02-10\tStory'].join('\n'), 'auto').badCompleted.length, 1,
+     'text in the completion cell that is not a date is still an error');
+
+  const dWip = TD.derive(wip.rows, WORKBOOK_SETTINGS, { filterValue: '', months: 'all' });
+  const w07 = dWip.weeks.indexOf('2015-07');
+  is(dWip.throughput[w07], 1, 'unfinished items add nothing to throughput');
+  /* A-1 alone: 12 Feb − 9 Feb = 3 days. The two unfinished items must not pull it. */
+  is(dWip.avgCycleTime[w07], 3, 'unfinished items add nothing to the cycle-time average');
+  is(dWip.netFlow[w07], -2,
+     'but they DO count as work started: 1 completed − 3 started = −2 (Work in Progress!U2)');
+  is(dWip.inProgressCount, 2, 'derive reports how many are still in progress');
+
+  /* The bug this replaced, stated as a test: dropping the unfinished rows makes
+     net flow read too positive, because only the completions survive. */
+  const finishedOnly = wip.rows.filter(r => r.completed);
+  is(TD.derive(finishedOnly, WORKBOOK_SETTINGS, { filterValue: '', months: 'all' }).netFlow[w07], 0,
+     'sanity: with the unfinished rows thrown away the same week reads 0, not −2');
+
+  is(TD.derive([{ completed: null, started: TD.utcDate(2015, 2, 10), type: '' }],
+     WORKBOOK_SETTINGS, { filterValue: '', months: 'all' }).empty, true,
+     'a team with nothing finished at all has no week axis to draw');
+
+  /* ══════════════════════════════════════════════════════════
      Multi-team state. These are the boundary: everything here decides what a
      copy arriving from the cloud is allowed to turn into.
      ══════════════════════════════════════════════════════════ */

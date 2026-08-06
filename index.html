@@ -459,9 +459,11 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
     <div class="card">
       <h2>Paste work items for <span id="pasteTeamName">this team</span></h2>
       <p class="hint">
-        Three columns — <strong>Completed Date</strong>, <strong>Start Date</strong> (optional),
-        <strong>Type</strong> (optional). Copy straight out of Excel, Jira or a CSV; tabs and commas
-        both work, and a header row is skipped automatically.
+        Needs a <strong>completed date</strong>, a <strong>start date</strong> and a
+        <strong>work type</strong> somewhere in each row. Paste the export as it comes — extra
+        columns like the issue key are fine, the right ones are worked out from the data and
+        named back to you below. Tabs and commas both work, and a header row is skipped.
+        Items that are started but not finished belong here too: they count as work started.
       </p>
       <div style="margin-top:var(--sp-6)">
         <label for="pasteBox">Pasted rows</label>
@@ -774,7 +776,7 @@ function parseDate(text, order) {
 function detectDateOrder(rawRows) {
   let dayFirst = 0, monthFirst = 0;
   for (const cells of rawRows) {
-    for (const cell of cells.slice(0, 2)) {
+    for (const cell of cells) {
       const m = String(cell || '').trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
       if (!m) continue;
       if (+m[1] > 12) dayFirst++;
@@ -788,8 +790,13 @@ function detectDateOrder(rawRows) {
    3. PASTE PARSING  (pure — pinned by tests.html)
 
    Mirrors the "Your Data" sheet: Completed Date, Start Date (optional),
-   Type (optional). Returns the good rows plus the bad ones, so the UI can
-   reproduce the workbook's Settings!B27 error message.
+   Type (optional) — but a real Jira export is never just those three columns.
+   It leads with an issue key, may order the dates either way round, and holds
+   plenty of items that are started and not yet finished.
+
+   So the columns are worked out from the paste rather than assumed by position,
+   and the result says which columns were used: a wrong guess here silently
+   corrupts every metric, so it has to be visible rather than quiet.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function splitCells(line) {
@@ -800,34 +807,158 @@ function splitCells(line) {
 
 function looksLikeHeader(cells) {
   const joined = cells.join(' ').toLowerCase();
-  return /complet|start|type|date/.test(joined) && !/\d{4}/.test(joined);
+  return /complet|start|type|date|key|resolv|status/.test(joined) && !/\d{4}/.test(joined);
 }
 
-function parsePastedRows(text, order) {
+/* Header names are the strongest signal when they're there. "Created" is only
+   accepted as a start date if nothing better matched — in a flow-metrics export
+   it usually is the start, but "In Progress" beats it whenever both exist. */
+const HEADER_PATTERNS = {
+  completed: [/complet|resolv|closed|done|finish/i, /end\s*date/i],
+  started:   [/start|begin|in.?progress/i, /created/i],
+  type:      [/(issue\s*)?type|kind|category/i]
+};
+
+function matchHeader(header, field) {
+  if (!header) return -1;
+  for (const pattern of HEADER_PATTERNS[field]) {
+    const i = header.findIndex(h => pattern.test(String(h || '')));
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
+/* Per-column shape of the data: how often it parses as a date, and how repetitive
+   it is. The second number is what separates a Type column (a handful of values,
+   repeated) from an issue-key column (every value distinct). */
+function columnStats(rows, order) {
+  const width = rows.reduce((n, r) => Math.max(n, r.length), 0);
+  const stats = [];
+  for (let c = 0; c < width; c++) {
+    const vals = rows.map(r => String(r[c] == null ? '' : r[c]).trim()).filter(Boolean);
+    const dates = vals.filter(v => parseDate(v, order)).length;
+    stats.push({
+      index: c,
+      filled: vals.length,
+      dateRate: vals.length ? dates / vals.length : 0,
+      distinct: new Set(vals).size,
+      distinctRatio: vals.length ? new Set(vals).size / vals.length : 1
+    });
+  }
+  return stats;
+}
+
+/**
+ * Works out which column is which. Returns { completed, started, type },
+ * each a column index or -1.
+ */
+function detectColumns(rows, header, order) {
+  const stats = columnStats(rows, order);
+  const map = {
+    completed: matchHeader(header, 'completed'),
+    started:   matchHeader(header, 'started'),
+    type:      matchHeader(header, 'type')
+  };
+  const taken = () => [map.completed, map.started, map.type].filter(i => i >= 0);
+
+  /* Columns that hold dates. 0.6 rather than 1.0 because a stray "in progress"
+     or "-" in a date column shouldn't disqualify it. */
+  const dateCols = stats.filter(s => s.filled && s.dateRate >= 0.6).map(s => s.index);
+  const freeDates = dateCols.filter(i => !taken().includes(i));
+
+  if (map.completed < 0 && map.started < 0 && freeDates.length >= 2) {
+    const [a, b] = freeDates;
+    /* Which of the two is the completion? Not position — an export can put them
+       either way round. On rows where both are present, the completion is the
+       later one, because work finishes after it starts. */
+    let aLater = 0, bLater = 0;
+    for (const r of rows) {
+      const da = parseDate(r[a], order), db = parseDate(r[b], order);
+      if (!da || !db) continue;
+      if (da > db) aLater++; else if (db > da) bLater++;
+    }
+    if (bLater > aLater) { map.completed = b; map.started = a; }
+    else                 { map.completed = a; map.started = b; }
+  } else if (map.completed < 0 && freeDates.length) {
+    map.completed = freeDates[0];
+  } else if (map.started < 0 && freeDates.length) {
+    map.started = freeDates[0];
+  }
+
+  if (map.type < 0) {
+    /* The discriminator is repetition, not a ratio: an issue key never repeats,
+       a work type always does. A ratio threshold fails on small pastes — four
+       rows of Story/Story/Story/Bug is a distinct-ratio of 0.5, which is a
+       perfectly normal type column and was being rejected. The 20 cap keeps a
+       long free-text column (a summary, a reporter) out of it. */
+    const candidates = stats.filter(s =>
+      s.filled && s.dateRate < 0.6 && !taken().includes(s.index) && s.distinct <= 20 &&
+      /* Rejected only on positive evidence of being an identifier: every value
+         distinct, over enough rows to mean something. Two rows of one type each
+         are all-distinct too, and that is not grounds to throw the column away. */
+      !(s.distinct === s.filled && s.filled >= 3));
+    if (candidates.length) {
+      /* Fewest distinct values wins; rightmost breaks a tie, since exports tend
+         to put the type after the identifier. */
+      map.type = candidates.reduce((best, s) =>
+        (s.distinct < best.distinct || (s.distinct === best.distinct && s.index > best.index))
+          ? s : best).index;
+    }
+  }
+
+  return map;
+}
+
+/**
+ * @param text   pasted rows
+ * @param order  'auto' | 'dmy' | 'mdy'
+ * @param forced optional { completed, started, type } column indices, to override detection
+ */
+function parsePastedRows(text, order, forced) {
   const lines = String(text || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const raw = lines.map(splitCells).map(c => c.map(x => x.trim()));
 
-  let skippedHeader = false;
-  if (raw.length && looksLikeHeader(raw[0])) { raw.shift(); skippedHeader = true; }
+  let skippedHeader = false, header = null;
+  if (raw.length && looksLikeHeader(raw[0])) { header = raw.shift(); skippedHeader = true; }
 
   const resolved = (!order || order === 'auto') ? detectDateOrder(raw) : order;
+  const cols = forced || detectColumns(raw, header, resolved);
+
+  const at = (cells, i) => (i >= 0 && cells[i] != null ? String(cells[i]).trim() : '');
 
   const rows = [], badCompleted = [], badStarted = [];
+  let unfinished = 0, undated = 0;
+
   raw.forEach((cells, i) => {
     const lineNo = i + 1 + (skippedHeader ? 1 : 0);
-    const completed = parseDate(cells[0], resolved);
-    const started   = parseDate(cells[1], resolved);
-    const type      = (cells[2] || '').trim();
+    const rawCompleted = at(cells, cols.completed);
+    const rawStarted   = at(cells, cols.started);
+    const completed = parseDate(rawCompleted, resolved);
+    const started   = parseDate(rawStarted, resolved);
+    const type      = at(cells, cols.type);
 
-    if (!completed) { badCompleted.push({ line: lineNo, text: cells.join(' | ') }); return; }
-    /* A blank start date is legitimate (the column is optional); text that was
-       meant to be a date but isn't is not. */
-    if (!started && (cells[1] || '').trim() !== '') badStarted.push({ line: lineNo, text: cells.join(' | ') });
+    /* An empty completion date is not an error — it is work in progress, and the
+       workbook counts it (Work in Progress!C2 tests for a blank completion
+       explicitly, and the "started this week" tally never looks at completion at
+       all). Dropping these rows made net flow read systematically too positive.
+       Text in the cell that *isn't* a date is still an error. */
+    if (!completed && rawCompleted !== '') {
+      badCompleted.push({ line: lineNo, text: cells.join(' | ') });
+      return;
+    }
+    if (!started && rawStarted !== '') badStarted.push({ line: lineNo, text: cells.join(' | ') });
 
-    rows.push({ completed, started: started || null, type });
+    /* A row with neither date says nothing about flow — nothing to count. Not an
+       error (an untouched backlog item is a normal thing to have in an export),
+       but counted, because quietly dropping a third of someone's paste is how
+       you get a dashboard nobody trusts. */
+    if (!completed && !started) { undated++; return; }
+    if (!completed) unfinished++;
+
+    rows.push({ completed: completed || null, started: started || null, type });
   });
 
-  return { rows, badCompleted, badStarted, skippedHeader, dateOrder: resolved };
+  return { rows, badCompleted, badStarted, unfinished, undated, skippedHeader, dateOrder: resolved, columns: cols };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -881,16 +1012,22 @@ function derive(rows, settings, view) {
   const items = (filterVal
       ? rows.filter(r => String(r.type || '').trim().toLowerCase() === filterVal)
       : rows.slice())
-    .filter(r => r.completed);
+    .filter(r => r.completed || r.started);
 
-  if (!items.length) return { empty: true, weeks: [], startDate: null, endDate: null };
+  /* Items still in progress. They contribute nothing to throughput, quality or
+     cycle time — all three key off a completion — but they DO count as work
+     started, so they move net flow. Work in Progress!U2 counts start dates with
+     no reference to completion at all. */
+  const finished = items.filter(r => r.completed);
+
+  if (!finished.length) return { empty: true, weeks: [], startDate: null, endDate: null };
 
   const isUnplanned = r => String(r.type || '').trim().toLowerCase() === defectStr;
 
   /* Team Dashboard!Q2 — =MAX(MAX(startDates), MAX(completedDates)) */
   let endDate = null;
   for (const r of items) {
-    if (!endDate || r.completed > endDate) endDate = r.completed;
+    if (r.completed && (!endDate || r.completed > endDate)) endDate = r.completed;
     if (r.started && (!endDate || r.started > endDate)) endDate = r.started;
   }
   /* Team Dashboard!O2 — =IF(L2="All","",EDATE(EndDate, L2*-1)) */
@@ -902,7 +1039,7 @@ function derive(rows, settings, view) {
 
   /* Throughput!A — first week is the window start, or the earliest completed
      week if the window is "All"; then +7 until the window (or the data) runs out. */
-  const completedSundays = items.map(r => priorSunday(r.completed));
+  const completedSundays = finished.map(r => priorSunday(r.completed));
   const maxCompletedPS = new Date(Math.max.apply(null, completedSundays.map(d => d.getTime())));
   const minCompletedPS = new Date(Math.min.apply(null, completedSundays.map(d => d.getTime())));
   const limit = new Date(Math.min(endPS.getTime(), maxCompletedPS.getTime()));
@@ -919,20 +1056,22 @@ function derive(rows, settings, view) {
   const cycleByWeek     = new Map();   /* Cycle Time!C — keyed on the completed date itself */
 
   for (const r of items) {
+    /* Started counts every item that has a start date, finished or not. */
+    if (r.started) {
+      const sk = weekKey(priorSunday(r.started));
+      byStartedWeek.set(sk, (byStartedWeek.get(sk) || 0) + 1);
+    }
+    if (!r.completed) continue;
+
     const ck = weekKey(priorSunday(r.completed));
     if (!byCompletedWeek.has(ck)) byCompletedWeek.set(ck, []);
     byCompletedWeek.get(ck).push(r);
 
-    if (r.started) {
-      const sk = weekKey(priorSunday(r.started));
-      byStartedWeek.set(sk, (byStartedWeek.get(sk) || 0) + 1);
-
-      const ct = cycleTimeOf(r, sameDay);
-      if (ct != null) {
-        const ctk = weekKey(r.completed);
-        if (!cycleByWeek.has(ctk)) cycleByWeek.set(ctk, []);
-        cycleByWeek.get(ctk).push(ct);
-      }
+    const ct = cycleTimeOf(r, sameDay);
+    if (ct != null) {
+      const ctk = weekKey(r.completed);
+      if (!cycleByWeek.has(ctk)) cycleByWeek.set(ctk, []);
+      cycleByWeek.get(ctk).push(ct);
     }
   }
 
@@ -967,6 +1106,7 @@ function derive(rows, settings, view) {
     empty: weeks.length === 0,
     weeks, throughput, defectRate, avgCycleTime, netFlow,
     itemCount: items.length,
+    inProgressCount: items.length - finished.length,
     startDate, endDate,
     titles: {
       /* Throughput!Q7 — =UnplannedLegendLabel & " Percentage Rate (avg: " & TEXT(Q6,"0.00%") & ")" */
@@ -993,7 +1133,7 @@ function derive(rows, settings, view) {
 /* Exposed for tests.html, which drives the real app in a hidden iframe. */
 window.TD = {
   excelWeekday, priorSunday, excelWeekNum, weekKey, edate,
-  parseDate, detectDateOrder, parsePastedRows,
+  parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats,
   cycleTimeOf, linearTrend, derive, utcDate
 };
 
@@ -1049,11 +1189,15 @@ function sanitizeTeams(teams) {
 
 function hydrateRows(raw) {
   if (!Array.isArray(raw)) return [];
+  const date = v => { if (!v) return null; const d = new Date(v + 'T00:00:00Z'); return isNaN(d) ? null : d; };
   return raw.map(r => ({
-    completed: r && r.c ? new Date(r.c + 'T00:00:00Z') : null,
-    started:   r && r.s ? new Date(r.s + 'T00:00:00Z') : null,
+    completed: date(r && r.c),
+    started:   date(r && r.s),
     type:      (r && r.t) || ''
-  })).filter(r => r.completed && !isNaN(r.completed));
+  }))
+  /* An item with no completion is work in progress, not a broken row — keep it,
+     it still counts as work started. Only a row with neither date is useless. */
+  .filter(r => r.completed || r.started);
 }
 const serializeRows = rows => rows.map(r => ({ c: isoOf(r.completed), s: isoOf(r.started), t: r.type }));
 
@@ -1472,15 +1616,12 @@ function renderDashboard() {
     return;
   }
 
-  $('windowNote').innerHTML =
-    'Showing <strong>' + prettyDate(d.startDate || null) + '</strong> to ' +
-    '<strong>' + prettyDate(d.endDate) + '</strong><br>' +
-    d.weeks.length + ' weeks &middot; ' + d.itemCount + ' items';
-  if (!d.startDate) {
-    $('windowNote').innerHTML =
-      'Showing <strong>all data</strong> up to <strong>' + prettyDate(d.endDate) + '</strong><br>' +
-      d.weeks.length + ' weeks &middot; ' + d.itemCount + ' items';
-  }
+  const span = d.startDate
+    ? 'Showing <strong>' + prettyDate(d.startDate) + '</strong> to <strong>' + prettyDate(d.endDate) + '</strong>'
+    : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(d.endDate) + '</strong>';
+  $('windowNote').innerHTML = span + '<br>' +
+    d.weeks.length + ' weeks &middot; ' + d.itemCount + ' items' +
+    (d.inProgressCount ? ' (' + d.inProgressCount + ' in progress)' : '');
 
   $('titleQuality').textContent        = d.titles.quality;
   $('titleResponsiveness').textContent = d.titles.responsiveness;
@@ -1499,15 +1640,17 @@ function renderDataTable() {
     return;
   }
 
-  const sorted = rows.slice().sort((a, b) => b.completed - a.completed);
+  /* Unfinished items sort to the top — they're the ones still in play. */
+  const key = r => (r.completed || r.started || new Date(0)).getTime() + (r.completed ? 0 : 1e12);
+  const sorted = rows.slice().sort((a, b) => key(b) - key(a));
   const body = sorted.map(r => {
     const ct = cycleTimeOf(r, Number(state.settings.sameDayValue));
     return '<tr>' +
-      '<td>' + isoOf(r.completed) + '</td>' +
+      '<td>' + (r.completed ? isoOf(r.completed) : '<span class="hint">in progress</span>') + '</td>' +
       '<td>' + (r.started ? isoOf(r.started) : '<span class="hint">—</span>') + '</td>' +
       '<td>' + (escapeHtml(r.type) || '<span class="hint">—</span>') + '</td>' +
       '<td class="num">' + (ct == null ? '—' : num1(ct)) + '</td>' +
-      '<td class="num">' + weekKey(priorSunday(r.completed)) + '</td>' +
+      '<td class="num">' + (r.completed ? weekKey(priorSunday(r.completed)) : '—') + '</td>' +
       '</tr>';
   }).join('');
 
@@ -1609,11 +1752,21 @@ function showParseNote(res, mode, team) {
     html += '<ul>' + shown.map(b => 'line ' + b.line + ': ' + escapeHtml(b.text)).join('</ul><ul>') + '</ul>';
     html += '</div>';
   }
+  /* Which column was read as what is the single most damaging thing to get wrong
+     silently, so it's stated every time rather than buried in a tooltip. */
+  const colName = i => (i < 0 ? 'none' : 'column ' + (i + 1));
   html += '<div class="note ok" style="margin-top:var(--sp-4)">' +
     (mode === 'append' ? 'Added ' : 'Loaded ') + res.rows.length + ' item' + (res.rows.length === 1 ? '' : 's') +
     ' into <strong>' + escapeHtml(team.name) + '</strong>' +
-    (res.skippedHeader ? ' (header row skipped)' : '') +
-    '. Dates read as <strong>' + (res.dateOrder === 'mdy' ? 'month first' : 'day first') + '</strong>.' +
+    (res.unfinished ? ', ' + res.unfinished + ' of them still in progress' : '') +
+    (res.skippedHeader ? ' (header row skipped)' : '') + '.' +
+    (res.undated ? ' <strong>' + res.undated + '</strong> row' + (res.undated === 1 ? ' had' : 's had') +
+      ' no dates at all and ' + (res.undated === 1 ? 'was' : 'were') + ' ignored — nothing started, ' +
+      'nothing finished, so nothing to plot.' : '') +
+    '<br>Read <strong>' + colName(res.columns.completed) + '</strong> as the completed date, ' +
+    '<strong>' + colName(res.columns.started) + '</strong> as the start date and ' +
+    '<strong>' + colName(res.columns.type) + '</strong> as the work type; ' +
+    'dates as <strong>' + (res.dateOrder === 'mdy' ? 'month first' : 'day first') + '</strong>.' +
     '</div>';
   el.innerHTML = html;
 }

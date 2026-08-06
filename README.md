@@ -28,24 +28,37 @@ switching team on the laptop shouldn't yank the phone to the same team.
 
 ## Getting your data in
 
-The **Your Data** tab takes three columns pasted straight from Excel, Jira or a CSV, and loads
-them into the team currently selected in the header:
+The **Your Data** tab takes a paste from Excel, Jira or a CSV and loads it into the team
+currently selected in the header. Paste the export as it comes — a Jira export looks like this
+and works unchanged:
 
 ```
-Completed Date   Start Date   Type
-2015-01-21       2015-01-14
-2015-01-26       2015-01-14   Defect
-2015-01-26       2015-01-21   Unplanned
+Key        Resolved    In Progress   Issue Type
+DAE-1064   5/11/2026   4/27/2026     Story
+DAE-1058   5/15/2026                 Story
+DAE-1491               8/5/2026      Story
 ```
 
-- Only **Completed Date** is required. Start Date is needed for cycle time and net flow;
-  Type is needed for the Quality chart.
+**The columns are worked out from the data, not assumed by position.** Header names win when
+they're there (`Resolved`/`Completed`, `In Progress`/`Start`, `Issue Type`); otherwise the app
+finds the date columns by content and tells completion from start by **which date is later**,
+so an export with the two the other way round still reads correctly. The work-type column is
+told from the issue-key column by repetition — keys never repeat, types always do. Whatever it
+settles on is **named back to you** after every paste, because a wrong guess here would
+silently corrupt every number on the dashboard.
+
 - Tabs and commas both work, and a header row is skipped automatically.
 - Dates can be ISO (`2015-01-21`), numeric (`21/01/2015`), month-name (`21 Jan 2015`) or raw
   Excel serial numbers. Where `03/04/2015` is genuinely ambiguous, the app auto-detects
   day-first vs month-first from the rest of your data — or you can force it.
-- Rows with an unreadable completion date are skipped and listed back to you; a bad start
-  date keeps the row but drops the date.
+
+**Work in progress belongs in the paste.** An item with a start date and no completion is not
+an error — it's work you've begun, and it counts on the Predictability chart as work started.
+The workbook does the same (`Work in Progress!C2` tests for a blank completion explicitly).
+Rows with *no* dates at all — untouched backlog — are ignored, and the count is reported so a
+paste of 260 rows that becomes 170 items explains itself.
+
+Genuinely unreadable dates are still errors and get listed back with their line numbers.
 
 There's no inline row editing — to fix something, correct it at the source and paste again.
 
@@ -79,6 +92,10 @@ reproduces. The parts worth knowing:
   workbook's behaviour and it's deliberate.
 - **Cycle time** is `completed − started`, floored at 0, with same-day items taking the
   configured value.
+- **Unfinished items count as work started, and nothing else.** They move net flow but add
+  nothing to throughput, the defect rate or the cycle-time average, all three of which key off
+  a completion. Dropping them — which an earlier version did — made net flow read
+  systematically too positive.
 - **A week with no unplanned work scores 0%**, not blank; a week with no completions has an
   average cycle time of 0.
 
@@ -156,10 +173,12 @@ claim true, so don't allow it through.
 `tests.html` pins the pure functions by loading the real `index.html` in a hidden iframe — no
 copies to drift. It must be served over `http://localhost`, not opened as a file.
 
-Beyond the metrics it covers the sync boundary: `sanitizeTeams()` (ids arriving from the cloud
-end up in `data-` attributes and `<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is
-replaced), `normalizeSettings()`, and `hasData()` — the predicate the "empty never beats data"
-rule rests on.
+Beyond the metrics it covers `detectColumns()` (a leading key column, the dates either way
+round, header names beating position, a free-text summary not being mistaken for the type),
+work-in-progress handling — including the net-flow bug stated as a test — and the sync
+boundary: `sanitizeTeams()` (ids arriving from the cloud end up in `data-` attributes and
+`<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is replaced), `normalizeSettings()`,
+and `hasData()`, the predicate the "empty never beats data" rule rests on.
 
 The expectations aren't invented: they're the cached formula results from the workbook itself
 for its own 141-item sample. If the suite is green, this app reproduces Excel — down to
