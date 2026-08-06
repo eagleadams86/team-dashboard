@@ -140,8 +140,13 @@ To recreate the setup from scratch (e.g. in a fork):
    Credentials** — open the OAuth 2.0 Client ID named *Web client (auto created by Google
    Service)*. Copy its Client ID into `GOOGLE_CLIENT_ID` in `index.html`, and under
    **Authorized JavaScript origins** add `https://eagleadams86.github.io` (and
-   `http://localhost:8000` if you run it locally). Without the origin, Google rejects the
+   the exact localhost origin you serve from locally). Without the origin, Google rejects the
    token request with `origin_mismatch` and sign-in never starts.
+
+   **Origins match exactly, port included.** `http://localhost` and `http://localhost:5000`
+   are two different origins to Google, and neither covers `http://localhost:8080`. This
+   project has `http://localhost`, `http://localhost:5000` and `https://eagleadams86.github.io`
+   registered — serving locally on any other port means adding it here first.
 
 ### Why sign-in doesn't use Firebase's popup
 

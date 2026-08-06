@@ -1960,9 +1960,10 @@ const FIREBASE_CONFIG = {
    Get it from Google Cloud Console → APIs & Services → Credentials → the OAuth
    2.0 Client ID named "Web client (auto created by Google Service)". The same
    screen must list this app's origin under "Authorized JavaScript origins"
-   (https://eagleadams86.github.io, plus http://localhost:8000 for local work)
-   or Google refuses the token request with origin_mismatch. README has the
-   full walkthrough. */
+   (https://eagleadams86.github.io, plus the exact localhost origin you serve
+   from) or Google refuses the token request with origin_mismatch. Origins match
+   exactly, port included — localhost and localhost:5000 are different origins.
+   README has the full walkthrough. */
 const GOOGLE_CLIENT_ID = "158011010857-epd5u3i177ojj0vjo0qoqbra9mri1oto.apps.googleusercontent.com";
 
 const SDK = 'https://www.gstatic.com/firebasejs/12.17.1/';
