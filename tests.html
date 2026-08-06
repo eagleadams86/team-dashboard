@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="midnight">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Dashboard — tests</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  /* Dev-only page: pins the pure functions in index.html. It loads the real app
+     in a hidden same-origin iframe and calls its functions directly, so what's
+     tested is exactly what ships — no copies, no build step. Serve over
+     http://localhost (python3 -m http.server 8013); file:// iframes are blocked
+     in some browsers. Nothing here writes localStorage. */
+  body { background: var(--bg); color: var(--text-primary); margin: 0;
+         font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: var(--text-muted); font-size: 12.5px; margin: 0 0 18px; }
+  #summary { font-weight: 600; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px;
+             border: 1px solid var(--border); background: var(--surface); }
+  #summary.ok  { color: var(--ok);  border-color: var(--ok); }
+  #summary.bad { color: var(--err); border-color: var(--err); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td.st { width: 28px; font-weight: 700; }
+  tr.pass td.st { color: var(--ok); }
+  tr.fail td.st { color: var(--err); }
+  tr.fail td.msg { color: var(--err); }
+  .msg { color: var(--text-muted); font-size: 12px; white-space: pre-wrap;
+         font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .group td { padding-top: 16px; font-size: 11px; font-weight: 600; letter-spacing: .06em;
+              text-transform: uppercase; color: var(--text-muted); border-bottom-color: var(--border-strong); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Team Dashboard — pure-function tests</h1>
+  <p class="sub">
+    Runs against the real <code>index.html</code> in a hidden iframe. Read-only: nothing is saved.
+    The <code>derive()</code> expectations are the actual cached values from the
+    "Team Dashboard v5" workbook, so a passing run means this app reproduces Excel.
+  </p>
+  <div id="summary">Loading app…</div>
+  <table><tbody id="out"></tbody></table>
+</div>
+<iframe id="app" src="index.html" style="position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px" aria-hidden="true"></iframe>
+
+<script>
+/* ── The workbook's own "Your Data" sheet, 141 items, exported verbatim.
+      Every expectation below was read out of the workbook's cached formula
+      results for this exact dataset. ─────────────────────────────────────── */
+const WORKBOOK_PASTE = [
+  'Completed Date\tStart Date\tType',
+  '2015-01-21\t2015-01-14\t',
+  '2015-01-26\t2015-01-14\tUnplanned',
+  '2015-01-26\t2015-01-14\tDefect',
+  '2015-01-26\t2015-01-21\tUnplanned',
+  '2015-01-26\t2015-01-22\tUnplanned',
+  '2015-01-29\t2015-01-23\tUnplanned',
+  '2015-02-02\t2015-01-23\tUnplanned',
+  '2015-02-02\t2015-01-20\tDefect',
+  '2015-02-02\t2015-01-20\tDefect',
+  '2015-02-04\t2015-01-20\tUnplanned',
+  '2015-02-04\t2015-01-26\t',
+  '2015-02-04\t2015-01-23\tUnplanned',
+  '2015-02-04\t2015-01-22\t',
+  '2015-02-04\t2015-01-28\tUnplanned',
+  '2015-02-05\t2015-01-29\t',
+  '2015-02-05\t2015-01-22\t',
+  '2015-02-06\t2015-01-28\tDefect',
+  '2015-02-09\t2015-01-28\tUnplanned',
+  '2015-02-09\t2015-02-02\t',
+  '2015-02-09\t2015-01-29\tDefect',
+  '2015-02-10\t2015-01-29\tDefect',
+  '2015-02-11\t2015-02-04\t',
+  '2015-02-11\t2015-02-02\tUnplanned',
+  '2015-02-12\t2015-01-29\t',
+  '2015-02-16\t2015-02-05\t',
+  '2015-02-17\t2015-02-09\tUnplanned',
+  '2015-02-17\t2015-02-04\t',
+  '2015-02-17\t2015-02-04\t',
+  '2015-02-17\t2015-02-05\tDefect',
+  '2015-02-17\t2015-02-11\tUnplanned',
+  '2015-02-18\t2015-02-11\t',
+  '2015-02-23\t2015-02-11\t',
+  '2015-02-23\t2015-02-12\tDefect',
+  '2015-02-23\t2015-02-10\t',
+  '2015-02-24\t2015-02-11\tDefect',
+  '2015-02-24\t2015-02-11\t',
+  '2015-02-24\t2015-02-10\t',
+  '2015-02-25\t2015-02-13\t',
+  '2015-02-25\t2015-02-10\tDefect',
+  '2015-02-25\t2015-02-20\t',
+  '2015-02-25\t2015-02-20\t',
+  '2015-02-26\t2015-02-18\tDefect',
+  '2015-02-27\t2015-02-23\tDefect',
+  '2015-02-27\t2015-02-20\t',
+  '2015-02-27\t2015-02-20\t',
+  '2015-02-27\t2015-02-25\t',
+  '2015-02-27\t2015-02-20\t',
+  '2015-03-02\t2015-02-25\t',
+  '2015-03-03\t2015-02-25\tDefect',
+  '2015-03-04\t2015-02-12\tDefect',
+  '2015-03-04\t2015-02-27\tDefect',
+  '2015-03-05\t2015-02-27\t',
+  '2015-03-05\t2015-02-23\t',
+  '2015-03-05\t2015-02-25\t',
+  '2015-03-06\t2015-02-27\t',
+  '2015-03-06\t2015-03-01\t',
+  '2015-03-09\t2015-03-02\t',
+  '2015-03-10\t2015-03-03\t',
+  '2015-03-10\t2015-03-03\t',
+  '2015-03-10\t2015-03-05\t',
+  '2015-03-10\t2015-03-03\t',
+  '2015-03-10\t2015-03-03\t',
+  '2015-03-10\t2015-03-06\tDefect',
+  '2015-03-10\t2015-03-05\t',
+  '2015-03-11\t2015-03-09\t',
+  '2015-03-12\t2015-03-09\t',
+  '2015-03-12\t2015-03-09\t',
+  '2015-03-17\t2015-03-04\tDefect',
+  '2015-03-17\t2015-02-26\t',
+  '2015-03-17\t2015-02-26\t',
+  '2015-03-17\t2015-02-26\t',
+  '2015-03-19\t2015-02-26\t',
+  '2015-03-19\t2015-03-11\t',
+  '2015-03-20\t2015-03-12\tDefect',
+  '2015-03-20\t2015-03-12\tDefect',
+  '2015-03-20\t2015-03-17\t',
+  '2015-03-20\t2015-03-12\t',
+  '2015-03-23\t2015-03-17\t',
+  '2015-03-24\t2015-03-16\tDefect',
+  '2015-03-24\t2015-03-18\t',
+  '2015-03-26\t2015-03-18\t',
+  '2015-03-26\t2015-03-18\t',
+  '2015-03-26\t2015-03-18\tDefect',
+  '2015-03-31\t2015-03-18\t',
+  '2015-04-02\t2015-03-19\t',
+  '2015-04-02\t2015-03-23\tDefect',
+  '2015-04-02\t2015-03-24\t',
+  '2015-04-02\t2015-03-24\t',
+  '2015-04-02\t2015-03-25\t',
+  '2015-04-03\t2015-03-19\t',
+  '2015-04-06\t2015-03-19\t',
+  '2015-04-06\t2015-03-30\t',
+  '2015-04-07\t2015-03-31\t',
+  '2015-04-08\t2015-04-01\t',
+  '2015-04-08\t2015-03-20\tDefect',
+  '2015-04-08\t2015-03-25\t',
+  '2015-04-09\t2015-03-31\t',
+  '2015-04-09\t2015-04-02\t',
+  '2015-04-09\t2015-04-03\t',
+  '2015-04-10\t2015-04-02\t',
+  '2015-04-10\t2015-03-26\t',
+  '2015-04-10\t2015-04-07\t',
+  '2015-04-14\t2015-04-08\t',
+  '2015-04-14\t2015-04-08\tDefect',
+  '2015-04-16\t2015-04-06\t',
+  '2015-04-16\t2015-04-08\t',
+  '2015-04-16\t2015-04-08\t',
+  '2015-04-17\t2015-04-02\t',
+  '2015-04-20\t2015-04-08\t',
+  '2015-04-22\t2015-04-08\t',
+  '2015-04-22\t2015-04-14\t',
+  '2015-04-23\t2015-04-10\t',
+  '2015-04-23\t2015-04-09\t',
+  '2015-04-23\t2015-04-13\tDefect',
+  '2015-04-23\t2015-04-16\t',
+  '2015-04-24\t2015-04-14\t',
+  '2015-04-27\t2015-04-16\t',
+  '2015-04-27\t2015-04-20\t',
+  '2015-04-27\t2015-04-17\t',
+  '2015-04-27\t2015-04-22\t',
+  '2015-04-28\t2015-04-20\t',
+  '2015-04-28\t2015-04-20\t',
+  '2015-04-30\t2015-04-20\t',
+  '2015-05-01\t2015-04-23\t',
+  '2015-05-04\t2015-04-27\t',
+  '2015-05-04\t2015-04-28\t',
+  '2015-05-05\t2015-04-23\t',
+  '2015-05-06\t2015-04-28\t',
+  '2015-05-06\t2015-04-27\tDefect',
+  '2015-05-06\t2015-04-28\tDefect',
+  '2015-05-08\t2015-04-30\t',
+  '2015-05-08\t2015-04-29\t',
+  '2015-05-11\t2015-05-04\t',
+  '2015-05-11\t2015-04-27\t',
+  '2015-05-11\t2015-04-29\t',
+  '2015-05-12\t2015-05-01\tDefect',
+  '2015-05-12\t2015-05-06\t',
+  '2015-05-12\t2015-05-04\t',
+  '2015-05-13\t2015-05-04\t',
+  '2015-05-13\t2015-05-04\tDefect',
+  '2015-05-13\t2015-05-06\t'
+].join('\n');
+
+/* Settings exactly as the workbook ships them. */
+const WORKBOOK_SETTINGS = {
+  sameDayValue: 0.5,
+  defectType: 'Defect',
+  plannedLabel: 'Stories',
+  unplannedLabel: 'Defects',
+  cycleTimeLabel: 'Time in Process'
+};
+
+let passed = 0, failed = 0;
+const out = document.getElementById('out');
+
+function group(name) {
+  const tr = document.createElement('tr');
+  tr.className = 'group';
+  tr.innerHTML = '<td colspan="3">' + name + '</td>';
+  out.appendChild(tr);
+}
+function record(ok, name, msg) {
+  ok ? passed++ : failed++;
+  const tr = document.createElement('tr');
+  tr.className = ok ? 'pass' : 'fail';
+  tr.innerHTML = '<td class="st">' + (ok ? '✓' : '✕') + '</td><td>' + name +
+                 '</td><td class="msg">' + (ok ? '' : (msg || '')) + '</td>';
+  out.appendChild(tr);
+}
+function is(actual, expected, name) {
+  const a = JSON.stringify(actual), e = JSON.stringify(expected);
+  record(a === e, name, 'expected ' + e + '\n     got ' + a);
+}
+function near(actual, expected, name, eps) {
+  const ok = typeof actual === 'number' && Math.abs(actual - expected) < (eps == null ? 1e-9 : eps);
+  record(ok, name, 'expected ≈' + expected + '\n     got ' + actual);
+}
+function ok(cond, name, msg) { record(!!cond, name, msg); }
+
+function run(TD) {
+  const D = (y, m, d) => TD.utcDate(y, m, d);
+  const iso = d => (d ? d.toISOString().slice(0, 10) : null);
+
+  /* ────────────────────────────────────────────────────────── */
+  group('Excel date functions');
+
+  is(TD.excelWeekday(D(2015, 2, 8)), 1, 'WEEKDAY(Sunday) = 1');
+  is(TD.excelWeekday(D(2015, 2, 13)), 6, 'WEEKDAY(Friday) = 6');
+  is(TD.excelWeekday(D(2015, 2, 14)), 7, 'WEEKDAY(Saturday) = 7');
+
+  is(iso(TD.priorSunday(D(2015, 2, 13))), '2015-02-08', 'priorSunday(Fri 13 Feb) = Sun 8 Feb');
+  is(iso(TD.priorSunday(D(2015, 2, 8))), '2015-02-08', 'priorSunday of a Sunday is itself');
+
+  is(TD.excelWeekNum(D(2015, 1, 1)), 1, 'WEEKNUM(1 Jan 2015) = 1');
+  is(TD.excelWeekNum(D(2015, 1, 3)), 1, 'WEEKNUM(3 Jan 2015) = 1 — still week 1');
+  is(TD.excelWeekNum(D(2015, 1, 4)), 2, 'WEEKNUM(4 Jan 2015) = 2 — new Sunday');
+  is(TD.excelWeekNum(D(2015, 2, 8)), 7, 'WEEKNUM(8 Feb 2015) = 7');
+  is(TD.excelWeekNum(D(2015, 5, 10)), 20, 'WEEKNUM(10 May 2015) = 20');
+  is(TD.excelWeekNum(D(2016, 1, 1)), 1, 'WEEKNUM(1 Jan 2016) = 1');
+
+  is(TD.weekKey(D(2015, 2, 8)), '2015-07', 'weekKey pads the week number to two digits');
+  is(TD.weekKey(D(2015, 1, 1)), '2015-01', 'weekKey(1 Jan) = 2015-01');
+
+  is(iso(TD.edate(D(2015, 5, 13), -3)), '2015-02-13', 'EDATE(13 May 2015, -3) = 13 Feb 2015');
+  is(iso(TD.edate(D(2015, 3, 31), -1)), '2015-02-28', 'EDATE clamps 31 Mar back to 28 Feb');
+  is(iso(TD.edate(D(2015, 1, 15), -1)), '2014-12-15', 'EDATE crosses the year boundary');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('Date parsing');
+
+  is(iso(TD.parseDate('2015-01-21', 'dmy')), '2015-01-21', 'ISO yyyy-mm-dd');
+  is(iso(TD.parseDate('2015/01/21', 'dmy')), '2015-01-21', 'ISO with slashes');
+  is(iso(TD.parseDate('21/01/2015', 'dmy')), '2015-01-21', 'day-first d/m/yyyy');
+  is(iso(TD.parseDate('01/21/2015', 'mdy')), '2015-01-21', 'month-first m/d/yyyy');
+  is(iso(TD.parseDate('21/01/2015', 'mdy')), '2015-01-21', 'unambiguous 21 beats the declared order');
+  is(iso(TD.parseDate('03/04/2015', 'dmy')), '2015-04-03', 'ambiguous 03/04 as day-first');
+  is(iso(TD.parseDate('03/04/2015', 'mdy')), '2015-03-04', 'ambiguous 03/04 as month-first');
+  is(iso(TD.parseDate('21 Jan 2015', 'dmy')), '2015-01-21', 'month name, day first');
+  is(iso(TD.parseDate('Jan 21 2015', 'dmy')), '2015-01-21', 'month name, month first');
+  is(iso(TD.parseDate('21-Jan-15', 'dmy')), '2015-01-21', 'two-digit year expands to 2015');
+  is(iso(TD.parseDate('42043', 'dmy')), '2015-02-08', 'raw Excel serial number');
+
+  is(TD.parseDate('', 'dmy'), null, 'blank is not a date');
+  is(TD.parseDate('   ', 'dmy'), null, 'whitespace is not a date');
+  is(TD.parseDate('Done', 'dmy'), null, 'a word is not a date');
+  is(TD.parseDate('31/02/2015', 'dmy'), null, '31 Feb is rejected, not rolled over to 3 Mar');
+  is(TD.parseDate('13/13/2015', 'dmy'), null, 'month 13 is rejected');
+
+  is(TD.detectDateOrder([['21/01/2015', '14/01/2015']]), 'dmy', 'detects day-first from a >12 day');
+  is(TD.detectDateOrder([['01/21/2015', '01/14/2015']]), 'mdy', 'detects month-first from a >12 second field');
+  is(TD.detectDateOrder([['03/04/2015', '01/02/2015']]), 'dmy', 'falls back to day-first when nothing decides');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('Paste parsing');
+
+  const p = TD.parsePastedRows(WORKBOOK_PASTE, 'auto');
+  is(p.skippedHeader, true, 'header row is detected and skipped');
+  is(p.rows.length, 141, 'all 141 workbook items parse');
+  is(p.badCompleted.length, 0, 'no bad completion dates');
+  is(p.badStarted.length, 0, 'no bad start dates');
+  is(iso(p.rows[0].completed), '2015-01-21', 'first row completed date');
+  is(iso(p.rows[0].started), '2015-01-14', 'first row start date');
+  is(p.rows[0].type, '', 'first row has no type');
+  is(p.rows[2].type, 'Defect', 'third row is a Defect');
+
+  const pc = TD.parsePastedRows('2015-01-21,2015-01-14,Defect\n2015-01-22,2015-01-15,', 'auto');
+  is(pc.rows.length, 2, 'comma-separated rows parse');
+  is(pc.skippedHeader, false, 'no header to skip');
+  is(pc.rows[0].type, 'Defect', 'type survives comma splitting');
+
+  const pb = TD.parsePastedRows('Completed\tStarted\tType\nnot-a-date\t2015-01-14\t\n2015-01-21\tnope\t\n2015-01-22\t\t', 'auto');
+  is(pb.rows.length, 2, 'a bad completion date drops the row, a bad start date does not');
+  is(pb.badCompleted.length, 1, 'one bad completion date counted');
+  is(pb.badStarted.length, 1, 'one bad start date counted');
+  is(pb.badCompleted[0].line, 2, 'bad-row line numbers account for the header');
+  is(pb.rows[0].started, null, 'the row with a bad start date is kept without one');
+  is(pb.rows[1].started, null, 'an empty start date is legitimate, not an error');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('Cycle time');
+
+  is(TD.cycleTimeOf({ completed: D(2015, 1, 21), started: D(2015, 1, 14) }, 0.5), 7, 'seven days');
+  is(TD.cycleTimeOf({ completed: D(2015, 1, 21), started: D(2015, 1, 21) }, 0.5), 0.5, 'same day uses the setting');
+  is(TD.cycleTimeOf({ completed: D(2015, 1, 21), started: D(2015, 1, 21) }, 1), 1, 'same-day value is configurable');
+  is(TD.cycleTimeOf({ completed: D(2015, 1, 21), started: D(2015, 1, 25) }, 0.5), 0, 'a negative span floors at 0');
+  is(TD.cycleTimeOf({ completed: D(2015, 1, 21), started: null }, 0.5), null, 'no start date, no cycle time');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('Linear trend');
+
+  is(TD.linearTrend([1, 2, 3, 4]), [1, 2, 3, 4], 'a straight line is recovered exactly');
+  const flat = TD.linearTrend([5, 5, 5]);
+  ok(flat.every(v => Math.abs(v - 5) < 1e-9), 'a flat series gives a flat trend', JSON.stringify(flat));
+  is(TD.linearTrend([]), [], 'no points, no trend');
+  is(TD.linearTrend([3]), [null], 'one point cannot make a line');
+  const gap = TD.linearTrend([0, null, 2, 3]);
+  ok(Math.abs(gap[1] - 1) < 1e-9, 'nulls are skipped but still take up an x slot', JSON.stringify(gap));
+
+  /* ══════════════════════════════════════════════════════════
+     derive() vs the workbook's own cached values.
+     Default view: 3-month window, no work-type filter.
+     ══════════════════════════════════════════════════════════ */
+  group('derive() — workbook oracle, 3-month window, no filter');
+
+  const d = TD.derive(p.rows, WORKBOOK_SETTINGS, { filterValue: '', months: 3 });
+
+  is(d.itemCount, 141, 'every item is in scope — the window trims weeks, not rows');
+  is(iso(d.endDate), '2015-05-13', 'Team Dashboard!Q2 — end date is the latest date in the data');
+  is(iso(d.startDate), '2015-02-13', 'Team Dashboard!O2 — EDATE(end, -3)');
+  is(d.weeks.length, 14, '14 weeks on the axis');
+  is(d.weeks[0], '2015-07', 'first week is 2015-07 (Sunday 8 Feb)');
+  is(d.weeks[13], '2015-20', 'last week is 2015-20');
+
+  /* Throughput!D — count of items completed in the week */
+  is(d.throughput, [7, 7, 16, 9, 11, 10, 6, 7, 12, 6, 8, 8, 8, 9], 'Throughput!D — weekly throughput');
+  is(d.throughput[0], 7, 'Throughput!D2 = 7');
+  is(d.throughput[1], 7, 'Throughput!D3 = 7');
+
+  /* Throughput!H — unplanned rate */
+  near(d.defectRate[0], 0.2857142857142857, 'Throughput!H2 = 0.2857… (2 defects of 7)');
+  near(d.defectRate[1], 0.14285714285714285, 'Throughput!H3 = 0.1428… (1 defect of 7)');
+  near(d.defectRate[11], 0, 'a week with no unplanned work is 0, not blank');
+
+  /* Cycle Time!Q — average cycle time */
+  near(d.avgCycleTime[0], 10.285714285714286, 'Cycle Time!Q2 = 10.2857…');
+  near(d.avgCycleTime[1], 10, 'Cycle Time!Q3 = 10');
+
+  /* Work in Progress!W — net flow */
+  is(d.netFlow, [-5, 1, 3, -1, 4, -2, 0, -1, 2, 0, 1, -2, 2, 9], 'Work in Progress!W — weekly net flow');
+  is(d.netFlow[0], -5, 'Work in Progress!W2 = -5 (7 completed, 12 started)');
+  is(d.netFlow[1], 1, 'Work in Progress!W3 = 1');
+
+  /* Throughput!Q7 — the chart title carries the average rate */
+  is(d.titles.quality, 'Defects percentage rate (avg: 19.92%)', 'Throughput!Q7 — avg defect rate is 19.92%');
+  is(d.titles.responsiveness, 'Average time in process per week', 'responsiveness title uses the cycle-time wording');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('derive() — window and filter behaviour');
+
+  const dAll = TD.derive(p.rows, WORKBOOK_SETTINGS, { filterValue: '', months: 'all' });
+  is(dAll.startDate, null, '"All" clears the start date');
+  is(dAll.weeks[0], '2015-04', 'with no window the axis starts at the first completed week');
+  ok(dAll.weeks.length > d.weeks.length, '"All" shows more weeks than a 3-month window',
+     dAll.weeks.length + ' vs ' + d.weeks.length);
+  is(dAll.itemCount, 141, 'item count is the same either way');
+
+  const d1 = TD.derive(p.rows, WORKBOOK_SETTINGS, { filterValue: '', months: 1 });
+  is(iso(d1.startDate), '2015-04-13', 'a 1-month window is EDATE(end, -1)');
+  ok(d1.weeks.length < d.weeks.length, 'a 1-month window shows fewer weeks',
+     d1.weeks.length + ' vs ' + d.weeks.length);
+
+  const dDefect = TD.derive(p.rows, WORKBOOK_SETTINGS, { filterValue: 'Defect', months: 'all' });
+  is(dDefect.itemCount, 29, 'filtering to Defect leaves the 29 defects');
+  ok(dDefect.defectRate.every(r => r === 0 || r === 1), 'a Defect-only view is all 0% or 100%',
+     JSON.stringify(dDefect.defectRate));
+
+  const dUnplanned = TD.derive(p.rows, WORKBOOK_SETTINGS, { filterValue: 'Unplanned', months: 'all' });
+  is(dUnplanned.itemCount, 12, 'filtering to Unplanned leaves the 12 unplanned items');
+
+  is(TD.derive([], WORKBOOK_SETTINGS, { filterValue: '', months: 3 }).empty, true, 'no rows means empty');
+  is(TD.derive(p.rows, WORKBOOK_SETTINGS, { filterValue: 'Nothing matches this', months: 3 }).empty, true,
+     'a filter that matches nothing means empty');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('derive() — settings actually change the numbers');
+
+  const dSameDay = TD.derive(
+    TD.parsePastedRows('2015-02-09\t2015-02-09\t', 'auto').rows,
+    Object.assign({}, WORKBOOK_SETTINGS, { sameDayValue: 2 }),
+    { filterValue: '', months: 'all' });
+  is(dSameDay.avgCycleTime[0], 2, 'the same-day cycle time setting feeds through to the average');
+
+  const dOtherDefect = TD.derive(p.rows, Object.assign({}, WORKBOOK_SETTINGS, { defectType: 'Unplanned' }),
+    { filterValue: '', months: 3 });
+  /* Week 2015-07 happens to hold 2 Defects and 2 Unplanned, so compare the whole
+     series rather than the first point. */
+  ok(JSON.stringify(dOtherDefect.defectRate) !== JSON.stringify(d.defectRate),
+     'renaming the unplanned type changes the quality rate',
+     JSON.stringify(dOtherDefect.defectRate) + '\n  vs ' + JSON.stringify(d.defectRate));
+
+  const dLabel = TD.derive(p.rows, Object.assign({}, WORKBOOK_SETTINGS, { unplannedLabel: 'Bugs' }),
+    { filterValue: '', months: 3 });
+  ok(dLabel.titles.quality.startsWith('Bugs '), 'the unplanned legend label drives the quality title',
+     dLabel.titles.quality);
+
+  /* ────────────────────────────────────────────────────────── */
+  const sum = document.getElementById('summary');
+  sum.className = failed ? 'bad' : 'ok';
+  sum.textContent = failed
+    ? failed + ' of ' + (passed + failed) + ' failed'
+    : 'All ' + passed + ' tests passed';
+}
+
+document.getElementById('app').addEventListener('load', function () {
+  const w = this.contentWindow;
+  if (!w.TD) {
+    document.getElementById('summary').className = 'bad';
+    document.getElementById('summary').textContent =
+      'Could not reach the app. Serve this over http://localhost — file:// iframes are blocked.';
+    return;
+  }
+  try { run(w.TD); }
+  catch (e) {
+    record(false, 'test run threw', e && e.stack ? e.stack : String(e));
+    const sum = document.getElementById('summary');
+    sum.className = 'bad';
+    sum.textContent = failed + ' of ' + (passed + failed) + ' failed';
+  }
+});
+</script>
+</body>
+</html>
