@@ -132,9 +132,37 @@ To recreate the setup from scratch (e.g. in a fork):
 4. **Build → Firestore Database → Create database** (production mode), then paste the contents
    of [`firestore.rules`](firestore.rules) into **Rules**
 5. **Project settings → Your apps → Add app → Web** — copy the `firebaseConfig` object and
-   paste it as the value of `FIREBASE_CONFIG`, **and** put its `authDomain` into the
-   `frame-src` of the Content-Security-Policy `<meta>` at the top of `index.html` — the
-   sign-in popup is blocked if those two disagree
+   paste it as the value of `FIREBASE_CONFIG`
+6. **[console.cloud.google.com](https://console.cloud.google.com) → APIs & Services →
+   Credentials** — open the OAuth 2.0 Client ID named *Web client (auto created by Google
+   Service)*. Copy its Client ID into `GOOGLE_CLIENT_ID` in `index.html`, and under
+   **Authorized JavaScript origins** add `https://eagleadams86.github.io` (and
+   `http://localhost:8000` if you run it locally). Without the origin, Google rejects the
+   token request with `origin_mismatch` and sign-in never starts.
+
+### Why sign-in doesn't use Firebase's popup
+
+Firebase's `signInWithPopup` sends the browser to `<project>.firebaseapp.com/__/auth/handler`.
+Corporate networks routinely block `*.firebaseapp.com` outright — it's a free app-hosting
+domain, so it's popular for phishing and security appliances categorise the whole domain as
+high risk. On such a network the popup dies at the proxy (`ERR_TUNNEL_CONNECTION_FAILED`, or
+the proxy's own block page) and signing in is simply impossible.
+
+So sign-in uses **Google Identity Services** instead: a popup straight to `accounts.google.com`
+returns an OAuth access token, which Firebase exchanges for a session via
+`signInWithCredential`. Same Google account, same Firestore data, same rules — only the doorway
+changed, and `accounts.google.com` is a mainstream Google domain that isn't blocked in the same
+way.
+
+This is why `GOOGLE_CLIENT_ID` exists as a separate constant: it is *not* part of
+`firebaseConfig` and can't be derived from it.
+
+**Reachability, if sign-in fails on a restricted network.** The app needs
+`accounts.google.com`, `www.gstatic.com`, `firestore.googleapis.com`,
+`identitytoolkit.googleapis.com` and `securetoken.googleapis.com`. Opening each in a browser is
+the quickest way to find which one a proxy is blocking. Note that an existing session keeps
+refreshing against `securetoken.googleapis.com` alone, so an app can look fine for weeks on a
+network where a *fresh* sign-in would fail — test in a private window.
 
 The config object is not a secret; access is controlled by the rules, which restrict every
 user to their own document. Each person who signs in gets their own private data — sharing
