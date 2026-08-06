@@ -15,10 +15,10 @@
 
   accounts.google.com appears in script-src, connect-src AND frame-src because
   sign-in goes through Google Identity Services rather than Firebase's hosted
-  handler at <project>.firebaseapp.com. That is deliberate — corporate networks
-  routinely block *.firebaseapp.com as a free-hosting phishing risk, which took
-  sign-in out entirely on one. accounts.google.com is not blocked in the same
-  way. See the sign-in block further down before changing any of this.
+  handler at <project>.firebaseapp.com. That is deliberate — this project's
+  firebaseapp.com hostname is blocked outright on a corporate network, which
+  took sign-in out entirely there. accounts.google.com is not blocked in the
+  same way. See the sign-in block further down before changing any of this.
 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
 <!--
@@ -2038,11 +2038,18 @@ const FIREBASE_CONFIG = {
 
 /* ── Why sign-in doesn't use Firebase's popup ───────────────────────────────
    authDomain above is still required by the SDK, but nothing in this app loads
-   it any more. Firebase's signInWithPopup navigates to
-   <project>.firebaseapp.com/__/auth/handler, and corporate networks block
-   *.firebaseapp.com wholesale — it's a free-hosting domain, so it's a favourite
-   for phishing and the security appliances categorise it accordingly. On one
-   such network the popup died at the proxy and sign-in was simply impossible.
+   it any more. Firebase's signInWithPopup opens the popup at
+   <project>.firebaseapp.com/__/auth/handler and only redirects to Google from
+   there, so a proxy that blocks that first hop kills sign-in outright. On one
+   corporate network the handler died at the proxy and signing in was impossible.
+
+   Worth knowing precisely, because the obvious conclusion is wrong: the block is
+   per *hostname*, not on firebaseapp.com as a whole. On the same network on the
+   same day, this project's hostname and a sibling app's were both refused while
+   a third sibling's went through untouched — same code, same SDK, three
+   projects created within days of each other. Whichever way a filter happens to
+   categorise a given hostname is outside our control and can change, so "our
+   other apps are fine" is not evidence that this one will be.
 
    So sign-in goes through Google Identity Services instead: a popup straight to
    accounts.google.com returns an OAuth access token, and Firebase exchanges it

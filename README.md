@@ -176,11 +176,24 @@ To recreate the setup from scratch (e.g. in a fork):
 
 ### Why sign-in doesn't use Firebase's popup
 
-Firebase's `signInWithPopup` sends the browser to `<project>.firebaseapp.com/__/auth/handler`.
-Corporate networks routinely block `*.firebaseapp.com` outright — it's a free app-hosting
-domain, so it's popular for phishing and security appliances categorise the whole domain as
-high risk. On such a network the popup dies at the proxy (`ERR_TUNNEL_CONNECTION_FAILED`, or
-the proxy's own block page) and signing in is simply impossible.
+Firebase's `signInWithPopup` opens the popup at `<project>.firebaseapp.com/__/auth/handler` and
+only redirects on to Google from there. A proxy that blocks that first hop kills sign-in
+outright — the popup dies with `ERR_TUNNEL_CONNECTION_FAILED` or the proxy's own block page,
+and nothing in the app ever runs.
+
+**The block is per hostname, not on `firebaseapp.com` as a whole**, which is worth stating
+because the obvious conclusion is wrong. Measured on one corporate network on a single day:
+
+| Hostname | Result |
+|---|---|
+| `teamdashboard-6723f.firebaseapp.com` | blocked |
+| `paptrack-6c817.firebaseapp.com` | blocked |
+| `sprintvelocity-141b7.firebaseapp.com` | **reachable** |
+
+Same sign-in code, same SDK, three projects created within days of each other — and the two
+blocked ones aren't even the newest. Whichever way a filter categorises a given hostname is
+outside our control and can change, so "the other apps are fine" is not evidence that this one
+will be, and a sibling app working today doesn't mean it will work next month.
 
 So sign-in uses **Google Identity Services** instead: a popup straight to `accounts.google.com`
 returns an OAuth access token, which Firebase exchanges for a session via
