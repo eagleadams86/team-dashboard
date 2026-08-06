@@ -16,6 +16,10 @@ Paste your work items, get four charts:
 
 Each chart carries a dashed linear trend line.
 
+The dashboard itself shows only each chart's title — the dimension heading and the coaching
+question that used to sit above every chart were removed deliberately, to get all four charts
+on screen together. This table is where that framing lives now.
+
 ## Teams
 
 Each team keeps its own list of work items; the picker in the header chooses which one the

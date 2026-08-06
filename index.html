@@ -320,12 +320,12 @@ select { cursor: pointer; }
 
 /* chart cards */
 .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-6); min-width: 0; }
-.chart-card .dim {
+/* The chart title is the card's only label now — the dimension eyebrow and the
+   coaching question above it are gone — so it takes over the eyebrow's styling. */
+.chart-card .chart-title {
   font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: var(--ls-label);
-  text-transform: uppercase; color: var(--accent); margin-bottom: var(--sp-3);
+  text-transform: uppercase; color: var(--accent); margin-bottom: var(--sp-4);
 }
-.chart-card .coach { color: var(--text-secondary); font-size: var(--fs-sm); margin-bottom: var(--sp-5); }
-.chart-card .chart-title { font-size: var(--fs-md); font-weight: var(--fw-semibold); margin-bottom: var(--sp-4); }
 .chart-wrap { position: relative; height: 300px; }
 
 /* data table */
@@ -614,33 +614,21 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
 
     <div id="dashCharts" class="grid charts">
       <div class="chart-card">
-        <div class="dim">Quality &middot; How well &middot; "Do it right"</div>
-        <p class="coach">How much bug debt do we carry that impedes consistent delivery?
-          Should be level, not up <em>or</em> down!</p>
         <div class="chart-title" id="titleQuality"></div>
         <div class="chart-wrap"><canvas id="chartQuality"></canvas></div>
       </div>
 
       <div class="chart-card">
-        <div class="dim">Responsiveness &middot; How fast &middot; "Do it fast"</div>
-        <p class="coach">How fast do we deliver from starting something to finishing it?
-          Look for trends by work type!</p>
         <div class="chart-title" id="titleResponsiveness"></div>
         <div class="chart-wrap"><canvas id="chartResponsiveness"></canvas></div>
       </div>
 
       <div class="chart-card">
-        <div class="dim">Productivity &middot; How much &middot; "Do lots"</div>
-        <p class="coach">What pace do we deliver work at? Goal: look for ways to increase.
-          Watch quality &amp; predictability if you overdrive!</p>
         <div class="chart-title" id="titleProductivity"></div>
         <div class="chart-wrap"><canvas id="chartProductivity"></canvas></div>
       </div>
 
       <div class="chart-card">
-        <div class="dim">Predictability &middot; How repeatable &middot; "Do it predictably"</div>
-        <p class="coach">How consistent is our completion pace? Goal: keep around zero.
-          Complete something in preference to starting.</p>
         <div class="chart-title" id="titlePredictability"></div>
         <div class="chart-wrap"><canvas id="chartPredictability"></canvas></div>
       </div>
