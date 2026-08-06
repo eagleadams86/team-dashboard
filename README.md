@@ -268,4 +268,4 @@ average bug rate in the Quality chart title. Change the maths and the suite says
 | `favicon.ico` | Tab icon |
 
 Four themes — Midnight (default), Dark, Light, Sepia — from the shared theme pack. Palette
-changes belong in the pack, not here.
+changes belong in the pack, not here. 
