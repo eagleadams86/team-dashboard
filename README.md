@@ -130,6 +130,27 @@ The config object is not a secret; access is controlled by the rules, which rest
 user to their own document. Each person who signs in gets their own private data — sharing
 the app means sharing the URL, not the data. There is deliberately no shared-workspace model.
 
+### About the `apiKey` in this file
+
+GitHub secret scanning flags it as a "Google API Key — public leak". **That alert is expected
+and has been closed as won't-fix** (the same alert exists, and is closed, on every one of these
+Firebase apps).
+
+A Firebase Web API key *identifies* the project; it doesn't *authorise* anything. Every Firebase
+web app ships it in client JavaScript, because the browser has to have it. Rotating it would
+change nothing, because the new one would be just as public.
+
+What actually guards the data, checked on 2026-08-06:
+
+| | |
+|---|---|
+| Firestore | Denies every unauthenticated read, on this app's path and all others |
+| Anonymous sign-up | Disabled — `accounts:signUp` returns `ADMIN_ONLY_OPERATION` |
+| Other Google APIs | None enabled in the project, so the key reaches nothing else |
+
+The one forward-looking risk is that enabling some other API in the project later would widen
+what an unrestricted key can reach. That's what the key restrictions below are for.
+
 `firestore.rules` is a checked-in copy for the audit trail; the console is what's live. If the
 rules ever change there, update the file to match.
 
