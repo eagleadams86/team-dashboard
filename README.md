@@ -1,8 +1,7 @@
 # Team Dashboard
 
 Four weekly flow metrics for as many delivery teams as you like, from nothing but a list of
-completed and started dates. A web port of the "Team Dashboard v5" Excel workbook, minus the
-20-second recalculation.
+completed and started dates. Single page, no build step, nothing to install.
 
 **Live:** https://eagleadams86.github.io/team-dashboard/
 
@@ -10,12 +9,12 @@ Paste your work items, get four charts:
 
 | Dimension | Question it answers | What's plotted |
 |---|---|---|
-| **Quality** — how well | How much defect debt do we carry? | Unplanned work as a share of everything completed, per week |
+| **Quality** — how well | How much bug debt do we carry? | Unplanned work as a share of everything completed, per week |
 | **Responsiveness** — how fast | How long from starting to finishing? | Average cycle time per week |
 | **Productivity** — how much | What pace do we deliver at? | Items completed per week |
 | **Predictability** — how repeatable | Is our completion pace consistent? | Net flow — items completed minus items started, per week |
 
-Each chart carries a dashed linear trend line, the same as the workbook's.
+Each chart carries a dashed linear trend line.
 
 ## Teams
 
@@ -28,8 +27,8 @@ switching team on the laptop shouldn't yank the phone to the same team.
 
 ## Getting your data in
 
-The **Your Data** tab takes a paste from Excel, Jira or a CSV and loads it into the team
-currently selected in the header. Paste the export as it comes — a Jira export looks like this
+The **Your Data** tab takes a paste from Jira, a CSV or any other export and loads it into the
+team currently selected in the header. Paste the export as it comes — a Jira export looks like this
 and works unchanged:
 
 ```
@@ -48,13 +47,12 @@ settles on is **named back to you** after every paste, because a wrong guess her
 silently corrupt every number on the dashboard.
 
 - Tabs and commas both work, and a header row is skipped automatically.
-- Dates can be ISO (`2015-01-21`), numeric (`21/01/2015`), month-name (`21 Jan 2015`) or raw
-  Excel serial numbers. Where `03/04/2015` is genuinely ambiguous, the app auto-detects
+- Dates can be ISO (`2015-01-21`), numeric (`21/01/2015`), month-name (`21 Jan 2015`) or a raw
+  day-count serial (`42043`). Where `03/04/2015` is genuinely ambiguous, the app auto-detects
   day-first vs month-first from the rest of your data — or you can force it.
 
 **Work in progress belongs in the paste.** An item with a start date and no completion is not
 an error — it's work you've begun, and it counts on the Predictability chart as work started.
-The workbook does the same (`Work in Progress!C2` tests for a blank completion explicitly).
 Rows with *no* dates at all — untouched backlog — are ignored, and the count is reported so a
 paste of 260 rows that becomes 170 items explains itself.
 
@@ -64,44 +62,41 @@ There's no inline row editing — to fix something, correct it at the source and
 
 ## Settings
 
-Everything the four charts depend on, shared by all your teams and defaulted to the workbook's
-own values:
+Everything the four charts depend on, shared by all your teams:
 
 - **Unplanned work type** — the exact text in your Type column that means "unplanned"
-  (`Defect` by default). Anything blank, or not matching, counts as planned work.
+  (`Bug` by default). Anything blank, or not matching, counts as planned work.
 - **Same-day cycle time** — what an item that starts and finishes on one day is worth
   (`0.5` days)
-- **Legend labels** and the **word for cycle time** (Cycle time / Time in Process / TiP /
-  In process time)
-- **Work type filter list** — the Display → Value pairs behind the dashboard's filter
+- **Legend labels** (`Stories` and `Bugs` by default) and the **word for cycle time**
+  (Cycle time / Time in Process / TiP / In process time)
+- **Work type filter list** — the Display → Value pairs behind the dashboard's filter, `All`
+  and `Bugs → Bug` out of the box
 
-The workbook's aging thresholds, WIP/age warning percentages and cycle-time percentile aren't
-here: they only feed the *WIP and Age* and *More Charts* sheets, which this app doesn't carry.
+Nothing else is here on purpose: a setting that changes nothing is worse than a missing one.
 
 ## How the numbers are worked out
 
-`derive()` in [index.html](index.html) is the only place any figure is computed, and it's a
-faithful port of the workbook's formula chain — each block cites the sheet and column it
-reproduces. The parts worth knowing:
+`derive()` in [index.html](index.html) is the only place any figure is computed. The parts
+worth knowing:
 
-- **Weeks start on Sunday.** Week keys are `YEAR-WW` using Excel's default `WEEKNUM`, where the
-  week containing 1 January is week 1. Reimplemented rather than approximated, because
-  JavaScript has no equivalent.
+- **Weeks start on Sunday.** Week keys are `YEAR-WW`, where the week containing 1 January is
+  week 1. Written out by hand, because JavaScript has no week-number function.
 - **The date window trims the axis, not the data.** "Show data for most recent 3 months" moves
-  where the chart starts; every item still counts toward the weeks that remain. That's the
-  workbook's behaviour and it's deliberate.
+  where the chart starts; every item still counts toward the weeks that remain. That's
+  deliberate.
 - **Cycle time** is `completed − started`, floored at 0, with same-day items taking the
   configured value.
 - **Unfinished items count as work started, and nothing else.** They move net flow but add
-  nothing to throughput, the defect rate or the cycle-time average, all three of which key off
+  nothing to throughput, the bug rate or the cycle-time average, all three of which key off
   a completion. Dropping them — which an earlier version did — made net flow read
   systematically too positive.
 - **A week with no unplanned work scores 0%**, not blank; a week with no completions has an
   average cycle time of 0.
 
-One deliberate departure from the workbook: it colours the net-flow bars blue and orange. This
-app uses the theme's accent for positive and `--serious` for negative — not the red/green pair,
-because the coaching goal is "keep around zero", so neither sign is good or bad.
+Net-flow bars use the theme's accent for positive and `--serious` for negative — deliberately
+not the red/green pair, because the coaching goal is "keep around zero", so neither sign is
+good or bad.
 
 ## Cross-device sync (Firebase, free tier — optional)
 
@@ -201,10 +196,9 @@ boundary: `sanitizeTeams()` (ids arriving from the cloud end up in `data-` attri
 `<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is replaced), `normalizeSettings()`,
 and `hasData()`, the predicate the "empty never beats data" rule rests on.
 
-The expectations aren't invented: they're the cached formula results from the workbook itself
-for its own 141-item sample. If the suite is green, this app reproduces Excel — down to
-`Throughput!D2 = 7`, `Cycle Time!Q2 = 10.2857…`, `Work in Progress!W2 = −5`, and the
-19.92% average defect rate in the Quality chart title.
+The expectations are pinned to a fixed 141-item sample, right down to the weekly throughput
+series, `10.2857…` days average cycle time in week 1, `−5` net flow in week 1, and the 19.92%
+average bug rate in the Quality chart title. Change the maths and the suite says so.
 
 ## Files
 

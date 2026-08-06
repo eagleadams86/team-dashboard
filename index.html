@@ -23,7 +23,7 @@
 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://teamdashboard-6723f.firebaseapp.com; base-uri 'none'; form-action 'self'">
 <!--
-  Team Dashboard — a web port of the "Team Dashboard v5" Excel workbook.
+  Team Dashboard — four weekly flow metrics from your work items.
 
   Paste completed/started dates for your work items and it derives the four
   weekly flow metrics: Quality, Responsiveness, Productivity, Predictability.
@@ -32,8 +32,8 @@
   external file is the vendored chart.min.js sitting next to this one. Your data
   never leaves the browser (localStorage).
 
-  The maths is a faithful port of the workbook's formula chain — see derive()
-  below, which cites the originating sheet and cell for every column.
+  Every number comes out of derive() below — one function, one place the maths
+  lives, pinned end to end by tests.html.
 -->
 <script>
   /* Set the theme before first paint so the page never flashes the wrong palette.
@@ -468,8 +468,8 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
       <div style="margin-top:var(--sp-6)">
         <label for="pasteBox">Pasted rows</label>
         <textarea id="pasteBox" spellcheck="false" placeholder="2015-01-21&#9;2015-01-14&#9;
-2015-01-26&#9;2015-01-14&#9;Defect
-2015-01-26&#9;2015-01-21&#9;Unplanned"></textarea>
+2015-01-26&#9;2015-01-14&#9;Bug
+2015-01-26&#9;2015-01-21&#9;Story"></textarea>
       </div>
       <div class="grid two" style="margin-top:var(--sp-5)">
         <div>
@@ -512,8 +512,8 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
           </select>
         </div>
         <div>
-          <label for="setDefectType">Unplanned work type — the exact text in your Type column</label>
-          <input type="text" id="setDefectType" placeholder="Defect">
+          <label for="setUnplannedType">Unplanned work type — the exact text in your Type column</label>
+          <input type="text" id="setUnplannedType" placeholder="Bug">
         </div>
         <div>
           <label for="setSameDay">Cycle time to use when an item starts and finishes the same day (days)</label>
@@ -525,12 +525,12 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
         </div>
         <div>
           <label for="setUnplannedLabel">Unplanned work legend label</label>
-          <input type="text" id="setUnplannedLabel" placeholder="Defects">
+          <input type="text" id="setUnplannedLabel" placeholder="Bugs">
         </div>
       </div>
       <div class="note info" style="margin-top:var(--sp-6)">
         Anything whose Type is blank, or doesn't match the unplanned text above, counts as
-        <em>planned</em> work — same rule as the workbook.
+        <em>planned</em> work.
       </div>
     </div>
 
@@ -554,12 +554,11 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
 
     <div class="card">
       <div class="btn-row">
-        <button class="btn danger" id="btnResetSettings">Reset settings to workbook defaults</button>
+        <button class="btn danger" id="btnResetSettings">Reset settings to defaults</button>
       </div>
       <div class="note info" style="margin-top:var(--sp-6)">
-        The workbook's aging thresholds, WIP/age warning percentages and cycle-time percentile aren't
-        here: they only drive the <em>WIP and Age</em> and <em>More Charts</em> sheets, which this app
-        doesn't carry. A setting that changes nothing is worse than a missing one.
+        Everything the four charts depend on is here, and nothing else. A setting that changes
+        nothing is worse than a missing one.
       </div>
     </div>
   </section>
@@ -590,14 +589,14 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
       <p>Head to the <strong>Your Data</strong> tab and paste your work items — three columns:</p>
       <pre>Completed Date   Start Date   Type
 2015-01-21       2015-01-14
-2015-01-26       2015-01-14   Defect
-2015-01-26       2015-01-21   Unplanned</pre>
+2015-01-26       2015-01-14   Bug
+2015-01-26       2015-01-21   Story</pre>
     </div>
 
     <div id="dashCharts" class="grid charts">
       <div class="chart-card">
         <div class="dim">Quality &middot; How well &middot; "Do it right"</div>
-        <p class="coach">How much defect debt do we carry that impedes consistent delivery?
+        <p class="coach">How much bug debt do we carry that impedes consistent delivery?
           Should be level, not up <em>or</em> down!</p>
         <div class="chart-title" id="titleQuality"></div>
         <div class="chart-wrap"><canvas id="chartQuality"></canvas></div>
@@ -629,8 +628,7 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
     </div>
 
     <p class="footer">
-      Every chart carries a dashed linear trend line. Ported from the
-      "Team Dashboard v5" Excel workbook — all figures are computed in your browser.
+      Every chart carries a dashed linear trend line. All figures are computed in your browser.
     </p>
   </section>
 
@@ -659,7 +657,7 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   1. DATE HELPERS — Excel-compatible
+   1. DATE HELPERS
 
    All dates are UTC-midnight Date objects, so day arithmetic is never bitten
    by daylight saving.
@@ -671,32 +669,31 @@ function utcDate(y, m, d) { return new Date(Date.UTC(y, m - 1, d)); }
 function addDays(d, n)    { return new Date(d.getTime() + n * DAY_MS); }
 function diffDays(a, b)   { return Math.round((a.getTime() - b.getTime()) / DAY_MS); }
 
-/* Excel WEEKDAY(), default return_type 1: Sunday = 1 … Saturday = 7. */
-function excelWeekday(d) { return d.getUTCDay() + 1; }
+/* Sunday = 1 … Saturday = 7. */
+function weekdayNum(d) { return d.getUTCDay() + 1; }
 
-/* Calculations!D — "Prior Complete Sunday": =A2 - (WEEKDAY(A2)-1) */
-function priorSunday(d) { return addDays(d, -(excelWeekday(d) - 1)); }
+/* The Sunday on or before d — the start of the week every metric buckets into. */
+function priorSunday(d) { return addDays(d, -(weekdayNum(d) - 1)); }
 
-/* Excel WEEKNUM(), default return_type 1: the week containing Jan 1 is week 1
-   and weeks start on Sunday. JS has no equivalent, so count Sundays from the
-   Sunday on or before Jan 1. */
-function excelWeekNum(d) {
+/* Week number where the week containing Jan 1 is week 1 and weeks start on
+   Sunday. JS has no equivalent, so count Sundays from the Sunday on or before
+   Jan 1. */
+function weekNumber(d) {
   const jan1Sunday = priorSunday(utcDate(d.getUTCFullYear(), 1, 1));
   return Math.floor(diffDays(priorSunday(d), jan1Sunday) / 7) + 1;
 }
 
-/* Calculations!G — =YEAR(d) & "-" & TEXT(WEEKNUM(d),"00").
+/* "YYYY-WW" — the label a week is plotted under.
 
-   Two call conventions, both taken straight from the workbook:
-     • Throughput!C / Work in Progress!P pass a week-start Sunday.
-     • Cycle Time!C passes the completed date itself.
-   They agree except across a year boundary, where YEAR() differs — that
-   discrepancy is the workbook's, and is reproduced rather than "fixed". */
+   Two call conventions: throughput and net flow pass a week-start Sunday, while
+   cycle time passes the completed date itself. They agree except across a year
+   boundary, where the year differs by a few days either side. Left as it is
+   deliberately: the numbers are pinned to it. */
 function weekKey(d) {
-  return d.getUTCFullYear() + '-' + String(excelWeekNum(d)).padStart(2, '0');
+  return d.getUTCFullYear() + '-' + String(weekNumber(d)).padStart(2, '0');
 }
 
-/* Excel EDATE(): same day-of-month n months away, clamped to the month's end. */
+/* Same day-of-month n months away, clamped to the month's end. */
 function edate(d, months) {
   const y = d.getUTCFullYear(), m = d.getUTCMonth() + months, day = d.getUTCDate();
   const target = new Date(Date.UTC(y, m, 1));
@@ -762,7 +759,8 @@ function parseDate(text, order) {
     return order === 'mdy' ? buildDate(y, a, b) : buildDate(y, b, a);
   }
 
-  /* Excel serial number, in case someone pastes raw cell values. */
+  /* Some exports hand over a date as a raw day count from 30 Dec 1899 rather
+     than as text. Decode it, so a paste of those isn't silently all errors. */
   if (/^\d{4,6}(\.\d+)?$/.test(s)) {
     const serial = Math.floor(parseFloat(s));
     if (serial > 0 && serial < 60000) return addDays(utcDate(1899, 12, 30), serial);
@@ -789,9 +787,9 @@ function detectDateOrder(rawRows) {
 /* ═══════════════════════════════════════════════════════════════════════════
    3. PASTE PARSING  (pure — pinned by tests.html)
 
-   Mirrors the "Your Data" sheet: Completed Date, Start Date (optional),
-   Type (optional) — but a real Jira export is never just those three columns.
-   It leads with an issue key, may order the dates either way round, and holds
+   What the metrics need is Completed Date, Start Date (optional) and Type
+   (optional) — but a real Jira export is never just those three columns. It
+   leads with an issue key, may order the dates either way round, and holds
    plenty of items that are started and not yet finished.
 
    So the columns are worked out from the paste rather than assumed by position,
@@ -937,11 +935,10 @@ function parsePastedRows(text, order, forced) {
     const started   = parseDate(rawStarted, resolved);
     const type      = at(cells, cols.type);
 
-    /* An empty completion date is not an error — it is work in progress, and the
-       workbook counts it (Work in Progress!C2 tests for a blank completion
-       explicitly, and the "started this week" tally never looks at completion at
-       all). Dropping these rows made net flow read systematically too positive.
-       Text in the cell that *isn't* a date is still an error. */
+    /* An empty completion date is not an error — it is work in progress, and it
+       counts: the "started this week" tally never looks at completion at all.
+       Dropping these rows made net flow read systematically too positive. Text
+       in the cell that *isn't* a date is still an error. */
     if (!completed && rawCompleted !== '') {
       badCompleted.push({ line: lineNo, text: cells.join(' | ') });
       return;
@@ -964,20 +961,21 @@ function parsePastedRows(text, order, forced) {
 /* ═══════════════════════════════════════════════════════════════════════════
    4. THE METRICS ENGINE  (pure — pinned by tests.html)
 
-   One function, one place the numbers come from. Every block cites the
-   workbook sheet and column it reproduces.
+   One function, one place the numbers come from. Every block says what it
+   computes and why.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Calculations!L — "Cycle Time (days)":
-   =IF(OR(A="",B=""), NA(), MAX(0, IF(A-B=0, SameDayCycleTimeSettingValue, A-B))) */
+/* Cycle time in days. An item with only one of the two dates has no cycle time
+   at all (null, not zero), and one that starts and finishes the same day takes
+   the configured same-day value rather than a misleading 0. */
 function cycleTimeOf(row, sameDayValue) {
   if (!row.completed || !row.started) return null;
   const days = diffDays(row.completed, row.started);
   return Math.max(0, days === 0 ? sameDayValue : days);
 }
 
-/* Ordinary least squares over the point index — the linear trendline Excel puts
-   on all four charts. Nulls are skipped, so a gap doesn't drag the line. */
+/* Ordinary least squares over the point index — the dashed linear trend line on
+   all four charts. Nulls are skipped, so a gap doesn't drag the line. */
 function linearTrend(values) {
   const pts = [];
   values.forEach((v, i) => { if (v != null && isFinite(v)) pts.push([i, v]); });
@@ -998,17 +996,16 @@ function mean(a) { return a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0
 
 /**
  * @param rows      [{completed: Date, started: Date|null, type: string}]
- * @param settings  {sameDayValue, defectType, plannedLabel, unplannedLabel, cycleTimeLabel}
+ * @param settings  {sameDayValue, unplannedType, plannedLabel, unplannedLabel, cycleTimeLabel}
  * @param view      {filterValue: string ('' = no filter), months: number|'all'}
  */
 function derive(rows, settings, view) {
   const sameDay   = Number(settings.sameDayValue);
-  const defectStr = String(settings.defectType || '').trim().toLowerCase();
+  const unplannedStr = String(settings.unplannedType || '').trim().toLowerCase();
   const filterVal = String(view.filterValue || '').trim().toLowerCase();
 
-  /* Settings!B42 → Calculations!A/B: rows whose type doesn't match the filter
-     are blanked out entirely. Note the filter is on work type only — the date
-     window below never removes rows. */
+  /* Rows whose type doesn't match the filter drop out entirely. Note the filter
+     is on work type only — the date window below never removes rows. */
   const items = (filterVal
       ? rows.filter(r => String(r.type || '').trim().toLowerCase() === filterVal)
       : rows.slice())
@@ -1016,29 +1013,30 @@ function derive(rows, settings, view) {
 
   /* Items still in progress. They contribute nothing to throughput, quality or
      cycle time — all three key off a completion — but they DO count as work
-     started, so they move net flow. Work in Progress!U2 counts start dates with
+     started, so they move net flow: the started tally counts start dates with
      no reference to completion at all. */
   const finished = items.filter(r => r.completed);
 
   if (!finished.length) return { empty: true, weeks: [], startDate: null, endDate: null };
 
-  const isUnplanned = r => String(r.type || '').trim().toLowerCase() === defectStr;
+  const isUnplanned = r => String(r.type || '').trim().toLowerCase() === unplannedStr;
 
-  /* Team Dashboard!Q2 — =MAX(MAX(startDates), MAX(completedDates)) */
+  /* The window hangs off the latest date in the data, not off today: a paste of
+     last quarter's export should show last quarter, not an empty chart. */
   let endDate = null;
   for (const r of items) {
     if (r.completed && (!endDate || r.completed > endDate)) endDate = r.completed;
     if (r.started && (!endDate || r.started > endDate)) endDate = r.started;
   }
-  /* Team Dashboard!O2 — =IF(L2="All","",EDATE(EndDate, L2*-1)) */
+  /* "All" means no start bound at all. */
   const startDate = view.months === 'all' ? null : edate(endDate, -Number(view.months));
 
-  /* Settings!F25 / H25 — the prior Sundays either end of the window. */
+  /* The prior Sundays either end of the window. */
   const startPS = startDate ? priorSunday(startDate) : null;
   const endPS   = priorSunday(endDate);
 
-  /* Throughput!A — first week is the window start, or the earliest completed
-     week if the window is "All"; then +7 until the window (or the data) runs out. */
+  /* First week is the window start, or the earliest completed week if the window
+     is "All"; then +7 until the window (or the data) runs out. */
   const completedSundays = finished.map(r => priorSunday(r.completed));
   const maxCompletedPS = new Date(Math.max.apply(null, completedSundays.map(d => d.getTime())));
   const minCompletedPS = new Date(Math.min.apply(null, completedSundays.map(d => d.getTime())));
@@ -1051,9 +1049,9 @@ function derive(rows, settings, view) {
   }
 
   /* Bucket once, read four times. */
-  const byCompletedWeek = new Map();   /* Throughput!D — keyed on the week-start Sunday */
-  const byStartedWeek   = new Map();   /* Work in Progress!U */
-  const cycleByWeek     = new Map();   /* Cycle Time!C — keyed on the completed date itself */
+  const byCompletedWeek = new Map();   /* keyed on the week-start Sunday */
+  const byStartedWeek   = new Map();   /* keyed on the week-start Sunday */
+  const cycleByWeek     = new Map();   /* keyed on the completed date itself */
 
   for (const r of items) {
     /* Started counts every item that has a start date, finished or not. */
@@ -1075,7 +1073,7 @@ function derive(rows, settings, view) {
     }
   }
 
-  const weeks = [], throughput = [], defectRate = [], avgCycleTime = [], netFlow = [];
+  const weeks = [], throughput = [], unplannedRate = [], avgCycleTime = [], netFlow = [];
 
   for (const ws of weekStarts) {
     const key = weekKey(ws);
@@ -1083,20 +1081,18 @@ function derive(rows, settings, view) {
 
     const done = byCompletedWeek.get(key) || [];
 
-    /* Throughput!D — =COUNTIF(YearWeekValues, C2) */
     throughput.push(done.length);
 
-    /* Throughput!F/G/H — planned vs unplanned, and the rate.
-       H is 0 (not blank) when there is no unplanned work that week. */
+    /* Planned vs unplanned, and the rate. A week with no unplanned work is 0,
+       not blank — a gap in the line would read as missing data. */
     const unplanned = done.filter(isUnplanned).length;
     const planned   = done.length - unplanned;
-    defectRate.push(unplanned > 0 ? unplanned / (planned + unplanned) : 0);
+    unplannedRate.push(unplanned > 0 ? unplanned / (planned + unplanned) : 0);
 
-    /* Cycle Time!Q — =IFERROR(AVERAGEIF(weekKeys, O2, cycleTimes), 0) */
     const cts = cycleByWeek.get(key) || [];
     avgCycleTime.push(cts.length ? mean(cts) : 0);
 
-    /* Work in Progress!W — =V2-U2, complete this week minus started this week */
+    /* Net flow: completed this week minus started this week. */
     netFlow.push(done.length - (byStartedWeek.get(key) || 0));
   }
 
@@ -1104,14 +1100,13 @@ function derive(rows, settings, view) {
 
   return {
     empty: weeks.length === 0,
-    weeks, throughput, defectRate, avgCycleTime, netFlow,
+    weeks, throughput, unplannedRate, avgCycleTime, netFlow,
     itemCount: items.length,
     inProgressCount: items.length - finished.length,
     startDate, endDate,
     titles: {
-      /* Throughput!Q7 — =UnplannedLegendLabel & " Percentage Rate (avg: " & TEXT(Q6,"0.00%") & ")" */
       quality: (settings.unplannedLabel || 'Unplanned') +
-               ' percentage rate (avg: ' + (mean(defectRate) * 100).toFixed(2) + '%)',
+               ' percentage rate (avg: ' + (mean(unplannedRate) * 100).toFixed(2) + '%)',
       /* The label is used verbatim — lower-casing it turned the "TiP" setting
          into "tip", and an acronym the user chose is not ours to re-case. */
       responsiveness: 'Average ' + cycleLabel + ' per week',
@@ -1119,9 +1114,8 @@ function derive(rows, settings, view) {
       predictability: 'Net flow per week (items completed − items started)'
     },
     axisTitles: {
-      /* The workbook's own label is "Unplanned work rate (in addition to planned
-         work)". Shortened because a rotated axis title that long gets truncated
-         on a narrow screen, and the chart title above already says the rest. */
+      /* Deliberately short: a rotated axis title gets truncated on a narrow
+         screen, and the chart title above already says the rest. */
       quality: 'Unplanned work rate',
       responsiveness: cycleLabel + ' (days)',
       productivity: 'Count of closed items during week',
@@ -1132,7 +1126,7 @@ function derive(rows, settings, view) {
 
 /* Exposed for tests.html, which drives the real app in a hidden iframe. */
 window.TD = {
-  excelWeekday, priorSunday, excelWeekNum, weekKey, edate,
+  weekdayNum, priorSunday, weekNumber, weekKey, edate,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats,
   cycleTimeOf, linearTrend, derive, utcDate
 };
@@ -1142,15 +1136,14 @@ window.TD = {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const DEFAULT_SETTINGS = {
-  sameDayValue: 0.5,          /* Settings!A6 */
-  defectType: 'Defect',       /* Settings!C9 */
-  plannedLabel: 'Stories',    /* Settings!G8 */
-  unplannedLabel: 'Defects',  /* Settings!G9 */
-  cycleTimeLabel: 'Time in Process',  /* Settings!C12 */
-  filters: [                  /* Settings!A31:B40 */
-    { display: 'All',       value: 'All' },
-    { display: 'Unplanned', value: 'Unplanned' },
-    { display: 'Defects',   value: 'Defect' }
+  sameDayValue: 0.5,
+  unplannedType: 'Bug',
+  plannedLabel: 'Stories',
+  unplannedLabel: 'Bugs',
+  cycleTimeLabel: 'Cycle time',
+  filters: [
+    { display: 'All',  value: 'All' },
+    { display: 'Bugs', value: 'Bug' }
   ]
 };
 
@@ -1205,6 +1198,10 @@ function normalizeSettings(raw) {
   const s = Object.assign({}, DEFAULT_SETTINGS, raw && typeof raw === 'object' ? raw : {});
   if (!Array.isArray(s.filters) || !s.filters.length) s.filters = DEFAULT_SETTINGS.filters.map(f => Object.assign({}, f));
   delete s.teamName;                          /* v1 field — teams carry their own names now */
+  /* This setting used to be called defectType. Carry an older saved value over
+     rather than silently resetting a work type someone chose deliberately. */
+  if (typeof s.defectType === 'string' && !(raw && raw.unplannedType)) s.unplannedType = s.defectType;
+  delete s.defectType;
   return s;
 }
 
@@ -1439,7 +1436,7 @@ function renderChart(id, config) {
 }
 
 const pct1 = v => (v * 100).toFixed(1) + '%';        /* tooltips */
-const pct0 = v => Math.round(v * 100) + '%';         /* axis ticks — the workbook's "0%" format */
+const pct0 = v => Math.round(v * 100) + '%';         /* axis ticks — whole percents */
 const num1 = v => (Math.round(v * 10) / 10).toFixed(1);
 const int0 = v => String(Math.round(v));
 
@@ -1455,11 +1452,11 @@ function drawCharts(d) {
       labels: d.weeks,
       datasets: [{
         label: state.settings.unplannedLabel + ' rate',
-        data: d.defectRate,
+        data: d.unplannedRate,
         borderColor: accent,
         backgroundColor: accent,
         borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false, order: 1
-      }, trendDataset(d.defectRate)]
+      }, trendDataset(d.unplannedRate)]
     },
     options: qualOpts
   });
@@ -1505,9 +1502,9 @@ function drawCharts(d) {
   });
 
   /* ── Predictability: net flow per week ──
-     The workbook colours these blue/orange via invertIfNegative. Deliberately
-     not the red/green pair: the coaching goal is "keep around zero", so neither
-     sign is good or bad, and RAG would assert otherwise. */
+     Blue above zero, orange below. Deliberately not the red/green pair: the
+     coaching goal is "keep around zero", so neither sign is good or bad, and
+     RAG would assert otherwise. */
   const netColours = d.netFlow.map(v => (v < 0 ? serious : accent));
   const netOpts = baseOptions(d.axisTitles.predictability, int0);
   netOpts.scales.y.ticks.precision = 0;
@@ -1536,7 +1533,7 @@ const $ = id => document.getElementById(id);
 
 function currentFilterValue() {
   const chosen = state.settings.filters.find(f => f.display === view.filterDisplay);
-  /* Settings!B42 — "All" or nothing means no filter at all. */
+  /* "All" or nothing means no filter at all. */
   if (!chosen || !chosen.value || chosen.value.toLowerCase() === 'all') return '';
   return chosen.value;
 }
@@ -1686,7 +1683,7 @@ function renderFilterRows() {
 
 function renderSettingsForm() {
   $('setCycleLabel').value     = state.settings.cycleTimeLabel;
-  $('setDefectType').value     = state.settings.defectType;
+  $('setUnplannedType').value     = state.settings.unplannedType;
   $('setSameDay').value        = state.settings.sameDayValue;
   $('setPlannedLabel').value   = state.settings.plannedLabel;
   $('setUnplannedLabel').value = state.settings.unplannedLabel;
@@ -1742,7 +1739,6 @@ function showParseNote(res, mode, team) {
 
   let html = '';
   if (bad || badS) {
-    /* Settings!B27 — the workbook's own wording. */
     html += '<div class="note err"><strong>Data error:</strong> there ' + (bad === 1 ? 'is' : 'are') + ' ' +
       bad + ' badly formatted completion date' + (bad === 1 ? '' : 's') + ', and ' +
       badS + ' badly formatted start date' + (badS === 1 ? '' : 's') + ' in your data. ' +
@@ -1852,7 +1848,7 @@ $('monthsSel').addEventListener('change', e => { view.months = e.target.value; s
 
 /* settings — shared by every team */
 const SETTING_INPUTS = {
-  setCycleLabel: 'cycleTimeLabel', setDefectType: 'defectType',
+  setCycleLabel: 'cycleTimeLabel', setUnplannedType: 'unplannedType',
   setSameDay: 'sameDayValue', setPlannedLabel: 'plannedLabel', setUnplannedLabel: 'unplannedLabel'
 };
 Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
@@ -1887,7 +1883,7 @@ $('btnAddFilter').addEventListener('click', () => {
   renderFilterRows();
 });
 $('btnResetSettings').addEventListener('click', () => {
-  if (!confirm('Reset every setting back to the workbook defaults?\n\nYour teams and their data are not touched.')) return;
+  if (!confirm('Reset every setting back to its default?\n\nYour teams and their data are not touched.')) return;
   state.settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
   save();
   renderSettingsForm();
