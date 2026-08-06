@@ -6,6 +6,17 @@
 <title>Team Dashboard</title>
 <link rel="icon" href="favicon.ico">
 <!--
+  Locked down to what the app actually uses: scripts from this origin and
+  Firebase's CDN, network calls only to the Firebase endpoints sync needs, and
+  no frames except the project's own auth helper.
+
+  ⚠️ If a new external endpoint is ever added it must be added here too, or it
+  fails silently in production and works fine on localhost. The frame-src entry
+  is the project's authDomain — it has to match FIREBASE_CONFIG or the Google
+  sign-in popup is blocked.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://teamdashboard-app.firebaseapp.com; base-uri 'none'; form-action 'self'">
+<!--
   Team Dashboard — a web port of the "Team Dashboard v5" Excel workbook.
 
   Paste completed/started dates for your work items and it derives the four
@@ -220,11 +231,15 @@ code { font-family: var(--font-mono); font-size: var(--fs-sm); }
 
 /* header */
 .topbar {
-  display: flex; align-items: center; gap: var(--sp-5);
+  display: flex; align-items: flex-end; gap: var(--sp-5);
   flex-wrap: wrap; margin-bottom: var(--sp-5);
 }
-.topbar h1 { font-size: var(--fs-xl); flex: 1 1 auto; min-width: 0; }
+.topbar h1 { font-size: var(--fs-xl); align-self: center; }
 .topbar .spacer { flex: 1 1 auto; }
+/* Fixed widths so filling these from JS can't resize the header after paint. */
+.topfield { width: 170px; flex: 0 0 auto; }
+.btn.sync { flex: 0 0 auto; white-space: nowrap; }
+.btn.sync[data-state="error"] { color: var(--warn); border-color: var(--warn); }
 
 /* tabs */
 .tabs { display: flex; gap: var(--sp-1); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-7); flex-wrap: wrap; }
@@ -357,16 +372,48 @@ table.filters td.act { width: 1%; }
 .icon-btn:hover { color: var(--err); border-color: var(--err); }
 
 .footer { margin-top: var(--sp-8); color: var(--text-hint); font-size: var(--fs-sm); }
+.footer + .footer { margin-top: var(--sp-4); }
 .footer a { color: var(--accent); }
+
+/* dialog + toast */
+dialog {
+  background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  padding: var(--sp-7); max-width: 520px; width: calc(100% - var(--sp-8));
+}
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+dialog h2 { font-size: var(--fs-lg); margin-bottom: var(--sp-5); }
+dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
+
+#toast {
+  position: fixed; left: 50%; bottom: var(--sp-7); transform: translateX(-50%);
+  background: var(--surface-alt); color: var(--text-primary);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
+  padding: var(--sp-4) var(--sp-7); font-size: var(--fs-base);
+  opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 50;
+  max-width: calc(100% - var(--sp-8)); text-align: center;
+}
+#toast.show { opacity: 1; }
 </style>
 </head>
 <body>
 <div class="shell">
 
+  <!-- Everything in this row carries its final width in the markup. The header
+       paints long before the script at the foot of the page runs, so anything
+       sized by JS grows on screen: an empty select goes 40px → 180px, and the
+       sync button would appear only once the Firebase SDK had come over the
+       wire, re-wrapping the row. #teamSel therefore has a min-width and a
+       placeholder option, and #syncBtn ships visible and signed-out — it is
+       taken away only when sync genuinely can't run. -->
   <div class="topbar">
     <h1 id="appTitle">Team Dashboard</h1>
     <div class="spacer"></div>
-    <div style="min-width:150px">
+    <div class="topfield">
+      <label for="teamSel">Team</label>
+      <select id="teamSel"><option>—</option></select>
+    </div>
+    <div class="topfield">
       <label for="themeSel">Theme</label>
       <select id="themeSel">
         <option value="dark">Dark</option>
@@ -375,6 +422,7 @@ table.filters td.act { width: 1%; }
         <option value="sepia">Sepia</option>
       </select>
     </div>
+    <button class="btn sync" id="syncBtn" type="button" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
   </div>
 
   <div class="tabs" role="tablist">
@@ -386,7 +434,24 @@ table.filters td.act { width: 1%; }
   <!-- ══════════════════ YOUR DATA ══════════════════ -->
   <section class="panel" id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden>
     <div class="card">
-      <h2>Paste your work items</h2>
+      <h2>Teams</h2>
+      <p class="hint">
+        Each team keeps its own work items. The picker in the header chooses which one the
+        dashboard is showing; Settings below are shared by all of them.
+      </p>
+      <div class="table-scroll" style="margin-top:var(--sp-6)">
+        <table class="filters" id="teamTable">
+          <thead><tr><th>Team name</th><th class="act">Items</th><th class="act"></th></tr></thead>
+          <tbody id="teamRows"></tbody>
+        </table>
+      </div>
+      <div class="btn-row" style="margin-top:var(--sp-5)">
+        <button class="btn" id="btnAddTeam" type="button">Add a team</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Paste work items for <span id="pasteTeamName">this team</span></h2>
       <p class="hint">
         Three columns — <strong>Completed Date</strong>, <strong>Start Date</strong> (optional),
         <strong>Type</strong> (optional). Copy straight out of Excel, Jira or a CSV; tabs and commas
@@ -411,7 +476,7 @@ table.filters td.act { width: 1%; }
       <div class="btn-row" style="margin-top:var(--sp-6)">
         <button class="btn primary" id="btnLoad">Load pasted rows</button>
         <button class="btn" id="btnAppend">Append to existing</button>
-        <button class="btn danger" id="btnClear">Clear all data</button>
+        <button class="btn danger" id="btnClear">Clear this team's data</button>
       </div>
       <div id="parseNote" style="margin-top:var(--sp-6)"></div>
     </div>
@@ -426,12 +491,9 @@ table.filters td.act { width: 1%; }
   <!-- ══════════════════ SETTINGS ══════════════════ -->
   <section class="panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
     <div class="card">
-      <h2>Team &amp; labels</h2>
+      <h2>Labels &amp; work types</h2>
+      <p class="hint">Shared by every team. Team names live on the <strong>Your Data</strong> tab.</p>
       <div class="grid two" style="margin-top:var(--sp-6)">
-        <div>
-          <label for="setTeamName">Team name</label>
-          <input type="text" id="setTeamName" placeholder="My Awesome">
-        </div>
         <div>
           <label for="setCycleLabel">Word to use for cycle time on charts</label>
           <select id="setCycleLabel">
@@ -560,12 +622,29 @@ table.filters td.act { width: 1%; }
 
     <p class="footer">
       Every chart carries a dashed linear trend line. Ported from the
-      "Team Dashboard v5" Excel workbook — all figures are computed in your browser and nothing
-      is ever uploaded.
+      "Team Dashboard v5" Excel workbook — all figures are computed in your browser.
     </p>
   </section>
 
+  <!-- Live region: the sync module rewrites its text as the state changes, so it
+       must stay in the tree rather than being toggled hidden. -->
+  <p class="footer" id="privacyNote" role="status">🔒 Private — your data is stored in this browser only.</p>
+  <p class="footer"><a href="privacy.html">Privacy &amp; your data</a></p>
+
 </div>
+
+<!-- Reconciling two copies at first sign-in. Deliberately a question rather than
+     a timestamp guess: guessing once wiped a browser's data in the sibling app. -->
+<dialog id="syncChoiceDialog">
+  <h2>Which copy do you want to keep?</h2>
+  <p id="syncChoiceBody"></p>
+  <div class="btn-row" style="margin-top:var(--sp-6)">
+    <button class="btn primary" id="syncKeepDeviceBtn" type="button">Keep this device's</button>
+    <button class="btn" id="syncKeepGoogleBtn" type="button">Keep Google's</button>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script src="chart.min.js"></script>
 <script>
@@ -887,7 +966,9 @@ function derive(rows, settings, view) {
       /* Throughput!Q7 — =UnplannedLegendLabel & " Percentage Rate (avg: " & TEXT(Q6,"0.00%") & ")" */
       quality: (settings.unplannedLabel || 'Unplanned') +
                ' percentage rate (avg: ' + (mean(defectRate) * 100).toFixed(2) + '%)',
-      responsiveness: 'Average ' + cycleLabel.toLowerCase() + ' per week',
+      /* The label is used verbatim — lower-casing it turned the "TiP" setting
+         into "tip", and an acronym the user chose is not ours to re-case. */
+      responsiveness: 'Average ' + cycleLabel + ' per week',
       productivity: 'Throughput history trend (completed items per week)',
       predictability: 'Net flow per week (items completed − items started)'
     },
@@ -915,7 +996,6 @@ window.TD = {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const DEFAULT_SETTINGS = {
-  teamName: '',
   sameDayValue: 0.5,          /* Settings!A6 */
   defectType: 'Defect',       /* Settings!C9 */
   plannedLabel: 'Stories',    /* Settings!G8 */
@@ -928,44 +1008,170 @@ const DEFAULT_SETTINGS = {
   ]
 };
 
-const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto' };
+/* activeTeamId lives here, not in the synced payload: which team you happen to
+   be looking at is a position on this device, not shared data. Syncing it would
+   make switching team on the laptop yank the phone to the same team. */
+const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', activeTeamId: null };
 
-const LS = { rows: 'td-rows', settings: 'td-settings', view: 'td-view', theme: 'td-theme' };
+const LS = {
+  state: 'td-state', view: 'td-view', theme: 'td-theme',
+  updated: 'td-updated', syncUid: 'td-sync-uid',
+  /* v1 keys, read once by migrate() and then removed */
+  oldRows: 'td-rows', oldSettings: 'td-settings'
+};
 
-let settings = loadSettings();
-let view     = loadView();
-let rows     = loadRows();
-let charts   = {};
+/* state.teams[] each hold their own rows; settings are shared by all of them.
+   Everything in `state` syncs; everything in `view` stays on this device. */
+let state  = { teams: [], settings: Object.assign({}, DEFAULT_SETTINGS) };
+let view   = Object.assign({}, DEFAULT_VIEW);
+let charts = {};
 
-function loadSettings() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(LS.settings) || '{}');
-    const s = Object.assign({}, DEFAULT_SETTINGS, raw);
-    if (!Array.isArray(s.filters) || !s.filters.length) s.filters = DEFAULT_SETTINGS.filters.slice();
-    return s;
-  } catch (e) { return Object.assign({}, DEFAULT_SETTINGS); }
+const newId = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+/* Ids end up in data- attributes and <option value>, so anything arriving from
+   outside this device — the cloud, a hand-edited localStorage — is replaced
+   unless it is plainly safe. Same boundary check as the sibling app. */
+const ID_OK = /^[A-Za-z0-9_-]{1,64}$/;
+function sanitizeTeams(teams) {
+  const seen = new Set();
+  return (Array.isArray(teams) ? teams : []).map(t => {
+    let id = (t && typeof t.id === 'string' && ID_OK.test(t.id) && !seen.has(t.id)) ? t.id : newId();
+    seen.add(id);
+    return { id, name: String((t && t.name) || 'Untitled team'), rows: hydrateRows(t && t.rows) };
+  });
 }
+
+function hydrateRows(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(r => ({
+    completed: r && r.c ? new Date(r.c + 'T00:00:00Z') : null,
+    started:   r && r.s ? new Date(r.s + 'T00:00:00Z') : null,
+    type:      (r && r.t) || ''
+  })).filter(r => r.completed && !isNaN(r.completed));
+}
+const serializeRows = rows => rows.map(r => ({ c: isoOf(r.completed), s: isoOf(r.started), t: r.type }));
+
+function normalizeSettings(raw) {
+  const s = Object.assign({}, DEFAULT_SETTINGS, raw && typeof raw === 'object' ? raw : {});
+  if (!Array.isArray(s.filters) || !s.filters.length) s.filters = DEFAULT_SETTINGS.filters.map(f => Object.assign({}, f));
+  delete s.teamName;                          /* v1 field — teams carry their own names now */
+  return s;
+}
+
+/* The shape that goes to localStorage and to the cloud. Dates become ISO
+   strings; nothing else changes. */
+function serializeState() {
+  return {
+    teams: state.teams.map(t => ({ id: t.id, name: t.name, rows: serializeRows(t.rows) })),
+    settings: state.settings
+  };
+}
+function hydrateState(raw) {
+  return {
+    teams: sanitizeTeams(raw && raw.teams),
+    settings: normalizeSettings(raw && raw.settings)
+  };
+}
+
+/* v1 stored a single team's rows under td-rows with the name in td-settings.
+   Fold that into one team and drop the old keys, so an existing user's data
+   survives the upgrade without them doing anything. */
+function migrate() {
+  if (localStorage.getItem(LS.state)) return null;
+  const oldRowsRaw = localStorage.getItem(LS.oldRows);
+  if (!oldRowsRaw) return null;
+  let oldSettings = {};
+  try { oldSettings = JSON.parse(localStorage.getItem(LS.oldSettings) || '{}'); } catch (e) { /* defaults */ }
+  let rows = [];
+  try { rows = JSON.parse(oldRowsRaw); } catch (e) { /* nothing to carry over */ }
+  const migrated = {
+    teams: [{ id: newId(), name: String(oldSettings.teamName || '').trim() || 'My team', rows }],
+    settings: oldSettings
+  };
+  localStorage.removeItem(LS.oldRows);
+  localStorage.removeItem(LS.oldSettings);
+  return migrated;
+}
+
+function loadState() {
+  const migrated = migrate();
+  if (migrated) { state = hydrateState(migrated); persist(); return; }
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(LS.state) || 'null'); } catch (e) { /* fall through */ }
+  state = hydrateState(raw);
+  /* A brand-new browser gets one empty team so there's somewhere to paste into.
+     hasData() below deliberately doesn't count it — see the note there. */
+  if (!state.teams.length) state.teams.push({ id: newId(), name: 'My team', rows: [] });
+}
+
 function loadView() {
-  try { return Object.assign({}, DEFAULT_VIEW, JSON.parse(localStorage.getItem(LS.view) || '{}')); }
-  catch (e) { return Object.assign({}, DEFAULT_VIEW); }
+  try { view = Object.assign({}, DEFAULT_VIEW, JSON.parse(localStorage.getItem(LS.view) || '{}')); }
+  catch (e) { view = Object.assign({}, DEFAULT_VIEW); }
 }
-function loadRows() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(LS.rows) || '[]');
-    if (!Array.isArray(raw)) return [];
-    return raw.map(r => ({
-      completed: r.c ? new Date(r.c + 'T00:00:00Z') : null,
-      started:   r.s ? new Date(r.s + 'T00:00:00Z') : null,
-      type:      r.t || ''
-    })).filter(r => r.completed && !isNaN(r.completed));
-  } catch (e) { return []; }
+
+function persist() { localStorage.setItem(LS.state, JSON.stringify(serializeState())); }
+function saveView() { localStorage.setItem(LS.view, JSON.stringify(view)); }
+
+/* The one place a change to teams or settings is written down. It stamps the
+   local copy as the newest and asks the cloud module (if any) to push, so no
+   caller can save without the cloud finding out. */
+function save() {
+  persist();
+  localStorage.setItem(LS.updated, String(Date.now()));
+  if (window.cloudPush) window.cloudPush();
 }
-function saveRows() {
-  localStorage.setItem(LS.rows, JSON.stringify(
-    rows.map(r => ({ c: isoOf(r.completed), s: isoOf(r.started), t: r.type }))));
+
+function activeTeam() {
+  return state.teams.find(t => t.id === view.activeTeamId) || state.teams[0] || null;
 }
-function saveSettings() { localStorage.setItem(LS.settings, JSON.stringify(settings)); }
-function saveView()     { localStorage.setItem(LS.view, JSON.stringify(view)); }
+const activeRows = () => { const t = activeTeam(); return t ? t.rows : []; };
+
+/* ── Hooks the sync module uses ──────────────────────────────────────────────
+   "Does this copy hold anything worth protecting?" A fresh browser has exactly
+   one empty team, created by loadState() so there's a paste target — that must
+   read as empty, or signing in on a new device would let its nothing overwrite
+   the device that has the data. Teams the user actually made do count, even
+   before any rows are pasted into them: a name is real work. */
+function hasData(d) {
+  if (!d || !Array.isArray(d.teams)) return false;
+  return d.teams.length > 1 || d.teams.some(t => t && Array.isArray(t.rows) && t.rows.length);
+}
+
+window.tdGet = serializeState;
+window.tdHasData = hasData;
+/* Pure helpers tests.html pins. Kept beside the sync hooks because they are the
+   same boundary: everything here decides what a copy from outside is allowed to
+   turn into. */
+window.TDState = { sanitizeTeams, hydrateState, normalizeSettings, hasData, ID_OK };
+window.tdCounts = (d) => ({
+  teams: (d && d.teams) ? d.teams.length : 0,
+  items: (d && d.teams) ? d.teams.reduce((n, t) => n + ((t.rows && t.rows.length) || 0), 0) : 0
+});
+
+/* Replace everything with a copy from the cloud. */
+window.tdAdopt = (data, updatedAt) => {
+  state = hydrateState(data);
+  if (!state.teams.length) state.teams.push({ id: newId(), name: 'My team', rows: [] });
+  if (!state.teams.some(t => t.id === view.activeTeamId)) {
+    view.activeTeamId = state.teams[0].id;
+    saveView();
+  }
+  persist();
+  localStorage.setItem(LS.updated, String(updatedAt || Date.now()));
+  renderSettingsForm();
+  renderAll();
+};
+
+/* Short-lived status message. textContent only — never HTML, and never a
+   control: it's pointer-events:none, so nothing in it could be clicked. */
+let toastTimer = null;
+window.toast = (msg) => {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+};
 
 /* ═══════════════════════════════════════════════════════════════════════════
    6. CHART THEMING
@@ -1098,7 +1304,7 @@ function drawCharts(d) {
     data: {
       labels: d.weeks,
       datasets: [{
-        label: settings.unplannedLabel + ' rate',
+        label: state.settings.unplannedLabel + ' rate',
         data: d.defectRate,
         borderColor: accent,
         backgroundColor: accent,
@@ -1117,7 +1323,7 @@ function drawCharts(d) {
     data: {
       labels: d.weeks,
       datasets: [{
-        label: 'Avg ' + (settings.cycleTimeLabel || 'cycle time').toLowerCase(),
+        label: 'Avg ' + (state.settings.cycleTimeLabel || 'cycle time'),
         data: d.avgCycleTime,
         borderColor: accent,
         backgroundColor: accent,
@@ -1179,30 +1385,65 @@ function drawCharts(d) {
 const $ = id => document.getElementById(id);
 
 function currentFilterValue() {
-  const chosen = settings.filters.find(f => f.display === view.filterDisplay);
+  const chosen = state.settings.filters.find(f => f.display === view.filterDisplay);
   /* Settings!B42 — "All" or nothing means no filter at all. */
   if (!chosen || !chosen.value || chosen.value.toLowerCase() === 'all') return '';
   return chosen.value;
 }
 
 function renderTitle() {
-  const name = (settings.teamName || '').trim();
+  const t = activeTeam();
+  const name = t ? t.name.trim() : '';
   const title = name ? name + ' Team Dashboard' : 'Team Dashboard';
   $('appTitle').textContent = title;
   document.title = title;
+  $('pasteTeamName').textContent = name || 'this team';
+}
+
+function renderTeamSelect() {
+  const sel = $('teamSel');
+  const current = activeTeam();
+  sel.innerHTML = '';
+  state.teams.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.id;
+    o.textContent = t.name + (t.rows.length ? '' : ' (empty)');
+    sel.appendChild(o);
+  });
+  if (current) { view.activeTeamId = current.id; sel.value = current.id; }
+}
+
+/* Names are user text going into an input value and a label, so both sides are
+   escaped; the id goes into a data- attribute and has already been through
+   sanitizeTeams(). */
+function renderTeamRows() {
+  const tb = $('teamRows');
+  tb.innerHTML = '';
+  state.teams.forEach(t => {
+    const tr = document.createElement('tr');
+    const only = state.teams.length === 1;
+    tr.innerHTML =
+      '<td><input type="text" data-team="' + t.id + '" value="' + escapeHtml(t.name) +
+        '" aria-label="Name of team ' + escapeHtml(t.name) + '"></td>' +
+      '<td class="act num">' + t.rows.length + '</td>' +
+      '<td class="act">' + (only ? '' :
+        '<button class="icon-btn" data-delteam="' + t.id + '" title="Delete this team" aria-label="Delete ' +
+        escapeHtml(t.name) + '">&times;</button>') + '</td>';
+    tb.appendChild(tr);
+  });
 }
 
 function renderFilterSelect() {
   const sel = $('filterSel');
   sel.innerHTML = '';
-  settings.filters.forEach(f => {
+  state.settings.filters.forEach(f => {
     if (!f.display) return;
     const o = document.createElement('option');
     o.value = f.display; o.textContent = f.display;
     sel.appendChild(o);
   });
-  if (!settings.filters.some(f => f.display === view.filterDisplay)) {
-    view.filterDisplay = settings.filters[0] ? settings.filters[0].display : 'All';
+  if (!state.settings.filters.some(f => f.display === view.filterDisplay)) {
+    view.filterDisplay = state.settings.filters[0] ? state.settings.filters[0].display : 'All';
   }
   sel.value = view.filterDisplay;
 }
@@ -1210,13 +1451,14 @@ function renderFilterSelect() {
 function renderDashboard() {
   renderTitle();
 
-  const d = derive(rows, settings, { filterValue: currentFilterValue(), months: view.months });
-  const hasData = !d.empty && d.weeks.length > 0;
+  const rows = activeRows();
+  const d = derive(rows, state.settings, { filterValue: currentFilterValue(), months: view.months });
+  const plottable = !d.empty && d.weeks.length > 0;
 
-  $('dashEmpty').hidden = hasData;
-  $('dashCharts').hidden = !hasData;
+  $('dashEmpty').hidden = plottable;
+  $('dashCharts').hidden = !plottable;
 
-  if (!hasData) {
+  if (!plottable) {
     $('windowNote').innerHTML = rows.length
       ? 'No items match this filter.'
       : '';
@@ -1243,6 +1485,7 @@ function renderDashboard() {
 }
 
 function renderDataTable() {
+  const rows = activeRows();
   $('rowCount').textContent = rows.length ? '(' + rows.length + ' item' + (rows.length === 1 ? '' : 's') + ')' : '';
 
   if (!rows.length) {
@@ -1252,7 +1495,7 @@ function renderDataTable() {
 
   const sorted = rows.slice().sort((a, b) => b.completed - a.completed);
   const body = sorted.map(r => {
-    const ct = cycleTimeOf(r, Number(settings.sameDayValue));
+    const ct = cycleTimeOf(r, Number(state.settings.sameDayValue));
     return '<tr>' +
       '<td>' + isoOf(r.completed) + '</td>' +
       '<td>' + (r.started ? isoOf(r.started) : '<span class="hint">—</span>') + '</td>' +
@@ -1265,7 +1508,7 @@ function renderDataTable() {
   $('dataTable').innerHTML =
     '<div class="table-cap"><div class="table-scroll"><table class="data">' +
     '<thead><tr><th>Completed</th><th>Started</th><th>Type</th>' +
-    '<th>' + escapeHtml(settings.cycleTimeLabel) + ' (days)</th><th>Week</th></tr></thead>' +
+    '<th>' + escapeHtml(state.settings.cycleTimeLabel) + ' (days)</th><th>Week</th></tr></thead>' +
     '<tbody>' + body + '</tbody></table></div></div>';
 }
 
@@ -1277,7 +1520,7 @@ function escapeHtml(s) {
 function renderFilterRows() {
   const tb = $('filterRows');
   tb.innerHTML = '';
-  settings.filters.forEach((f, i) => {
+  state.settings.filters.forEach((f, i) => {
     const tr = document.createElement('tr');
     const locked = f.display === 'All';
     tr.innerHTML =
@@ -1293,16 +1536,17 @@ function renderFilterRows() {
 }
 
 function renderSettingsForm() {
-  $('setTeamName').value      = settings.teamName;
-  $('setCycleLabel').value    = settings.cycleTimeLabel;
-  $('setDefectType').value    = settings.defectType;
-  $('setSameDay').value       = settings.sameDayValue;
-  $('setPlannedLabel').value  = settings.plannedLabel;
-  $('setUnplannedLabel').value = settings.unplannedLabel;
+  $('setCycleLabel').value     = state.settings.cycleTimeLabel;
+  $('setDefectType').value     = state.settings.defectType;
+  $('setSameDay').value        = state.settings.sameDayValue;
+  $('setPlannedLabel').value   = state.settings.plannedLabel;
+  $('setUnplannedLabel').value = state.settings.unplannedLabel;
   renderFilterRows();
 }
 
 function renderAll() {
+  renderTeamSelect();
+  renderTeamRows();
   renderFilterSelect();
   renderDataTable();
   renderDashboard();
@@ -1338,7 +1582,7 @@ $('themeSel').addEventListener('change', e => {
 });
 
 /* paste / load */
-function showParseNote(res, mode) {
+function showParseNote(res, mode, team) {
   const el = $('parseNote');
   const bad = res.badCompleted.length, badS = res.badStarted.length;
 
@@ -1361,6 +1605,7 @@ function showParseNote(res, mode) {
   }
   html += '<div class="note ok" style="margin-top:var(--sp-4)">' +
     (mode === 'append' ? 'Added ' : 'Loaded ') + res.rows.length + ' item' + (res.rows.length === 1 ? '' : 's') +
+    ' into <strong>' + escapeHtml(team.name) + '</strong>' +
     (res.skippedHeader ? ' (header row skipped)' : '') +
     '. Dates read as <strong>' + (res.dateOrder === 'mdy' ? 'month first' : 'day first') + '</strong>.' +
     '</div>';
@@ -1368,11 +1613,13 @@ function showParseNote(res, mode) {
 }
 
 function doLoad(mode) {
+  const team = activeTeam();
+  if (!team) return;
   const res = parsePastedRows($('pasteBox').value, view.dateOrder);
-  showParseNote(res, mode);
+  showParseNote(res, mode, team);
   if (!res.rows.length) return;
-  rows = mode === 'append' ? rows.concat(res.rows) : res.rows;
-  saveRows();
+  team.rows = mode === 'append' ? team.rows.concat(res.rows) : res.rows;
+  save();
   renderAll();
   if (mode !== 'append') $('pasteBox').value = '';
 }
@@ -1380,29 +1627,79 @@ function doLoad(mode) {
 $('btnLoad').addEventListener('click', () => doLoad('replace'));
 $('btnAppend').addEventListener('click', () => doLoad('append'));
 $('btnClear').addEventListener('click', () => {
-  if (!rows.length) return;
-  if (!confirm('Delete all ' + rows.length + ' items? This cannot be undone.')) return;
-  rows = [];
-  saveRows();
+  const team = activeTeam();
+  if (!team || !team.rows.length) return;
+  if (!confirm('Delete all ' + team.rows.length + ' items for ' + team.name + '?\n\nThis cannot be undone.')) return;
+  team.rows = [];
+  save();
   $('parseNote').innerHTML = '';
   renderAll();
 });
 $('dateOrder').addEventListener('change', e => { view.dateOrder = e.target.value; saveView(); });
 
+/* teams */
+$('teamSel').addEventListener('change', e => {
+  view.activeTeamId = e.target.value;
+  saveView();
+  $('parseNote').innerHTML = '';
+  renderAll();
+  /* Switching team is navigation, not editing — nothing to save or push. */
+});
+
+$('btnAddTeam').addEventListener('click', () => {
+  const team = { id: newId(), name: 'Team ' + (state.teams.length + 1), rows: [] };
+  state.teams.push(team);
+  view.activeTeamId = team.id;
+  save();
+  saveView();
+  renderAll();
+  /* Land the cursor in the new team's name box — it's the only thing to do next. */
+  const input = $('teamRows').querySelector('[data-team="' + team.id + '"]');
+  if (input) { input.focus(); input.select(); }
+});
+
+$('teamRows').addEventListener('input', e => {
+  const id = e.target.dataset && e.target.dataset.team;
+  if (!id) return;
+  const team = state.teams.find(t => t.id === id);
+  if (!team) return;
+  team.name = e.target.value;
+  save();
+  /* Not renderTeamRows() — that would replace the input being typed in. */
+  renderTeamSelect();
+  renderTitle();
+});
+
+$('teamRows').addEventListener('click', e => {
+  const id = e.target.dataset && e.target.dataset.delteam;
+  if (!id) return;
+  const i = state.teams.findIndex(t => t.id === id);
+  if (i < 0 || state.teams.length === 1) return;
+  const team = state.teams[i];
+  const warning = team.rows.length
+    ? 'Delete ' + team.name + ' and its ' + team.rows.length + ' items?\n\nThis cannot be undone.'
+    : 'Delete ' + team.name + '?';
+  if (!confirm(warning)) return;
+  state.teams.splice(i, 1);
+  if (view.activeTeamId === id) { view.activeTeamId = state.teams[0].id; saveView(); }
+  save();
+  renderAll();
+  window.toast('Deleted ' + team.name);
+});
+
 /* dashboard controls */
 $('filterSel').addEventListener('change', e => { view.filterDisplay = e.target.value; saveView(); renderDashboard(); });
 $('monthsSel').addEventListener('change', e => { view.months = e.target.value; saveView(); renderDashboard(); });
 
-/* settings */
+/* settings — shared by every team */
 const SETTING_INPUTS = {
-  setTeamName: 'teamName', setCycleLabel: 'cycleTimeLabel', setDefectType: 'defectType',
+  setCycleLabel: 'cycleTimeLabel', setDefectType: 'defectType',
   setSameDay: 'sameDayValue', setPlannedLabel: 'plannedLabel', setUnplannedLabel: 'unplannedLabel'
 };
 Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
   $(id).addEventListener('input', e => {
-    settings[key] = key === 'sameDayValue' ? (parseFloat(e.target.value) || 0) : e.target.value;
-    saveSettings();
-    renderTitle();
+    state.settings[key] = key === 'sameDayValue' ? (parseFloat(e.target.value) || 0) : e.target.value;
+    save();
     renderDataTable();
     renderDashboard();
   });
@@ -1411,29 +1708,29 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
 $('filterRows').addEventListener('input', e => {
   const t = e.target;
   if (!t.dataset.k) return;
-  settings.filters[+t.dataset.i][t.dataset.k] = t.value;
-  saveSettings();
+  state.settings.filters[+t.dataset.i][t.dataset.k] = t.value;
+  save();
   renderFilterSelect();
   renderDashboard();
 });
 $('filterRows').addEventListener('click', e => {
   const del = e.target.dataset && e.target.dataset.del;
   if (del == null) return;
-  settings.filters.splice(+del, 1);
-  saveSettings();
+  state.settings.filters.splice(+del, 1);
+  save();
   renderFilterRows();
   renderFilterSelect();
   renderDashboard();
 });
 $('btnAddFilter').addEventListener('click', () => {
-  settings.filters.push({ display: '', value: '' });
-  saveSettings();
+  state.settings.filters.push({ display: '', value: '' });
+  save();
   renderFilterRows();
 });
 $('btnResetSettings').addEventListener('click', () => {
-  if (!confirm('Reset every setting back to the workbook defaults?')) return;
-  settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-  saveSettings();
+  if (!confirm('Reset every setting back to the workbook defaults?\n\nYour teams and their data are not touched.')) return;
+  state.settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  save();
   renderSettingsForm();
   renderAll();
 });
@@ -1442,11 +1739,286 @@ $('btnResetSettings').addEventListener('click', () => {
    9. BOOT
    ═══════════════════════════════════════════════════════════════════════════ */
 
+loadView();
+loadState();
+if (!state.teams.some(t => t.id === view.activeTeamId)) view.activeTeamId = state.teams[0].id;
+saveView();
+
 $('monthsSel').value = view.months;
 $('dateOrder').value = view.dateOrder;
 renderSettingsForm();
 renderAll();
-selectTab(rows.length ? 'dashboard' : 'data');
+selectTab(activeRows().length ? 'dashboard' : 'data');
+</script>
+
+<script type="module">
+/* ───────────────────────── Optional cross-device sync ─────────────────────────
+   Google sign-in + one Firestore document per user, ported from Sprint Velocity.
+   The config below is Firebase's *public client config*, not a secret — access is
+   enforced by the Firestore security rules (see firestore.rules), not by this key.
+
+   While FIREBASE_CONFIG is null the sync button is hidden and the app is 100%
+   local; the README has the five console steps that turn it on. localStorage
+   stays the source of truth either way — the cloud only ever mirrors it.
+
+   The first time a given Google account syncs in a given browser, if both sides
+   already hold data the user is *asked* which to keep rather than the code
+   guessing by timestamp; that guesswork once wiped a browser's data in the
+   sibling app. After that first reconciliation, and for live updates arriving
+   from another device, the newer side by 'td-updated' wins — except that an
+   empty copy never silently beats one with data in it. startSync() has the
+   full rule. */
+const FIREBASE_CONFIG = null;
+
+const SDK = 'https://www.gstatic.com/firebasejs/12.16.0/';
+const btn = document.getElementById('syncBtn');
+const privacyNote = document.getElementById('privacyNote');
+const localTs = () => Number(localStorage.getItem('td-updated') || 0);
+
+/* The button ships visible and signed-out in the markup so the header is its
+   final width at first paint. It's taken away only when sync genuinely can't
+   run — no config, or a failed SDK load. */
+if (FIREBASE_CONFIG) {
+  init().catch((e) => { console.warn('Sync unavailable:', e); btn.hidden = true; });
+} else {
+  btn.hidden = true;
+}
+
+let A, Fs, auth, db, user = null, unsub = null, pushTimer = null;
+
+async function init() {
+  const [{ initializeApp }, authMod, fsMod] = await Promise.all([
+    import(SDK + 'firebase-app.js'),
+    import(SDK + 'firebase-auth.js'),
+    import(SDK + 'firebase-firestore.js'),
+  ]);
+  A = authMod; Fs = fsMod;
+  const app = initializeApp(FIREBASE_CONFIG);
+  auth = A.getAuth(app);
+  db = Fs.getFirestore(app);
+  A.onAuthStateChanged(auth, (u) => {
+    user = u;
+    syncError = null;                 /* a change of who's signed in starts clean */
+    updateUI();
+    if (unsub) { unsub(); unsub = null; }
+    if (u) startSync().catch((e) => setSyncError(e));
+  });
+  A.getRedirectResult(auth).catch(() => {});   /* completes a mobile redirect sign-in, if one is in flight */
+  btn.addEventListener('click', onClick);
+}
+
+/* ── Saying so when sync stops working ──────────────────────────────────────
+   Every failure path here could have ended at console.warn, which nobody has
+   open — the app would go on looking signed in while nothing had left the
+   browser for weeks. Nothing is ever lost when this happens (localStorage is
+   the source of truth), but "your data is safe" and "your data is synced" are
+   different promises and the header should only make the one that's true.
+
+   There is deliberately no retry button: Firestore retries the transient causes
+   itself, and the ones it can't retry aren't fixed by pressing anything. Every
+   save attempts a push, so the state clears itself when sync genuinely works
+   again. */
+let syncError = null;
+
+function describeSyncError(e) {
+  const code = String((e && e.code) || e || '');
+  if (code.includes('invalid-argument')) return {
+    reason: 'There’s more data here than can be synced in one go.',
+    fix: 'Delete a team you no longer need — sync picks up again on the next change.' };
+  if (code.includes('permission-denied') || code.includes('unauthenticated')) return {
+    reason: 'Google refused the sign-in for this data.',
+    fix: 'Signing out and back in usually clears it.' };
+  if (code.includes('resource-exhausted')) return {
+    reason: 'This project has hit its daily sync limit.',
+    fix: 'It resets tomorrow; nothing is lost in the meantime.' };
+  if (code.includes('unavailable') || code.includes('deadline-exceeded')) return {
+    reason: 'Couldn’t reach Google just now.',
+    fix: 'It should sort itself out — the next change will try again.' };
+  return { reason: 'Sync has stopped working.',
+    fix: 'The next change will try again. If it keeps up, sign out and back in.' };
+}
+
+function setSyncError(e) {
+  console.warn('sync problem', e);
+  const first = !syncError;
+  syncError = describeSyncError(e);
+  updateUI();
+  /* Announce the change of state, not every retry — each save schedules another
+     push, so a lasting problem calls this repeatedly. */
+  if (first) window.toast('⚠️ Not syncing — see the note at the foot of the page');
+}
+
+function clearSyncError() {
+  if (!syncError) return;
+  syncError = null;
+  updateUI();
+  window.toast('Syncing again ☁️');
+}
+
+function updateUI() {
+  if (user && syncError) {
+    btn.textContent = '⚠️ Not syncing';
+    btn.dataset.state = 'error';
+    btn.title = syncError.reason + ' ' + syncError.fix;
+    privacyNote.textContent = `⚠️ Not syncing — ${syncError.reason} Everything is still saved in `
+      + `this browser, but your other devices aren’t getting it. ${syncError.fix}`;
+  } else if (user) {
+    btn.textContent = `☁️ ${user.displayName ? user.displayName.split(' ')[0] : user.email}`;
+    delete btn.dataset.state;
+    btn.title = 'Syncing across your devices — click to sign out';
+    privacyNote.textContent = `☁️ Signed in as ${user.email} — your teams sync privately to your own account and still work offline.`;
+  } else {
+    btn.textContent = '☁️ Sign in to sync';
+    delete btn.dataset.state;
+    btn.title = 'Sign in with Google to see the same data on all your devices';
+    privacyNote.textContent = '🔒 Private — your data is stored in this browser only. No account needed. Sign in with Google if you want the same teams on your other devices.';
+  }
+}
+
+async function onClick() {
+  if (user) {
+    if (confirm('Sign out? The app keeps working with the local copy on this device.')) A.signOut(auth);
+    return;
+  }
+  const provider = new A.GoogleAuthProvider();
+  try {
+    await A.signInWithPopup(auth, provider);
+  } catch (e) {
+    /* Popups are unreliable on mobile Safari — fall back to a full-page redirect. */
+    if (e && /popup|operation-not-supported/.test(String(e.code))) {
+      try { await A.signInWithRedirect(auth, provider); return; } catch { /* fall through */ }
+    }
+    if (String(e && e.code) !== 'auth/popup-closed-by-user') {
+      window.toast('Sign-in failed — check the Firebase setup');
+      console.warn('sign-in error', e);
+    }
+  }
+}
+
+const docRef = () => Fs.doc(db, 'teamdashboard', user.uid);
+
+/* Resolves true to keep Google's copy, false to keep this device's. Escape or a
+   backdrop dismiss resolves false — the non-destructive choice, since it just
+   re-pushes what's already here instead of overwriting anything. */
+function chooseSyncSource(local, remote, remoteUpdatedAt) {
+  return new Promise((resolve) => {
+    const dlg = document.getElementById('syncChoiceDialog');
+    const body = document.getElementById('syncChoiceBody');
+    const when = remoteUpdatedAt ? new Date(remoteUpdatedAt).toLocaleString() : 'an earlier sign-in';
+    const l = window.tdCounts(local), r = window.tdCounts(remote);
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    body.textContent =
+      `This device has ${plural(l.teams, 'team')} and ${plural(l.items, 'item')} saved. `
+      + `Your Google account already has ${plural(r.teams, 'team')} and ${plural(r.items, 'item')} `
+      + `(last updated ${when}). Pick which to keep — the other copy will be replaced.`;
+    const deviceBtn = document.getElementById('syncKeepDeviceBtn');
+    const googleBtn = document.getElementById('syncKeepGoogleBtn');
+    const preventCancel = (e) => e.preventDefault();
+    function finish(keepGoogle) {
+      deviceBtn.removeEventListener('click', onDevice);
+      googleBtn.removeEventListener('click', onGoogle);
+      dlg.removeEventListener('cancel', preventCancel);
+      dlg.close();
+      resolve(keepGoogle);
+    }
+    const onDevice = () => finish(false);
+    const onGoogle = () => finish(true);
+    deviceBtn.addEventListener('click', onDevice);
+    googleBtn.addEventListener('click', onGoogle);
+    dlg.addEventListener('cancel', preventCancel);
+    dlg.showModal();
+  });
+}
+
+/* Stamps this device's copy as the newest. "Keep this device's data" has to
+   actually win everywhere, and pushNow() sends the timestamp the local copy
+   already carries — which, when the cloud is what looked newer, is the older
+   of the two. Without this the choice sticks here and nowhere else. */
+const touchLocal = () => localStorage.setItem('td-updated', String(Date.now()));
+
+/* Reconciling the two copies at sign-in.
+
+   The rule underneath all four branches: an empty copy never beats a copy with
+   data in it, whatever the timestamps say. Timestamp-wins on its own has a hole
+   that costs real data — signing in on a fresh browser pushes that browser's
+   empty state stamped `now`, and the device that actually holds the teams, with
+   an older stamp because it was last edited days ago, would take the empty copy
+   as "newer" and empty itself.
+
+   With that rule the dialog is only needed for the genuine conflict: both sides
+   hold data and neither is obviously right. Once per account per browser. */
+async function startSync() {
+  const snap = await Fs.getDoc(docRef());
+  const remote = snap.exists() ? snap.data() : null;
+  const local = window.tdGet();
+  const remoteHas = !!(remote && window.tdHasData(remote.data));
+  const localHas = window.tdHasData(local);
+  const firstSyncForAccount = localStorage.getItem('td-sync-uid') !== user.uid;
+
+  if (remoteHas && localHas && firstSyncForAccount) {
+    const keepGoogle = await chooseSyncSource(local, remote.data, remote.updatedAt);
+    if (keepGoogle) {
+      window.tdAdopt(remote.data, remote.updatedAt);
+      window.toast('Loaded your teams from the cloud ☁️');
+    } else {
+      touchLocal();
+      await pushNow();
+      window.toast('Kept this device’s data');
+    }
+  } else if (remoteHas && !localHas) {
+    window.tdAdopt(remote.data, remote.updatedAt);      /* nothing here to lose */
+    window.toast('Loaded your teams from the cloud ☁️');
+  } else if (localHas && !remoteHas) {
+    await pushNow();     /* the cloud copy is empty; it doesn't get to win */
+  } else if (remoteHas && remote.updatedAt > localTs()) {
+    window.tdAdopt(remote.data, remote.updatedAt);
+    window.toast('Loaded your teams from the cloud ☁️');
+  } else {
+    await pushNow();
+  }
+  localStorage.setItem('td-sync-uid', user.uid);
+
+  unsub = Fs.onSnapshot(docRef(), (s) => {
+    if (s.metadata.hasPendingWrites || !s.exists()) return;
+    const r = s.data();
+    if (!(r.updatedAt > localTs())) return;
+    /* Same rule live. Clearing everything really is something people do, so this
+       asks rather than refusing — but it asks, because the alternative is a
+       device quietly emptying itself while its owner is looking at another tab. */
+    if (!window.tdHasData(r.data) && window.tdHasData(window.tdGet())) {
+      const keep = !confirm('Another device has cleared all its Team Dashboard data.\n\n'
+        + 'Clear this device too? Cancel keeps what\'s on this device and restores it '
+        + 'to your other devices.');
+      if (keep) {
+        touchLocal();
+        pushNow().catch(setSyncError);
+        window.toast('Kept this device’s data');
+        return;
+      }
+    }
+    window.tdAdopt(r.data, r.updatedAt);
+    window.toast('Synced from another device ☁️');
+  }, (e) => {
+    /* A listener that errors is dropped by Firestore and never fires again.
+       Without this second argument, another device's updates would just stop
+       arriving with the header still saying "syncing". */
+    setSyncError(e);
+    unsub = null;
+  });
+}
+
+async function pushNow() {
+  if (!user) return;
+  await Fs.setDoc(docRef(), { data: window.tdGet(), updatedAt: localTs() || Date.now() });
+  clearSyncError();
+}
+
+/* Called by save() on every local change; debounced so rapid edits batch up. */
+window.cloudPush = () => {
+  if (!user) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => pushNow().catch(setSyncError), 1200);
+};
 </script>
 </body>
 </html>

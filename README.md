@@ -1,7 +1,8 @@
 # Team Dashboard
 
-Four weekly flow metrics for a delivery team, from nothing but a list of completed and started
-dates. A web port of the "Team Dashboard v5" Excel workbook, minus the 20-second recalculation.
+Four weekly flow metrics for as many delivery teams as you like, from nothing but a list of
+completed and started dates. A web port of the "Team Dashboard v5" Excel workbook, minus the
+20-second recalculation.
 
 **Live:** https://eagleadams86.github.io/team-dashboard/
 
@@ -16,9 +17,19 @@ Paste your work items, get four charts:
 
 Each chart carries a dashed linear trend line, the same as the workbook's.
 
+## Teams
+
+Each team keeps its own list of work items; the picker in the header chooses which one the
+dashboard is showing. Add, rename and delete teams from the **Teams** card on the Your Data
+tab. Settings are shared by every team — one place to say what "unplanned" means.
+
+Which team you're looking at is a position on *this* device and deliberately isn't synced:
+switching team on the laptop shouldn't yank the phone to the same team.
+
 ## Getting your data in
 
-The **Your Data** tab takes three columns pasted straight from Excel, Jira or a CSV:
+The **Your Data** tab takes three columns pasted straight from Excel, Jira or a CSV, and loads
+them into the team currently selected in the header:
 
 ```
 Completed Date   Start Date   Type
@@ -40,9 +51,9 @@ There's no inline row editing — to fix something, correct it at the source and
 
 ## Settings
 
-Everything the four charts depend on, defaulted to the workbook's own values:
+Everything the four charts depend on, shared by all your teams and defaulted to the workbook's
+own values:
 
-- **Team name** — appears in the page title
 - **Unplanned work type** — the exact text in your Type column that means "unplanned"
   (`Defect` by default). Anything blank, or not matching, counts as planned work.
 - **Same-day cycle time** — what an item that starts and finishes on one day is worth
@@ -75,21 +86,72 @@ One deliberate departure from the workbook: it colours the net-flow bars blue an
 app uses the theme's accent for positive and `--serious` for negative — not the red/green pair,
 because the coaching goal is "keep around zero", so neither sign is good or bad.
 
+## Cross-device sync (Firebase, free tier — optional)
+
+Signing in with Google is entirely optional and does one thing: puts the same teams on your
+other devices. Without it the app is fully usable and fully local.
+
+**Status: built but switched off.** `FIREBASE_CONFIG` at the top of the bottom
+`<script type="module">` block in `index.html` is `null`, so the sync button is hidden and no
+Firebase code is ever fetched. To turn it on:
+
+1. At [console.firebase.google.com](https://console.firebase.google.com), create a project
+   (Analytics not needed)
+2. **Build → Authentication → Get started → Google** — enable the Google sign-in provider
+3. **Authentication → Settings → Authorized domains** — add `eagleadams86.github.io`
+4. **Build → Firestore Database → Create database** (production mode), then paste the contents
+   of [`firestore.rules`](firestore.rules) into **Rules**
+5. **Project settings → Your apps → Add app → Web** — copy the `firebaseConfig` object and
+   paste it as the value of `FIREBASE_CONFIG`, **and** put its `authDomain` into the
+   `frame-src` of the Content-Security-Policy `<meta>` at the top of `index.html` — the
+   sign-in popup is blocked if those two disagree
+
+The config object is not a secret; access is controlled by the rules, which restrict every
+user to their own document. Each person who signs in gets their own private data — sharing
+the app means sharing the URL, not the data. There is deliberately no shared-workspace model.
+
+`firestore.rules` is a checked-in copy for the audit trail; the console is what's live. If the
+rules ever change there, update the file to match.
+
+**How sync behaves:** `localStorage` stays in charge and the cloud only mirrors it. The
+**first** time a given Google account signs in on a browser, if both sides already hold data,
+a dialog asks which copy to keep — deliberately not a timestamp guess, which cost real data in
+the sibling app. Underneath that, **an empty copy never beats a copy with data in it**,
+whichever is newer: without that rule, signing in on a fresh browser would push its emptiness,
+stamped `now`, over the device that actually had the teams. The one empty team a fresh browser
+creates doesn't count as data; teams you named do.
+
+If sync stops working the button says **"⚠️ Not syncing"** and the note at the foot of the page
+gives the cause and the remedy — a silent failure would leave the app claiming to sync while
+nothing had left the browser for weeks. There's no retry button on purpose: Firestore retries
+the transient causes itself, and the next successful save clears the state.
+
 ## Running it
 
-Single page, no build step, no accounts, no network calls. Open `index.html` directly, or
-serve the folder:
+Single page, no build step, no accounts required. Open `index.html` directly, or serve the
+folder:
 
 ```bash
 python3 -m http.server 8013
 ```
 
-Your data lives in `localStorage` and never leaves the browser.
+Your data lives in `localStorage`, and leaves the browser only if you sign in.
+[`privacy.html`](privacy.html) is the privacy policy — keep it and its effective date current
+if what the app stores, or where it sends it, ever changes.
+
+A Content-Security-Policy `<meta>` at the top of `index.html` restricts the page to its own
+scripts plus Firebase's CDN, and network access to the handful of Firebase endpoints sync
+uses. **Any new external endpoint has to be added there too**, or it fails only in production.
 
 ## Tests
 
 `tests.html` pins the pure functions by loading the real `index.html` in a hidden iframe — no
 copies to drift. It must be served over `http://localhost`, not opened as a file.
+
+Beyond the metrics it covers the sync boundary: `sanitizeTeams()` (ids arriving from the cloud
+end up in `data-` attributes and `<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is
+replaced), `normalizeSettings()`, and `hasData()` — the predicate the "empty never beats data"
+rule rests on.
 
 The expectations aren't invented: they're the cached formula results from the workbook itself
 for its own 141-item sample. If the suite is green, this app reproduces Excel — down to
@@ -104,6 +166,8 @@ for its own 141-item sample. If the suite is green, this app reproduces Excel �
 | `chart.min.js` | Chart.js 4.4.1, vendored (no CDN) |
 | `theme.css` | Copy of the palette from [claude-theme-pack](https://github.com/eagleadams86/claude-theme-pack); also inlined into `index.html` so it works over `file://` |
 | `tests.html` | Pure-function tests |
+| `privacy.html` | Privacy policy — exists because other people may sign in |
+| `firestore.rules` | Checked-in copy of the deployed security rules |
 
 Four themes — Midnight (default), Dark, Light, Sepia — from the shared theme pack. Palette
 changes belong in the pack, not here.
