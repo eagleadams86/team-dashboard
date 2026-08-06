@@ -50,6 +50,9 @@ silently corrupt every number on the dashboard.
 - Dates can be ISO (`2015-01-21`), numeric (`21/01/2015`), month-name (`21 Jan 2015`) or a raw
   day-count serial (`42043`). Where `03/04/2015` is genuinely ambiguous, the app auto-detects
   day-first vs month-first from the rest of your data — or you can force it.
+- A **time on the end is fine** — `9/23/2025 10:21`, `23/Sep/25 4:12 PM`, `2025-09-23T10:21:00Z`.
+  Jira and Excel export timestamps rather than bare dates, and every metric here works in whole
+  days, so the clock is dropped. The date underneath still decides day-first vs month-first.
 
 **Work in progress belongs in the paste.** An item with a start date and no completion is not
 an error — it's work you've begun, and it counts on the Predictability chart as work started.

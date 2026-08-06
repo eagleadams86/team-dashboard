@@ -275,6 +275,14 @@ function run(TD, win) {
   is(iso(TD.parseDate('21-Jan-15', 'dmy')), '2015-01-21', 'two-digit year expands to 2015');
   is(iso(TD.parseDate('42043', 'dmy')), '2015-02-08', 'a date given as a raw day-count serial');
 
+  /* Jira and Excel hand over timestamps, not bare dates — the clock is dropped. */
+  is(iso(TD.parseDate('9/23/2025 10:21', 'mdy')), '2025-09-23', 'm/d/yyyy with a time on the end');
+  is(iso(TD.parseDate('23/09/2025 14:05:00', 'dmy')), '2025-09-23', 'd/m/yyyy with seconds');
+  is(iso(TD.parseDate('23/Sep/25 4:12 PM', 'dmy')), '2025-09-23', 'Jira dd/Mon/yy with am/pm');
+  is(iso(TD.parseDate('2025-09-23T10:21:00Z', 'dmy')), '2025-09-23', 'ISO timestamp with T and Z');
+  is(iso(TD.parseDate('9/23/2025 0:00', 'mdy')), '2025-09-23', 'midnight is still a date');
+  is(TD.parseDate('10:21', 'dmy'), null, 'a bare time is not a date');
+
   is(TD.parseDate('', 'dmy'), null, 'blank is not a date');
   is(TD.parseDate('   ', 'dmy'), null, 'whitespace is not a date');
   is(TD.parseDate('Done', 'dmy'), null, 'a word is not a date');
@@ -284,6 +292,12 @@ function run(TD, win) {
   is(TD.detectDateOrder([['21/01/2015', '14/01/2015']]), 'dmy', 'detects day-first from a >12 day');
   is(TD.detectDateOrder([['01/21/2015', '01/14/2015']]), 'mdy', 'detects month-first from a >12 second field');
   is(TD.detectDateOrder([['03/04/2015', '01/02/2015']]), 'dmy', 'falls back to day-first when nothing decides');
+  /* The whole export being timestamps used to hide every clue and silently
+     fall back to day-first, which then failed on every US-format row. */
+  is(TD.detectDateOrder([['Task', 'DAE-88', '9/23/2025 10:21', '9/23/2025 0:00']]), 'mdy',
+     'detects month-first through a time suffix');
+  is(TD.detectDateOrder([['Task', 'DAE-88', '23/09/2025 10:21', '23/09/2025 0:00']]), 'dmy',
+     'detects day-first through a time suffix');
 
   /* ────────────────────────────────────────────────────────── */
   group('Paste parsing');
@@ -302,6 +316,19 @@ function run(TD, win) {
   is(pc.rows.length, 2, 'comma-separated rows parse');
   is(pc.skippedHeader, false, 'no header to skip');
   is(pc.rows[0].type, 'Bug', 'type survives comma splitting');
+
+  /* A whole Jira export of US-format timestamps: every row used to be reported
+     as a badly formatted completion date and nothing loaded. */
+  const pt = TD.parsePastedRows(
+    'Work Type\tKey\tResolved\tStart date\n' +
+    'Task\tDAE-88\t9/23/2025 10:21\t9/23/2025 0:00\n' +
+    'Story\tDAE-87\t10/2/2025 9:34\t9/23/2025 0:00\n' +
+    'Story\tDAE-1460\t7/29/2026 16:53\t7/27/2026 0:00', 'auto');
+  is(pt.dateOrder, 'mdy', 'the time suffix no longer hides the month-first clue');
+  is(pt.rows.length, 3, 'all three timestamped rows load');
+  is(pt.badCompleted.length, 0, 'no timestamp is reported as a bad date');
+  is(iso(pt.rows[2].completed), '2026-07-29', 'a month-first date past the 12th parses');
+  is(pt.rows[0].type, 'Task', 'the type column still comes through');
 
   const pb = TD.parsePastedRows('Completed\tStarted\tType\nnot-a-date\t2015-01-14\t\n2015-01-21\tnope\t\n2015-01-22\t\t', 'auto');
   is(pb.rows.length, 2, 'a bad completion date drops the row, a bad start date does not');

@@ -728,10 +728,19 @@ function buildDate(y, m, d) {
   return out;
 }
 
+/* A real export hands over a timestamp far more often than a bare date:
+   "9/23/2025 10:21", "23/09/2025 14:05:00", "23/Sep/25 4:12 PM",
+   "2025-09-23T10:21:00Z". Every metric here works in whole days, so the clock
+   is dropped rather than parsed — without this the whole paste reads as
+   badly formatted dates. Anchored at the end, so a cell that is only a time
+   ("10:21") still isn't a date. */
+const TIME_SUFFIX = /[T\s]+\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?\s*(?:[ap]\.?m\.?)?\s*(?:z|[+-]\d{2}:?\d{2})?$/i;
+function withoutTime(s) { return s.replace(TIME_SUFFIX, '').trim(); }
+
 /* order: 'dmy' | 'mdy'. Returns a Date, or null if the text isn't a date. */
 function parseDate(text, order) {
   if (text == null) return null;
-  const s = String(text).trim();
+  const s = withoutTime(String(text).trim());
   if (!s) return null;
 
   /* ISO-ish: 2015-01-21, 2015/01/21 — year first is never ambiguous. */
@@ -776,7 +785,7 @@ function detectDateOrder(rawRows) {
   let dayFirst = 0, monthFirst = 0;
   for (const cells of rawRows) {
     for (const cell of cells) {
-      const m = String(cell || '').trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+      const m = withoutTime(String(cell || '').trim()).match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
       if (!m) continue;
       if (+m[1] > 12) dayFirst++;
       else if (+m[2] > 12) monthFirst++;
