@@ -91,9 +91,12 @@ because the coaching goal is "keep around zero", so neither sign is good or bad.
 Signing in with Google is entirely optional and does one thing: puts the same teams on your
 other devices. Without it the app is fully usable and fully local.
 
-**Status: built but switched off.** `FIREBASE_CONFIG` at the top of the bottom
-`<script type="module">` block in `index.html` is `null`, so the sync button is hidden and no
-Firebase code is ever fetched. To turn it on:
+Sync is **enabled** in this deployment, backed by the `teamdashboard-6723f` Firebase project.
+`FIREBASE_CONFIG`, at the top of the bottom `<script type="module">` block in `index.html`,
+points at it; setting that constant back to `null` returns the app to local-only mode and
+hides all sync UI.
+
+To recreate the setup from scratch (e.g. in a fork):
 
 1. At [console.firebase.google.com](https://console.firebase.google.com), create a project
    (Analytics not needed)

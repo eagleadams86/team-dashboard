@@ -15,7 +15,7 @@
   is the project's authDomain — it has to match FIREBASE_CONFIG or the Google
   sign-in popup is blocked.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://teamdashboard-app.firebaseapp.com; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; frame-src https://teamdashboard-6723f.firebaseapp.com; base-uri 'none'; form-action 'self'">
 <!--
   Team Dashboard — a web port of the "Team Dashboard v5" Excel workbook.
 
@@ -1768,9 +1768,16 @@ selectTab(activeRows().length ? 'dashboard' : 'data');
    from another device, the newer side by 'td-updated' wins — except that an
    empty copy never silently beats one with data in it. startSync() has the
    full rule. */
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDLVKHBFVlCOT6aI-p6CusbJS1ZazG7rFo",
+  authDomain: "teamdashboard-6723f.firebaseapp.com",
+  projectId: "teamdashboard-6723f",
+  storageBucket: "teamdashboard-6723f.firebasestorage.app",
+  messagingSenderId: "158011010857",
+  appId: "1:158011010857:web:df0fca1be501f079c59138"
+};
 
-const SDK = 'https://www.gstatic.com/firebasejs/12.16.0/';
+const SDK = 'https://www.gstatic.com/firebasejs/12.17.1/';
 const btn = document.getElementById('syncBtn');
 const privacyNote = document.getElementById('privacyNote');
 const localTs = () => Number(localStorage.getItem('td-updated') || 0);

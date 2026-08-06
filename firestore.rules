@@ -8,9 +8,13 @@ rules_version = '2';
 // changed in the console, update this file to match. (Same pattern as the
 // sprint-velocity and paptrack-ios repos.)
 //
-// Not yet verified against a deployed database: the Firebase project has not been
-// created at the time of writing. Paste these rules when creating it, then record
-// the verification date on this line.
+// Project: teamdashboard-6723f.
+//
+// Confirmed from outside on 2026-08-06 that the database exists and denies
+// unauthenticated reads on both /teamdashboard/{uid} and every other path. Note
+// what that does NOT prove: an unauthenticated probe cannot tell a correct
+// per-user rule from a blanket deny-all, and a signed-in probe is the only thing
+// that can. Re-verify the rule *text* in the console after any change.
 service cloud.firestore {
   match /databases/{database}/documents {
 
