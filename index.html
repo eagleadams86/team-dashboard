@@ -302,8 +302,10 @@ select { cursor: pointer; }
    row still line up. */
 .grid.two > div { display: flex; flex-direction: column; justify-content: flex-end; }
 .grid.two > div > label { flex: 0 0 auto; }
-.grid.charts { grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); }
-@media (max-width: 560px) { .grid.charts { grid-template-columns: 1fr; } }
+/* Charts sit in a fixed 2x2 grid so the four metrics stay paired, whatever the
+   window width; collapse to one column when 2 no longer fit. */
+.grid.charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 940px) { .grid.charts { grid-template-columns: 1fr; } }
 
 /* dashboard controls strip */
 .controls {

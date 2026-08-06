@@ -75,6 +75,21 @@ Everything the four charts depend on, shared by all your teams:
 
 Nothing else is here on purpose: a setting that changes nothing is worse than a missing one.
 
+### Settings you've already saved keep winning
+
+Defaults only fill in what isn't saved. A browser that has used the app before keeps whatever
+was set there, so a changed default doesn't reach it — **the `Bug` defaults above show up on a
+fresh browser, or after "Reset settings to defaults"**, not on a browser still holding the old
+`Defect` values.
+
+Two renames have happened in the stored data, and both are handled on load so nothing has to be
+re-entered:
+
+- The unplanned-work-type setting was saved as `defectType` and is now `unplannedType`. An old
+  saved value is carried across, so a team that had set it to `Incident` still has `Incident`.
+- The first version stored one team's rows under `td-rows`, with the team name in `td-settings`.
+  Those fold into a single team the first time a newer version loads, and the old keys go.
+
 ## How the numbers are worked out
 
 `derive()` in [index.html](index.html) is the only place any figure is computed. The parts
@@ -143,8 +158,11 @@ What actually guards the data, checked on 2026-08-06:
 | Anonymous sign-up | Disabled — `accounts:signUp` returns `ADMIN_ONLY_OPERATION` |
 | Other Google APIs | None enabled in the project, so the key reaches nothing else |
 
-The one forward-looking risk is that enabling some other API in the project later would widen
-what an unrestricted key can reach. That's what the key restrictions below are for.
+The one forward-looking risk is that enabling some other API in this project later would widen
+what the key can reach. The rule that follows: if a new Google API is ever turned on here,
+restrict the key at the same time — Google Cloud console → **APIs & Services → Credentials →
+the browser key → Application restrictions → HTTP referrers**, limited to
+`eagleadams86.github.io`.
 
 `firestore.rules` is a checked-in copy for the audit trail; the console is what's live. If the
 rules ever change there, update the file to match.
@@ -191,10 +209,11 @@ copies to drift. It must be served over `http://localhost`, not opened as a file
 
 Beyond the metrics it covers `detectColumns()` (a leading key column, the dates either way
 round, header names beating position, a free-text summary not being mistaken for the type),
-work-in-progress handling — including the net-flow bug stated as a test — and the sync
+work-in-progress handling — including the net-flow miscount stated as a test — and the sync
 boundary: `sanitizeTeams()` (ids arriving from the cloud end up in `data-` attributes and
-`<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is replaced), `normalizeSettings()`,
-and `hasData()`, the predicate the "empty never beats data" rule rests on.
+`<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is replaced), `normalizeSettings()`
+(including the `defectType` → `unplannedType` carry-over), and `hasData()`, the predicate the
+"empty never beats data" rule rests on.
 
 The expectations are pinned to a fixed 141-item sample, right down to the weekly throughput
 series, `10.2857…` days average cycle time in week 1, `−5` net flow in week 1, and the 19.92%
@@ -210,6 +229,7 @@ average bug rate in the Quality chart title. Change the maths and the suite says
 | `tests.html` | Pure-function tests |
 | `privacy.html` | Privacy policy — exists because other people may sign in |
 | `firestore.rules` | Checked-in copy of the deployed security rules |
+| `favicon.ico` | Tab icon |
 
 Four themes — Midnight (default), Dark, Light, Sepia — from the shared theme pack. Palette
 changes belong in the pack, not here.
