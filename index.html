@@ -495,6 +495,24 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
       <p class="hint">Read-only — to correct a row, fix it in your source and paste again.</p>
       <div id="dataTable" style="margin-top:var(--sp-5)"></div>
     </div>
+
+    <div class="card">
+      <h2>Back up &amp; restore</h2>
+      <p class="hint">
+        One JSON file holding every team, their work items and your shared settings — a copy
+        you keep, independent of this browser and of any Google account.
+      </p>
+      <div class="btn-row" style="margin-top:var(--sp-5)">
+        <button class="btn" id="btnExport" type="button">⬇ Download backup (JSON)</button>
+        <button class="btn" id="btnImport" type="button">⬆ Restore from backup…</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
+      <div class="note info" style="margin-top:var(--sp-6)">
+        Restoring <strong>replaces every team in this browser</strong>. You'll see what the file
+        holds and be asked to confirm first — and if you're signed in, the restored copy becomes
+        the one your other devices get.
+      </div>
+    </div>
   </section>
 
   <!-- ══════════════════ SETTINGS ══════════════════ -->
@@ -1294,12 +1312,23 @@ function hasData(d) {
   return d.teams.length > 1 || d.teams.some(t => t && Array.isArray(t.rows) && t.rows.length);
 }
 
+/* "Is this file plainly one of ours?" — asked before a restore, never after.
+   hydrateState() is deliberately forgiving: hand it {} and it hands back a valid
+   empty dashboard. That is right for a damaged saved copy and catastrophic for a
+   file chosen from a Downloads folder, because restoring the wrong JSON would
+   quietly replace every team with nothing instead of failing. A backup is
+   recognised by carrying a teams array — the one thing no other file will have
+   by accident. */
+function isBackup(raw) {
+  return !!raw && typeof raw === 'object' && Array.isArray(raw.teams);
+}
+
 window.tdGet = serializeState;
 window.tdHasData = hasData;
 /* Pure helpers tests.html pins. Kept beside the sync hooks because they are the
    same boundary: everything here decides what a copy from outside is allowed to
    turn into. */
-window.TDState = { sanitizeTeams, hydrateState, normalizeSettings, hasData, ID_OK };
+window.TDState = { sanitizeTeams, hydrateState, normalizeSettings, hasData, isBackup, ID_OK };
 window.tdCounts = (d) => ({
   teams: (d && d.teams) ? d.teams.length : 0,
   items: (d && d.teams) ? d.teams.reduce((n, t) => n + ((t.rows && t.rows.length) || 0), 0) : 0
@@ -1898,6 +1927,83 @@ $('btnResetSettings').addEventListener('click', () => {
   save();
   renderSettingsForm();
   renderAll();
+});
+
+/* ── Backup and restore ─────────────────────────────────────────────────────
+   The file is the same shape that goes to localStorage and the cloud, plus a
+   little provenance. Keeping it identical to serializeState() means a restore
+   can go through hydrateState() — the very same sanitising a synced copy gets,
+   so a hand-edited backup can't smuggle in an id that a synced copy couldn't.
+
+   What is deliberately NOT in the file: your theme, and which team you were
+   looking at. Both are positions on this device rather than data, for the same
+   reason they don't sync. */
+
+/* A UTC slice would stamp tomorrow's date on an evening export west of
+   Greenwich, which is exactly when a filename misleads. */
+function todayLocalISO() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+$('btnExport').addEventListener('click', () => {
+  const payload = Object.assign(
+    { app: 'team-dashboard', version: 2, exported: new Date().toISOString() },
+    serializeState()
+  );
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `team-dashboard-${todayLocalISO()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  /* Revoking in the same tick races the download starting — Chrome usually wins,
+     Firefox has historically handed back an empty file. A silently empty backup
+     is the worst outcome available here, so give it a turn of the event loop. */
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const c = window.tdCounts(payload);
+  window.toast(`Backup downloaded — ${c.teams} team${c.teams === 1 ? '' : 's'}, ${c.items} item${c.items === 1 ? '' : 's'}`);
+});
+
+$('btnImport').addEventListener('click', () => $('importFile').click());
+
+$('importFile').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed = null;
+    try { parsed = JSON.parse(String(reader.result)); }
+    catch (err) { parsed = null; }
+    if (!isBackup(parsed)) {
+      window.toast('That file isn’t a Team Dashboard backup');
+      e.target.value = '';
+      return;
+    }
+    const now = window.tdCounts(serializeState());
+    const inc = window.tdCounts(parsed);
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const msg = `Restore ${plural(inc.teams, 'team')} and ${plural(inc.items, 'item')} from this file?\n\n`
+      + `This replaces the ${plural(now.teams, 'team')} and ${plural(now.items, 'item')} in this browser. `
+      + `There is no undo.`;
+    if (!confirm(msg)) { e.target.value = ''; return; }
+    /* tdAdopt is the cloud's path in and deliberately doesn't push — a copy that
+       came from the cloud has no business being sent back. A restore from a file
+       is the opposite case: this device now holds the newest copy, so it has to
+       be stamped and pushed like any other edit. */
+    window.tdAdopt(parsed);
+    save();
+    window.toast(`Backup restored — ${plural(inc.teams, 'team')}, ${plural(inc.items, 'item')}`);
+    e.target.value = '';
+  };
+  reader.onerror = () => {
+    window.toast('Could not read that file');
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -116,6 +116,28 @@ Net-flow bars use the theme's accent for positive and `--serious` for negative �
 not the red/green pair, because the coaching goal is "keep around zero", so neither sign is
 good or bad.
 
+## Back up & restore
+
+The **Back up & restore** card at the foot of the Your Data tab writes one JSON file holding
+every team, their work items and your shared settings — `team-dashboard-YYYY-MM-DD.json`. It's
+a copy you keep, independent of this browser and of any Google account, and it's the only way
+back from a cleared browser if you've never signed in.
+
+**Restoring replaces everything.** You're shown what the file holds against what's already
+here — *"Restore 2 teams and 3 items from this file? This replaces the 1 team and 0 items in
+this browser"* — and nothing changes until you confirm. If you're signed in, the restored copy
+is stamped as the newest and pushed, so it becomes what your other devices get.
+
+A restored file goes through exactly the same sanitising as a copy arriving from the cloud
+(`hydrateState`), so a hand-edited backup can't introduce anything a synced copy couldn't.
+Before that, `isBackup()` checks the file is plainly one of ours: `hydrateState` is deliberately
+forgiving and will turn `{}` into a valid empty dashboard, which is right for a damaged saved
+copy and catastrophic for the wrong file picked out of a Downloads folder. Choosing a file that
+isn't a backup is refused outright and leaves your data alone.
+
+**Two things are deliberately not in the file:** your theme, and which team you were looking
+at. Both are positions on this device rather than data — the same reason they don't sync.
+
 ## Cross-device sync (Firebase, free tier — optional)
 
 Signing in with Google is entirely optional and does one thing: puts the same teams on your
@@ -230,13 +252,17 @@ Your data lives in `localStorage`, and leaves the browser only if you sign in.
 if what the app stores, or where it sends it, ever changes.
 
 A Content-Security-Policy `<meta>` at the top of `index.html` restricts the page to its own
-scripts plus Firebase's CDN, and network access to the handful of Firebase endpoints sync
-uses. **Any new external endpoint has to be added there too**, or it fails only in production.
+scripts plus Firebase's CDN and Google's sign-in client, and network access to the handful of
+endpoints sync uses. **Any new external endpoint has to be added there too**, or it fails only
+in production.
 
-One piece of expected console noise: Google's auth iframe fires a telemetry beacon at
-`apis.google.com/js/gen_204` and the policy blocks it. Sign-in is unaffected — it's
-fire-and-forget logging — and the block is what makes the privacy policy's "no analytics"
-claim true, so don't allow it through.
+`accounts.google.com` appears in `script-src`, `connect-src` *and* `frame-src` because sign-in
+goes through Google Identity Services — see [Why sign-in doesn't use Firebase's
+popup](#why-sign-in-doesnt-use-firebases-popup) above.
+
+Note for anyone comparing against the sibling apps: this one no longer allows `apis.google.com`
+and no longer produces the `gen_204` telemetry noise those apps document, because the auth
+iframe that fired it is gone.
 
 ## Tests
 
@@ -248,8 +274,9 @@ round, header names beating position, a free-text summary not being mistaken for
 work-in-progress handling — including the net-flow miscount stated as a test — and the sync
 boundary: `sanitizeTeams()` (ids arriving from the cloud end up in `data-` attributes and
 `<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is replaced), `normalizeSettings()`
-(including the `defectType` → `unplannedType` carry-over), and `hasData()`, the predicate the
-"empty never beats data" rule rests on.
+(including the `defectType` → `unplannedType` carry-over), `hasData()`, the predicate the
+"empty never beats data" rule rests on, and `isBackup()`, the guard that stops the wrong JSON
+file being restored over real data.
 
 The expectations are pinned to a fixed 141-item sample, right down to the weekly throughput
 series, `10.2857…` days average cycle time in week 1, `−5` net flow in week 1, and the 19.92%

@@ -592,6 +592,21 @@ function run(TD, win) {
      'two teams count even with no rows — naming them was real work');
 
   /* ────────────────────────────────────────────────────────── */
+  group('isBackup — the guard in front of a restore');
+
+  /* hydrateState turns anything into a valid empty dashboard, so this check is
+     the only thing standing between "wrong file chosen" and "every team gone". */
+  is(S.isBackup(null), false, 'null is not a backup');
+  is(S.isBackup('{}'), false, 'an unparsed string is not a backup');
+  is(S.isBackup({}), false, 'an object with no teams array is not a backup');
+  is(S.isBackup({ teams: 'Alpha' }), false, 'teams must be an array, not a string');
+  is(S.isBackup({ settings: { unplannedType: 'Bug' } }), false,
+     'settings alone is not enough — that would restore zero teams over real data');
+  is(S.isBackup({ teams: [] }), true, 'an empty teams array is a legitimate backup of nothing');
+  is(S.isBackup({ app: 'team-dashboard', version: 2, teams: [{ id: 'a', name: 'A', rows: [] }] }), true,
+     'a real export is recognised');
+
+  /* ────────────────────────────────────────────────────────── */
   group('hydrateState round-trip');
 
   const round = S.hydrateState({
