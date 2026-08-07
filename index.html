@@ -3032,7 +3032,27 @@ async function init() {
   ]);
   A = authMod; Fs = fsMod;
   const app = initializeApp(FIREBASE_CONFIG);
-  auth = A.getAuth(app);
+  /* initializeAuth rather than getAuth, to keep apis.google.com out of the page.
+     getAuth() always wires in browserPopupRedirectResolver, and on Safari, iOS
+     and mobile browsers the SDK initialises that resolver eagerly at startup —
+     which fetches https://apis.google.com/js/api.js to build the gapi iframe
+     that carries popup and redirect results back. Nothing here reads those
+     results: sign-in is signInWithCredential, and signInWithPopup and
+     signInWithRedirect are never called. CSP blocked the script, and the only
+     consequence was a red line in the console on phones and in Safari. Widening
+     script-src would have been the wrong fix — it admits a script no code reads.
+     Token refresh (securetoken.googleapis.com), sign-out and the cross-tab
+     session all run elsewhere in the SDK and never touch the resolver.
+
+     The three persistences are the ones getAuth would have set, in its order, so
+     where the session is stored and how tabs see each other are unchanged.
+
+     ⚠️ signInWithPopup, signInWithRedirect and phone sign-in now fail with
+     auth/argument-error. If one is ever wanted, pass browserPopupRedirectResolver
+     to that call — don't go back to getAuth() and reintroduce this at startup. */
+  auth = A.initializeAuth(app, {
+    persistence: [A.indexedDBLocalPersistence, A.browserLocalPersistence, A.browserSessionPersistence],
+  });
   db = Fs.getFirestore(app);
   A.onAuthStateChanged(auth, (u) => {
     user = u;
