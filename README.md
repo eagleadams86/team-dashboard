@@ -66,7 +66,8 @@ told from the issue-key column by repetition — keys never repeat, types always
 settles on is **named back to you** after every paste, because a wrong guess here would
 silently corrupt every number on the dashboard.
 
-- Tabs and commas both work, and a header row is skipped automatically.
+- Tabs and commas both work, and a header row is skipped automatically. Quoted CSV fields are
+  handled — `"Jan 21, 2015"` or `"Bug, urgent"` stays one cell, comma and all.
 - Dates can be ISO (`2015-01-21`), numeric (`21/01/2015`), month-name (`21 Jan 2015`) or a raw
   day-count serial (`42043`). Where `03/04/2015` is genuinely ambiguous, the app auto-detects
   day-first vs month-first from the rest of your data — or you can force it.
@@ -122,7 +123,9 @@ worth knowing:
   week 1. Written out by hand, because JavaScript has no week-number function.
 - **The date window trims the axis, not the data.** "Show data for most recent 3 months" moves
   where the chart starts; every item still counts toward the weeks that remain. That's
-  deliberate.
+  deliberate. The axis also never starts before the team's first completed week — a window
+  longer than the data doesn't pad empty weeks in front, which would read as real
+  zero-throughput weeks and dilute the tile averages for a young team.
 - **Cycle time** is `completed − started`, floored at 0, with same-day items taking the
   configured value.
 - **Unfinished items count as work started, and nothing else.** They move net flow but add
@@ -349,13 +352,19 @@ iframe that fired it is gone.
 ## Tests
 
 `tests.html` pins the pure functions by loading the real `index.html` in a hidden iframe — no
-copies to drift. It must be served over `http://localhost`, not opened as a file.
+copies to drift. It must be served over `http://localhost`, not opened as a file. The iframe is
+marked `data-td-tests`, which the sync module checks so no sign-in session ever boots inside
+the harness.
 
 Beyond the metrics it covers `detectColumns()` (a leading key column, the dates either way
 round, header names beating position, a free-text summary not being mistaken for the type),
-work-in-progress handling — including the net-flow miscount stated as a test — and the sync
+work-in-progress handling — including the net-flow miscount stated as a test, and a WIP row
+whose *empty completed cell comes first*, which a line-trim once shifted into a completed row —
+the week straddling New Year (whose cycle times once vanished from the chart and tile), quoted
+CSV fields, the share-link codec round trip on both wire formats, and the sync
 boundary: `sanitizeTeams()` (ids arriving from the cloud end up in `data-` attributes and
-`<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is replaced), `normalizeSettings()`
+`<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is replaced, names are capped, types
+coerced to strings), `normalizeSettings()`
 (including the `defectType` → `unplannedType` carry-over), `hasData()`, the predicate the
 "empty never beats data" rule rests on, and `isBackup()`, the guard that stops the wrong JSON
 file being restored over real data.

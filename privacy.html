@@ -86,12 +86,16 @@
 
   <h2>What is never sent anywhere</h2>
   <ul>
-    <li>Nothing at all leaves your browser unless you sign in.</li>
+    <li>Nothing you store in the app ever leaves your browser unless you sign in.</li>
     <li>There is no analytics, no tracking pixels, no advertising, no cookies beyond what
       Google's sign-in itself sets.</li>
-    <li>The page loads no third-party code except Firebase's own SDK from Google's CDN, and
-      only when sync is switched on. A Content-Security-Policy on the page restricts network
-      access to that short list.</li>
+    <li>The page loads no third-party code except Firebase's SDK from Google's CDN and
+      Google's own sign-in client — both only while sync is switched on. A
+      Content-Security-Policy on the page restricts network access to that short list.</li>
+    <li>One incidental request exists: expanding the <em>Recent changes</em> box at the foot
+      of the page fetches this app's commit list from GitHub's public API. Like any web
+      request, that necessarily shows GitHub your IP address — but none of your data is sent,
+      and nothing is fetched unless you open the box.</li>
   </ul>
 
   <h2>Deleting your data</h2>

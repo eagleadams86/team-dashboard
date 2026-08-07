@@ -10,7 +10,14 @@
      in a hidden same-origin iframe and calls its functions directly, so what's
      tested is exactly what ships — no copies, no build step. Serve over
      http://localhost (python3 -m http.server 8013); file:// iframes are blocked
-     in some browsers. Nothing here writes localStorage. */
+     in some browsers.
+
+     Two honest caveats about "read-only": the iframe boots the real app, which
+     writes its own td-* keys in THIS origin's localStorage (localhost — your
+     deployed data lives on a different origin and is never touched). And the
+     iframe is marked data-td-tests, which index.html checks so the sync module
+     never initialises inside the harness — without that, an origin that had
+     ever signed in would start real sync traffic mid-test. */
   body { background: var(--bg); color: var(--text-primary); margin: 0;
          font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
   .wrap { max-width: 900px; margin: 0 auto; padding: 28px 20px 60px; }
@@ -36,14 +43,16 @@
 <div class="wrap">
   <h1>Team Dashboard — pure-function tests</h1>
   <p class="sub">
-    Runs against the real <code>index.html</code> in a hidden iframe. Read-only: nothing is saved.
+    Runs against the real <code>index.html</code> in a hidden iframe — your deployed data is
+    on another origin and can't be touched, and sync stays off inside the harness.
     The <code>derive()</code> expectations are pinned to a fixed 141-item sample, so a
     passing run means the metrics still come out exactly as they always have.
   </p>
   <div id="summary">Loading app…</div>
   <table><tbody id="out"></tbody></table>
 </div>
-<iframe id="app" src="index.html" style="position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px" aria-hidden="true"></iframe>
+<!-- data-td-tests: index.html's sync module checks for this and stays off. -->
+<iframe id="app" src="index.html" data-td-tests style="position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px" aria-hidden="true"></iframe>
 
 <script>
 /* ── The reference sample: 141 items. Every expectation below is pinned to this
@@ -232,7 +241,7 @@ function near(actual, expected, name, eps) {
 }
 function ok(cond, name, msg) { record(!!cond, name, msg); }
 
-function run(TD, win) {
+async function run(TD, win) {
   const D = (y, m, d) => TD.utcDate(y, m, d);
   const iso = d => (d ? d.toISOString().slice(0, 10) : null);
 
@@ -316,6 +325,16 @@ function run(TD, win) {
   is(pc.rows.length, 2, 'comma-separated rows parse');
   is(pc.skippedHeader, false, 'no header to skip');
   is(pc.rows[0].type, 'Bug', 'type survives comma splitting');
+
+  /* A real CSV quotes fields that hold commas — splitting on every comma broke
+     exactly the rows that needed the quotes. */
+  const pq = TD.parsePastedRows(
+    '"Jan 21, 2015","Jan 14, 2015","Bug, urgent"\n"Jan 26, 2015","Jan 15, 2015","Bug, urgent"', 'auto');
+  is(pq.rows.length, 2, 'quoted CSV fields with commas inside parse as whole cells');
+  is(iso(pq.rows[0].completed), '2015-01-21', 'a quoted "Jan 21, 2015" is one date, not two cells');
+  is(pq.rows[0].type, 'Bug, urgent', 'a comma inside a quoted type survives');
+  is(TD.parsePastedRows('2015-01-21,2015-01-14,"He said ""go"""', 'auto').rows[0].type,
+     'He said "go"', 'a doubled quote inside a quoted field is a literal quote');
 
   /* A whole Jira export of US-format timestamps: every row used to be reported
      as a badly formatted completion date and nothing loaded. */
@@ -424,6 +443,20 @@ function run(TD, win) {
   ok(d1.weeks.length < d.weeks.length, 'a 1-month window shows fewer weeks',
      d1.weeks.length + ' vs ' + d.weeks.length);
 
+  /* A team younger than the window: the axis must not be padded with empty
+     weeks from before the team's first completion — those read as real
+     zero-throughput weeks and dilute every tile average. */
+  const young = [
+    { completed: D(2026, 5, 4),  started: D(2026, 4, 27), type: '' },
+    { completed: D(2026, 5, 26), started: D(2026, 5, 14), type: '' }
+  ];
+  const dY = TD.derive(young, SAMPLE_SETTINGS, { filterValue: '', months: 3 });
+  is(dY.weeks[0], TD.weekKey(TD.priorSunday(D(2026, 5, 4))),
+     'a 3-month window over 4 weeks of data starts at the first completed week');
+  is(dY.weeks.length, 4, 'four weeks on the axis, not thirteen');
+  near(dY.summary.avgThroughput, 0.5,
+     'the tile average is over real weeks — 2 items in 4 weeks, not 2 in 13');
+
   const dBug = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: 'Bug', months: 'all' });
   is(dBug.itemCount, 29, 'filtering to Bug leaves the 29 bugs');
   ok(dBug.unplannedRate.every(r => r === 0 || r === 1), 'a Bug-only view is all 0% or 100%',
@@ -463,6 +496,23 @@ function run(TD, win) {
      the dates however it likes, so the columns are worked out from the data.
      Getting this wrong silently corrupts every metric.
      ══════════════════════════════════════════════════════════ */
+  group('derive() — the week straddling New Year');
+
+  /* One Sunday-week, 29 Dec 2024 – 4 Jan 2025, items completed either side of
+     midnight: 31 Dec with a 10-day cycle, 2 Jan with a 4-day cycle. Keying the
+     cycle bucket off the completed date instead of the week's Sunday put the
+     January item under "2025-01" — a key the axis never reads — so its cycle
+     time silently vanished from the chart AND the summary tile. */
+  const dNY = TD.derive([
+    { completed: D(2024, 12, 31), started: D(2024, 12, 21), type: '' },
+    { completed: D(2025, 1, 2),   started: D(2024, 12, 29), type: '' }
+  ], SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+  is(dNY.weeks, ['2024-53'], 'both items land in the one straddling week');
+  is(dNY.throughput, [2], 'throughput counts both');
+  near(dNY.avgCycleTime[0], 7, 'the weekly average holds BOTH cycle times — (10 + 4) / 2');
+  near(dNY.summary.avgCycleTime, 7, 'and so does the pooled tile average');
+
+  /* ────────────────────────────────────────────────────────── */
   group('detectColumns — finding the right columns in a real export');
 
   const cols = s => TD.parsePastedRows(s, 'auto').columns;
@@ -549,6 +599,22 @@ function run(TD, win) {
      SAMPLE_SETTINGS, { filterValue: '', months: 'all' }).empty, true,
      'a team with nothing finished at all has no week axis to draw');
 
+  /* Completed-first layout — the app's own placeholder format. A WIP row here
+     starts with an EMPTY cell, i.e. a leading tab. Trimming the line used to
+     eat that tab and shift every cell left, so the start date was silently
+     read as a completion date and the item counted as finished. */
+  const wipLead = TD.parsePastedRows([
+    'Completed Date\tStart Date\tType',
+    '2026-05-04\t2026-04-27\tStory',
+    '\t2026-05-11\tStory'
+  ].join('\n'), 'auto');
+  is(wipLead.rows.length, 2, 'a WIP row with an empty leading completed cell is kept');
+  is(iso(wipLead.rows[1].completed), null, 'its completion is empty — NOT the start date shifted over');
+  is(iso(wipLead.rows[1].started), '2026-05-11', 'its start date stays a start date');
+  is(wipLead.rows[1].type, 'Story', 'and its type stays in the type column');
+  is(wipLead.unfinished, 1, 'it is counted as work in progress');
+  is(wipLead.badStarted.length, 0, 'nothing about it is reported as an error');
+
   /* ══════════════════════════════════════════════════════════
      Multi-team state. These are the boundary: everything here decides what a
      copy arriving from the cloud is allowed to turn into.
@@ -573,6 +639,10 @@ function run(TD, win) {
   is(S.sanitizeTeams('not an array'), [], 'a teams value that is not an array becomes empty');
   is(S.sanitizeTeams([{ id: 'a', name: 'X', rows: [{ c: '2015-01-21' }, { c: 'rubbish' }, {}] }])[0].rows.length, 1,
      'rows without a usable completed date are dropped on the way in');
+  is(S.sanitizeTeams([{ id: 'a', name: 'X', rows: [{ c: '2015-01-21', t: { not: 'a string' } }] }])[0].rows[0].type,
+     '', 'a non-string type from outside becomes an empty string');
+  ok(S.sanitizeTeams([{ id: 'a', name: 'x'.repeat(500) }])[0].name.length <= 120,
+     'an absurdly long name is capped');
 
   /* ────────────────────────────────────────────────────────── */
   group('normalizeSettings');
@@ -638,6 +708,31 @@ function run(TD, win) {
   is(dB.itemCount, 1, 'team B sees only its own one item');
   ok(dA.unplannedRate[0] !== dB.unplannedRate[0], 'and they produce different numbers',
      dA.unplannedRate[0] + ' vs ' + dB.unplannedRate[0]);
+
+  /* ────────────────────────────────────────────────────────── */
+  group('Share links — the codec round trip');
+
+  /* A link is the least trusted input the app has, so the codec is pinned:
+     what goes in must come out exactly, on both wire formats. */
+  const Sh = win.TDShare;
+  const sharePayload = {
+    v: 1, sharedAt: 123456, label: 'Alpha',
+    teams: [{ id: 'a', name: 'Alpha', rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Bug' }] }],
+    settings: { unplannedType: 'Bug' }
+  };
+  const shareToken = await Sh.encodeShare(sharePayload);
+  ok(/^\d+\./.test(shareToken), 'the token leads with a format marker', shareToken.slice(0, 12));
+  is(await Sh.decodeShare(shareToken), sharePayload, 'a payload survives the round trip exactly');
+  const plainToken = '0.' + btoa(JSON.stringify(sharePayload))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  is(await Sh.decodeShare(plainToken), sharePayload,
+     'the uncompressed "0." fallback format decodes too');
+  let shareThrew = false;
+  try { await Sh.decodeShare('9.notaformat'); } catch (e) { shareThrew = true; }
+  ok(shareThrew, 'an unknown format marker is rejected, not guessed at');
+  shareThrew = false;
+  try { await Sh.decodeShare(plainToken.slice(0, 30)); } catch (e) { shareThrew = true; }
+  ok(shareThrew, 'a truncated link throws rather than half-decoding');
 
   /* ────────────────────────────────────────────────────────── */
   group('Clean up old data — what a cutoff condemns');
@@ -706,13 +801,12 @@ document.getElementById('app').addEventListener('load', function () {
       'Could not reach the app. Serve this over http://localhost — file:// iframes are blocked.';
     return;
   }
-  try { run(w.TD, w); }
-  catch (e) {
+  run(w.TD, w).catch(function (e) {
     record(false, 'test run threw', e && e.stack ? e.stack : String(e));
     const sum = document.getElementById('summary');
     sum.className = 'bad';
     sum.textContent = failed + ' of ' + (passed + failed) + ' failed';
-  }
+  });
 });
 </script>
 </body>
