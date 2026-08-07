@@ -445,6 +445,33 @@ table.filters td.act { width: 1%; }
 .changelog a { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--border-strong); }
 .changelog a:hover { color: var(--text-primary); }
 
+/* share dialog furniture — the sibling app's, unchanged */
+fieldset.formpanel { border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px; margin: 14px 0 0; background: var(--surface-alt); min-width: 0; }
+legend { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-secondary); font-weight: 700; padding: 0 6px; }
+.checklist { display: grid; gap: 7px; max-height: 200px; overflow-y: auto; }
+label.checkline { display: flex; gap: 8px; align-items: center; font-size: 14px;
+  font-weight: 400; color: var(--text-primary); margin: 0; min-height: 24px; }
+.checkline input { flex: none; }
+#shareLink { width: 100%; font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-secondary); }
+.warn { color: var(--err); font-size: 13px; margin-top: 10px; }
+/* Live regions have to stay in the tree to announce, so they're emptied rather
+   than hidden — this collapses them, margin included, while they hold nothing. */
+.warn:empty, #shareMeta:empty { display: none; }
+
+/* read-only share view: a standing bar above the tabs, so a borrowed link never
+   reads as your own data. The focus colour, not amber — a shared view is just a
+   different mode, not something needing attention. */
+.viewbar { display: flex; gap: 10px 14px; align-items: baseline; flex-wrap: wrap;
+  border: 1px solid var(--border-strong); border-left: 4px solid var(--focus-border);
+  border-radius: var(--radius); background: var(--surface-alt);
+  padding: 11px 14px; margin-bottom: 16px; font-size: 13px; }
+.viewbar strong { font-weight: 700; }
+.viewbar .muted { color: var(--text-secondary); }
+.viewbar .mine { margin-left: auto; color: var(--accent); }
+
 /* dialog + toast */
 dialog { background: var(--surface); color: var(--text-primary);
   border: 1px solid var(--border-strong); border-radius: var(--radius);
@@ -498,11 +525,15 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
       <option value="sepia">📜 Sepia</option>
     </select>
     <button class="btn small" id="dataBtn" type="button" title="Back up or restore your data">Back up</button>
+    <button class="btn small" id="shareBtn" type="button" title="Create a read-only link to show someone your figures">Share</button>
     <button class="btn small" id="syncBtn" type="button" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
   </div>
 </header>
 
 <div class="shell">
+
+  <!-- Filled once when a share link is opened; empty and invisible otherwise. -->
+  <div id="shareBar"></div>
 
   <!-- A tablist owes a screen reader two things: which panel each tab drives
        (aria-controls), and a single stop in the tab order rather than one per
@@ -740,6 +771,38 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
   </div>
 </dialog>
 
+<!-- ── Share a read-only link — the sibling app's feature, same shape ─────── -->
+<dialog id="shareDialog" aria-labelledby="shareDialogTitle">
+  <h2 id="shareDialogTitle">Share a read-only link</h2>
+  <p>Anyone opening this link sees the figures you pick, with no way to change
+    them and no sign-in. The data travels <em>inside</em> the link itself — it isn't uploaded
+    anywhere, and it doesn't touch whatever they have saved in their own browser.</p>
+
+  <fieldset class="formpanel">
+    <legend>Which teams</legend>
+    <div class="checklist" id="shareTeams"></div>
+  </fieldset>
+
+  <fieldset class="formpanel">
+    <legend>Your link</legend>
+    <input type="text" id="shareLink" readonly aria-label="Read-only share link">
+    <p class="hint" id="shareMeta" role="status" style="margin:8px 0 0"></p>
+    <p class="warn" id="shareWarn" role="status"></p>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="btn primary" id="shareCopyBtn">Copy link</button>
+      <button type="button" class="btn" id="shareOpenBtn">Preview it</button>
+    </div>
+  </fieldset>
+
+  <p class="hint" style="margin-top:14px">This is a <strong>snapshot</strong>, frozen as it
+    looks right now — later edits won't appear, so send a fresh link when the numbers move.
+    There's no way to withdraw one once sent, so treat it like emailing a spreadsheet.</p>
+
+  <div class="row" style="justify-content:flex-end;margin-top:18px">
+    <button class="btn primary" id="shareCloseBtn" type="button">Done</button>
+  </div>
+</dialog>
+
 <!-- ── What a figure means — one dialog, filled per ⓘ press ───────────────── -->
 <dialog id="helpDialog" aria-labelledby="helpTitle">
   <h2 id="helpTitle"></h2>
@@ -765,6 +828,20 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 <script src="chart.min.js"></script>
 <script>
 'use strict';
+
+/* ── Read-only share links (the sibling app's feature) ──────────────────────
+   Decided before anything renders: a '#share=…' fragment means this page is
+   showing someone else's snapshot. `viewOnly` strips every edit surface and,
+   through the save()/persist()/saveView() guards below, guarantees nothing a
+   visitor does can touch what's saved in their own browser — often another
+   copy of their own data. The sync module is gated separately via
+   window.tdViewOnly. */
+const SHARE_PREFIX = '#share=';
+const shareToken = location.hash.startsWith(SHARE_PREFIX)
+  ? location.hash.slice(SHARE_PREFIX.length) : null;
+const viewOnly = !!shareToken;
+let shareMeta = null;   // { sharedAt, label } once a link has been decoded
+window.tdViewOnly = viewOnly;
 
 /* ═══════════════════════════════════════════════════════════════════════════
    1. DATE HELPERS
@@ -1389,13 +1466,17 @@ function loadView() {
   catch (e) { view = Object.assign({}, DEFAULT_VIEW); }
 }
 
-function persist() { localStorage.setItem(LS.state, JSON.stringify(serializeState())); }
-function saveView() { localStorage.setItem(LS.view, JSON.stringify(view)); }
+/* Both writers are view-mode chokepoints: in a shared view the state in memory
+   is someone else's snapshot, and it must never be written over the visitor's
+   own saved copy. UI state still moves in memory — it just isn't persisted. */
+function persist() { if (viewOnly) return; localStorage.setItem(LS.state, JSON.stringify(serializeState())); }
+function saveView() { if (viewOnly) return; localStorage.setItem(LS.view, JSON.stringify(view)); }
 
 /* The one place a change to teams or settings is written down. It stamps the
    local copy as the newest and asks the cloud module (if any) to push, so no
    caller can save without the cloud finding out. */
 function save() {
+  if (viewOnly) return;   // someone else's data — never write it over your own
   persist();
   localStorage.setItem(LS.updated, String(Date.now()));
   if (window.cloudPush) window.cloudPush();
@@ -1916,18 +1997,24 @@ function selectTab(name) {
   /* Chart.js sizes to a hidden canvas as 0×0, so re-measure on reveal. */
   if (name === 'dashboard') Object.values(charts).forEach(c => c.resize());
 }
-TABS.forEach((t, i) => {
+/* Hidden tabs are skipped — a shared view keeps only the dashboard, and an
+   invisible stop on the end of the row would be a trap for the arrow keys. */
+const visibleTabs = () => TABS.filter(t => !$('tab-' + t).hidden);
+TABS.forEach(t => {
   const tab = $('tab-' + t);
   tab.addEventListener('click', () => selectTab(t));
   tab.addEventListener('keydown', e => {
     const step = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' }[e.key];
     if (step === undefined) return;
     e.preventDefault();
-    const j = step === 'first' ? 0
-      : step === 'last' ? TABS.length - 1
-      : (i + step + TABS.length) % TABS.length;
-    $('tab-' + TABS[j]).focus();
-    selectTab(TABS[j]);
+    const list = visibleTabs();
+    const i = list.indexOf(t);
+    const next = step === 'first' ? list[0]
+      : step === 'last' ? list[list.length - 1]
+      : list[(i + step + list.length) % list.length];
+    if (!next) return;
+    $('tab-' + next).focus();
+    selectTab(next);
   });
 });
 
@@ -2224,19 +2311,253 @@ $('importFile').addEventListener('change', (e) => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   9. BOOT
+   9. READ-ONLY SHARE LINKS  (ported from the sibling app)
+
+   The whole payload rides in the URL fragment. Everything after '#' is never
+   sent to a server, so the figures reach the recipient without GitHub Pages,
+   Firebase or anyone else seeing them — no account, no network, no rules.
+
+   Format: '#share=<marker>.<base64url>' where marker 1 is deflate-raw and 0 is
+   plain JSON (CompressionStream is missing on older Safari, and an
+   uncompressed link can be read by hand when something looks wrong).
+
+   The payload is a *trimmed copy*, never `state` itself: only the chosen teams,
+   plus the shared settings — those drive every number on the charts, so a
+   viewer must see the figures under the owner's settings, not their own.
+   Nothing identifying goes in — no email, no sync uid, no theme.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-loadView();
-loadState();
-if (!state.teams.some(t => t.id === view.activeTeamId)) view.activeTeamId = state.teams[0].id;
-saveView();
+const SHARE_FORMAT = 1;
 
-$('monthsSel').value = view.months;
-$('dateOrder').value = view.dateOrder;
-renderSettingsForm();
-renderAll();
-selectTab(activeRows().length ? 'dashboard' : 'data');
+const b64urlEncode = (bytes) => {
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const b64urlDecode = (str) => {
+  const b = atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(b, (c) => c.charCodeAt(0));
+};
+
+async function squeeze(bytes, Stream, format) {
+  const s = new Stream(format);
+  const w = s.writable.getWriter();
+  w.write(bytes); w.close();
+  return new Uint8Array(await new Response(s.readable).arrayBuffer());
+}
+
+function buildSharePayload(teamIds) {
+  const s = serializeState();
+  const teams = s.teams.filter(t => teamIds.includes(t.id));
+  return {
+    v: 1,
+    sharedAt: Date.now(),
+    label: teams.map(t => t.name).join(', '),
+    teams,
+    settings: s.settings
+  };
+}
+
+async function encodeShare(payload) {
+  const json = new TextEncoder().encode(JSON.stringify(payload));
+  if (typeof CompressionStream !== 'function') return '0.' + b64urlEncode(json);
+  const packed = await squeeze(json, CompressionStream, 'deflate-raw');
+  return SHARE_FORMAT + '.' + b64urlEncode(packed);
+}
+
+async function decodeShare(token) {
+  const dot = token.indexOf('.');
+  if (dot < 1) throw new Error('no format marker');
+  const marker = token.slice(0, dot);
+  const bytes = b64urlDecode(token.slice(dot + 1));
+  let json;
+  if (marker === '0') {
+    json = new TextDecoder().decode(bytes);
+  } else if (marker === String(SHARE_FORMAT)) {
+    if (typeof DecompressionStream !== 'function') throw new Error('no DecompressionStream');
+    json = new TextDecoder().decode(await squeeze(bytes, DecompressionStream, 'deflate-raw'));
+  } else {
+    throw new Error('unknown format ' + marker);
+  }
+  const p = JSON.parse(json);
+  if (!p || !Array.isArray(p.teams) || !p.teams.length) throw new Error('not a share payload');
+  return p;
+}
+
+/* ── Opening a shared link ──────────────────────────────────────────────── */
+
+/* Deliberately never falls back to the viewer's own data on failure: showing
+   their numbers under a "shared view" banner would be worse than an error. */
+async function openSharedView() {
+  try {
+    const p = await decodeShare(shareToken);
+    shareMeta = { sharedAt: p.sharedAt, label: p.label };
+    /* A link is the least trusted input the app has — it arrives from someone
+       else by definition. hydrateState() is the same sanitising boundary a
+       synced copy crosses: hostile ids are replaced, settings normalised. */
+    state = hydrateState(p);
+    if (!state.teams.length) throw new Error('empty payload');
+    view.activeTeamId = state.teams[0].id;
+    $('shareBar').innerHTML = shareBanner();
+    $('dashEmpty').innerHTML =
+      '<h2>Nothing to plot for this team</h2><p>The shared copy has no work items for it.</p>';
+    renderAll();
+  } catch (e) {
+    console.warn('share link could not be read', e);
+    renderShareError();
+  }
+}
+
+function renderShareError() {
+  document.querySelector('.tabs').hidden = true;
+  $('teamSel').hidden = true;
+  $('panel-dashboard').innerHTML =
+    '<div class="card empty">' +
+    '<h2>This shared link couldn’t be opened</h2>' +
+    '<p>It looks incomplete — links are long, and mail apps sometimes cut them in half or ' +
+    'wrap them across two lines. Ask whoever sent it for a fresh copy, and paste the ' +
+    'whole thing in one go.</p>' +
+    '<div class="row" style="justify-content:center;margin-top:18px">' +
+    '<a class="btn primary" href="' + escapeHtml(location.pathname) + '">Open my own data</a>' +
+    '</div></div>';
+}
+
+function shareBanner() {
+  const when = shareMeta && shareMeta.sharedAt
+    ? new Date(shareMeta.sharedAt).toLocaleDateString(undefined,
+        { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+  return '<div class="viewbar">' +
+    '<strong>👁 Read-only view' + (shareMeta && shareMeta.label ? ' — ' + escapeHtml(shareMeta.label) : '') + '</strong>' +
+    '<span class="muted">Shared' + (when ? ' on ' + when : '') + '. Nothing you do here is saved, ' +
+    'and your own data is untouched.</span>' +
+    '<a class="mine" href="' + escapeHtml(location.pathname) + '">Open my own data</a>' +
+    '</div>';
+}
+
+/* ── Creating a link ────────────────────────────────────────────────────── */
+
+/* Long URLs survive browsers fine but not always the trip through a mail
+   client, so warn well below any hard limit rather than at it. */
+const SHARE_WARN_AT = 8000;
+
+function openShare() {
+  const active = activeTeam();
+  $('shareTeams').innerHTML = state.teams.map(t =>
+    '<label class="checkline"><input type="checkbox" data-share-team="' + t.id + '"' +
+    (active && t.id === active.id ? ' checked' : '') + '><span>' + escapeHtml(t.name) +
+    (t.rows.length ? '' : ' (empty)') + '</span></label>').join('');
+  $('shareTeams').querySelectorAll('input').forEach(i => { i.onchange = refreshShareLink; });
+  refreshShareLink();
+  $('shareDialog').showModal();
+}
+
+function sharePicked() {
+  return Array.from($('shareTeams').querySelectorAll('input:checked'))
+    .map(i => i.dataset.shareTeam);
+}
+
+let shareSeq = 0;   // a slow encode must not overwrite the box after a later tick
+
+async function refreshShareLink() {
+  const teamIds = sharePicked();
+  const link = $('shareLink'), meta = $('shareMeta'), warn = $('shareWarn');
+  const busy = ++shareSeq;
+  const setBusy = (on) => {
+    $('shareCopyBtn').disabled = on;
+    $('shareOpenBtn').disabled = on;
+  };
+
+  if (!teamIds.length) {
+    link.value = '';
+    meta.textContent = 'Pick at least one team.';
+    warn.textContent = '';
+    setBusy(true);
+    return;
+  }
+
+  const payload = buildSharePayload(teamIds);
+  const token = await encodeShare(payload);
+  if (busy !== shareSeq) return;
+
+  const url = location.origin + location.pathname + SHARE_PREFIX + token;
+  link.value = url;
+  setBusy(false);
+  const items = payload.teams.reduce((n, t) => n + t.rows.length, 0);
+  const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+  meta.textContent = plural(payload.teams.length, 'team') + ', ' + plural(items, 'item')
+    + ' · ' + url.length.toLocaleString() + ' characters';
+  warn.textContent = url.length > SHARE_WARN_AT
+    ? 'That’s a long link — some mail apps break links this size across two lines. '
+      + 'Sharing fewer teams will shorten it.' : '';
+}
+
+$('shareBtn').addEventListener('click', openShare);
+$('shareCloseBtn').addEventListener('click', () => $('shareDialog').close());
+closeOnBackdropClick($('shareDialog'));
+
+$('shareCopyBtn').addEventListener('click', async () => {
+  const url = $('shareLink').value;
+  if (!url) return;
+  try {
+    await navigator.clipboard.writeText(url);
+    window.toast('Link copied — paste it into an email or chat');
+  } catch (e) {
+    /* Clipboard access is refused on insecure origins and in some mobile
+       browsers; selecting the text is the honest fallback. */
+    $('shareLink').select();
+    window.toast('Press ⌘C / Ctrl+C to copy the selected link');
+  }
+});
+
+$('shareOpenBtn').addEventListener('click', () => {
+  if ($('shareLink').value) window.open($('shareLink').value, '_blank', 'noopener');
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   10. BOOT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Pasting a share link into a tab that already has the app open changes only
+   the fragment, which browsers handle without reloading — the page would sit
+   there looking broken. Reload instead, and let the normal boot path run. */
+addEventListener('hashchange', () => {
+  const nowShared = location.hash.startsWith(SHARE_PREFIX);
+  if (nowShared !== viewOnly || (nowShared && location.hash.slice(SHARE_PREFIX.length) !== shareToken))
+    location.reload();
+});
+
+if (viewOnly) {
+  /* Everything that writes, imports, shares or signs in belongs to whoever owns
+     the data, not to a visitor. Theme stays — that's the viewer's own
+     preference, in its own key. syncBtn is hidden from here rather than left to
+     the sync module, which is deferred — a visitor shouldn't see a sign-in
+     button that then vanishes. */
+  ['dataBtn', 'shareBtn', 'syncBtn'].forEach(id => { $(id).hidden = true; });
+  $('tab-data').hidden = true;
+  $('tab-settings').hidden = true;
+  $('privacyNote').textContent = 'This is a read-only copy someone shared with you. It was '
+    + 'read from the link itself — nothing was uploaded or downloaded, and nothing you '
+    + 'already had saved in this browser has been changed.';
+  /* Decoding is async, so hold a neutral card rather than the paste-your-data
+     instructions — and never the visitor's own teams. */
+  $('dashEmpty').innerHTML = '<h2>Opening shared view&hellip;</h2>';
+  $('monthsSel').value = view.months;
+  selectTab('dashboard');
+  openSharedView();
+} else {
+  loadView();
+  loadState();
+  if (!state.teams.some(t => t.id === view.activeTeamId)) view.activeTeamId = state.teams[0].id;
+  saveView();
+
+  $('monthsSel').value = view.months;
+  $('dateOrder').value = view.dateOrder;
+  renderSettingsForm();
+  renderAll();
+  selectTab(activeRows().length ? 'dashboard' : 'data');
+}
 </script>
 
 <script type="module">
@@ -2304,8 +2625,11 @@ const localTs = () => Number(localStorage.getItem('td-updated') || 0);
 
 /* The button ships visible and signed-out in the markup so the header is its
    final width at first paint. It's taken away only when sync genuinely can't
-   run — no config, no client ID, or a failed SDK load. */
-if (FIREBASE_CONFIG && GOOGLE_CLIENT_ID) {
+   run — no config, no client ID, a failed SDK load, or a shared view. A shared
+   view must not start sync at all: if the visitor happens to be signed in,
+   onAuthStateChanged would fire startSync() and tdAdopt() would replace the
+   shared payload with their own cloud copy — and push it straight back out. */
+if (FIREBASE_CONFIG && GOOGLE_CLIENT_ID && !window.tdViewOnly) {
   init().catch((e) => { console.warn('Sync unavailable:', e); btn.hidden = true; });
 } else {
   if (!GOOGLE_CLIENT_ID) console.warn('Sync unavailable: GOOGLE_CLIENT_ID is not set.');

@@ -30,8 +30,8 @@ direction is good.
 
 This app shares its look and behaviour with
 [Sprint Predictability](https://eagleadams86.github.io/sprint-velocity/), its sibling: the same
-sticky header, button tabs (with arrow-key navigation), summary tiles, ⓘ help dialogs, theme
-picker and footer. Each app links to the other at the foot of the page, and a **Recent
+sticky header, button tabs (with arrow-key navigation), summary tiles, ⓘ help dialogs,
+read-only share links, theme picker and footer. Each app links to the other at the foot of the page, and a **Recent
 changes** box down there lists the last ten changes to this file, fetched from GitHub when
 expanded. If a chrome rule changes in one app, it should change in the other too.
 
@@ -157,6 +157,25 @@ isn't a backup is refused outright and leaves your data alone.
 
 **Two things are deliberately not in the file:** your theme, and which team you were looking
 at. Both are positions on this device rather than data — the same reason they don't sync.
+
+## Sharing a read-only link
+
+The **Share** button in the header builds a link that shows someone the teams you pick,
+read-only — no sign-in, no way to change anything, and (ported from the sibling app) the
+data travels **inside the link itself**: everything after the `#` never leaves the browser,
+so the figures reach the recipient without GitHub Pages, Firebase or anyone else seeing
+them. The payload is a trimmed copy — the chosen teams plus the shared settings, because
+those drive every number on the charts — and never anything identifying.
+
+The recipient sees a standing "Read-only view" bar, the dashboard only (no Your Data or
+Settings tabs), and a link back to their own data. Nothing they do is saved, and nothing
+already in their browser is touched — `save()`, `persist()` and `saveView()` are all
+no-ops in a shared view, and sync never initialises. A link that arrives truncated (mail
+apps do this) shows an error card rather than ever falling through to the viewer's own
+data.
+
+It's a **snapshot**: later edits don't appear in links already sent, and a sent link can't
+be withdrawn — treat it like emailing a spreadsheet.
 
 ## Cross-device sync (Firebase, free tier — optional)
 
