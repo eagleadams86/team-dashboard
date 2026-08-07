@@ -399,6 +399,16 @@ function run(TD, win) {
      { filterValue: '', months: 3 }).titles.responsiveness, 'Average TiP per week',
      'an acronym label keeps its capitals — "TiP" must not become "tip"');
 
+  /* the summary figures the dashboard tiles read */
+  near(d.summary.avgThroughput, 124 / 14, 'summary: avg throughput is the mean of the weekly counts');
+  is(d.summary.netFlowTotal, 11, 'summary: net flow total is the sum of the weekly net flows');
+  near(d.summary.unplannedRateAvg, 0.1992, 'summary: avg unplanned rate matches the chart title', 0.0001);
+  ok(d.summary.avgCycleTime > 0, 'summary: pooled avg cycle time is a real figure',
+     String(d.summary.avgCycleTime));
+  is(TD.derive([{ completed: TD.utcDate(2015, 2, 10), started: null, type: '' }],
+     SAMPLE_SETTINGS, { filterValue: '', months: 'all' }).summary.avgCycleTime, null,
+     'summary: no measurable cycle times reads as null, not 0');
+
   /* ────────────────────────────────────────────────────────── */
   group('derive() — window and filter behaviour');
 

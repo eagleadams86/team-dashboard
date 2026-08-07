@@ -14,11 +14,26 @@ Paste your work items, get four charts:
 | **Productivity** — how much | What pace do we deliver at? | Items completed per week |
 | **Predictability** — how repeatable | Is our completion pace consistent? | Net flow — items completed minus items started, per week |
 
-Each chart carries a dashed linear trend line.
+Each chart carries a dashed linear trend line, and a row of **summary tiles** above the charts
+states the window-wide figures — average completed per week, average cycle time (pooled over
+the items in the window, so an empty week can't drag it down), the unplanned rate, and total
+net flow. The tiles are deliberately neutral: this app has no targets, so no tile is ever
+coloured "good" or "bad".
 
-The dashboard itself shows only each chart's title — the dimension heading and the coaching
-question that used to sit above every chart were removed deliberately, to get all four charts
-on screen together. This table is where that framing lives now.
+The dashboard shows each chart's title and nothing else standing — the dimension heading and
+the coaching question that used to sit above every chart were removed deliberately, to get all
+four charts on screen together. That framing now lives one press away: the **ⓘ button** beside
+every tile and chart title opens a plain-English note on what the figure means and which
+direction is good.
+
+## One of a pair
+
+This app shares its look and behaviour with
+[Sprint Predictability](https://eagleadams86.github.io/sprint-velocity/), its sibling: the same
+sticky header, button tabs (with arrow-key navigation), summary tiles, ⓘ help dialogs, theme
+picker and footer. Each app links to the other at the foot of the page, and a **Recent
+changes** box down there lists the last ten changes to this file, fetched from GitHub when
+expanded. If a chrome rule changes in one app, it should change in the other too.
 
 ## Teams
 
@@ -122,7 +137,8 @@ good or bad.
 
 ## Back up & restore
 
-The **Back up & restore** card at the foot of the Your Data tab writes one JSON file holding
+The **Back up** button in the header opens a dialog (the same shape as the sibling app's)
+that writes one JSON file holding
 every team, their work items and your shared settings — `team-dashboard-YYYY-MM-DD.json`. It's
 a copy you keep, independent of this browser and of any Google account, and it's the only way
 back from a cleared browser if you've never signed in.
@@ -270,8 +286,8 @@ if what the app stores, or where it sends it, ever changes.
 
 A Content-Security-Policy `<meta>` at the top of `index.html` restricts the page to its own
 scripts plus Firebase's CDN and Google's sign-in client, and network access to the handful of
-endpoints sync uses. **Any new external endpoint has to be added there too**, or it fails only
-in production.
+endpoints sync uses plus `api.github.com` (the Recent-changes box). **Any new external
+endpoint has to be added there too**, or it fails only in production.
 
 `accounts.google.com` appears in `script-src`, `connect-src` *and* `frame-src` because sign-in
 goes through Google Identity Services — see [Why sign-in doesn't use Firebase's

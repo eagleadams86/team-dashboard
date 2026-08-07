@@ -20,7 +20,7 @@
   took sign-in out entirely there. accounts.google.com is not blocked in the
   same way. See the sign-in block further down before changing any of this.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com https://api.github.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
 <!--
   Team Dashboard — four weekly flow metrics from your work items.
 
@@ -219,83 +219,111 @@
   --spinner-head: #6a5e46;
 }
 
-/* ── app ──────────────────────────────────────────────────────────────────── */
+/* ── app ──────────────────────────────────────────────────────────────────────
+   The chrome below deliberately matches Sprint Predictability (the sibling app)
+   so the two read as one family: same sticky header, button tabs, cards, tiles,
+   ⓘ help buttons and footer. If a chrome rule changes in one app, change it in
+   the other too. */
+
+/* App tokens on top of the shared palette. color-scheme makes the browser draw
+   its own controls (pickers, spinners, scrollbars) to match the theme; the
+   shadows need a value per theme because a dark card wants a heavier one to
+   register at all. Overrides live in [data-theme] blocks AFTER the :root
+   defaults — equal specificity, so the later rule winning is load-bearing. */
+:root { color-scheme: dark;   /* midnight, the default */
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+  --chrome-h: 30px; }
+[data-theme="dark"]  { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04); }
+[data-theme="sepia"] { color-scheme: light;
+  --shadow: 0 1px 2px rgba(90,70,30,.10), 0 4px 12px rgba(90,70,30,.07); }
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  background: var(--bg);
-  color: var(--text-primary);
-  font: var(--fw-normal) var(--fs-base)/var(--lh-base) var(--font-sans);
-  -webkit-text-size-adjust: 100%;
+  background: var(--bg); color: var(--text-primary);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%;
 }
-h1, h2, h3 { margin: 0; font-weight: var(--fw-semibold); letter-spacing: var(--ls-tight); }
+h1, h2, h3 { margin: 0; font-weight: var(--fw-semibold); letter-spacing: -.01em; }
 p { margin: 0; }
-code { font-family: var(--font-mono); font-size: var(--fs-sm); }
+code { font-family: var(--font-mono); font-size: 12px; }
+button, select, input, textarea { font: inherit; color: inherit; }
 
-.shell { max-width: 1500px; margin: 0 auto; padding: var(--sp-6) var(--sp-6) var(--sp-9); }
+.shell { max-width: 1500px; margin: 0 auto; padding: 0 16px 64px; }
 
-/* header */
-.topbar {
-  display: flex; align-items: flex-end; gap: var(--sp-5);
-  flex-wrap: wrap; margin-bottom: var(--sp-5);
-}
-.topbar h1 { font-size: var(--fs-xl); align-self: center; }
-.topbar .spacer { flex: 1 1 auto; }
-/* Fixed widths so filling these from JS can't resize the header after paint. */
-.topfield { width: 170px; flex: 0 0 auto; }
-.btn.sync { flex: 0 0 auto; white-space: nowrap; }
-.btn.sync[data-state="error"] { color: var(--warn); border-color: var(--warn); }
+/* header — sticky, the sibling app's shape. Everything in the row carries its
+   final width in the markup: the header paints long before the script at the
+   foot of the page runs, so anything sized by JS grows on screen. #teamSel has
+   a min-width and a placeholder option, and #syncBtn ships visible and
+   signed-out — it is taken away only when sync genuinely can't run. */
+header { position: sticky; top: 0; z-index: 20; background: var(--surface);
+  border-bottom: 1px solid var(--border); padding: 10px 0; margin-bottom: 20px; }
+.headbar { max-width: 1500px; margin: 0 auto; padding: 0 16px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { font-size: 17px; font-weight: 700; letter-spacing: -.01em; margin: 0 auto 0 0; }
+.brand span { color: var(--text-muted); font-weight: 500; }
 
-/* tabs */
-.tabs { display: flex; gap: var(--sp-1); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-7); flex-wrap: wrap; }
-.tab {
-  appearance: none; background: none; border: 0; border-bottom: 2px solid transparent;
-  color: var(--text-secondary); font: var(--fw-medium) var(--fs-md)/1 var(--font-sans);
-  padding: var(--sp-5) var(--sp-6); cursor: pointer; border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  margin-bottom: -1px;
-}
-.tab:hover { color: var(--text-primary); background: var(--surface); }
-.tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
-.tab:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 2px solid var(--focus-border); outline-offset: 2px;
-}
-/* .grid sets display:grid, which beats the UA rule for [hidden] — force it. */
-[hidden] { display: none !important; }
-
-/* controls */
-label { display: block; font-size: var(--fs-sm); color: var(--text-secondary); margin-bottom: var(--sp-2); }
-input[type="text"], input[type="number"], select, textarea {
-  background: var(--surface); color: var(--text-primary);
-  border: 1px solid var(--input-border); border-radius: var(--radius-sm);
-  font: var(--fw-normal) var(--fs-base)/var(--lh-base) var(--font-sans);
-  padding: var(--sp-3) var(--sp-4); width: 100%;
-}
-textarea { font-family: var(--font-mono); font-size: var(--fs-sm); resize: vertical; min-height: 190px; }
-select { cursor: pointer; }
-.btn {
-  appearance: none; cursor: pointer;
-  background: var(--surface-alt); color: var(--text-primary);
-  border: 1px solid var(--border-control); border-radius: var(--radius-sm);
-  font: var(--fw-medium) var(--fs-base)/1 var(--font-sans);
-  padding: var(--sp-4) var(--sp-6);
-}
-.btn:hover { background: var(--accent-bg); }
+/* buttons */
+.btn { background: var(--surface-alt); color: var(--text-primary);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: 7px 12px; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--text-muted); }
 .btn.primary { background: var(--btn-bg); color: var(--btn-text); border-color: var(--btn-bg); }
 .btn.primary:hover { opacity: .88; }
 .btn.danger { color: var(--err); border-color: var(--err); background: transparent; }
 .btn.danger:hover { background: var(--err-bg); }
-.btn-row { display: flex; gap: var(--sp-4); flex-wrap: wrap; align-items: center; }
+/* Shared height for the header chrome: a native <select> ignores line-height,
+   so the height is pinned on both or the row lines up on neither edge. */
+.btn.small { padding: 4px 9px; font-size: 13px; min-height: var(--chrome-h); }
+#teamSel, #themeSel { width: auto; background: var(--surface-alt); color: var(--text-primary);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: 4px 9px; font-size: 13px; cursor: pointer; min-height: var(--chrome-h); }
+#teamSel:hover, #themeSel:hover { border-color: var(--text-muted); }
+#teamSel { min-width: 140px; }
+#syncBtn { min-width: 125px; }
+#syncBtn[data-state="error"] { color: var(--warn); border-color: var(--warn); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row.spread { justify-content: space-between; }
+
+/* tabs — buttons, filled when selected, exactly as the sibling app draws them */
+.tabs { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.tab { background: var(--surface-alt); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); padding: 8px 14px; cursor: pointer;
+  color: var(--text-primary); font-weight: 500; }
+.tab:hover { border-color: var(--text-muted); }
+.tab[aria-selected="true"] { background: var(--unit-active-bg);
+  border-color: var(--unit-active-bg); color: var(--unit-active-txt); font-weight: 600; }
+.tab[aria-selected="true"]:hover { border-color: var(--unit-active-bg); }
+/* Settings looks after the app rather than at this team's numbers, so it sits
+   apart from the two data tabs — but only while the row fits on one line
+   (same rule as the sibling app's All teams tab). */
+@media (min-width: 470px) { #tab-settings { margin-left: auto; } }
+:focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
+/* .grid sets display:grid, which beats the UA rule for [hidden] — force it. */
+[hidden] { display: none !important; }
+
+/* controls */
+label { display: block; font-size: 13px; color: var(--text-secondary);
+  font-weight: 600; margin-bottom: 4px; }
+input[type="text"], input[type="number"], select, textarea {
+  background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--input-border); border-radius: var(--radius-sm);
+  padding: 7px 9px; width: 100%;
+}
+textarea { font-family: var(--font-mono); font-size: 12px; resize: vertical; min-height: 190px; }
+select { cursor: pointer; }
 
 /* cards */
-.card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: var(--sp-6);
-}
-.card + .card { margin-top: var(--sp-6); }
-.card h2 { font-size: var(--fs-lg); margin-bottom: var(--sp-2); }
-.card .hint { color: var(--text-muted); font-size: var(--fs-sm); }
+.card { background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+.card + .card { margin-top: 18px; }
+.card h2 { font-size: 16px; margin-bottom: 4px; }
+.card .hint { color: var(--text-secondary); font-size: 13px; }
 
-.grid { display: grid; gap: var(--sp-6); }
+.grid { display: grid; gap: 16px; }
 .grid.two { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: end; }
 /* Labels wrap to different heights; bottom-align each cell so the inputs in a
    row still line up. */
@@ -303,139 +331,187 @@ select { cursor: pointer; }
 .grid.two > div > label { flex: 0 0 auto; }
 /* Charts sit in a fixed 2x2 grid so the four metrics stay paired, whatever the
    window width; collapse to one column when 2 no longer fit. */
-.grid.charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.charts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 @media (max-width: 940px) { .grid.charts { grid-template-columns: 1fr; } }
 
 /* dashboard controls strip */
-.controls {
-  display: flex; gap: var(--sp-6); flex-wrap: wrap; align-items: flex-end;
+.controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: var(--sp-5) var(--sp-6); margin-bottom: var(--sp-6);
-}
+  border-radius: var(--radius); padding: 12px 18px; margin-bottom: 18px;
+  box-shadow: var(--shadow); }
 .controls .field { min-width: 160px; }
-.controls .window {
-  margin-left: auto; text-align: right; font-size: var(--fs-sm); color: var(--text-secondary);
-}
+.controls .window { margin-left: auto; text-align: right; font-size: 13px; color: var(--text-secondary); }
 .controls .window strong { color: var(--text-primary); font-weight: var(--fw-semibold); }
 
+/* summary tiles — the sibling app's tile, minus the RAG states: this dashboard
+   has no targets, and a threshold nobody chose shouldn't be invented by CSS.
+   Tiles share the parent's rows via subgrid so label, number and caption line
+   up straight across the row; browsers without subgrid lay each tile out on
+   its own, which is an acceptable fallback. */
+.tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-rows: repeat(3, auto); margin-bottom: 18px; }
+.tile { display: grid; grid-row: span 3; grid-template-rows: subgrid; align-content: start;
+  border: 1px solid var(--border); border-left-width: 4px;
+  border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface-alt); }
+.tile .label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase;
+  letter-spacing: .04em; font-weight: 600;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.tile .value { font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin-top: 2px; }
+.tile .foot { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+/* The ⓘ help button, straight from the sibling app: the circle is sized to the
+   label's own line so adding it never makes the row taller, and the pointer
+   target grows to WCAG's 24px through an unpainted pseudo-element instead. The
+   margin keeps the circle off the last letter — flush against the word, it
+   reads as part of it rather than as a control you can press. */
+.tile-help { position: relative; margin-left: 7px;
+  flex: none; width: 16px; height: 16px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--border-strong); background: transparent;
+  color: var(--text-secondary); font-size: 11px; font-weight: 700; line-height: 1;
+  font-family: inherit; text-transform: none; cursor: pointer; }
+.tile-help::after { content: ''; position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); width: 24px; height: 24px; }
+.tile-help:hover { color: var(--text-primary); background: var(--surface);
+  border-color: var(--text-secondary); }
+/* A tile label is a flex row whose own gap pins the button to the far right,
+   so there the margin would only be dead space. */
+.tile .label .tile-help { margin-left: 0; }
+
 /* chart cards */
-.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-6); min-width: 0; }
-/* The chart title is the card's only label now — the dimension eyebrow and the
-   coaching question above it are gone — so it takes over the eyebrow's styling. */
-.chart-card .chart-title {
+.chart-card { background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px; min-width: 0; box-shadow: var(--shadow); }
+/* The chart title is the card's only label — it takes the eyebrow styling. */
+.chart-card .chart-title { display: flex; align-items: center;
   font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: var(--ls-label);
-  text-transform: uppercase; color: var(--accent); margin-bottom: var(--sp-4);
-}
+  text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
 .chart-wrap { position: relative; height: 300px; }
 
 /* data table */
 .table-scroll { overflow-x: auto; }
-table.data { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
-table.data th, table.data td { text-align: left; padding: var(--sp-3) var(--sp-5); border-bottom: 1px solid var(--border); white-space: nowrap; }
-table.data th {
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: var(--ls-label);
-  text-transform: uppercase; color: var(--text-muted); position: sticky; top: 0; background: var(--surface);
-}
-table.data td.num { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); }
+table.data { width: 100%; border-collapse: collapse; font-size: 14px;
+  font-variant-numeric: tabular-nums; }
+table.data th, table.data td { text-align: left; padding: 8px 12px;
+  border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.data th { font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-secondary); position: sticky; top: 0;
+  background: var(--surface); border-bottom-color: var(--border-strong); }
+table.data tbody tr:hover { background: var(--surface-alt); }
+table.data td.num { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
 .table-cap { max-height: 460px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 
 /* status notes */
-.note {
-  border: 1px solid var(--border); border-left-width: 3px;
-  border-radius: var(--radius-sm); padding: var(--sp-5); font-size: var(--fs-sm);
-}
+.note { border: 1px solid var(--border); border-left-width: 3px;
+  border-radius: var(--radius-sm); padding: 12px; font-size: 13px; }
 .note.ok   { border-left-color: var(--ok);   background: var(--ok-bg);   color: var(--text-primary); }
 .note.err  { border-left-color: var(--err);  background: var(--err-bg);  color: var(--text-primary); }
 .note.info { border-left-color: var(--border-strong); background: var(--surface-alt); color: var(--text-secondary); }
-.note ul { margin: var(--sp-4) 0 0; padding-left: var(--sp-7); }
-.note li { font-family: var(--font-mono); font-size: var(--fs-sm); }
+.note ul { margin: 8px 0 0; padding-left: 24px; }
+.note li { font-family: var(--font-mono); font-size: 12px; }
 
-.empty {
-  text-align: center; padding: var(--sp-9) var(--sp-6);
-  color: var(--text-secondary);
-}
-.empty h2 { font-size: var(--fs-lg); margin-bottom: var(--sp-5); color: var(--text-primary); }
-.empty pre {
-  display: inline-block; text-align: left; margin: var(--sp-6) 0 0;
+.empty { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+.empty h2 { font-size: 16px; margin-bottom: 12px; color: var(--text-primary); }
+.empty pre { display: inline-block; text-align: left; margin: 16px 0 0;
   background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: var(--sp-5) var(--sp-6); font-family: var(--font-mono); font-size: var(--fs-sm);
-  color: var(--text-primary); overflow-x: auto; max-width: 100%;
-}
+  padding: 12px 16px; font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-primary); overflow-x: auto; max-width: 100%; }
 
 /* settings filter list */
 table.filters { width: 100%; border-collapse: collapse; }
-table.filters td { padding: var(--sp-2) var(--sp-2) var(--sp-2) 0; vertical-align: middle; }
-table.filters th {
-  text-align: left; padding: 0 var(--sp-2) var(--sp-3) 0;
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: var(--ls-label);
-  text-transform: uppercase; color: var(--text-muted);
-}
+table.filters td { padding: 4px 4px 4px 0; vertical-align: middle; }
+table.filters th { text-align: left; padding: 0 4px 6px 0;
+  font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-secondary); }
 table.filters td.act { width: 1%; }
-.icon-btn {
-  appearance: none; background: none; border: 1px solid var(--border-control);
+.icon-btn { appearance: none; background: none; border: 1px solid var(--border-strong);
   color: var(--text-muted); border-radius: var(--radius-sm); cursor: pointer;
-  width: 30px; height: 30px; font-size: var(--fs-md); line-height: 1;
-}
+  width: 30px; height: 30px; font-size: 14px; line-height: 1; }
 .icon-btn:hover { color: var(--err); border-color: var(--err); }
 
-.footer { margin-top: var(--sp-8); color: var(--text-hint); font-size: var(--fs-sm); }
-.footer + .footer { margin-top: var(--sp-4); }
-.footer a { color: var(--accent); }
+/* footer notes — the sibling app's .privacy: lined up with the text inside the
+   last card (18px of card padding + its 1px border), not with the card edge. */
+.privacy { font-size: 12px; color: var(--text-muted); margin: 28px 0 0; padding-left: 19px; }
+.privacy-links { margin-top: 6px; }
+.privacy-links a { color: var(--text-muted); }
+.privacy-links a:hover { color: var(--text-secondary); }
+
+/* "Recent changes" — ported with its rules: no opacity dimming, which would
+   stack on an already-muted token and drop below AA on the light palettes. */
+.changelog { margin: 14px 0 0; padding-left: 19px; font-size: 12.5px; color: var(--text-muted); }
+.changelog summary { cursor: pointer; user-select: none; padding: 4px 0; }
+.changelog summary:hover { color: var(--text-secondary); }
+.changelog ol { list-style: none; margin: 10px 0 0; padding: 0; }
+.changelog li { display: flex; gap: 10px; padding: 3px 0; align-items: baseline; }
+.cl-date { white-space: nowrap; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.changelog a { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--border-strong); }
+.changelog a:hover { color: var(--text-primary); }
 
 /* dialog + toast */
-dialog {
-  background: var(--surface); color: var(--text-primary);
+dialog { background: var(--surface); color: var(--text-primary);
   border: 1px solid var(--border-strong); border-radius: var(--radius);
-  padding: var(--sp-7); max-width: 520px; width: calc(100% - var(--sp-8));
-}
+  padding: 20px; max-width: 560px; width: calc(100% - 32px); box-shadow: var(--shadow); }
 dialog::backdrop { background: rgba(0, 0, 0, .55); }
-dialog h2 { font-size: var(--fs-lg); margin-bottom: var(--sp-5); }
-dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
+dialog h2 { font-size: 16px; margin-bottom: 12px; }
+dialog p { color: var(--text-secondary); font-size: 14px; }
 
-#toast {
-  position: fixed; left: 50%; bottom: var(--sp-7); transform: translateX(-50%);
-  background: var(--surface-alt); color: var(--text-primary);
-  border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
-  padding: var(--sp-4) var(--sp-7); font-size: var(--fs-base);
-  opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 50;
-  max-width: calc(100% - var(--sp-8)); text-align: center;
-}
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  background: var(--btn-bg); color: var(--btn-text); padding: 10px 18px;
+  border-radius: var(--radius-pill); font-size: 14px; font-weight: 600; z-index: 100;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+  max-width: calc(100% - 32px); text-align: center; }
 #toast.show { opacity: 1; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* Charts opt out of animation in code, so this governs the toast's fade — and
+   any future addition that would otherwise have to remember to ask. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important; scroll-behavior: auto !important;
+  }
+}
 </style>
 </head>
 <body>
+
+<!-- Everything in this row carries its final width in the markup. The header
+     paints long before the script at the foot of the page runs, so anything
+     sized by JS grows on screen: an empty select goes 40px → 180px, and the
+     sync button would appear only once the Firebase SDK had come over the
+     wire, re-wrapping the row. #teamSel therefore has a min-width and a
+     placeholder option, and #syncBtn ships visible and signed-out — it is
+     taken away only when sync genuinely can't run. -->
+<header>
+  <div class="headbar">
+    <h1 class="brand">Team&nbsp;Dashboard <span>· Charlie’s Flow Metrics</span></h1>
+    <label class="sr-only" for="teamSel">Team</label>
+    <select id="teamSel" title="Which team you're looking at"><option>—</option></select>
+    <label class="sr-only" for="themeSel">Theme</label>
+    <!-- The four unified themes, listed alphabetically (matches the sibling app).
+         Midnight is pre-selected to match the theme the boot script in <head>
+         has already applied. THEMES is read back off these options. -->
+    <select id="themeSel" title="Change the colour theme">
+      <option value="dark">☾ Dark</option>
+      <option value="light">☀ Light</option>
+      <option value="midnight" selected>✦ Midnight</option>
+      <option value="sepia">📜 Sepia</option>
+    </select>
+    <button class="btn small" id="dataBtn" type="button" title="Back up or restore your data">Back up</button>
+    <button class="btn small" id="syncBtn" type="button" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
+  </div>
+</header>
+
 <div class="shell">
 
-  <!-- Everything in this row carries its final width in the markup. The header
-       paints long before the script at the foot of the page runs, so anything
-       sized by JS grows on screen: an empty select goes 40px → 180px, and the
-       sync button would appear only once the Firebase SDK had come over the
-       wire, re-wrapping the row. #teamSel therefore has a min-width and a
-       placeholder option, and #syncBtn ships visible and signed-out — it is
-       taken away only when sync genuinely can't run. -->
-  <div class="topbar">
-    <h1 id="appTitle">Team Dashboard</h1>
-    <div class="spacer"></div>
-    <div class="topfield">
-      <label for="teamSel">Team</label>
-      <select id="teamSel"><option>—</option></select>
-    </div>
-    <div class="topfield">
-      <label for="themeSel">Theme</label>
-      <select id="themeSel">
-        <option value="dark">Dark</option>
-        <option value="light">Light</option>
-        <option value="midnight">Midnight</option>
-        <option value="sepia">Sepia</option>
-      </select>
-    </div>
-    <button class="btn sync" id="syncBtn" type="button" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
-  </div>
-
-  <div class="tabs" role="tablist">
-    <button class="tab" role="tab" id="tab-data"      aria-controls="panel-data"      aria-selected="false">Your Data</button>
-    <button class="tab" role="tab" id="tab-settings"  aria-controls="panel-settings"  aria-selected="false">Settings</button>
-    <button class="tab" role="tab" id="tab-dashboard" aria-controls="panel-dashboard" aria-selected="true">Team Dashboard</button>
+  <!-- A tablist owes a screen reader two things: which panel each tab drives
+       (aria-controls), and a single stop in the tab order rather than one per
+       tab. tabindex is roved in selectTab() alongside aria-selected; the arrow
+       keys are wired at the foot of the page. Same pattern as the sibling app. -->
+  <div class="tabs" role="tablist" aria-label="Views">
+    <button class="tab" role="tab" id="tab-dashboard" aria-controls="panel-dashboard" aria-selected="true"  tabindex="0">Dashboard</button>
+    <button class="tab" role="tab" id="tab-data"      aria-controls="panel-data"      aria-selected="false" tabindex="-1">Your Data</button>
+    <button class="tab" role="tab" id="tab-settings"  aria-controls="panel-settings"  aria-selected="false" tabindex="-1">Settings</button>
   </div>
 
   <!-- ══════════════════ YOUR DATA ══════════════════ -->
@@ -496,23 +572,6 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
       <div id="dataTable" style="margin-top:var(--sp-5)"></div>
     </div>
 
-    <div class="card">
-      <h2>Back up &amp; restore</h2>
-      <p class="hint">
-        One JSON file holding every team, their work items and your shared settings — a copy
-        you keep, independent of this browser and of any Google account.
-      </p>
-      <div class="btn-row" style="margin-top:var(--sp-5)">
-        <button class="btn" id="btnExport" type="button">⬇ Download backup (JSON)</button>
-        <button class="btn" id="btnImport" type="button">⬆ Restore from backup…</button>
-        <input type="file" id="importFile" accept="application/json,.json" hidden>
-      </div>
-      <div class="note info" style="margin-top:var(--sp-6)">
-        Restoring <strong>replaces every team in this browser</strong>. You'll see what the file
-        holds and be asked to confirm first — and if you're signed in, the restored copy becomes
-        the one your other devices get.
-      </div>
-    </div>
   </section>
 
   <!-- ══════════════════ SETTINGS ══════════════════ -->
@@ -612,6 +671,11 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
 2015-01-26       2015-01-21   Story</pre>
     </div>
 
+    <!-- Summary tiles — the sibling app's pattern, without RAG colour: this
+         dashboard has no targets, so a tile states the figure and the ⓘ says
+         what to make of it. Rendered by renderDashboard(). -->
+    <div id="dashTiles" class="tiles" hidden></div>
+
     <div id="dashCharts" class="grid charts">
       <div class="chart-card">
         <div class="chart-title" id="titleQuality"></div>
@@ -634,17 +698,56 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-base); }
       </div>
     </div>
 
-    <p class="footer">
+    <p class="privacy" style="padding-left:0">
       Every chart carries a dashed linear trend line. All figures are computed in your browser.
     </p>
   </section>
 
   <!-- Live region: the sync module rewrites its text as the state changes, so it
        must stay in the tree rather than being toggled hidden. -->
-  <p class="footer" id="privacyNote" role="status">🔒 Private — your data is stored in this browser only.</p>
-  <p class="footer"><a href="privacy.html">Privacy &amp; your data</a></p>
+  <p class="privacy" id="privacyNote" role="status">🔒 Private — your data is stored in this browser only.</p>
+  <!-- Its own element, not part of #privacyNote: the sync code rewrites that
+       note's textContent, which would silently delete links nested inside it. -->
+  <p class="privacy privacy-links"><a href="privacy.html">Privacy &amp; your data</a> &middot;
+    <a href="https://eagleadams86.github.io/sprint-velocity/">Sprint Predictability — the sibling app</a></p>
+
+  <details class="changelog" id="cl-box">
+    <summary>Recent changes</summary>
+    <ol id="cl-list"><li>Loading&hellip;</li></ol>
+  </details>
 
 </div>
+
+<!-- ── Backup / restore — opened from the header, like the sibling app ────── -->
+<dialog id="dataDialog" aria-labelledby="dataDialogTitle">
+  <h2 id="dataDialogTitle">Back up &amp; restore</h2>
+  <p>
+    One JSON file holding every team, their work items and your shared settings — a copy
+    you keep, independent of this browser and of any Google account.
+  </p>
+  <div class="btn-row" style="margin-top:12px">
+    <button class="btn" id="btnExport" type="button">⬇ Download backup (JSON)</button>
+    <button class="btn" id="btnImport" type="button">⬆ Restore from backup…</button>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+  </div>
+  <div class="note info" style="margin-top:16px">
+    Restoring <strong>replaces every team in this browser</strong>. You'll see what the file
+    holds and be asked to confirm first — and if you're signed in, the restored copy becomes
+    the one your other devices get.
+  </div>
+  <div class="row" style="justify-content:flex-end;margin-top:18px">
+    <button class="btn primary" id="dataCloseBtn" type="button">Close</button>
+  </div>
+</dialog>
+
+<!-- ── What a figure means — one dialog, filled per ⓘ press ───────────────── -->
+<dialog id="helpDialog" aria-labelledby="helpTitle">
+  <h2 id="helpTitle"></h2>
+  <p id="helpBody" style="margin:0"></p>
+  <div class="row" style="justify-content:flex-end;margin-top:18px">
+    <button class="btn primary" id="helpCloseBtn" type="button">Got it</button>
+  </div>
+</dialog>
 
 <!-- Reconciling two copies at first sign-in. Deliberately a question rather than
      a timestamp guess: guessing once wiped a browser's data in the sibling app. -->
@@ -1090,6 +1193,10 @@ function derive(rows, settings, view) {
   }
 
   const weeks = [], throughput = [], unplannedRate = [], avgCycleTime = [], netFlow = [];
+  /* Every individual cycle time inside the window, pooled — the summary tile
+     averages these rather than the weekly means, so an empty week (stored as 0
+     in the weekly series to keep the line unbroken) can't drag it down. */
+  const windowCycles = [];
 
   for (const ws of weekStarts) {
     const key = weekKey(ws);
@@ -1107,6 +1214,7 @@ function derive(rows, settings, view) {
 
     const cts = cycleByWeek.get(key) || [];
     avgCycleTime.push(cts.length ? mean(cts) : 0);
+    windowCycles.push(...cts);
 
     /* Net flow: completed this week minus started this week. */
     netFlow.push(done.length - (byStartedWeek.get(key) || 0));
@@ -1117,6 +1225,15 @@ function derive(rows, settings, view) {
   return {
     empty: weeks.length === 0,
     weeks, throughput, unplannedRate, avgCycleTime, netFlow,
+    /* Window-wide figures for the summary tiles. avgCycleTime here is the mean
+       over the pooled cycle times (per item), not over the weekly means — and
+       null, not 0, when nothing in the window has one. */
+    summary: {
+      avgThroughput: mean(throughput),
+      avgCycleTime: windowCycles.length ? mean(windowCycles) : null,
+      unplannedRateAvg: mean(unplannedRate),
+      netFlowTotal: netFlow.reduce((a, b) => a + b, 0)
+    },
     itemCount: items.length,
     inProgressCount: items.length - finished.length,
     startDate, endDate,
@@ -1344,7 +1461,7 @@ window.toast = (msg) => {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1565,13 +1682,50 @@ function currentFilterValue() {
   return chosen.value;
 }
 
+/* The header brand stays put — the team picker beside it already names the
+   team, and a sticky header that re-widens per team is exactly the kind of
+   movement the final-width rule exists to prevent. The browser tab keeps it. */
 function renderTitle() {
   const t = activeTeam();
   const name = t ? t.name.trim() : '';
-  const title = name ? name + ' Team Dashboard' : 'Team Dashboard';
-  $('appTitle').textContent = title;
-  document.title = title;
+  document.title = name ? name + ' — Team Dashboard' : 'Team Dashboard';
   $('pasteTeamName').textContent = name || 'this team';
+}
+
+/* ── ⓘ help — the sibling app's pattern ─────────────────────────────────────
+   The dimension framing that used to sit above every chart (and was removed to
+   fit all four on screen) lives here instead: on demand, one press away. */
+const METRIC_HELP = {
+  quality: { title: 'Quality — how well',
+    body: 'How much unplanned work do we carry? Plots unplanned work — anything whose '
+      + 'Type matches the unplanned text in Settings — as a share of everything completed, '
+      + 'week by week. Trending down is the good direction.' },
+  responsiveness: { title: 'Responsiveness — how fast',
+    body: 'How long does an item take from starting to finishing? The average cycle time '
+      + 'of the items completed each week, in days. Steady and falling is the good direction.' },
+  productivity: { title: 'Productivity — how much',
+    body: 'What pace do we deliver at? The count of items completed each week. Read the '
+      + 'trend line rather than any single week — throughput is naturally lumpy.' },
+  predictability: { title: 'Predictability — how repeatable',
+    body: 'Is our completion pace consistent? Items completed minus items started, per week. '
+      + 'Around zero is the goal: persistently below zero means more work starts than '
+      + 'finishes and work in progress is piling up; persistently above zero drains it.' }
+};
+
+function helpBtn(key, label) {
+  if (!METRIC_HELP[key]) return '';
+  return '<button type="button" class="tile-help" data-help="' + key +
+    '" aria-label="What does ' + escapeHtml(label) + ' mean?">i</button>';
+}
+
+/* A summary tile. No RAG state on purpose: this app has no targets, so the
+   tile states the figure and the ⓘ says what to make of it. */
+function tile(label, valueHtml, foot, helpKey) {
+  return '<div class="tile">' +
+    '<div class="label">' + escapeHtml(label) + helpBtn(helpKey, label) + '</div>' +
+    '<div class="value">' + valueHtml + '</div>' +
+    (foot ? '<div class="foot">' + escapeHtml(foot) + '</div>' : '') +
+    '</div>';
 }
 
 function renderTeamSelect() {
@@ -1631,6 +1785,7 @@ function renderDashboard() {
 
   $('dashEmpty').hidden = plottable;
   $('dashCharts').hidden = !plottable;
+  $('dashTiles').hidden = !plottable;
 
   if (!plottable) {
     $('windowNote').innerHTML = rows.length
@@ -1647,10 +1802,28 @@ function renderDashboard() {
     d.weeks.length + ' weeks &middot; ' + d.itemCount + ' items' +
     (d.inProgressCount ? ' (' + d.inProgressCount + ' in progress)' : '');
 
-  $('titleQuality').textContent        = d.titles.quality;
-  $('titleResponsiveness').textContent = d.titles.responsiveness;
-  $('titleProductivity').textContent   = d.titles.productivity;
-  $('titlePredictability').textContent = d.titles.predictability;
+  const s = d.summary;
+  $('dashTiles').innerHTML =
+    tile('Completed per week', num1(s.avgThroughput),
+      'items per week over ' + d.weeks.length + ' week' + (d.weeks.length === 1 ? '' : 's'),
+      'productivity') +
+    tile('Avg ' + (state.settings.cycleTimeLabel || 'cycle time'),
+      s.avgCycleTime == null ? '—' : num1(s.avgCycleTime),
+      'days from start to finish', 'responsiveness') +
+    tile((state.settings.unplannedLabel || 'Unplanned') + ' rate', pct1(s.unplannedRateAvg),
+      'share of completed work', 'quality') +
+    tile('Net flow', (s.netFlowTotal > 0 ? '+' : '') + s.netFlowTotal,
+      'completed − started; aim near 0', 'predictability');
+
+  /* Titles hold user-chosen label text, so they're escaped; the ⓘ restores the
+     coaching framing the standing eyebrow text used to carry. */
+  const setTitle = (id, text, key) => {
+    $(id).innerHTML = '<span>' + escapeHtml(text) + '</span>' + helpBtn(key, text);
+  };
+  setTitle('titleQuality',        d.titles.quality,        'quality');
+  setTitle('titleResponsiveness', d.titles.responsiveness, 'responsiveness');
+  setTitle('titleProductivity',   d.titles.productivity,   'productivity');
+  setTitle('titlePredictability', d.titles.predictability, 'predictability');
 
   drawCharts(d);
 }
@@ -1729,17 +1902,49 @@ function renderAll() {
    8. EVENTS
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* tabs */
-const TABS = ['data', 'settings', 'dashboard'];
+/* tabs — roving tabindex plus arrow keys, the sibling app's tablist manners:
+   one stop in the tab order, ArrowLeft/Right/Home/End move along the row. */
+const TABS = ['dashboard', 'data', 'settings'];
 function selectTab(name) {
   TABS.forEach(t => {
-    $('tab-' + t).setAttribute('aria-selected', String(t === name));
-    $('panel-' + t).hidden = t !== name;
+    const sel = t === name;
+    const tab = $('tab-' + t);
+    tab.setAttribute('aria-selected', String(sel));
+    tab.tabIndex = sel ? 0 : -1;
+    $('panel-' + t).hidden = !sel;
   });
   /* Chart.js sizes to a hidden canvas as 0×0, so re-measure on reveal. */
   if (name === 'dashboard') Object.values(charts).forEach(c => c.resize());
 }
-TABS.forEach(t => $('tab-' + t).addEventListener('click', () => selectTab(t)));
+TABS.forEach((t, i) => {
+  const tab = $('tab-' + t);
+  tab.addEventListener('click', () => selectTab(t));
+  tab.addEventListener('keydown', e => {
+    const step = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' }[e.key];
+    if (step === undefined) return;
+    e.preventDefault();
+    const j = step === 'first' ? 0
+      : step === 'last' ? TABS.length - 1
+      : (i + step + TABS.length) % TABS.length;
+    $('tab-' + TABS[j]).focus();
+    selectTab(TABS[j]);
+  });
+});
+
+/* ⓘ help + the header dialogs. One delegated listener picks up every [data-help]
+   button wherever a render puts it. textContent only — never markup. */
+document.addEventListener('click', e => {
+  const btn = e.target.closest ? e.target.closest('[data-help]') : null;
+  if (!btn) return;
+  const h = METRIC_HELP[btn.dataset.help];
+  if (!h) return;
+  $('helpTitle').textContent = h.title;
+  $('helpBody').textContent = h.body;
+  $('helpDialog').showModal();
+});
+$('helpCloseBtn').addEventListener('click', () => $('helpDialog').close());
+$('dataBtn').addEventListener('click', () => $('dataDialog').showModal());
+$('dataCloseBtn').addEventListener('click', () => $('dataDialog').close());
 
 /* theme */
 const THEMES = [...$('themeSel').options].map(o => o.value);
@@ -2356,6 +2561,38 @@ window.cloudPush = () => {
   clearTimeout(pushTimer);
   pushTimer = setTimeout(() => pushNow().catch(setSyncError), 1200);
 };
+</script>
+
+<script>
+/* "Recent changes" box — lazily loads this file's last 10 commit subjects from
+   the GitHub API the first time the box is expanded (ported from the sibling
+   app). Commit subjects are user-facing here, so write them for a reader. */
+(function(){
+  var box=document.getElementById('cl-box'),loaded=false;
+  box.addEventListener('toggle',function(){
+    if(!box.open||loaded)return;loaded=true;
+    var list=document.getElementById('cl-list');
+    fetch('https://api.github.com/repos/eagleadams86/team-dashboard/commits?path=index.html&per_page=10')
+      .then(function(r){if(!r.ok)throw new Error('http');return r.json();})
+      .then(function(cs){
+        list.innerHTML='';
+        if(!cs.length){list.innerHTML='<li>No changes recorded yet.</li>';return;}
+        cs.forEach(function(c){
+          var li=document.createElement('li');
+          var d=document.createElement('span');d.className='cl-date';
+          d.textContent=new Date(c.commit.author.date).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+          // Only accept a real github.com https link — never trust a URL from
+          // the API blindly, or a javascript: href would run on click.
+          var url=String(c.html_url||'');
+          var a=document.createElement(/^https:\/\/github\.com\//.test(url)?'a':'span');
+          if(a.tagName==='A'){a.href=url;a.target='_blank';a.rel='noopener noreferrer';}
+          a.textContent=c.commit.message.split('\n')[0];
+          li.appendChild(d);li.appendChild(a);list.appendChild(li);
+        });
+      })
+      .catch(function(){list.innerHTML='<li>Changelog unavailable right now (offline?).</li>';});
+  });
+})();
 </script>
 </body>
 </html>
