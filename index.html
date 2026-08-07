@@ -1946,6 +1946,30 @@ $('helpCloseBtn').addEventListener('click', () => $('helpDialog').close());
 $('dataBtn').addEventListener('click', () => $('dataDialog').showModal());
 $('dataCloseBtn').addEventListener('click', () => $('dataDialog').close());
 
+/* A modal <dialog> ignores backdrop clicks by default, which reads as the app
+   being stuck. Clicking outside now closes, same as the button and Escape —
+   ported from the sibling app. Two details worth keeping:
+   · the hit test is against the dialog's box, not `e.target === dialog` — the
+     dialog has padding, and a click on that padding is still inside the window;
+   · the press has to have *started* outside too, so selecting text inside and
+     releasing past the edge doesn't slam the dialog shut. */
+function closeOnBackdropClick(dlg) {
+  const outside = (e) => {
+    const r = dlg.getBoundingClientRect();
+    return e.clientX < r.left || e.clientX > r.right
+        || e.clientY < r.top  || e.clientY > r.bottom;
+  };
+  let startedOutside = false;
+  dlg.addEventListener('mousedown', (e) => { startedOutside = outside(e); });
+  dlg.addEventListener('click', (e) => {
+    if (startedOutside && outside(e)) dlg.close();
+    startedOutside = false;
+  });
+}
+/* Every dialog except the sync reconciliation one, which deliberately refuses
+   to be dismissed — picking which copy of your data to keep has to be a choice. */
+['dataDialog', 'helpDialog'].forEach(id => closeOnBackdropClick($(id)));
+
 /* theme */
 const THEMES = [...$('themeSel').options].map(o => o.value);
 $('themeSel').value = (() => {
