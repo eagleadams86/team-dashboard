@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Team Dashboard</title>
+<title>Team Dashboard · Charlie’s Epic Flow Metrics</title>
 <link rel="icon" href="favicon.ico">
 <!--
   Locked down to what the app actually uses: scripts from this origin, Firebase's
@@ -357,8 +357,15 @@ select { cursor: pointer; }
    Tiles share the parent's rows via subgrid so label, number and caption line
    up straight across the row; browsers without subgrid lay each tile out on
    its own, which is an acceptable fallback. */
-.tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+.tiles { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: repeat(3, auto); margin-bottom: 18px; }
+/* Column counts are spelled out rather than left to auto-fit, which at in-between
+   widths dropped the fourth tile onto a row of its own and read as an afterthought.
+   Four tiles, one per dimension, so they go four-across or pair into a 2x2 — never
+   3+1. This is the one tile rule the sibling app does NOT share: its tile groups
+   vary in count, so auto-fit is still right there. */
+@media (max-width: 720px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 400px) { .tiles { grid-template-columns: 1fr; } }
 .tile { display: grid; grid-row: span 3; grid-template-rows: subgrid; align-content: start;
   border: 1px solid var(--border); border-left-width: 4px;
   border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface-alt); }
@@ -743,7 +750,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
       </div>
     </div>
 
-    <p class="privacy" style="padding-left:0">
+    <p class="privacy">
       Every chart carries a dashed linear trend line. All figures are computed in your browser.
     </p>
   </section>
@@ -1912,11 +1919,13 @@ function currentFilterValue() {
 
 /* The header brand stays put — the team picker beside it already names the
    team, and a sticky header that re-widens per team is exactly the kind of
-   movement the final-width rule exists to prevent. The browser tab keeps it. */
+   movement the final-width rule exists to prevent. The browser tab stays put
+   too: it carries the same brand line as the header, which is how the rest of
+   the family names its tabs, so a tab is recognisable as this app before it's
+   recognisable as one team's view of it. Set once in <title>, never rewritten. */
 function renderTitle() {
   const t = activeTeam();
   const name = t ? t.name.trim() : '';
-  document.title = name ? name + ' — Team Dashboard' : 'Team Dashboard';
   $('pasteTeamName').textContent = name || 'this team';
 }
 

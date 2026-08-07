@@ -14,11 +14,13 @@ Paste your work items, get four charts:
 | **Productivity** — how much | What pace do we deliver at? | Items completed per week |
 | **Predictability** — how repeatable | Is our completion pace consistent? | Net flow — items completed minus items started, per week |
 
-Each chart carries a dashed linear trend line, and a row of **summary tiles** above the charts
-states the window-wide figures — average completed per week, average cycle time (pooled over
+Each chart carries a dashed linear trend line, and four **summary tiles** above the charts
+state the window-wide figures — average completed per week, average cycle time (pooled over
 the items in the window, so an empty week can't drag it down), the unplanned rate, and total
 net flow. The tiles are deliberately neutral: this app has no targets, so no tile is ever
-coloured "good" or "bad".
+coloured "good" or "bad". There being exactly four of them, one per dimension, they go
+four-across on a wide window and pair into a 2x2 on a narrower one — never three and a
+stray fourth.
 
 The dashboard shows each chart's title and nothing else standing — the dimension heading and
 the coaching question that used to sit above every chart were removed deliberately, to get all
@@ -33,7 +35,10 @@ This app shares its look and behaviour with
 sticky header, button tabs (with arrow-key navigation), summary tiles, ⓘ help dialogs,
 read-only share links, theme picker and footer. Each app links to the other at the foot of the page, and a **Recent
 changes** box down there lists the last ten changes to this file, fetched from GitHub when
-expanded. If a chrome rule changes in one app, it should change in the other too.
+expanded. If a chrome rule changes in one app, it should change in the other too — with one
+noted exception: how many tile columns there are. This app always has exactly four tiles and
+so states its column counts outright, while the sibling's tile groups vary in size and are
+still laid out by `auto-fit`.
 
 ## Teams
 
