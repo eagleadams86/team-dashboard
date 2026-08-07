@@ -38,8 +38,9 @@ expanded. If a chrome rule changes in one app, it should change in the other too
 ## Teams
 
 Each team keeps its own list of work items; the picker in the header chooses which one the
-dashboard is showing. Add, rename and delete teams from the **Teams** card on the Your Data
-tab. Settings are shared by every team — one place to say what "unplanned" means.
+dashboard is showing. Add, rename and delete teams from the **Teams** button beside that
+picker — a dialog, the same shape as the sibling app's Teams & PIs. Settings are shared by
+every team — one place to say what "unplanned" means.
 
 Which team you're looking at is a position on *this* device and deliberately isn't synced:
 switching team on the laptop shouldn't yank the phone to the same team.
