@@ -5,13 +5,13 @@ completed and started dates. Single page, no build step, nothing to install.
 
 **Live:** https://eagleadams86.github.io/team-dashboard/
 
-Paste your work items, get four charts:
+Paste your work items, get four charts — listed here in the order they appear on screen:
 
 | Dimension | Question it answers | What's plotted |
 |---|---|---|
-| **Quality** — how well | How much bug debt do we carry? | Unplanned work as a share of everything completed, per week |
-| **Responsiveness** — how fast | How long from starting to finishing? | Average cycle time per week |
 | **Productivity** — how much | What pace do we deliver at? | Items completed per week |
+| **Responsiveness** — how fast | How long from starting to finishing? | Average cycle time per week |
+| **Quality** — how well | How much bug debt do we carry? | Unplanned work as a share of everything completed, per week |
 | **Predictability** — how repeatable | Is our completion pace consistent? | Net flow — items completed minus items started, per week |
 
 Each chart carries a dashed linear trend line, and four **summary tiles** above the charts

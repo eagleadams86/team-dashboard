@@ -728,10 +728,13 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
          what to make of it. Rendered by renderDashboard(). -->
     <div id="dashTiles" class="tiles" hidden></div>
 
+    <!-- Chart order matches the tile order above — productivity, responsiveness,
+         quality, predictability — so the tile you read and the chart that expands
+         it sit in the same position in their row. -->
     <div id="dashCharts" class="grid charts">
       <div class="chart-card">
-        <div class="chart-title" id="titleQuality"></div>
-        <div class="chart-wrap"><canvas id="chartQuality"></canvas></div>
+        <div class="chart-title" id="titleProductivity"></div>
+        <div class="chart-wrap"><canvas id="chartProductivity"></canvas></div>
       </div>
 
       <div class="chart-card">
@@ -740,8 +743,8 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
       </div>
 
       <div class="chart-card">
-        <div class="chart-title" id="titleProductivity"></div>
-        <div class="chart-wrap"><canvas id="chartProductivity"></canvas></div>
+        <div class="chart-title" id="titleQuality"></div>
+        <div class="chart-wrap"><canvas id="chartQuality"></canvas></div>
       </div>
 
       <div class="chart-card">
