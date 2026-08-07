@@ -640,6 +640,57 @@ function run(TD, win) {
      dA.unplannedRate[0] + ' vs ' + dB.unplannedRate[0]);
 
   /* ────────────────────────────────────────────────────────── */
+  group('Clean up old data — what a cutoff condemns');
+
+  const C = win.TDCleanup;
+  const row = (c, s, t) => ({ completed: c ? D.apply(null, c) : null,
+                              started:   s ? D.apply(null, s) : null, type: t || '' });
+  const cutoff = D(2015, 3, 1);
+
+  /* The completed date decides, and the cutoff day itself is kept — the dialog
+     promises "on or after", so an item completed ON it must survive. */
+  is(C.cleanupDoomed(row([2015, 2, 28]), cutoff, false), true, 'completed the day before the cutoff goes');
+  is(C.cleanupDoomed(row([2015, 3, 1]), cutoff, false), false, 'completed ON the cutoff stays');
+  is(C.cleanupDoomed(row([2015, 3, 2]), cutoff, false), false, 'completed after the cutoff stays');
+
+  /* Work in progress is not old data — it is unfinished work, whatever its age. */
+  is(C.cleanupDoomed(row(null, [2010, 1, 1]), cutoff, false), false,
+     'an ancient unfinished item stays while the box is unticked');
+  is(C.cleanupDoomed(row(null, [2010, 1, 1]), cutoff, true), true,
+     'and goes once the box is ticked');
+  is(C.cleanupDoomed(row(null, [2015, 6, 1]), cutoff, true), false,
+     'a recent unfinished item stays even with the box ticked');
+
+  /* A started date must never drag out an item that finished in the kept window
+     — that is the mistake that would silently delete recent throughput. */
+  is(C.cleanupDoomed(row([2015, 4, 1], [2014, 1, 1]), cutoff, true), false,
+     'an old start with a recent completion stays — the completion decides');
+
+  /* The anchor is the newest date in the data, not today: pasting a stale export
+     must not put every row one press from deletion. */
+  const stale = [{ rows: [row([2015, 1, 21], [2015, 1, 14]), row([2015, 5, 13], [2015, 5, 4])] }];
+  is(iso(C.cleanupAnchor(stale)), '2015-05-13', 'the anchor is the newest completion in the data');
+  is(iso(C.cleanupAnchor([{ rows: [row(null, [2016, 2, 2])] }])), '2016-02-02',
+     'an unfinished item can be the newest date too');
+  is(C.cleanupAnchor([{ rows: [] }]), null, 'no rows means no anchor, so no cutoff can be offered');
+  is(iso(TD.edate(C.cleanupAnchor(stale), -3)), '2015-02-13',
+     'keeping 3 months from that anchor cuts at 13 Feb 2015, not three months before today');
+
+  /* End to end: the filter the button applies is the one the preview counted. */
+  const bulk = TD.parsePastedRows(SAMPLE_PASTE, 'auto').rows;
+  const cut  = TD.edate(C.cleanupAnchor([{ rows: bulk }]), -3);
+  const kept = bulk.filter(r => !C.cleanupDoomed(r, cut, false));
+  const gone = bulk.filter(r =>  C.cleanupDoomed(r, cut, false));
+  is(kept.length + gone.length, bulk.length, 'every item is either kept or removed, never both');
+  ok(gone.length > 0 && kept.length > 0,
+     'the reference sample really does straddle a 3-month cutoff',
+     gone.length + ' removed, ' + kept.length + ' kept');
+  ok(kept.every(r => !r.completed || r.completed >= cut),
+     'nothing completed before the cutoff survives');
+  ok(gone.every(r => r.completed && r.completed < cut),
+     'nothing without an old completion is removed');
+
+  /* ────────────────────────────────────────────────────────── */
   const sum = document.getElementById('summary');
   sum.className = failed ? 'bad' : 'ok';
   sum.textContent = failed
@@ -649,7 +700,7 @@ function run(TD, win) {
 
 document.getElementById('app').addEventListener('load', function () {
   const w = this.contentWindow;
-  if (!w.TD || !w.TDState) {
+  if (!w.TD || !w.TDState || !w.TDCleanup) {
     document.getElementById('summary').className = 'bad';
     document.getElementById('summary').textContent =
       'Could not reach the app. Serve this over http://localhost — file:// iframes are blocked.';

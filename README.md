@@ -135,6 +135,35 @@ Net-flow bars use the theme's accent for positive and `--serious` for negative �
 not the red/green pair, because the coaching goal is "keep around zero", so neither sign is
 good or bad.
 
+## Cleaning up old data
+
+Years of history make every paste, backup and share link heavier without telling you anything
+new. **Your Data → Clean up old data → Remove old items** drops the items older than a cutoff
+you choose:
+
+- **How much to keep** — the last 3, 6 or 12 months, the last 2 or 3 years, or everything from
+  a date you pick yourself.
+- **Which teams** — any combination. Teams with nothing in them can't be picked.
+- **Unfinished items** — off by default, and worth leaving off. An item with no completion date
+  is still in progress however old its start date, and it still counts as work started on the
+  Predictability chart.
+
+**The completed date decides.** An item that took a year to finish but finished inside the
+window stays — the start date never drags it out.
+
+**Relative options count back from the newest item in the data, not from today**, which is the
+same anchor the dashboard's own date window uses. It matters: without it, loading last year's
+export and picking "the last 12 months" would leave you one press from deleting all of it.
+Whichever option you pick, the exact cutoff date is named before you commit.
+
+Nothing happens until you press **Remove items**. Until then a running summary says how many
+items would go and how many would stay, broken down per team when you've picked more than one,
+and it calls out by name any team the cutoff would empty completely. The button stays disabled
+while there's nothing to remove. There's no undo, so the dialog offers the same JSON download
+as the Back up button — one press away from a deletion is exactly when a backup is worth having.
+
+Removing items only removes items. The team itself survives, even if it ends up empty.
+
 ## Back up & restore
 
 The **Back up** button in the header opens a dialog (the same shape as the sibling app's)
@@ -329,6 +358,13 @@ boundary: `sanitizeTeams()` (ids arriving from the cloud end up in `data-` attri
 (including the `defectType` → `unplannedType` carry-over), `hasData()`, the predicate the
 "empty never beats data" rule rests on, and `isBackup()`, the guard that stops the wrong JSON
 file being restored over real data.
+
+Cleanup gets the same treatment, since it's the one action with no undo: `cleanupDoomed()` is
+pinned on both sides of the cutoff (the cutoff day itself is kept), on work in progress with
+and without the box ticked, and on the case that would hurt most — an old start date with a
+recent completion, which must stay. `cleanupAnchor()` is pinned to the newest date in the data
+rather than today. One end-to-end check runs the whole reference sample past a 3-month cutoff
+and asserts every item is either kept or removed, never both.
 
 The expectations are pinned to a fixed 141-item sample, right down to the weekly throughput
 series, `10.2857…` days average cycle time in week 1, `−5` net flow in week 1, and the 19.92%

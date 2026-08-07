@@ -274,6 +274,13 @@ header { position: sticky; top: 0; z-index: 20; background: var(--surface);
 .btn.primary:hover { opacity: .88; }
 .btn.danger { color: var(--err); border-color: var(--err); background: transparent; }
 .btn.danger:hover { background: var(--err-bg); }
+/* Opacity rather than a greyed colour, so nothing here invents a palette value.
+   The cleanup dialog leans on this to say "there is nothing to remove"; the
+   share dialog's copy buttons have always been disabled while a link builds. */
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:disabled:hover { border-color: var(--border-strong); }
+.btn.danger:disabled:hover { background: transparent; border-color: var(--err); }
+.btn.primary:disabled:hover { opacity: .45; }
 /* Shared height for the header chrome: a native <select> ignores line-height,
    so the height is pinned on both or the row lines up on neither edge. */
 .btn.small { padding: 4px 9px; font-size: 13px; min-height: var(--chrome-h); }
@@ -450,7 +457,10 @@ fieldset.formpanel { border: 1px solid var(--border); border-radius: var(--radiu
   padding: 12px; margin: 14px 0 0; background: var(--surface-alt); min-width: 0; }
 legend { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
   color: var(--text-secondary); font-weight: 700; padding: 0 6px; }
-.checklist { display: grid; gap: 7px; max-height: 200px; overflow-y: auto; }
+/* overflow-x is spelled out because `overflow-y: auto` alone leaves the browser
+   free to reserve a horizontal scrollbar it never needs — a 15px white stripe
+   under a two-line list, which is exactly what it looked like. */
+.checklist { display: grid; gap: 7px; max-height: 200px; overflow: hidden auto; }
 label.checkline { display: flex; gap: 8px; align-items: center; font-size: 14px;
   font-weight: 400; color: var(--text-primary); margin: 0; min-height: 24px; }
 .checkline input { flex: none; }
@@ -475,7 +485,12 @@ label.checkline { display: flex; gap: 8px; align-items: center; font-size: 14px;
 /* dialog + toast */
 dialog { background: var(--surface); color: var(--text-primary);
   border: 1px solid var(--border-strong); border-radius: var(--radius);
-  padding: 20px; max-width: 560px; width: calc(100% - 32px); box-shadow: var(--shadow); }
+  padding: 20px; max-width: 560px; width: calc(100% - 32px); box-shadow: var(--shadow);
+  /* A tall dialog on a short laptop screen used to open already scrolled past
+     its own heading — showModal() focuses the first control and drags it into
+     view. Cap the height so the scrolling happens inside a dialog that fits.
+     vh, not dvh: dvh resolves to 0 in some embedded engines. */
+  max-height: calc(100vh - 32px); overflow: auto; }
 dialog::backdrop { background: rgba(0, 0, 0, .55); }
 dialog h2 { font-size: 16px; margin-bottom: 12px; }
 dialog p { color: var(--text-secondary); font-size: 14px; }
@@ -514,6 +529,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
     <h1 class="brand">Team&nbsp;Dashboard <span>· Charlie’s Epic Flow Metrics</span></h1>
     <label class="sr-only" for="teamSel">Team</label>
     <select id="teamSel" title="Which team you're looking at"><option>—</option></select>
+    <button class="btn small" id="manageBtn" type="button" title="Add or rename teams">Teams</button>
     <label class="sr-only" for="themeSel">Theme</label>
     <!-- The four unified themes, listed alphabetically (matches the sibling app).
          Midnight is pre-selected to match the theme the boot script in <head>
@@ -547,23 +563,6 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 
   <!-- ══════════════════ YOUR DATA ══════════════════ -->
   <section class="panel" id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden>
-    <div class="card">
-      <h2>Teams</h2>
-      <p class="hint">
-        Each team keeps its own work items. The picker in the header chooses which one the
-        dashboard is showing; Settings below are shared by all of them.
-      </p>
-      <div class="table-scroll" style="margin-top:var(--sp-6)">
-        <table class="filters" id="teamTable">
-          <thead><tr><th>Team name</th><th class="act">Items</th><th class="act"></th></tr></thead>
-          <tbody id="teamRows"></tbody>
-        </table>
-      </div>
-      <div class="btn-row" style="margin-top:var(--sp-5)">
-        <button class="btn" id="btnAddTeam" type="button">Add a team</button>
-      </div>
-    </div>
-
     <div class="card">
       <h2>Paste work items for <span id="pasteTeamName">this team</span></h2>
       <p class="hint">
@@ -603,13 +602,26 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
       <div id="dataTable" style="margin-top:var(--sp-5)"></div>
     </div>
 
+    <div class="card">
+      <h2>Clean up old data</h2>
+      <p class="hint">
+        Work items pile up, and years of them make every paste and every backup heavier
+        without telling you anything new. This drops the ones older than a cutoff you pick.
+        You choose how far back to keep, and see exactly what would go, before anything
+        is deleted.
+      </p>
+      <div class="btn-row" style="margin-top:var(--sp-6)">
+        <button class="btn" id="btnCleanup" type="button">Remove old items&hellip;</button>
+      </div>
+    </div>
+
   </section>
 
   <!-- ══════════════════ SETTINGS ══════════════════ -->
   <section class="panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
     <div class="card">
       <h2>Labels &amp; work types</h2>
-      <p class="hint">Shared by every team. Team names live on the <strong>Your Data</strong> tab.</p>
+      <p class="hint">Shared by every team. Team names live behind the <strong>Teams</strong> button in the header.</p>
       <div class="grid two" style="margin-top:var(--sp-6)">
         <div>
           <label for="setCycleLabel">Word to use for cycle time on charts</label>
@@ -749,6 +761,25 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 
 </div>
 
+<!-- ── Teams — opened from the header, like the sibling app's Teams & PIs ─── -->
+<dialog id="manageDialog" aria-labelledby="manageDialogTitle">
+  <h2 id="manageDialogTitle">Teams</h2>
+  <p>
+    Each team keeps its own work items. The picker in the header chooses which one the
+    dashboard is showing; Settings are shared by all of them.
+  </p>
+  <div class="table-scroll" style="margin-top:12px">
+    <table class="filters" id="teamTable">
+      <thead><tr><th>Team name</th><th class="act">Items</th><th class="act"></th></tr></thead>
+      <tbody id="teamRows"></tbody>
+    </table>
+  </div>
+  <div class="row spread" style="margin-top:14px">
+    <button class="btn" id="btnAddTeam" type="button">+ Add a team</button>
+    <button class="btn primary" id="manageCloseBtn" type="button">Done</button>
+  </div>
+</dialog>
+
 <!-- ── Backup / restore — opened from the header, like the sibling app ────── -->
 <dialog id="dataDialog" aria-labelledby="dataDialogTitle">
   <h2 id="dataDialogTitle">Back up &amp; restore</h2>
@@ -768,6 +799,67 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
   </div>
   <div class="row" style="justify-content:flex-end;margin-top:18px">
     <button class="btn primary" id="dataCloseBtn" type="button">Close</button>
+  </div>
+</dialog>
+
+<!-- ── Clean up old data ──────────────────────────────────────────────────────
+     Deliberately shaped like the share dialog: pick the scope, read the count,
+     then commit. Every control refreshes the preview, so the destructive button
+     is never the thing that tells you what it is about to do. -->
+<dialog id="cleanupDialog" aria-labelledby="cleanupTitle">
+  <h2 id="cleanupTitle">Clean up old data</h2>
+  <p>Choose how much history to keep. Nothing goes until you press
+    <strong>Remove items</strong> — the summary below only says what that press would do.</p>
+
+  <fieldset class="formpanel">
+    <legend>How much to keep</legend>
+    <div class="grid two">
+      <div>
+        <label for="cleanupKeep">Keep</label>
+        <select id="cleanupKeep">
+          <option value="3">The last 3 months</option>
+          <option value="6">The last 6 months</option>
+          <option value="12" selected>The last 12 months</option>
+          <option value="24">The last 2 years</option>
+          <option value="36">The last 3 years</option>
+          <option value="custom">Everything from a date I choose</option>
+        </select>
+      </div>
+      <div id="cleanupDateWrap" hidden>
+        <label for="cleanupDate">Keep items completed on or after</label>
+        <input type="date" id="cleanupDate">
+      </div>
+    </div>
+    <p class="hint" style="margin:10px 0 0">
+      Months count back from the <strong>newest item in the data</strong>, not from today —
+      the same anchor the dashboard's date window uses, so a stale export is never one
+      press from vanishing.
+    </p>
+  </fieldset>
+
+  <fieldset class="formpanel">
+    <legend>Which teams</legend>
+    <div class="checklist" id="cleanupTeams"></div>
+  </fieldset>
+
+  <fieldset class="formpanel">
+    <legend>Unfinished items</legend>
+    <label class="checkline"><input type="checkbox" id="cleanupWip"><span>Also remove
+      unfinished items started before the cutoff</span></label>
+    <p class="hint" style="margin:10px 0 0">
+      Off by default: an item with no completion date is still in progress, however old
+      its start date.
+    </p>
+  </fieldset>
+
+  <div id="cleanupPreview" role="status" style="margin-top:var(--sp-6)"></div>
+
+  <div class="row" style="justify-content:space-between;margin-top:18px;gap:10px;flex-wrap:wrap">
+    <button class="btn" id="cleanupBackupBtn" type="button">&#11015; Back up first</button>
+    <span class="row" style="gap:10px">
+      <button class="btn" id="cleanupCancelBtn" type="button">Cancel</button>
+      <button class="btn danger" id="cleanupRunBtn" type="button">Remove items</button>
+    </span>
   </div>
 </dialog>
 
@@ -2032,6 +2124,8 @@ document.addEventListener('click', e => {
 $('helpCloseBtn').addEventListener('click', () => $('helpDialog').close());
 $('dataBtn').addEventListener('click', () => $('dataDialog').showModal());
 $('dataCloseBtn').addEventListener('click', () => $('dataDialog').close());
+$('manageBtn').addEventListener('click', () => $('manageDialog').showModal());
+$('manageCloseBtn').addEventListener('click', () => $('manageDialog').close());
 
 /* A modal <dialog> ignores backdrop clicks by default, which reads as the app
    being stuck. Clicking outside now closes, same as the button and Escape —
@@ -2055,7 +2149,7 @@ function closeOnBackdropClick(dlg) {
 }
 /* Every dialog except the sync reconciliation one, which deliberately refuses
    to be dismissed — picking which copy of your data to keep has to be a choice. */
-['dataDialog', 'helpDialog'].forEach(id => closeOnBackdropClick($(id)));
+['dataDialog', 'helpDialog', 'manageDialog'].forEach(id => closeOnBackdropClick($(id)));
 
 /* theme */
 const THEMES = [...$('themeSel').options].map(o => o.value);
@@ -2251,7 +2345,9 @@ function todayLocalISO() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-$('btnExport').addEventListener('click', () => {
+/* Its own function because the cleanup dialog offers the same download as its
+   safety net — one deletion away is exactly when a backup is worth taking. */
+function downloadBackup() {
   const payload = Object.assign(
     { app: 'team-dashboard', version: 2, exported: new Date().toISOString() },
     serializeState()
@@ -2270,7 +2366,9 @@ $('btnExport').addEventListener('click', () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   const c = window.tdCounts(payload);
   window.toast(`Backup downloaded — ${c.teams} team${c.teams === 1 ? '' : 's'}, ${c.items} item${c.items === 1 ? '' : 's'}`);
-});
+}
+
+$('btnExport').addEventListener('click', downloadBackup);
 
 $('btnImport').addEventListener('click', () => $('importFile').click());
 
@@ -2516,6 +2614,191 @@ $('shareOpenBtn').addEventListener('click', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   9b. CLEAN UP OLD DATA
+
+   Deleting history is the one action here with no undo, so the whole design is
+   arranged around showing the consequence first: every control re-runs the
+   preview, the preview names the exact cutoff date and the per-team counts, and
+   the button stays disabled while there is nothing to remove.
+
+   What counts as "old" is the COMPLETED date. An item with no completion is in
+   progress — it earns its keep on the net flow chart however old its start is —
+   so it only goes if the box for it is ticked.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Relative options count back from the newest date in the teams being cleaned,
+   not from today. Same anchor as derive()'s date window, and for the same
+   reason: someone pasting a stale export should not find that "keep the last 12
+   months" means "keep nothing". */
+function cleanupAnchor(teams) {
+  let newest = null;
+  teams.forEach(t => t.rows.forEach(r => {
+    if (r.completed && (!newest || r.completed > newest)) newest = r.completed;
+    if (r.started   && (!newest || r.started   > newest)) newest = r.started;
+  }));
+  return newest;
+}
+
+function cleanupTeamsPicked() {
+  const ids = Array.from($('cleanupTeams').querySelectorAll('input:checked'))
+    .map(i => i.dataset.cleanTeam);
+  return state.teams.filter(t => ids.includes(t.id));
+}
+
+/* The cutoff, or null when it can't be worked out yet — no teams picked, no
+   dated rows to anchor to, or a custom date box that hasn't been filled in. */
+function cleanupCutoff(teams) {
+  const keep = $('cleanupKeep').value;
+  if (keep === 'custom') {
+    const v = $('cleanupDate').value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+    const d = new Date(v + 'T00:00:00Z');
+    return isNaN(d) ? null : d;
+  }
+  const anchor = cleanupAnchor(teams);
+  return anchor ? edate(anchor, -Number(keep)) : null;
+}
+
+/* One decision, in one place, used by both the preview and the deletion — so
+   what the count promises and what the button does can't drift apart. */
+function cleanupDoomed(row, cutoff, wip) {
+  if (row.completed) return row.completed < cutoff;
+  return wip && !!row.started && row.started < cutoff;
+}
+
+function refreshCleanupPreview() {
+  const teams  = cleanupTeamsPicked();
+  const wip    = $('cleanupWip').checked;
+  const cutoff = cleanupCutoff(teams);
+  const box    = $('cleanupPreview');
+  const stop   = (msg) => {
+    box.innerHTML = '<div class="note info">' + msg + '</div>';
+    $('cleanupRunBtn').disabled = true;
+  };
+
+  if (!teams.length)  return stop('Pick at least one team.');
+  if (!cutoff && $('cleanupKeep').value === 'custom')
+    return stop('Choose the date to keep from.');
+  if (!cutoff)        return stop('Nothing to work from — the teams you picked hold no dated items yet.');
+
+  const per = teams.map(t => ({
+    team: t,
+    going: t.rows.filter(r => cleanupDoomed(r, cutoff, wip)).length
+  }));
+  const going = per.reduce((n, p) => n + p.going, 0);
+  const kept  = teams.reduce((n, t) => n + t.rows.length, 0) - going;
+  const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+
+  if (!going) {
+    box.innerHTML = '<div class="note ok">Nothing older than <strong>' + prettyDate(cutoff) +
+      '</strong> in ' + (teams.length === 1 ? 'that team' : 'those teams') + ' — there is nothing to remove.</div>';
+    $('cleanupRunBtn').disabled = true;
+    return;
+  }
+
+  /* A team losing everything is the outcome most worth seeing coming, so it is
+     called out by name rather than left to be inferred from the arithmetic. */
+  const emptied = per.filter(p => p.going && p.going === p.team.rows.length);
+  const breakdown = per.length > 1
+    ? '<ul>' + per.map(p => '<li>' + escapeHtml(p.team.name) + ' — ' +
+        (p.going ? plural(p.going, 'item') + ' removed' : 'nothing to remove') + '</li>').join('') + '</ul>'
+    : '';
+
+  box.innerHTML =
+    '<div class="note err"><strong>' + plural(going, 'item') + '</strong> would be removed — ' +
+    'everything completed before <strong>' + prettyDate(cutoff) + '</strong>' +
+    (wip ? ', plus unfinished items started before it' : '') + '. ' +
+    plural(kept, 'item') + ' would stay.' + breakdown +
+    (emptied.length ? '<p style="margin:8px 0 0">This empties ' +
+      emptied.map(p => '<strong>' + escapeHtml(p.team.name) + '</strong>').join(', ') +
+      ' completely. The team itself stays — only its items go.</p>' : '') +
+    '</div>';
+  $('cleanupRunBtn').disabled = false;
+}
+
+/* Rebuilt on open and again after a removal, so the counts beside each team are
+   never a description of data that has already gone. `checked` carries over. */
+function renderCleanupTeams(preset) {
+  const box = $('cleanupTeams');
+  const keep = preset || new Set(
+    Array.from(box.querySelectorAll('input:checked')).map(i => i.dataset.cleanTeam));
+  box.innerHTML = state.teams.map(t =>
+    '<label class="checkline"><input type="checkbox" data-clean-team="' + t.id + '"' +
+    (keep.has(t.id) && t.rows.length ? ' checked' : '') + (t.rows.length ? '' : ' disabled') +
+    '><span>' + escapeHtml(t.name) +
+    (t.rows.length ? ' (' + t.rows.length + ' item' + (t.rows.length === 1 ? '' : 's') + ')' : ' (empty)') +
+    '</span></label>').join('');
+  box.querySelectorAll('input').forEach(i => { i.onchange = refreshCleanupPreview; });
+}
+
+function openCleanup() {
+  const active = activeTeam();
+  renderCleanupTeams(new Set(active ? [active.id] : []));
+  /* An empty active team can't be the one ticked box — that would open on an
+     error. Fall back to whichever teams actually hold something. */
+  if (!$('cleanupTeams').querySelector('input:checked'))
+    $('cleanupTeams').querySelectorAll('input:not([disabled])').forEach(i => { i.checked = true; });
+  refreshCleanupPreview();
+  $('cleanupDialog').showModal();
+  /* showModal() focuses the first control and scrolls it into view, which on a
+     short screen lands past the heading. Start at the top. */
+  $('cleanupDialog').scrollTop = 0;
+}
+
+$('btnCleanup').addEventListener('click', openCleanup);
+$('cleanupCancelBtn').addEventListener('click', () => $('cleanupDialog').close());
+closeOnBackdropClick($('cleanupDialog'));
+$('cleanupBackupBtn').addEventListener('click', downloadBackup);
+
+/* Remembered because the custom date box opens on whatever cutoff was already on
+   screen — and by the time the change fires, the select no longer says what that
+   was. Reading it back would prefill today, which is not what was showing. */
+let cleanupLastRelative = $('cleanupKeep').value;
+
+$('cleanupKeep').addEventListener('change', e => {
+  const custom = e.target.value === 'custom';
+  $('cleanupDateWrap').hidden = !custom;
+  if (!custom) cleanupLastRelative = e.target.value;
+  else if (!$('cleanupDate').value) {
+    const anchor = cleanupAnchor(cleanupTeamsPicked());
+    $('cleanupDate').value = anchor
+      ? isoOf(edate(anchor, -Number(cleanupLastRelative)))
+      : todayLocalISO();
+  }
+  refreshCleanupPreview();
+});
+$('cleanupDate').addEventListener('input', refreshCleanupPreview);
+$('cleanupWip').addEventListener('change', refreshCleanupPreview);
+
+$('cleanupRunBtn').addEventListener('click', () => {
+  const teams  = cleanupTeamsPicked();
+  const wip    = $('cleanupWip').checked;
+  const cutoff = cleanupCutoff(teams);
+  if (!teams.length || !cutoff) return;
+
+  let going = 0;
+  teams.forEach(t => { going += t.rows.filter(r => cleanupDoomed(r, cutoff, wip)).length; });
+  if (!going) return;
+
+  const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+  const scope = teams.length === 1 ? teams[0].name : plural(teams.length, 'team');
+  if (!confirm('Remove ' + plural(going, 'item') + ' from ' + scope +
+               ', completed before ' + prettyDate(cutoff) + '?\n\nThis cannot be undone.')) return;
+
+  teams.forEach(t => { t.rows = t.rows.filter(r => !cleanupDoomed(r, cutoff, wip)); });
+  save();
+  $('parseNote').innerHTML = '';
+  renderAll();
+  renderCleanupTeams();             /* the dialog stays open — refresh its counts too */
+  refreshCleanupPreview();
+  window.toast('Removed ' + plural(going, 'old item') + ' from ' + scope);
+});
+
+/* The two decisions worth pinning in tests.html: what the relative options
+   anchor to, and which rows a cutoff condemns. */
+window.TDCleanup = { cleanupAnchor, cleanupDoomed };
+
+/* ═══════════════════════════════════════════════════════════════════════════
    10. BOOT
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -2534,7 +2817,7 @@ if (viewOnly) {
      preference, in its own key. syncBtn is hidden from here rather than left to
      the sync module, which is deferred — a visitor shouldn't see a sign-in
      button that then vanishes. */
-  ['dataBtn', 'shareBtn', 'syncBtn'].forEach(id => { $(id).hidden = true; });
+  ['manageBtn', 'dataBtn', 'shareBtn', 'syncBtn'].forEach(id => { $(id).hidden = true; });
   $('tab-data').hidden = true;
   $('tab-settings').hidden = true;
   $('privacyNote').textContent = 'This is a read-only copy someone shared with you. It was '
