@@ -688,12 +688,14 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
     </div>
 
     <div class="card">
+      <!-- Button and note share a row. The note's flex-basis is what makes that
+           safe on a narrow window: too little room and .btn-row's wrap drops it
+           under the button rather than crushing it into a column of one word. -->
       <div class="btn-row">
         <button class="btn danger" id="btnResetSettings">Reset settings to defaults</button>
-      </div>
-      <div class="note info" style="margin-top:var(--sp-6)">
-        Everything the four charts depend on is here, and nothing else. A setting that changes
-        nothing is worse than a missing one.
+        <div class="note info" style="flex:1 1 320px; min-width:0">
+          Everything the four charts depend on is here, and nothing else.
+        </div>
       </div>
     </div>
   </section>
