@@ -1,9 +1,14 @@
-# Team Dashboard
+# Flow Metrics
 
 Four weekly flow metrics for as many delivery teams as you like, from nothing but a list of
 completed and started dates. Single page, no build step, nothing to install.
 
 **Live:** https://eagleadams86.github.io/team-dashboard/
+
+The app is called **Flow Metrics** on screen. The repo, the Pages path, the Firebase project
+(`teamdashboard-6723f`) and the `app: 'team-dashboard'` marker inside a backup file all still
+say *team-dashboard* — renaming any of those would break existing links, backups and sync,
+so the rename is deliberately a display-only one.
 
 Paste your work items, get four charts — listed here in the order they appear on screen:
 
@@ -33,8 +38,10 @@ direction is good.
 This app shares its look and behaviour with
 [Sprint Predictability](https://eagleadams86.github.io/sprint-velocity/), its sibling: the same
 sticky header, button tabs (with arrow-key navigation), summary tiles, ⓘ help dialogs,
-read-only share links, theme picker and footer. Each app links to the other at the foot of the page, and a **Recent
-changes** box down there lists the last ten changes to this file, fetched from GitHub when
+read-only share links, theme picker and footer. **Each app's header carries a link to the
+other**, next to the title — one click either way, from anywhere on the page — and both
+still cross-link at the foot of the page, where a **Recent
+changes** box lists the last ten changes to this file, fetched from GitHub when
 expanded. If a chrome rule changes in one app, it should change in the other too — with one
 noted exception: how many tile columns there are. This app always has exactly four tiles and
 so states its column counts outright, while the sibling's tile groups vary in size and are
