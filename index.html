@@ -457,13 +457,22 @@ table.data td.num { font-family: var(--font-mono); font-size: 12px; color: var(-
   padding: 12px 16px; font-family: var(--font-mono); font-size: 12px;
   color: var(--text-primary); overflow-x: auto; max-width: 100%; }
 
-/* settings filter list */
+/* settings filter list, and the Teams dialog's table */
 table.filters { width: 100%; border-collapse: collapse; }
-table.filters td { padding: 4px 4px 4px 0; vertical-align: middle; }
-table.filters th { text-align: left; padding: 0 4px 6px 0;
+/* 12px between columns, not 4. Every cell in these tables holds a full-width
+   input, and an input's focus ring (2px, offset 2px) ate the old gap whole and
+   landed on whatever sat in the next column — the item count in the Teams
+   dialog read as part of the name box rather than as its own column. The last
+   column keeps the table's right edge. */
+table.filters td { padding: 4px 12px 4px 0; vertical-align: middle; }
+table.filters th { text-align: left; padding: 0 12px 6px 0;
   font-size: 12px; font-weight: 600; letter-spacing: .04em;
   text-transform: uppercase; color: var(--text-secondary); }
+table.filters td:last-child, table.filters th:last-child { padding-right: 0; }
 table.filters td.act { width: 1%; }
+/* A count belongs under its heading, not hard against the box to its left, and
+   these columns are only as wide as their widest cell. */
+table.filters th.act, table.filters td.act { text-align: right; }
 .icon-btn { appearance: none; background: none; border: 1px solid var(--border-strong);
   color: var(--text-muted); border-radius: var(--radius-sm); cursor: pointer;
   width: 30px; height: 30px; font-size: 14px; line-height: 1; }
