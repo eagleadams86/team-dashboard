@@ -54,6 +54,12 @@ dashboard is showing. Add, rename and delete teams from the **Teams** button bes
 picker — a dialog, the same shape as the sibling app's Teams & PIs. Settings are shared by
 every team — one place to say what "unplanned" means.
 
+The picker only appears once there are **two or more** teams: with one team it is not a
+choice. It is part of a wider rule — nothing shows until there is something behind it, so a
+first run is the paste box and its instructions, and nothing else. The **Loaded data** card,
+the **Clean up old data** card and the **Append to existing** / **Clear this team's data**
+buttons all appear the moment rows exist (`renderEmptyState()`).
+
 Which team you're looking at is a position on *this* device and deliberately isn't synced:
 switching team on the laptop shouldn't yank the phone to the same team.
 

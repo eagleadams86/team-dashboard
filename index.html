@@ -47,6 +47,15 @@
     if (t === 'slate') t = 'dark';                       /* legacy id, same palette */
     document.documentElement.setAttribute('data-theme',
       ['midnight', 'dark', 'light', 'sepia'].indexOf(t) >= 0 ? t : 'midnight');
+    /* A browser with nothing saved has exactly one (empty) team, so the team
+       picker is not a choice — renderEmptyState() hides it. That runs at the
+       foot of the page, though, which would paint the picker and then take it
+       away; the header rule is that nothing in that row may move. Hiding it
+       here, before first paint, costs an existing user nothing (they have a
+       td-state, so the flag is never set) and renderEmptyState() clears the
+       flag on its first pass, whichever way it then decides. */
+    if (!localStorage.getItem('td-state'))
+      document.documentElement.setAttribute('data-first-run', '');
   })();
 </script>
 <style>
@@ -299,6 +308,10 @@ header { position: sticky; top: 0; z-index: 20; background: var(--surface);
   padding: 4px 9px; font-size: 13px; cursor: pointer; min-height: var(--chrome-h); }
 #teamSel:hover, #themeSel:hover { border-color: var(--text-muted); }
 #teamSel { min-width: 140px; }
+/* Set by the boot script in <head> when nothing is saved yet, so a first run
+   never paints a team picker it is about to hide. renderEmptyState() clears the
+   attribute and takes over with the `hidden` property. */
+html[data-first-run] #teamSel { display: none; }
 #syncBtn { min-width: 125px; }
 #syncBtn[data-state="error"] { color: var(--warn); border-color: var(--warn); }
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -618,19 +631,22 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
       </div>
       <div class="btn-row" style="margin-top:var(--sp-6)">
         <button class="btn primary" id="btnLoad">Load pasted rows</button>
-        <button class="btn" id="btnAppend">Append to existing</button>
-        <button class="btn danger" id="btnClear">Clear this team's data</button>
+        <button class="btn" id="btnAppend" hidden>Append to existing</button>
+        <button class="btn danger" id="btnClear" hidden>Clear this team's data</button>
       </div>
       <div id="parseNote" style="margin-top:var(--sp-6)"></div>
     </div>
 
-    <div class="card">
+    <!-- Both cards, and the two buttons above, are hidden until there is data for
+         them to act on — see renderEmptyState(). A first run should show the paste
+         box and nothing else. -->
+    <div class="card" id="loadedCard" hidden>
       <h2>Loaded data <span class="hint" id="rowCount"></span></h2>
       <p class="hint">Read-only — to correct a row, fix it in your source and paste again.</p>
       <div id="dataTable" style="margin-top:var(--sp-5)"></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="cleanupCard" hidden>
       <h2>Clean up old data</h2>
       <p class="hint">
         Work items pile up, and years of them make every paste and every backup heavier
@@ -2148,11 +2164,30 @@ function renderSettingsForm() {
   renderFilterRows();
 }
 
+/* Nothing on screen that has nothing behind it. A first run is a paste box and
+   the instructions above it; the picker, the loaded-data card, the cleanup card
+   and the append/clear buttons each appear the moment they mean something —
+   one team is not a choice, and there is nothing to list, prune, add to or
+   clear until rows exist. Cleanup is the one that reads *all* teams: its dialog
+   picks teams itself, so it stays useful from any team as long as some team
+   holds data. The picker is also hidden pre-paint on a true first run (see the
+   boot script in <head>) so it never blinks in and out. */
+function renderEmptyState() {
+  const rows = activeRows().length;
+  $('teamSel').hidden    = state.teams.length < 2;
+  $('btnAppend').hidden  = !rows;
+  $('btnClear').hidden   = !rows;
+  $('loadedCard').hidden = !rows;
+  $('cleanupCard').hidden = !state.teams.some(t => t.rows.length);
+  document.documentElement.removeAttribute('data-first-run');
+}
+
 function renderAll() {
   renderTeamSelect();
   renderTeamRows();
   renderFilterSelect();
   renderDataTable();
+  renderEmptyState();
   renderDashboard();
 }
 
