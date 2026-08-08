@@ -430,6 +430,14 @@ select { cursor: pointer; }
 
 /* data table */
 .table-scroll { overflow-x: auto; }
+/* A focus ring is drawn *outside* the box it belongs to (2px wide, 2px offset),
+   and an overflow container clips anything that leaves it — so the team-name
+   box, flush against the left edge of this scroller, lost the left side of its
+   ring when it was focused. Give the scroller those 4px as padding and take the
+   same 4px back as margin: the table lines up with the text above it exactly as
+   before, and the ring now has somewhere to be drawn. The 8px top margin plus
+   4px of padding is the 12px this div used to carry inline. */
+#manageDialog .table-scroll { margin: 8px -4px 0; padding: 4px; }
 table.data { width: 100%; border-collapse: collapse; font-size: 14px;
   font-variant-numeric: tabular-nums; }
 table.data th, table.data td { text-align: left; padding: 8px 12px;
@@ -823,7 +831,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
     Each team keeps its own work items. The picker in the header chooses which one the
     dashboard is showing; Settings are shared by all of them.
   </p>
-  <div class="table-scroll" style="margin-top:12px">
+  <div class="table-scroll">
     <table class="filters" id="teamTable">
       <thead><tr><th>Team name</th><th class="act">Items</th><th class="act"></th></tr></thead>
       <tbody id="teamRows"></tbody>
