@@ -152,6 +152,9 @@ worth knowing:
   systematically too positive.
 - **A week with no unplanned work scores 0%**, not blank; a week with no completions has an
   average cycle time of 0.
+- **A team whose items are all still in progress has nothing to chart yet, and the dashboard
+  says exactly that** — "Nothing finished yet", not a complaint about the filter. The filter
+  message only appears when a filter really is what's excluding everything.
 
 Net-flow bars use the theme's accent for positive and `--serious` for negative — deliberately
 not the red/green pair, because the coaching goal is "keep around zero", so neither sign is
@@ -381,10 +384,17 @@ one is ever wanted, pass `browserPopupRedirectResolver` to that call rather than
 
 ## Tests
 
+![tests](https://github.com/eagleadams86/team-dashboard/actions/workflows/tests.yml/badge.svg)
+
 `tests.html` pins the pure functions by loading the real `index.html` in a hidden iframe — no
 copies to drift. It must be served over `http://localhost`, not opened as a file. The iframe is
 marked `data-td-tests`, which the sync module checks so no sign-in session ever boots inside
 the harness.
+
+The suite also runs on every push:
+[`.github/workflows/tests.yml`](.github/workflows/tests.yml) serves the folder, opens
+`tests.html` in headless Chromium and fails the build if the summary goes red or the page
+throws — so a suite that only ever ran when someone remembered to open it can't silently rot.
 
 Beyond the metrics it covers `detectColumns()` (a leading key column, the dates either way
 round, header names beating position, a free-text summary not being mistaken for the type),
@@ -395,9 +405,16 @@ CSV fields, the share-link codec round trip on both wire formats, and the sync
 boundary: `sanitizeTeams()` (ids arriving from the cloud end up in `data-` attributes and
 `<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is replaced, names are capped, types
 coerced to strings), `normalizeSettings()`
-(including the `defectType` → `unplannedType` carry-over), `hasData()`, the predicate the
+(including the `defectType` → `unplannedType` carry-over, and junk filter entries or a junk
+same-day value being coerced rather than trusted), `hasData()`, the predicate the
 "empty never beats data" rule rests on, and `isBackup()`, the guard that stops the wrong JSON
 file being restored over real data.
+
+Two promises get pinned end to end rather than function by function:
+`buildSharePayload()` — a share link holds **only the chosen teams** plus the shared settings,
+and nothing else (no theme, no sync uid, no view state) — and `migrate()`, the v1 upgrade,
+exercised the way it really runs: the old `td-rows`/`td-settings` keys are planted, a second
+hidden copy of the app boots, and the suite checks the single team it folds them into.
 
 Cleanup gets the same treatment, since it's the one action with no undo: `cleanupDoomed()` is
 pinned on both sides of the cutoff (the cutoff day itself is kept), on work in progress with
@@ -420,6 +437,7 @@ average bug rate in the Quality chart title. Change the maths and the suite says
 | `tests.html` | Pure-function tests |
 | `privacy.html` | Privacy policy — exists because other people may sign in |
 | `firestore.rules` | Checked-in copy of the deployed security rules |
+| `.github/workflows/tests.yml` | Runs `tests.html` headless on every push |
 | `favicon.ico` | Tab icon |
 
 Four themes — Midnight (default), Dark, Light, Sepia — from the shared theme pack. Palette
