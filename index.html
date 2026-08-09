@@ -651,7 +651,10 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
         <button class="btn" id="btnAppend" hidden>Append to existing</button>
         <button class="btn danger" id="btnClear" hidden>Clear this team's data</button>
       </div>
-      <div id="parseNote" style="margin-top:var(--sp-6)"></div>
+      <!-- role="status": the result of a load — including its data errors — is
+           announced to a screen reader, the same promise the cleanup preview
+           and the share dialog's meta line already make. -->
+      <div id="parseNote" role="status" style="margin-top:var(--sp-6)"></div>
     </div>
 
     <!-- Both cards, and the two buttons above, are hidden until there is data for
@@ -775,6 +778,17 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 2015-01-21       2015-01-14
 2015-01-26       2015-01-14   Bug
 2015-01-26       2015-01-21   Story</pre>
+    </div>
+
+    <!-- Rows exist but nothing plots. Its own card, not #dashEmpty: that one
+         teaches a first run how to paste, which is the wrong thing to show
+         someone whose data is already loaded. renderDashboard() fills in which
+         of the two honest reasons applies — everything still in progress, or a
+         filter that matches nothing — because a single message here used to
+         blame the filter even when none was applied. -->
+    <div id="dashNothing" class="card empty" hidden>
+      <h2 id="dashNothingTitle"></h2>
+      <p id="dashNothingBody"></p>
     </div>
 
     <!-- Summary tiles — the sibling app's pattern, without RAG colour: this
@@ -1284,9 +1298,8 @@ function detectColumns(rows, header, order) {
 /**
  * @param text   pasted rows
  * @param order  'auto' | 'dmy' | 'mdy'
- * @param forced optional { completed, started, type } column indices, to override detection
  */
-function parsePastedRows(text, order, forced) {
+function parsePastedRows(text, order) {
   /* Trim spaces but never tabs: in a tab-separated paste a leading tab is an
      empty first cell — a work-in-progress row in a completed-first export.
      l.trim() here once ate that tab and shifted every cell left, so the start
@@ -1300,7 +1313,7 @@ function parsePastedRows(text, order, forced) {
   if (raw.length && looksLikeHeader(raw[0])) { header = raw.shift(); skippedHeader = true; }
 
   const resolved = (!order || order === 'auto') ? detectDateOrder(raw) : order;
-  const cols = forced || detectColumns(raw, header, resolved);
+  const cols = detectColumns(raw, header, resolved);
 
   const at = (cells, i) => (i >= 0 && cells[i] != null ? String(cells[i]).trim() : '');
 
@@ -1599,12 +1612,30 @@ const serializeRows = rows => rows.map(r => ({ c: isoOf(r.completed), s: isoOf(r
 
 function normalizeSettings(raw) {
   const s = Object.assign({}, DEFAULT_SETTINGS, raw && typeof raw === 'object' ? raw : {});
-  if (!Array.isArray(s.filters) || !s.filters.length) s.filters = DEFAULT_SETTINGS.filters.map(f => Object.assign({}, f));
+  /* Settings cross the same boundary as teams — a hand-edited backup or cloud
+     doc can hold anything — so filter entries are coerced to the
+     {display, value} string pair the renderers assume, with the same length cap
+     names get. An entry that isn't an object at all is dropped; a list emptied
+     that way gets the defaults back, exactly as an empty list does. */
+  s.filters = (Array.isArray(s.filters) ? s.filters : [])
+    .filter(f => f && typeof f === 'object')
+    .map(f => ({
+      display: (typeof f.display === 'string' ? f.display : '').slice(0, 120),
+      value:   (typeof f.value   === 'string' ? f.value   : '').slice(0, 120)
+    }));
+  if (!s.filters.length) s.filters = DEFAULT_SETTINGS.filters.map(f => Object.assign({}, f));
   delete s.teamName;                          /* v1 field — teams carry their own names now */
   /* This setting used to be called defectType. Carry an older saved value over
      rather than silently resetting a work type someone chose deliberately. */
   if (typeof s.defectType === 'string' && !(raw && raw.unplannedType)) s.unplannedType = s.defectType;
   delete s.defectType;
+  /* Same treatment for the scalars: a non-string label would render as its
+     default, and a junk same-day value would put NaN in every cycle time. */
+  for (const k of ['cycleTimeLabel', 'unplannedType', 'plannedLabel', 'unplannedLabel']) {
+    if (typeof s[k] !== 'string') s[k] = DEFAULT_SETTINGS[k];
+  }
+  const n = Number(s.sameDayValue);
+  s.sameDayValue = Number.isFinite(n) && n >= 0 ? n : DEFAULT_SETTINGS.sameDayValue;
   return s;
 }
 
@@ -1662,7 +1693,18 @@ function loadView() {
 /* Both writers are view-mode chokepoints: in a shared view the state in memory
    is someone else's snapshot, and it must never be written over the visitor's
    own saved copy. UI state still moves in memory — it just isn't persisted. */
-function persist() { if (viewOnly) return; localStorage.setItem(LS.state, JSON.stringify(serializeState())); }
+function persist() {
+  if (viewOnly) return;
+  try { localStorage.setItem(LS.state, JSON.stringify(serializeState())); }
+  catch (e) {
+    /* A big paste can outgrow the browser's storage quota. The change is live
+       in memory (and still reaches the cloud if signed in) but would be gone on
+       reload — the one honest thing to do is say so, because the load note has
+       already said "Loaded". */
+    console.warn('localStorage save failed', e);
+    window.toast('⚠️ Storage is full — this change is on screen but could not be saved in this browser. Remove old items and try again.');
+  }
+}
 function saveView() { if (viewOnly) return; localStorage.setItem(LS.view, JSON.stringify(view)); }
 
 /* The one place a change to teams or settings is written down. It stamps the
@@ -2074,14 +2116,28 @@ function renderDashboard() {
   const d = derive(rows, state.settings, { filterValue: currentFilterValue(), months: view.months });
   const plottable = !d.empty && d.weeks.length > 0;
 
-  $('dashEmpty').hidden = plottable;
+  /* Three states, three surfaces: the charts when something plots; the paste
+     instructions when the team holds nothing at all; and #dashNothing when rows
+     exist but nothing can chart, which says which of two reasons applies. */
+  $('dashEmpty').hidden = plottable || rows.length > 0;
+  $('dashNothing').hidden = plottable || !rows.length;
   $('dashCharts').hidden = !plottable;
   $('dashTiles').hidden = !plottable;
 
   if (!plottable) {
-    $('windowNote').innerHTML = rows.length
-      ? 'No items match this filter.'
-      : '';
+    if (rows.length && !rows.some(r => r.completed)) {
+      /* Every metric keys off a completion, so all-in-progress data has no week
+         axis yet — that is not a filter problem and must not be blamed on one. */
+      $('dashNothingTitle').textContent = 'Nothing finished yet';
+      $('dashNothingBody').textContent = rows.length + ' item' + (rows.length === 1 ? ' is' : 's are')
+        + ' in progress. Every chart keys off a completion, so the dashboard'
+        + ' starts with the first item that finishes.';
+    } else if (rows.length) {
+      $('dashNothingTitle').textContent = 'No items match this filter';
+      $('dashNothingBody').textContent = 'Nothing completed matches the '
+        + view.filterDisplay + ' work type filter. Pick another type — or All — above.';
+    }
+    $('windowNote').innerHTML = '';
     Object.keys(charts).forEach(k => { charts[k].destroy(); delete charts[k]; });
     return;
   }
@@ -2160,10 +2216,15 @@ function renderFilterRows() {
   state.settings.filters.forEach((f, i) => {
     const tr = document.createElement('tr');
     const locked = f.display === 'All';
+    /* The table's column headings don't name the inputs for a screen reader, so
+       each carries its own label. Positional, not the current value — a label
+       built from the value would go stale with every keystroke. */
     tr.innerHTML =
       '<td><input type="text" data-i="' + i + '" data-k="display" value="' + escapeHtml(f.display) + '"' +
+        ' aria-label="Display name, work type row ' + (i + 1) + '"' +
         (locked ? ' readonly' : '') + '></td>' +
       '<td><input type="text" data-i="' + i + '" data-k="value" value="' + escapeHtml(f.value) + '"' +
+        ' aria-label="Type text to match, work type row ' + (i + 1) + '"' +
         (locked ? ' readonly' : '') + '></td>' +
       '<td class="act">' + (locked ? '' :
         '<button class="icon-btn" data-del="' + i + '" title="Remove this type" aria-label="Remove ' +
@@ -2319,7 +2380,7 @@ function showParseNote(res, mode, team) {
       (bad ? 'Rows with a bad completion date were skipped; ' : '') +
       'rows with only a bad start date were kept without one.';
     const shown = res.badCompleted.concat(res.badStarted).slice(0, 8);
-    html += '<ul>' + shown.map(b => 'line ' + b.line + ': ' + escapeHtml(b.text)).join('</ul><ul>') + '</ul>';
+    html += '<ul>' + shown.map(b => '<li>line ' + b.line + ': ' + escapeHtml(b.text) + '</li>').join('') + '</ul>';
     html += '</div>';
   }
   /* Which column was read as what is the single most damaging thing to get wrong
@@ -3361,8 +3422,26 @@ async function pushNow() {
 window.cloudPush = () => {
   if (!user) return;
   clearTimeout(pushTimer);
-  pushTimer = setTimeout(() => pushNow().catch(setSyncError), 1200);
+  pushTimer = setTimeout(() => { pushTimer = null; pushNow().catch(setSyncError); }, 1200);
 };
+
+/* The debounce means "edit, then close the tab inside 1.2s" would leave the
+   push scheduled but never sent — localStorage has the change, the cloud
+   doesn't, and the other devices stay stale until the NEXT edit on this one.
+   Flush a pending push the moment the page is hidden; pagehide too, for the
+   paths that skip visibilitychange. Best-effort by nature — a request this late
+   in a page's life can still be cut off — but the next edit or sign-in
+   re-sends regardless, so nothing is ever lost, only late. */
+const flushPush = () => {
+  if (!user || !pushTimer) return;
+  clearTimeout(pushTimer);
+  pushTimer = null;
+  pushNow().catch(() => { /* page is going away — nowhere left to report */ });
+};
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushPush();
+});
+addEventListener('pagehide', flushPush);
 </script>
 
 <script>
