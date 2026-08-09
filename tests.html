@@ -660,6 +660,22 @@ async function run(TD, win) {
   is(S.normalizeSettings(null).filters.length, 2, 'null settings give the defaults');
   is(S.normalizeSettings({ filters: 'nope' }).filters.length, 2, 'a non-array filter list is restored');
 
+  /* Settings cross the same boundary as teams — a hand-edited backup or cloud
+     doc can hold anything — so entries and scalars are coerced, not trusted. */
+  is(S.normalizeSettings({ filters: ['junk', 42, null] }).filters.length, 2,
+     'junk filter entries are dropped — and an emptied list gets the defaults back');
+  is(S.normalizeSettings({ filters: [{ display: 'OK', value: 'ok' }, 'junk'] }).filters,
+     [{ display: 'OK', value: 'ok' }], 'a junk entry is dropped, a real one kept');
+  is(S.normalizeSettings({ filters: [{ display: 7, value: ['x'] }, { display: 'B', value: 'b' }] }).filters[0],
+     { display: '', value: '' }, 'non-string fields inside an entry become empty strings');
+  ok(S.normalizeSettings({ filters: [{ display: 'x'.repeat(500), value: 'y' }] }).filters[0].display.length <= 120,
+     'an absurdly long display text is capped, like a team name');
+  is(S.normalizeSettings({ sameDayValue: 'abc' }).sameDayValue, 0.5,
+     'a junk same-day value falls back to the default instead of NaN');
+  is(S.normalizeSettings({ sameDayValue: -3 }).sameDayValue, 0.5, 'so does a negative one');
+  is(S.normalizeSettings({ unplannedType: 42 }).unplannedType, 'Bug',
+     'a non-string label setting falls back to its default');
+
   /* ────────────────────────────────────────────────────────── */
   group('hasData — an empty copy must never beat a copy with data');
 
@@ -735,6 +751,30 @@ async function run(TD, win) {
   ok(shareThrew, 'a truncated link throws rather than half-decoding');
 
   /* ────────────────────────────────────────────────────────── */
+  group('buildSharePayload — only what was chosen goes into a link');
+
+  /* The codec is pinned above; this pins what is HANDED to it. The payload is
+     built from the app's live state, so the harness plants a known state first
+     — through tdAdopt, the same door a cloud copy comes in by. (This writes
+     td-* keys on this origin, which the note at the top already owns up to.) */
+  win.tdAdopt({
+    teams: [
+      { id: 'team-a', name: 'Alpha', rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Bug' }] },
+      { id: 'team-b', name: 'Bravo', rows: [{ c: '2015-02-21', s: '2015-02-14', t: '' }] }
+    ],
+    settings: { unplannedType: 'Incident' }
+  });
+  const sp = Sh.buildSharePayload(['team-a']);
+  is(sp.teams.length, 1, 'only the chosen team is in the payload');
+  is(sp.teams[0].name, 'Alpha', 'and it is the right one');
+  is(sp.label, 'Alpha', 'the label names only the chosen teams');
+  is(sp.settings.unplannedType, 'Incident', 'the shared settings ride along — they drive every number');
+  ok(typeof sp.sharedAt === 'number', 'the share is timestamped', String(sp.sharedAt));
+  is(Object.keys(sp).sort(), ['label', 'settings', 'sharedAt', 'teams', 'v'],
+     'and nothing else goes in — no theme, no sync uid, no view state');
+  is(Sh.buildSharePayload([]).teams, [], 'choosing nothing shares nothing');
+
+  /* ────────────────────────────────────────────────────────── */
   group('Clean up old data — what a cutoff condemns');
 
   const C = win.TDCleanup;
@@ -784,6 +824,35 @@ async function run(TD, win) {
      'nothing completed before the cutoff survives');
   ok(gone.every(r => r.completed && r.completed < cut),
      'nothing without an old completion is removed');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('migrate — v1 single-team data folds into a team on first load');
+
+  /* migrate() runs inside loadState() at boot, so it is exercised the way it
+     really runs: plant the v1 keys, boot a second hidden copy of the app, read
+     what it made of them. The primary iframe's in-memory state is untouched,
+     and this origin's td-state is put back afterwards. */
+  const savedState = localStorage.getItem('td-state');
+  localStorage.removeItem('td-state');
+  localStorage.setItem('td-rows', JSON.stringify([{ c: '2015-01-21', s: '2015-01-14', t: 'Bug' }]));
+  localStorage.setItem('td-settings', JSON.stringify({ teamName: 'Kraken', defectType: 'Incident' }));
+  const f2 = document.createElement('iframe');
+  f2.setAttribute('data-td-tests', '');
+  f2.setAttribute('aria-hidden', 'true');
+  f2.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
+  await new Promise((resolve) => { f2.onload = resolve; f2.src = 'index.html'; document.body.appendChild(f2); });
+  const mig = f2.contentWindow.tdGet();
+  is(mig.teams.length, 1, 'the v1 rows become one team');
+  is(mig.teams[0].name, 'Kraken', 'named from the v1 teamName setting');
+  is(mig.teams[0].rows.length, 1, 'the rows come across');
+  is(mig.teams[0].rows[0].c, '2015-01-21', 'dates intact');
+  is(mig.settings.unplannedType, 'Incident', 'the v1 defectType is carried over');
+  is(mig.settings.teamName, undefined, 'teamName does not survive into the shared settings');
+  is(localStorage.getItem('td-rows'), null, 'the v1 rows key is removed');
+  is(localStorage.getItem('td-settings'), null, 'the v1 settings key is removed');
+  f2.remove();
+  if (savedState != null) localStorage.setItem('td-state', savedState);
+  else localStorage.removeItem('td-state');
 
   /* ────────────────────────────────────────────────────────── */
   const sum = document.getElementById('summary');
