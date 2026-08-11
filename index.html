@@ -486,6 +486,12 @@ table.data td.num { font-family: var(--font-mono); font-size: 12px; color: var(-
 .note.ok   { border-left-color: var(--ok);   background: var(--ok-bg);   color: var(--text-primary); }
 .note.err  { border-left-color: var(--err);  background: var(--err-bg);  color: var(--text-primary); }
 .note.info { border-left-color: var(--border-strong); background: var(--surface-alt); color: var(--text-secondary); }
+/* Amber, between ok and err: rows that loaded but are worth looking at, as
+   against rows that could not be loaded at all. Deliberately not a second red —
+   the two severities have to be tellable apart, and not on the red/green axis.
+   Named `caution` rather than `warn` because a standalone .warn class already
+   exists for inline text and the two would fight over colour and size. */
+.note.caution { border-left-color: var(--warn); background: var(--warn-bg); color: var(--text-primary); }
 .note ul { margin: 8px 0 0; padding-left: 24px; }
 .note li { font-family: var(--font-mono); font-size: 12px; }
 
@@ -660,7 +666,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
         columns like the issue key are fine, the right ones are worked out from the data and
         named back to you below. Tabs and commas both work, and a header row is skipped.
         Items that are started but not finished belong here too: they count as work started.
-        A <strong>created date</strong> is optional and adds lead time and flow efficiency.
+        A <strong>created date</strong> is optional and adds lead time.
       </p>
       <div style="margin-top:var(--sp-6)">
         <label for="pasteBox">Pasted rows</label>
@@ -1509,8 +1515,8 @@ function parsePastedRows(text, order) {
 
   const at = (cells, i) => (i >= 0 && cells[i] != null ? String(cells[i]).trim() : '');
 
-  const rows = [], badCompleted = [], badStarted = [], badCreated = [];
-  let unfinished = 0, undated = 0, createdAfterStarted = 0;
+  const rows = [], badCompleted = [], badStarted = [], badCreated = [], createdOutOfOrder = [];
+  let unfinished = 0, undated = 0;
 
   raw.forEach((cells, i) => {
     const lineNo = i + 1 + (skippedHeader ? 1 : 0);
@@ -1532,10 +1538,22 @@ function parsePastedRows(text, order) {
     }
     if (!started && rawStarted !== '') badStarted.push({ line: lineNo, text: cells.join(' | ') });
     if (!created && rawCreated !== '') badCreated.push({ line: lineNo, text: cells.join(' | ') });
-    /* Work cannot start before it is raised. A row like that means the created
-       column was read off something else — a due date, an updated date — so the
-       count is reported rather than the rows being quietly kept. */
-    if (created && started && created > started) createdAfterStarted++;
+
+    /* created ≤ started ≤ completed is the one hard ordering the dates have.
+       A created date later than the work it describes usually means the column
+       was read off something else — a due date, an updated date — or that the
+       ticket was raised after the work had already begun.
+
+       The date is dropped rather than kept, because keeping it produces a lead
+       time SHORTER than the same item's cycle time, and a wait cannot be less
+       than the work inside it. Everything else about the row is fine and is
+       kept: only the one unusable field goes, and the row is listed so it can
+       be found in the export. */
+    let usableCreated = created;
+    if (created && ((started && created > started) || (completed && created > completed))) {
+      createdOutOfOrder.push({ line: lineNo, text: cells.join(' | ') });
+      usableCreated = null;
+    }
 
     /* A row with neither date says nothing about flow — nothing to count. Not an
        error (an untouched backlog item is a normal thing to have in an export),
@@ -1544,10 +1562,11 @@ function parsePastedRows(text, order) {
     if (!completed && !started) { undated++; return; }
     if (!completed) unfinished++;
 
-    rows.push({ completed: completed || null, started: started || null, created: created || null, type });
+    rows.push({ completed: completed || null, started: started || null,
+                created: usableCreated || null, type });
   });
 
-  return { rows, badCompleted, badStarted, badCreated, unfinished, undated, createdAfterStarted,
+  return { rows, badCompleted, badStarted, badCreated, createdOutOfOrder, unfinished, undated,
            skippedHeader, dateOrder: resolved, columns: cols };
 }
 
@@ -1568,9 +1587,9 @@ function cycleTimeOf(row, sameDayValue) {
 }
 
 /* Lead time in days: raised to delivered, where cycle time is started to
-   delivered. Structurally identical to cycleTimeOf on purpose — flow efficiency
-   divides one by the other, and two different conventions for "same day" or
-   "unmeasurable" would show up as a ratio nobody could explain. */
+   delivered. Structurally identical to cycleTimeOf on purpose: the two are read
+   side by side and subtracted from each other, and two different conventions for
+   "same day" or "unmeasurable" would show up as a gap nobody could explain. */
 function leadTimeOf(row, sameDayValue) {
   if (!row.completed || !row.created) return null;
   const days = diffDays(row.completed, row.created);
@@ -1744,8 +1763,8 @@ function derive(rows, settings, view) {
   }
 
   /* Does this data carry created dates at all? Everything downstream of it —
-     lead time, flow efficiency, the defects-raised series — shows an empty
-     state rather than a wrong number when it doesn't. */
+     lead time and the defects-raised series — shows an empty state rather than
+     a wrong number when it doesn't. */
   const withCreated = items.filter(r => r.created).length;
   const hasCreated = withCreated > 0;
 
@@ -2007,10 +2026,9 @@ function hydrateRows(raw) {
   return raw.map(r => ({
     completed: date(r && r.c),
     started:   date(r && r.s),
-    /* When the export has one. Lead time and flow efficiency are the only
-       things that read it, and both say so rather than falling back to the
-       start date — a lead time that is secretly a cycle time is worse than
-       no lead time at all. */
+    /* When the export has one. Lead time is the only thing that reads it, and
+       it says so rather than falling back to the start date — a lead time that
+       is secretly a cycle time is worse than no lead time at all. */
     created:   date(r && r.k),
     /* Only ever a string: a hand-edited backup or cloud doc can put anything
        here, and a non-string would round-trip back out through serializeRows. */
@@ -2518,7 +2536,7 @@ function drawCharts(d) {
     options: netOpts
   });
 
-  /* ── Lead time and flow efficiency ──
+  /* ── Lead time ──
      Both need a created date. Without one the canvas is hidden and the card
      explains what to paste, rather than the chart quietly disappearing or —
      worse — falling back to the start date and drawing a lead time that is
@@ -3100,23 +3118,59 @@ $('themeSel').addEventListener('change', e => {
 /* paste / load */
 function showParseNote(res, mode, team) {
   const el = $('parseNote');
-  const bad = res.badCompleted.length, badS = res.badStarted.length;
+  const skipped = res.badCompleted;
+  /* Problems that cost a field rather than the row. Each carries its own rows,
+     so every one of them can be listed under the sentence that explains it —
+     a count on its own tells you something is wrong without telling you where. */
+  const kept = [
+    { rows: res.badStarted,
+      what: 'a start date that could not be read, and were kept without one' },
+    { rows: res.badCreated,
+      what: 'a created date that could not be read, and were kept without one' },
+    { rows: res.createdOutOfOrder,
+      what: 'a created date later than the work itself, which cannot happen — the created '
+          + 'date was dropped on those rows and everything else about them kept' }
+  ].filter(g => g.rows.length);
 
-  if (!res.rows.length && !bad && !badS) {
+  if (!res.rows.length && !skipped.length && !kept.length) {
     el.innerHTML = '<div class="note info">Nothing to load — paste some rows first.</div>';
     return;
   }
 
+  /* Line number and the line itself, so a row can be found in the export rather
+     than hunted for. Capped, because a badly mismapped column can make every
+     row a problem and a list of 1300 helps nobody — the count above it is
+     always the true total. */
+  const LIST_CAP = 20;
+  const listOf = (rows) => '<ul>' +
+    rows.slice(0, LIST_CAP).map(b => '<li>line ' + b.line + ': ' + escapeHtml(b.text) + '</li>').join('') +
+    (rows.length > LIST_CAP ? '<li>… and ' + (rows.length - LIST_CAP) + ' more</li>' : '') +
+    '</ul>';
+  const plural = (n) => n === 1 ? ' row' : ' rows';
+
   let html = '';
-  if (bad || badS) {
-    html += '<div class="note err"><strong>Data error:</strong> there ' + (bad === 1 ? 'is' : 'are') + ' ' +
-      bad + ' badly formatted completion date' + (bad === 1 ? '' : 's') + ', and ' +
-      badS + ' badly formatted start date' + (badS === 1 ? '' : 's') + ' in your data. ' +
-      (bad ? 'Rows with a bad completion date were skipped; ' : '') +
-      'rows with only a bad start date were kept without one.';
-    const shown = res.badCompleted.concat(res.badStarted).slice(0, 8);
-    html += '<ul>' + shown.map(b => '<li>line ' + b.line + ': ' + escapeHtml(b.text) + '</li>').join('') + '</ul>';
-    html += '</div>';
+  if (skipped.length) {
+    html += '<div class="note err"><strong>Skipped ' + skipped.length + plural(skipped.length) +
+      ':</strong> the completion date could not be read, and every metric keys off one. ' +
+      'Correct these at the source and paste again.' + listOf(skipped) + '</div>';
+  }
+  if (kept.length) {
+    /* A handful of out-of-order rows is data — a ticket raised after the work
+       had started. A large share of them is a mismapped column, which is a
+       different problem with a different fix, so say which one this looks like
+       rather than leaving the reader to guess. */
+    const ooo = res.createdOutOfOrder.length;
+    const seen = res.rows.length + skipped.length;
+    const mismapped = ooo && seen && (ooo / seen) > 0.2;
+    html += '<div class="note caution" style="margin-top:var(--sp-4)">' +
+      '<strong>Loaded, but worth a look:</strong>' +
+      kept.map(g => '<div style="margin-top:var(--sp-5)">' + g.rows.length + plural(g.rows.length) +
+        ' had ' + g.what + '.' + listOf(g.rows) + '</div>').join('') +
+      (mismapped ? '<div style="margin-top:var(--sp-5)">That is ' + Math.round(ooo / seen * 100)
+        + '% of the paste, which looks less like odd tickets than like the wrong column: '
+        + 'check whether column ' + (res.columns.created + 1) + ' is a due or updated date '
+        + 'rather than when the work was raised.</div>' : '') +
+      '</div>';
   }
   /* Which column was read as what is the single most damaging thing to get wrong
      silently, so it's stated every time rather than buried in a tooltip. */
@@ -3144,19 +3198,10 @@ function showParseNote(res, mode, team) {
         + 'tell the two apart.'
       : '') +
     (res.columns.created < 0
-      ? '<br>No created date in this paste — lead time and flow efficiency need one. Add a '
-        + '<em>Created</em> column and paste again to see them.'
+      ? '<br>No created date in this paste — lead time needs one. Add a '
+        + '<em>Created</em> column and paste again to see it.'
       : '') +
     '</div>';
-  /* Work cannot start before it was raised, so this is the loudest available
-     signal that the created column was read off the wrong thing. */
-  if (res.createdAfterStarted) {
-    html += '<div class="note warn" style="margin-top:var(--sp-4)"><strong>Check the created ' +
-      'column:</strong> ' + res.createdAfterStarted + ' row' +
-      (res.createdAfterStarted === 1 ? ' has a created date' : 's have created dates') +
-      ' after their start date, which cannot happen. That column may be a due or updated ' +
-      'date rather than when the work was raised.</div>';
-  }
   el.innerHTML = html;
 }
 

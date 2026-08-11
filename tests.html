@@ -962,7 +962,24 @@ async function run(TD, win) {
     ['Key\tCreated\tIn Progress\tResolved\tType',
      'A-1\t2015-01-20\t2015-01-14\t2015-01-21\tStory',
      'A-2\t2015-01-02\t2015-01-14\t2015-01-26\tStory'].join('\n'), 'auto');
-  is(backwards.createdAfterStarted, 1, 'a created date after the start date is counted');
+  is(backwards.createdOutOfOrder.length, 1, 'a created date after the start date is caught');
+  is(backwards.createdOutOfOrder[0].line, 2, 'and reported with the line it is on, so it can be found');
+  is(backwards.rows.length, 2, 'the row itself is kept — only the one unusable field goes');
+  is(backwards.rows[0].created, null, 'the impossible created date is dropped, not stored');
+  is(TD.leadTimeOf(backwards.rows[0], 0.5), null,
+     'so it contributes no lead time, rather than one shorter than its own cycle time');
+  ok(TD.cycleTimeOf(backwards.rows[0], 0.5) != null,
+     'while its cycle time is untouched — the row is still perfectly good flow data');
+  is(backwards.rows[1].created.toISOString().slice(0, 10), '2015-01-02',
+     'a row whose dates are in order keeps its created date');
+
+  /* No start date, but raised after it was finished — equally impossible. */
+  const afterDone = TD.parsePastedRows(
+    ['Key\tCreated\tIn Progress\tResolved\tType',
+     'A-1\t2015-02-20\t\t2015-01-21\tStory'].join('\n'), 'auto');
+  is(afterDone.createdOutOfOrder.length, 1,
+     'a created date after the completion is caught even with no start date');
+  is(afterDone.rows[0].created, null, 'and dropped the same way');
 
   const badCreated = TD.parsePastedRows(
     ['Key\tCreated\tIn Progress\tResolved\tType',
