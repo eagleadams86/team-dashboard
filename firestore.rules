@@ -18,8 +18,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Sync stores one document per signed-in user, holding { data, updatedAt },
-    // where data is { teams, settings }.
+    // Sync stores one document per signed-in user, holding
+    // { data, updatedAt, serverAt, writerId }, where data is { teams, settings }.
+    // serverAt is a server timestamp and is what decides which copy is newer —
+    // two devices' own clocks can't be compared. writerId identifies the device
+    // that wrote it, so a device can tell its own write from another's. No rule
+    // change was needed for those fields: the owner may write anything here.
     //
     // The {uid} path segment is the user's Firebase auth UID, so comparing it to
     // request.auth.uid is what confines each account to its own record. A rule of

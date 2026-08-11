@@ -2198,6 +2198,9 @@ window.tdCounts = (d) => ({
 });
 
 /* Replace everything with a copy from the cloud. */
+/* Returns true if the incoming copy was taken, false if this device kept its
+   own. The caller needs to know: the sync module records which cloud version it
+   holds, and it must not record one it declined. */
 window.tdAdopt = (data, updatedAt) => {
   /* Before the swap, because the comparison is against what this device holds
      now. Created dates going from "some" to "none" is the same class of event
@@ -2228,7 +2231,7 @@ window.tdAdopt = (data, updatedAt) => {
          cleared-everything branch makes. */
       save();
       if (typeof toast === 'function') toast('Kept this device’s Created dates ☁️', 6000);
-      return;
+      return false;
     }
   }
 
@@ -2242,6 +2245,7 @@ window.tdAdopt = (data, updatedAt) => {
   localStorage.setItem(LS.updated, String(updatedAt || Date.now()));
   renderSettingsForm();
   renderAll();
+  return true;
 };
 
 /* Short-lived status message. textContent only — never HTML, and never a
@@ -3876,6 +3880,50 @@ const btn = document.getElementById('syncBtn');
 const privacyNote = document.getElementById('privacyNote');
 const localTs = () => Number(localStorage.getItem('td-updated') || 0);
 
+/* ── Which copy is newer ──────────────────────────────────────────────────────
+   This used to be decided by comparing two devices' wall clocks: the pushing
+   device wrote its own Date.now() as updatedAt, and the receiving device
+   compared that against its own last-edit stamp. Nothing reconciled the two
+   clocks, so a laptop and a virtual desktop a few minutes apart could each
+   conclude the other's newer change was older — and the "loser" then pushed its
+   staler copy over the newer one on its next sign-in. That is how one device
+   ends up holding Created dates the other has never seen.
+
+   Ordering now comes from the Firestore server's clock, which both devices
+   share. Each device records the serverAt of the version it currently holds and
+   compares incoming writes against that, rather than against anything local.
+
+   The device id exists so a device can recognise its own write coming back:
+   serverTimestamp() only resolves once the server has it, so our own push
+   returns to us as a snapshot that would otherwise look like news. */
+const SERVER_AT_KEY = 'td-server-at';
+const localServerAt = () => Number(localStorage.getItem(SERVER_AT_KEY) || 0);
+const setServerAt = (ms) => { if (ms) localStorage.setItem(SERVER_AT_KEY, String(ms)); };
+
+function deviceId() {
+  let id = localStorage.getItem('td-device-id');
+  if (!id) {
+    id = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    localStorage.setItem('td-device-id', id);
+  }
+  return id;
+}
+
+/* Null while a write is still pending — the server hasn't stamped it yet — and
+   absent entirely on a document written by a build that predates this. */
+const serverMillis = (r) => (r && r.serverAt && typeof r.serverAt.toMillis === 'function')
+  ? r.serverAt.toMillis() : 0;
+
+/* Server time decides whenever both sides know it. Until then — a document
+   written by an older build, or the first run on this device after upgrading —
+   fall back to the old clock rule, which is no worse than what it replaces.
+   One push from each device is enough to leave the fallback behind for good. */
+function remoteIsNewer(r) {
+  const rs = serverMillis(r), ls = localServerAt();
+  if (rs && ls) return rs > ls;
+  return r.updatedAt > localTs();
+}
+
 /* The button ships visible and signed-out in the markup so the header is its
    final width at first paint. It's taken away only when sync genuinely can't
    run — no config, no client ID, a failed SDK load, or a shared view. A shared
@@ -4129,9 +4177,10 @@ async function startSync() {
   const firstSyncForAccount = localStorage.getItem('td-sync-uid') !== user.uid;
 
   if (remoteHas && localHas && firstSyncForAccount) {
-    const keepGoogle = await chooseSyncSource(local, remote.data, remote.updatedAt);
+    const keepGoogle = await chooseSyncSource(local, remote.data,
+      serverMillis(remote) || remote.updatedAt);
     if (keepGoogle) {
-      window.tdAdopt(remote.data, remote.updatedAt);
+      if (window.tdAdopt(remote.data, remote.updatedAt)) setServerAt(serverMillis(remote));
       window.toast('Loaded your teams from the cloud ☁️');
     } else {
       touchLocal();
@@ -4140,12 +4189,17 @@ async function startSync() {
     }
   } else if (remoteHas && !localHas) {
     window.tdAdopt(remote.data, remote.updatedAt);      /* nothing here to lose */
+    setServerAt(serverMillis(remote));
     window.toast('Loaded your teams from the cloud ☁️');
   } else if (localHas && !remoteHas) {
     await pushNow();     /* the cloud copy is empty; it doesn't get to win */
-  } else if (remoteHas && remote.updatedAt > localTs()) {
-    window.tdAdopt(remote.data, remote.updatedAt);
-    window.toast('Loaded your teams from the cloud ☁️');
+  } else if (remoteHas && remoteIsNewer(remote)) {
+    if (window.tdAdopt(remote.data, remote.updatedAt)) {
+      setServerAt(serverMillis(remote));
+      window.toast('Loaded your teams from the cloud ☁️');
+    } else {
+      await pushNow();       /* kept this device's copy — put it back on top */
+    }
   } else {
     await pushNow();
   }
@@ -4154,7 +4208,11 @@ async function startSync() {
   unsub = Fs.onSnapshot(docRef(), (s) => {
     if (s.metadata.hasPendingWrites || !s.exists()) return;
     const r = s.data();
-    if (!(r.updatedAt > localTs())) return;
+    /* Our own push, now stamped by the server. Nothing to adopt — the data is
+       already here — but this is the only place the server's clock is visible,
+       so record it: it's what the next comparison is made against. */
+    if (r.writerId && r.writerId === deviceId()) { setServerAt(serverMillis(r)); return; }
+    if (!remoteIsNewer(r)) return;
     /* Same rule live. Clearing everything really is something people do, so this
        asks rather than refusing — but it asks, because the alternative is a
        device quietly emptying itself while its owner is looking at another tab. */
@@ -4169,8 +4227,14 @@ async function startSync() {
         return;
       }
     }
-    window.tdAdopt(r.data, r.updatedAt);
-    window.toast('Synced from another device ☁️');
+    if (window.tdAdopt(r.data, r.updatedAt)) {
+      setServerAt(serverMillis(r));
+      window.toast('Synced from another device ☁️');
+    } else {
+      /* Declined it — this device kept its own copy, so put that back on top
+         rather than leaving the other device's version as the newest. */
+      pushNow().catch(setSyncError);
+    }
   }, (e) => {
     /* A listener that errors is dropped by Firestore and never fires again.
        Without this second argument, another device's updates would just stop
@@ -4182,7 +4246,15 @@ async function startSync() {
 
 async function pushNow() {
   if (!user) return;
-  await Fs.setDoc(docRef(), { data: window.tdGet(), updatedAt: localTs() || Date.now() });
+  /* updatedAt stays for a build that predates serverAt and still orders by it;
+     serverAt is what this build compares. writerId lets us tell our own write
+     apart from another device's when it comes back on the listener. */
+  await Fs.setDoc(docRef(), {
+    data: window.tdGet(),
+    updatedAt: localTs() || Date.now(),
+    serverAt: Fs.serverTimestamp(),
+    writerId: deviceId()
+  });
   clearSyncError();
 }
 
