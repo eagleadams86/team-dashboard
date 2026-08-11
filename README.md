@@ -109,7 +109,33 @@ an error — it's work you've begun, and it counts on the net flow chart as work
 Rows with *no* dates at all — untouched backlog — are ignored, and the count is reported so a
 paste of 260 rows that becomes 170 items explains itself.
 
-Genuinely unreadable dates are still errors and get listed back with their line numbers.
+### What happens to bad data
+
+A bad *cell* costs you that field, not the whole row — with one exception, because every metric
+keys off a completion date.
+
+| What's wrong | What the row does |
+|---|---|
+| Completion date unreadable | **Row skipped** — nothing can be plotted without it |
+| Completion date empty | Kept — it's work in progress |
+| Start date unreadable | Kept, without a start date |
+| Created date unreadable | Kept, without a created date |
+| Created date later than the start or the completion | Kept, and the **created date dropped** |
+| No completion and no start | Dropped — untouched backlog says nothing about flow |
+| A date that cannot exist (31 Feb, month 13) | Rejected rather than silently rolled over |
+
+**Every problem row is listed back with its line number and the line itself**, so you can find it
+in the export rather than hunt for it — the listing includes whatever identifier your paste
+carries, so a Jira key comes back with it. Long lists are capped, but the count above each list
+is always the true total.
+
+The out-of-order case is worth explaining. `created ≤ started ≤ completed` is the one hard
+ordering these dates have, and a created date later than the work it describes would produce a
+lead time *shorter* than the same item's cycle time — a wait cannot be less than the work inside
+it. So that one field is dropped rather than kept: the row still counts for throughput, cycle
+time and everything else, it just contributes no lead time it couldn't legitimately have. A
+handful of those is data — a ticket raised after work had already started. A large share is a
+mismapped column, and the app says which it looks like.
 
 There's no inline row editing — to fix something, correct it at the source and paste again.
 
