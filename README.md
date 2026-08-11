@@ -407,7 +407,7 @@ them. The payload is a trimmed copy — the chosen teams plus the shared setting
 those drive every number on the charts — and never anything identifying.
 
 This dialog carries more than any other, so on a screen 760px or wider it opens **820px wide
-with its two choices side by side** rather than stacked. That is the point of the extra width —
+with its two choices side by side**, matched in height, rather than stacked. That is the point of the extra width —
 widening a single column only makes the lines longer. It takes the dialog from 764px tall to
 621px, which is the difference between opening already scrolled on a laptop and not. Below that
 it stacks and behaves as before, and no other dialog changes: the ⓘ help window is a paragraph
