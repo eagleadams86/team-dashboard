@@ -209,7 +209,6 @@ const SAMPLE_PASTE = [
 const SAMPLE_SETTINGS = {
   sameDayValue: 0.5,
   unplannedType: 'Bug',
-  plannedLabel: 'Stories',
   unplannedLabel: 'Bugs',
   cycleTimeLabel: 'Cycle time'
 };
@@ -412,10 +411,10 @@ async function run(TD, win) {
   is(d.netFlow[1], 1, 'week 2 net flow = 1');
 
   /* the chart title carries the average rate */
-  is(d.titles.quality, 'Bugs percentage rate (avg: 19.92%)', 'avg bug rate is 19.92%');
-  is(d.titles.responsiveness, 'Average Cycle time per week', 'responsiveness title uses the cycle-time wording');
+  is(d.titles.defectRate, 'Bugs percentage rate (avg: 19.92%)', 'avg bug rate is 19.92%');
+  is(d.titles.cycleTime, 'Average Cycle time per week', 'the cycle time title uses the cycle-time wording');
   is(TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { cycleTimeLabel: 'TiP' }),
-     { filterValue: '', months: 3 }).titles.responsiveness, 'Average TiP per week',
+     { filterValue: '', months: 3 }).titles.cycleTime, 'Average TiP per week',
      'an acronym label keeps its capitals — "TiP" must not become "tip"');
 
   /* the summary figures the dashboard tiles read */
@@ -483,13 +482,13 @@ async function run(TD, win) {
   /* Week 2015-07 happens to hold 2 Bugs and 2 Unplanned, so compare the whole
      series rather than the first point. */
   ok(JSON.stringify(dOtherType.unplannedRate) !== JSON.stringify(d.unplannedRate),
-     'renaming the unplanned type changes the quality rate',
+     'renaming the defect type changes the defect rate',
      JSON.stringify(dOtherType.unplannedRate) + '\n  vs ' + JSON.stringify(d.unplannedRate));
 
   const dLabel = TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { unplannedLabel: 'Incidents' }),
     { filterValue: '', months: 3 });
-  ok(dLabel.titles.quality.startsWith('Incidents '), 'the unplanned legend label drives the quality title',
-     dLabel.titles.quality);
+  ok(dLabel.titles.defectRate.startsWith('Incidents '), 'the defect label drives the defect rate title',
+     dLabel.titles.defectRate);
 
   /* ══════════════════════════════════════════════════════════
      Column detection. A real Jira export leads with an issue key and orders

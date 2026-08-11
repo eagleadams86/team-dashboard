@@ -1,6 +1,6 @@
 # Flow Metrics
 
-Four weekly flow metrics for as many delivery teams as you like, from nothing but a list of
+Kanban flow metrics for as many delivery teams as you like, from nothing but a list of
 completed and started dates. Single page, no build step, nothing to install.
 
 **Live:** https://eagleadams86.github.io/team-dashboard/
@@ -10,28 +10,27 @@ The app is called **Flow Metrics** on screen. The repo, the Pages path, the Fire
 say *team-dashboard* — renaming any of those would break existing links, backups and sync,
 so the rename is deliberately a display-only one.
 
-Paste your work items, get four charts — listed here in the order they appear on screen:
+Paste your work items and the charts are grouped into three tabs — **by what the data means**,
+so the measures that move together are read together:
 
-| Dimension | Question it answers | What's plotted |
+| Group | Question it answers | What's plotted |
 |---|---|---|
-| **Productivity** — how much | What pace do we deliver at? | Items completed per week |
-| **Responsiveness** — how fast | How long from starting to finishing? | Average cycle time per week |
-| **Quality** — how well | How much bug debt do we carry? | Unplanned work as a share of everything completed, per week |
-| **Predictability** — how repeatable | Is our completion pace consistent? | Net flow — items completed minus items started, per week |
+| **Flow** — how long work takes | How long does an item take once started? | Average cycle time per week |
+| **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per week; net flow (completed minus started) |
+| **Health** — the state of the board | How much of what we finish is defect work? | Defect rate — defects as a share of everything completed, per week |
 
-Each chart carries a dashed linear trend line, and four **summary tiles** above the charts
-state the window-wide figures — average completed per week, average cycle time (pooled over
-the items in the window, so an empty week can't drag it down), the unplanned rate, and total
-net flow. The tiles are deliberately neutral: this app has no targets, so no tile is ever
-coloured "good" or "bad". There being exactly four of them, one per dimension, they go
-four-across on a wide window and pair into a 2x2 on a narrower one — never three and a
-stray fourth.
+Each chart carries a dashed linear trend line, and four **summary tiles** above the tabs state
+the window-wide figures — average completed per week, average cycle time (pooled over the items
+in the window, so an empty week can't drag it down), the defect rate, and total net flow. Those
+four stay visible whichever group is open. The tiles are deliberately neutral: this app has no
+targets, so no tile is ever coloured "good" or "bad". There being exactly four of them, they go
+four-across on a wide window and pair into a 2x2 on a narrower one — never three and a stray
+fourth.
 
-The dashboard shows each chart's title and nothing else standing — the dimension heading and
-the coaching question that used to sit above every chart were removed deliberately, to get all
-four charts on screen together. That framing now lives one press away: the **ⓘ button** beside
-every tile and chart title opens a plain-English note on what the figure means and which
-direction is good.
+The dashboard shows each chart's title and nothing else standing — the coaching question that
+used to sit above every chart was removed deliberately, to get more chart on screen. That
+framing lives one press away: the **ⓘ button** beside every tile and chart title opens a
+plain-English note on what the figure means and which direction is good.
 
 ## One of a pair
 
@@ -94,7 +93,7 @@ silently corrupt every number on the dashboard.
   days, so the clock is dropped. The date underneath still decides day-first vs month-first.
 
 **Work in progress belongs in the paste.** An item with a start date and no completion is not
-an error — it's work you've begun, and it counts on the Predictability chart as work started.
+an error — it's work you've begun, and it counts on the net flow chart as work started.
 Rows with *no* dates at all — untouched backlog — are ignored, and the count is reported so a
 paste of 260 rows that becomes 170 items explains itself.
 
@@ -104,13 +103,13 @@ There's no inline row editing — to fix something, correct it at the source and
 
 ## Settings
 
-Everything the four charts depend on, shared by all your teams:
+Everything the charts depend on, shared by all your teams:
 
-- **Unplanned work type** — the exact text in your Type column that means "unplanned"
-  (`Bug` by default). Anything blank, or not matching, counts as planned work.
+- **Defect work type** — the exact text in your Type column that means "defect"
+  (`Bug` by default). Anything blank, or not matching, counts as ordinary planned work.
 - **Same-day cycle time** — what an item that starts and finishes on one day is worth
   (`0.5` days)
-- **Legend labels** (`Stories` and `Bugs` by default) and the **word for cycle time**
+- **Word for defects on charts** (`Bugs` by default) and the **word for cycle time**
   (Cycle time / Time in Process / TiP / In process time)
 - **Work type filter list** — the Display → Value pairs behind the dashboard's filter, `All`
   and `Bugs → Bug` out of the box
@@ -127,8 +126,13 @@ fresh browser, or after "Reset settings to defaults"**, not on a browser still h
 Two renames have happened in the stored data, and both are handled on load so nothing has to be
 re-entered:
 
-- The unplanned-work-type setting was saved as `defectType` and is now `unplannedType`. An old
+- The defect-work-type setting was saved as `defectType` and is now `unplannedType`. An old
   saved value is carried across, so a team that had set it to `Incident` still has `Incident`.
+  (The key kept its name when the charts went back to calling this "defects": the *value* is
+  your data, a share link carries it, and there is no version negotiation on a share link that
+  would let an older build understand a renamed key.)
+- A `plannedLabel` setting existed, with an input and a saved value, but nothing on screen ever
+  read it. It is dropped on load rather than left riding along in every backup and synced copy.
 - The first version stored one team's rows under `td-rows`, with the team name in `td-settings`.
   Those fold into a single team the first time a newer version loads, and the old keys go.
 
@@ -171,7 +175,7 @@ you choose:
 - **Which teams** — any combination. Teams with nothing in them can't be picked.
 - **Unfinished items** — off by default, and worth leaving off. An item with no completion date
   is still in progress however old its start date, and it still counts as work started on the
-  Predictability chart.
+  net flow chart.
 
 **The completed date decides.** An item that took a year to finish but finished inside the
 window stays — the start date never drags it out.
@@ -425,7 +429,7 @@ and asserts every item is either kept or removed, never both.
 
 The expectations are pinned to a fixed 141-item sample, right down to the weekly throughput
 series, `10.2857…` days average cycle time in week 1, `−5` net flow in week 1, and the 19.92%
-average bug rate in the Quality chart title. Change the maths and the suite says so.
+average bug rate in the defect rate chart title. Change the maths and the suite says so.
 
 ## Files
 
