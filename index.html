@@ -453,10 +453,17 @@ select { cursor: pointer; }
 /* chart cards */
 .chart-card { background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 18px; min-width: 0; box-shadow: var(--shadow); }
-/* The chart title is the card's only label — it takes the eyebrow styling. */
-.chart-card .chart-title { display: flex; align-items: center;
+/* Two lines: what the chart IS, then what it plots. The name takes the eyebrow
+   styling the single title used to have, so a card is identifiable at a glance
+   and from across a room in a stand-up; the sentence under it carries the
+   detail — which grouping, which series, the window average — and steps back to
+   secondary text so it reads as a subheading rather than competing. The ⓘ sits
+   on the name, because that is what it explains. */
+.chart-card .chart-name { display: flex; align-items: center;
   font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: var(--ls-label);
-  text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  text-transform: uppercase; color: var(--accent); }
+.chart-card .chart-title { font-size: var(--fs-sm); color: var(--text-secondary);
+  margin-top: 2px; margin-bottom: 8px; }
 .chart-wrap { position: relative; height: 300px; }
 
 /* data table */
@@ -862,6 +869,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
       <div class="grid charts" id="spanel-flow" role="tabpanel" aria-labelledby="stab-flow">
         <div class="tiles group" id="tilesFlow"></div>
         <div class="chart-card">
+          <div class="chart-name" id="nameCycleTime"></div>
           <div class="chart-title" id="titleCycleTime"></div>
           <div class="chart-wrap"><canvas id="chartCycleTime"></canvas></div>
         </div>
@@ -870,6 +878,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
              They hold a card either way rather than vanishing, so the answer to
              "where is lead time?" is on screen instead of missing. -->
         <div class="chart-card" id="cardLeadTime">
+          <div class="chart-name" id="nameLeadTime"></div>
           <div class="chart-title" id="titleLeadTime"></div>
           <div class="chart-wrap"><canvas id="chartLeadTime"></canvas></div>
           <div class="note info needs-created" hidden>
@@ -882,11 +891,13 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 
       <div class="grid charts" id="spanel-delivery" role="tabpanel" aria-labelledby="stab-delivery" hidden>
         <div class="chart-card">
+          <div class="chart-name" id="nameThroughput"></div>
           <div class="chart-title" id="titleThroughput"></div>
           <div class="chart-wrap"><canvas id="chartThroughput"></canvas></div>
         </div>
 
         <div class="chart-card">
+          <div class="chart-name" id="nameNetFlow"></div>
           <div class="chart-title" id="titleNetFlow"></div>
           <div class="chart-wrap"><canvas id="chartNetFlow"></canvas></div>
         </div>
@@ -896,16 +907,19 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
         <div class="tiles group" id="tilesHealth"></div>
 
         <div class="chart-card">
+          <div class="chart-name" id="nameWip"></div>
           <div class="chart-title" id="titleWip"></div>
           <div class="chart-wrap"><canvas id="chartWip"></canvas></div>
         </div>
 
         <div class="chart-card">
+          <div class="chart-name" id="nameAgedWork"></div>
           <div class="chart-title" id="titleAgedWork"></div>
           <div class="chart-wrap"><canvas id="chartAgedWork"></canvas></div>
         </div>
 
         <div class="chart-card wide">
+          <div class="chart-name" id="nameDefectRate"></div>
           <div class="chart-title" id="titleDefectRate"></div>
           <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
         </div>
@@ -1953,6 +1967,19 @@ function derive(rows, settings, view) {
     itemCount: items.length,
     inProgressCount: items.length - finished.length,
     startDate, endDate,
+    /* What each chart IS, as against what it plots. Short enough to head a card
+       — the sentence in `titles` carries the detail. Cycle time follows the
+       "word to use for cycle time" setting, because that setting exists to
+       rename the metric itself; the rest are the standard names. */
+    names: {
+      defectRate: 'Defect rate',
+      cycleTime: cycleLabel,
+      throughput: 'Throughput',
+      netFlow: 'Net flow',
+      leadTime: 'Lead time',
+      wip: 'Work in progress',
+      agedWork: 'Aged work'
+    },
     titles: {
       defectRate: (settings.unplannedLabel || 'Unplanned') +
                ' percentage rate (avg: ' + (mean(unplannedRate) * 100).toFixed(2) + '%)',
@@ -2655,13 +2682,11 @@ function drawCharts(d) {
       (d.buckets.length === 1 ? '' : 's') + ' ending ' + prettyDate(d.endDate) +
       '. Every underlying item is listed on the Your Data tab.');
   };
-  describe('chartDefectRate', d.titles.defectRate);
-  describe('chartCycleTime',  d.titles.cycleTime);
-  describe('chartThroughput', d.titles.throughput);
-  describe('chartNetFlow',    d.titles.netFlow);
-  describe('chartWip',       d.titles.wip);
-  describe('chartAgedWork',  d.titles.agedWork);
-  if (d.hasCreated) describe('chartLeadTime', d.titles.leadTime);
+  /* Both lines, so the label reads the way the card does. */
+  const label = k => d.names[k] + ' — ' + d.titles[k];
+  ['defectRate', 'cycleTime', 'throughput', 'netFlow', 'wip', 'agedWork']
+    .forEach(k => describe('chart' + k.charAt(0).toUpperCase() + k.slice(1), label(k)));
+  if (d.hasCreated) describe('chartLeadTime', label('leadTime'));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2863,18 +2888,14 @@ function renderDashboard() {
     tile('Net flow', (s.netFlowTotal > 0 ? '+' : '') + s.netFlowTotal,
       'completed − started; aim near 0', 'netFlow');
 
-  /* Titles hold user-chosen label text, so they're escaped; the ⓘ restores the
-     coaching framing the standing eyebrow text used to carry. */
-  const setTitle = (id, text, key) => {
-    $(id).innerHTML = '<span>' + escapeHtml(text) + '</span>' + helpBtn(key, text);
+  /* Both lines hold user-chosen label text, so both are escaped. The ⓘ goes on
+     the name, which is what it explains. */
+  const setTitle = (key, name, text) => {
+    const cap = key.charAt(0).toUpperCase() + key.slice(1);
+    $('name' + cap).innerHTML = '<span>' + escapeHtml(name) + '</span>' + helpBtn(key, name);
+    $('title' + cap).textContent = text;
   };
-  setTitle('titleDefectRate',     d.titles.defectRate,     'defectRate');
-  setTitle('titleCycleTime',      d.titles.cycleTime,      'cycleTime');
-  setTitle('titleThroughput',     d.titles.throughput,     'throughput');
-  setTitle('titleNetFlow',        d.titles.netFlow,        'netFlow');
-  setTitle('titleLeadTime',       d.titles.leadTime,       'leadTime');
-  setTitle('titleWip',            d.titles.wip,            'wip');
-  setTitle('titleAgedWork',       d.titles.agedWork,       'agedWork');
+  Object.keys(d.names).forEach(k => setTitle(k, d.names[k], d.titles[k]));
 
   /* The Flow group's own tiles, beside the charts that expand them. The four
      headline tiles above stay as they are — eight in one row would push every

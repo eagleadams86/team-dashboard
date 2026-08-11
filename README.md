@@ -35,10 +35,11 @@ targets, so no tile is ever coloured "good" or "bad". There being exactly four o
 four-across on a wide window and pair into a 2x2 on a narrower one — never three and a stray
 fourth.
 
-The dashboard shows each chart's title and nothing else standing — the coaching question that
-used to sit above every chart was removed deliberately, to get more chart on screen. That
-framing lives one press away: the **ⓘ button** beside every tile and chart title opens a
-plain-English note on what the figure means and which direction is good.
+Each chart card heads with **what it is** — CYCLE TIME, THROUGHPUT, AGED WORK — and carries the
+detail on a second line beneath: which grouping, which series, the window average. The name is
+identifiable at a glance across a room in a stand-up; the sentence under it answers "plotted
+how?". The **ⓘ button** sits on the name and opens a plain-English note on what the figure means
+and which direction is good.
 
 ## One of a pair
 
