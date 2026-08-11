@@ -15,9 +15,9 @@ so the measures that move together are read together:
 
 | Group | Question it answers | What's plotted |
 |---|---|---|
-| **Flow** — how long work takes | How long does an item take once started? | Average cycle time per period |
+| **Flow** — how long work takes | How long does an item take, and how much of that was waiting? | Cycle time; lead time; flow efficiency |
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started) |
-| **Health** — the state of the board | How much of what we finish is defect work? | Defect rate — defects as a share of everything completed, per period |
+| **Health** — the state of the board | How much of what we finish is defect work? | Defect rate — defects resolved, and defects raised, against everything completed |
 
 **Group by week, 2 weeks or month.** The control sits beside the date window on the dashboard.
 Weekly is the default and the finest grain; monthly smooths out the lumpiness that makes a
@@ -74,16 +74,21 @@ team currently selected in the header. Paste the export as it comes — a Jira e
 and works unchanged:
 
 ```
-Key        Resolved    In Progress   Issue Type
-DAE-1064   5/11/2026   4/27/2026     Story
-DAE-1058   5/15/2026                 Story
-DAE-1491               8/5/2026      Story
+Key        Created     In Progress   Resolved    Issue Type
+DAE-1064   4/02/2026   4/27/2026     5/11/2026   Story
+DAE-1058   4/09/2026   4/28/2026                 Story
+DAE-1491   7/28/2026   8/5/2026                  Story
 ```
 
+The **Created** column is optional and unlocks lead time and flow efficiency. Without it
+everything else works exactly as before, and those two charts say so on their face rather than
+disappearing.
+
 **The columns are worked out from the data, not assumed by position.** Header names win when
-they're there (`Resolved`/`Completed`, `In Progress`/`Start`, `Issue Type`); otherwise the app
-finds the date columns by content and tells completion from start by **which date is later**,
-so an export with the two the other way round still reads correctly. The work-type column is
+they're there (`Resolved`/`Completed`, `In Progress`/`Start`, `Created`, `Issue Type`);
+otherwise the app finds the date columns by content and ranks them by **which date is later**,
+so an export with them in any order still reads correctly — created before started before
+completed. The work-type column is
 told from the issue-key column by repetition — keys never repeat, types always do. Whatever it
 settles on is **named back to you** after every paste, because a wrong guess here would
 silently corrupt every number on the dashboard.
@@ -138,6 +143,20 @@ re-entered:
   would let an older build understand a renamed key.)
 - A `plannedLabel` setting existed, with an input and a saved value, but nothing on screen ever
   read it. It is dropped on load rather than left riding along in every backup and synced copy.
+
+### Created dates and older versions of the app
+
+Rows gained an optional created date (`k` on the wire, backup `version: 3`, `schema: 3` in the
+saved and synced state). A row without one is left exactly as it was — no `k` key is written —
+so a team that has never pasted a created date saves byte-identically to before.
+
+One thing to know if you use sync: **a browser still running an older build will strip created
+dates from the synced copy.** It hydrates only the fields it knows about and pushes the rest
+back without them. That build also drops the `schema` marker, so a document arriving without
+one when this device holds created dates is detectably that case, and the app says so in a
+toast rather than losing the data quietly. The fix is to reload Flow Metrics on the other
+device. There's deliberately no automatic merge — that belongs in the sync conflict dialog,
+which is its own piece of work.
 - The first version stored one team's rows under `td-rows`, with the team name in `td-settings`.
   Those fold into a single team the first time a newer version loads, and the old keys go.
 
@@ -172,7 +191,20 @@ worth knowing:
   longer than the data doesn't pad empty periods in front, which would read as real
   zero-throughput periods and dilute the tile averages for a young team.
 - **Cycle time** is `completed − started`, floored at 0, with same-day items taking the
-  configured value.
+  configured value. **Lead time** is `completed − created` by exactly the same rules — the
+  whole wait, including the time an item sat in the backlog before anyone picked it up. Lead
+  time is therefore always the longer of the two, and the gap between them is queue.
+- **Flow efficiency is pooled, and it is an approximation.** Per period it is
+  `total cycle time ÷ total lead time` over the items completed in it — not the average of the
+  per-item ratios, which lets one item raised and closed the same day report 100% and drown
+  out a real one. It is *not* the textbook measure: a true flow efficiency needs the time an
+  item spent in each individual status, so it can tell working from waiting *inside* the
+  in-progress span. A plain Jira export doesn't carry that, so this counts everything between
+  start and finish as working time and reads high when work sits blocked mid-flight. It still
+  answers the question that matters most — how much of the total wait was queue.
+- **A created date alone is not enough to keep a row.** An item raised and never picked up is
+  backlog, not flow; counting it would make the intake series track grooming rather than work.
+  The rule is unchanged: no completion and no start, no row.
 - **Unfinished items count as work started, and nothing else.** They move net flow but add
   nothing to throughput, the bug rate or the cycle-time average, all three of which key off
   a completion. Dropping them — which an earlier version did — made net flow read

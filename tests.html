@@ -639,6 +639,80 @@ async function run(TD, win) {
   is(TD.linearTrend([5]), [null], 'a single point has no trend line');
 
   /* ══════════════════════════════════════════════════════════
+     The created date: lead time, flow efficiency, defect intake.
+
+     Existing data has no created date, so the first thing to pin is that its
+     absence produces nothing at all rather than something wrong.
+     ══════════════════════════════════════════════════════════ */
+  group('lead time and flow efficiency');
+
+  is(TD.leadTimeOf({ completed: D(2015, 1, 10), started: D(2015, 1, 8) }, 0.5), null,
+     'no created date means no lead time — null, not zero');
+  is(TD.leadTimeOf({ completed: D(2015, 1, 10), created: D(2015, 1, 1) }, 0.5), 9,
+     'lead time is completed minus created');
+  is(TD.leadTimeOf({ completed: D(2015, 1, 10), created: D(2015, 1, 10) }, 0.5), 0.5,
+     'raised and delivered the same day takes the same-day value, like cycle time');
+  is(TD.leadTimeOf({ completed: D(2015, 1, 10), created: D(2015, 1, 20) }, 0.5), 0,
+     'a created date after the completion floors at 0 rather than going negative');
+
+  /* Legacy rows — the shape every existing paste is in. */
+  const dLegacy = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 3 });
+  is(dLegacy.hasCreated, false, 'rows with no created date report none');
+  is(dLegacy.createdCoverage, 0, 'and no coverage');
+  ok(dLegacy.avgLeadTime.every(v => v === null), 'lead time is all null, never 0');
+  ok(dLegacy.flowEfficiency.every(v => v === null), 'flow efficiency is all null');
+  ok(dLegacy.defectCreatedRate.every(v => v === null), 'the defects-raised series is all null');
+  is(dLegacy.summary.avgLeadTime, null, 'and the tile shows nothing rather than zero');
+  is(dLegacy.summary.flowEfficiency, null, 'same for flow efficiency');
+
+  /* Flow efficiency is pooled, not the mean of per-item ratios. These two items
+     are built so the two methods disagree: item A is raised and delivered the
+     same day (ratio 1), item B waits 99 days for 1 day of work (ratio ~0.01).
+     The mean of the ratios is ~0.5; the truth — 1.5 working days out of 99.5
+     elapsed — is ~1.5%. A mean would let the trivial item drown out the real
+     one. */
+  const dEff = TD.derive([
+    { created: D(2015, 1, 5), started: D(2015, 1, 5), completed: D(2015, 1, 5), type: 'Story' },
+    { created: D(2015, 1, 1), started: D(2015, 4, 9), completed: D(2015, 4, 10), type: 'Story' }
+  ], SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: 'month' });
+  is(dEff.hasCreated, true, 'created dates are detected');
+  near(dEff.summary.flowEfficiency, 1.5 / 99.5,
+       'flow efficiency pools the totals rather than averaging the ratios');
+  ok(dEff.summary.flowEfficiency < 0.1,
+     'the mean of the ratios (~0.5) would have been wildly wrong',
+     String(dEff.summary.flowEfficiency));
+  ok(dEff.flowEfficiency.every(v => v === null || v <= 1),
+     'flow efficiency never exceeds 100%');
+
+  /* An item raised long before it was started but finished the same day it
+     started would compute over 1 without the clamp. */
+  const dClamp = TD.derive([
+    { created: D(2015, 1, 1), started: D(2015, 1, 20), completed: D(2015, 1, 20), type: 'Story' }
+  ], SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+  ok(dClamp.flowEfficiency[0] <= 1, 'flow efficiency is clamped at 1', String(dClamp.flowEfficiency[0]));
+
+  /* Lead time is pooled per item too, matching how cycle time already works. */
+  const dLead = TD.derive([
+    { created: D(2015, 1, 1), started: D(2015, 1, 8), completed: D(2015, 1, 11), type: 'Story' },
+    { created: D(2015, 1, 1), started: D(2015, 1, 8), completed: D(2015, 1, 21), type: 'Story' }
+  ], SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: 'month' });
+  is(dLead.summary.avgLeadTime, 15, 'the lead time tile pools every item in the window');
+  ok(dLead.summary.avgLeadTime > dLead.summary.avgCycleTime,
+     'lead time is longer than cycle time — the gap is the queue');
+
+  /* A period with completions but no defects raised is a real 0. A period with
+     no completions at all cannot have a rate, because the denominator is 0 —
+     and plotting 0 there would claim no defects were raised when some were. */
+  const dIntake = TD.derive([
+    { created: D(2015, 1, 2), started: D(2015, 1, 3), completed: D(2015, 1, 5), type: 'Story' },
+    { created: D(2015, 3, 2), started: D(2015, 3, 3), completed: D(2015, 3, 5), type: 'Bug' }
+  ], SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: 'month' });
+  is(dIntake.buckets, ['2015-01', '2015-02', '2015-03'], 'three months on the axis');
+  is(dIntake.defectCreatedRate[0], 0, 'a period that completed work but raised no defects is 0');
+  is(dIntake.defectCreatedRate[1], null, 'a period that completed nothing has no rate at all');
+  is(dIntake.defectCreatedRate[2], 1, 'one defect raised against one item completed is 100%');
+
+  /* ══════════════════════════════════════════════════════════
      Column detection. A real Jira export leads with an issue key and orders
      the dates however it likes, so the columns are worked out from the data.
      Getting this wrong silently corrupts every metric.
@@ -668,30 +742,33 @@ async function run(TD, win) {
            '2015-01-21\t2015-01-14\t',
            '2015-01-26\t2015-01-14\tBug',
            '2015-01-26\t2015-01-21\tBug'].join('\n')),
-     { completed: 0, started: 1, type: 2 }, 'the plain three-column layout still works');
+     { completed: 0, started: 1, created: -1, type: 2 },
+     'the plain three-column layout still works, and invents no created column');
 
   is(cols(['Key\tResolved\tIn Progress\tIssue Type',
            'DAE-1\t5/11/2026\t4/27/2026\tStory',
            'DAE-2\t6/22/2026\t4/28/2026\tStory'].join('\n')),
-     { completed: 1, started: 2, type: 3 }, 'a leading issue-key column is skipped (header names)');
+     { completed: 1, started: 2, created: -1, type: 3 },
+     'a leading issue-key column is skipped (header names)');
 
   is(cols(['DAE-1064\t5/11/2026\t4/27/2026\tStory',
            'DAE-1062\t6/22/2026\t4/28/2026\tStory',
            'DAE-1060\t5/11/2026\t4/27/2026\tBug',
            'DAE-1054\t5/19/2026\t4/29/2026\tStory'].join('\n')),
-     { completed: 1, started: 2, type: 3 }, 'a leading issue-key column is skipped with no header at all');
+     { completed: 1, started: 2, created: -1, type: 3 },
+     'a leading issue-key column is skipped with no header at all');
 
   is(cols(['DAE-1\t4/27/2026\t5/11/2026\tStory',
            'DAE-2\t4/28/2026\t6/22/2026\tStory',
            'DAE-3\t4/27/2026\t5/11/2026\tBug',
            'DAE-4\t4/29/2026\t5/19/2026\tStory'].join('\n')),
-     { completed: 2, started: 1, type: 3 },
+     { completed: 2, started: 1, created: -1, type: 3 },
      'start-before-completed is detected by which date is later, not by position');
 
   is(cols(['Issue Type\tKey\tResolved\tIn Progress',
            'Story\tDAE-1\t5/11/2026\t4/27/2026',
            'Bug\tDAE-2\t6/22/2026\t4/28/2026'].join('\n')),
-     { completed: 2, started: 3, type: 0 }, 'header names win over position');
+     { completed: 2, started: 3, created: -1, type: 0 }, 'header names win over position');
 
   is(cols(['AAA-1\t5/11/2026\t4/27/2026\tStory',
            'AAA-2\t6/22/2026\t4/28/2026\tStory',
@@ -703,7 +780,101 @@ async function run(TD, win) {
            'AAA-2\tAdd export button\t6/22/2026\t4/28/2026\tStory',
            'AAA-3\tTidy the footer\t5/11/2026\t4/27/2026\tStory',
            'AAA-4\tCache the results\t5/19/2026\t4/29/2026\tBug'].join('\n')),
-     { completed: 2, started: 3, type: 4 }, 'a free-text summary column is not mistaken for the type');
+     { completed: 2, started: 3, created: -1, type: 4 },
+     'a free-text summary column is not mistaken for the type');
+
+  /* ══════════════════════════════════════════════════════════
+     Finding a created column — without breaking the pastes that came before it.
+     ══════════════════════════════════════════════════════════ */
+  group('detectColumns — the created date');
+
+  /* THE backward-compatibility test. Every paste made before lead time existed
+     is this shape: Created standing in for the start date because there is no
+     In Progress column. It must keep meaning exactly that, or every existing
+     user's cycle time silently becomes null. */
+  const legacyPaste = ['Key\tCreated\tResolved\tType',
+                       'A-1\t2015-01-14\t2015-01-21\tStory',
+                       'A-2\t2015-01-14\t2015-01-26\tBug',
+                       'A-3\t2015-01-21\t2015-01-26\tStory'].join('\n');
+  is(cols(legacyPaste), { completed: 2, started: 1, created: 1, type: 3 },
+     'with no In Progress column, Created is still read as the start — and as created');
+  const legacyRows = TD.parsePastedRows(legacyPaste, 'auto').rows;
+  ok(legacyRows.every(r => TD.cycleTimeOf(r, 0.5) != null),
+     'so cycle time keeps working exactly as it did before created dates existed');
+  ok(legacyRows.every(r => TD.leadTimeOf(r, 0.5) === TD.cycleTimeOf(r, 0.5)),
+     'and lead time comes out equal to it, which is honest rather than wrong');
+
+  /* Three date columns is the shape that genuinely carries a created date. */
+  is(cols(['Key\tCreated\tIn Progress\tResolved\tType',
+           'A-1\t2015-01-02\t2015-01-14\t2015-01-21\tStory',
+           'A-2\t2015-01-09\t2015-01-14\t2015-01-26\tBug',
+           'A-3\t2015-01-11\t2015-01-21\t2015-01-26\tStory'].join('\n')),
+     { completed: 3, started: 2, created: 1, type: 4 },
+     'Created, In Progress and Resolved are told apart by their header names');
+
+  /* And without a header, by content — created ≤ started ≤ completed. Column
+     order is shuffled to prove position plays no part. */
+  is(cols(['A-1\t2015-01-21\t2015-01-02\t2015-01-14\tStory',
+           'A-2\t2015-01-26\t2015-01-09\t2015-01-14\tBug',
+           'A-3\t2015-01-26\t2015-01-11\t2015-01-21\tStory',
+           'A-4\t2015-02-02\t2015-01-12\t2015-01-28\tStory'].join('\n')),
+     { completed: 1, started: 3, created: 2, type: 4 },
+     'three unlabelled date columns are ranked by which date is later, not by position');
+
+  /* Four or more free date columns: one of them is probably a due or updated
+     date. Reading that as Created would put a plausible wrong number on the
+     chart; declining shows an empty state that a re-paste fixes. Always fail
+     toward under-reading. */
+  is(cols(['A-1\t2015-01-02\t2015-01-14\t2015-01-21\t2015-03-01\tStory',
+           'A-2\t2015-01-09\t2015-01-14\t2015-01-26\t2015-03-02\tBug',
+           'A-3\t2015-01-11\t2015-01-21\t2015-01-26\t2015-03-03\tStory'].join('\n')).created, -1,
+     'four unlabelled date columns is too ambiguous to guess a created date from');
+
+  /* Impossible rows are counted, not silently kept: work cannot start before it
+     was raised, so this means the column was read off the wrong thing. */
+  const backwards = TD.parsePastedRows(
+    ['Key\tCreated\tIn Progress\tResolved\tType',
+     'A-1\t2015-01-20\t2015-01-14\t2015-01-21\tStory',
+     'A-2\t2015-01-02\t2015-01-14\t2015-01-26\tStory'].join('\n'), 'auto');
+  is(backwards.createdAfterStarted, 1, 'a created date after the start date is counted');
+
+  const badCreated = TD.parsePastedRows(
+    ['Key\tCreated\tIn Progress\tResolved\tType',
+     'A-1\tnot a date\t2015-01-14\t2015-01-21\tStory',
+     'A-2\t2015-01-02\t2015-01-14\t2015-01-26\tStory'].join('\n'), 'auto');
+  is(badCreated.badCreated.length, 1, 'an unreadable created date is reported');
+  is(badCreated.rows.length, 2, 'but the row is kept — a bad created date is not a bad row');
+  is(badCreated.rows[0].created, null, 'it just has no created date');
+
+  /* ════════════════════════════════════════════════════════
+     Round-tripping the created date through storage.
+     ════════════════════════════════════════════════════════ */
+  group('created date — storage round trip');
+
+  const St = win.TDState;
+  const rt = rows => St.sanitizeTeams([{ id: 'a1', name: 'T', rows }])[0].rows;
+
+  is(rt([{ c: '2015-01-21', s: '2015-01-14', k: '2015-01-02', t: 'Story' }])[0].created.toISOString().slice(0, 10),
+     '2015-01-02', 'a created date survives hydration');
+  is(rt([{ c: '2015-01-21', s: '2015-01-14', t: 'Story' }])[0].created, null,
+     'a legacy row with no k hydrates with no created date');
+  is(rt([{ c: '2015-01-21', s: '2015-01-14', t: 'Story' }]).length, 1,
+     'and is still kept, not dropped');
+  is(rt([{ c: '2015-01-21', s: '2015-01-14', k: 'junk', t: 'Story' }])[0].created, null,
+     'junk in k hydrates to null rather than an Invalid Date');
+  is(rt([{ c: '', s: '', k: '2015-01-02', t: 'Story' }]).length, 0,
+     'a row whose only date is created is backlog, not flow — dropped, as before');
+
+  /* k is omitted when there is nothing to write, so a team that has never
+     pasted a created date serialises byte-identically to before, and its first
+     save after upgrading does not rewrite the whole synced document. */
+  const legacyWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story' };
+  is(St.serializeRows(St.hydrateRows([legacyWire])), [legacyWire],
+     'a legacy row round-trips byte-identically — no stray k key');
+  const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
+  is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
+     'and a row with a created date round-trips whole');
+  is(St.SCHEMA, 3, 'the schema marker is 3 — the version that added the created date');
 
   /* ────────────────────────────────────────────────────────── */
   group('Work in progress — started but not finished');
