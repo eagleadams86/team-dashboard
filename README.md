@@ -175,11 +175,15 @@ Everything the charts depend on, shared by all your teams:
 - **Aged after (days)** — how long an item can sit in progress before the Aged work chart
   counts it (`14` by default; worth keeping under a month).
 - **Same-day cycle time** — what an item that starts and finishes on one day is worth
-  (`0.5` days)
-- **Word for defects on charts** (`Bugs` by default) and the **word for cycle time**
-  (Cycle time / Time in Process / TiP / In process time)
-- **Work type filter list** — the Display → Value pairs behind the dashboard's filter, `All`
-  and `Bugs → Bug` out of the box
+  (`1` day: it still occupied someone for that day)
+- **Word for defects on charts** (`Defect` by default — singular, because it reads as
+  "Defect rate") and the **word for cycle time** (Cycle Time / Time in Process / TiP /
+  In Process Time)
+- **Work type filter list** — the Display → Value pairs behind the dashboard's filter. Out of
+  the box: `All`, `Defects → Bug`, `Spikes → Spike`, `Stories → Story`, `Tasks → Task`, so the
+  filter is useful on the first paste rather than after a trip back here. Spikes especially —
+  they are timeboxed investigations rather than delivered value, and taking them out of
+  throughput changes the picture
 
 Nothing else is here on purpose: a setting that changes nothing is worse than a missing one.
 
@@ -210,9 +214,10 @@ derivable from dates.
 ### Settings you've already saved keep winning
 
 Defaults only fill in what isn't saved. A browser that has used the app before keeps whatever
-was set there, so a changed default doesn't reach it — **the `Bug` defaults above show up on a
-fresh browser, or after "Reset settings to defaults"**, not on a browser still holding the old
-`Defect` values.
+was set there, so a changed default doesn't reach it — **the values above show up on a fresh
+browser, or after "Reset settings to defaults"**, and nowhere else. That is why the defaults can
+be changed freely: they are the starting point for a new browser, not a setting pushed onto an
+existing one.
 
 Two renames have happened in the stored data, and both are handled on load so nothing has to be
 re-entered:

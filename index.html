@@ -752,7 +752,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
         </div>
         <div>
           <label for="setUnplannedLabel">Word to use for defects on charts</label>
-          <input type="text" id="setUnplannedLabel" placeholder="Bugs">
+          <input type="text" id="setUnplannedLabel" placeholder="Defect">
         </div>
         <div>
           <label for="setAgedDays">Count an in-progress item as aged after (days)</label>
@@ -2027,17 +2027,37 @@ window.TD = {
    5. STATE
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* What a browser that has never used the app before starts with. Everything
+   here is what a real board settled on after a season of use, rather than a
+   guess: a fresh start should look like a working dashboard, not a blank one
+   waiting to be configured.
+
+   Changing any of this reaches ONLY a first run and "Reset settings to
+   defaults" — a browser with saved settings keeps whatever it has, because
+   normalizeSettings fills in gaps rather than overwriting. */
 const DEFAULT_SETTINGS = {
-  sameDayValue: 0.5,
+  /* A whole day, not half. An item opened and closed inside one day still
+     occupied someone for that day, and half-days made the cycle time chart
+     dip below anything the team recognised. */
+  sameDayValue: 1,
   unplannedType: 'Bug',
-  unplannedLabel: 'Bugs',
+  /* Singular: it is read as "Defect rate" and "Defect Percentage Rate", where
+     a plural would give "Defects rate". */
+  unplannedLabel: 'Defect',
   /* Two weeks. The usual coaching starting point, and short enough that a board
      with a real ageing problem shows it. */
   agedDays: 14,
   cycleTimeLabel: 'Cycle Time',
+  /* The four types a Jira board actually produces, so the dashboard filter is
+     useful on the first paste instead of after a trip to Settings. Spikes
+     especially: they are timeboxed investigations rather than delivered value,
+     and being able to take them out of throughput matters. */
   filters: [
-    { display: 'All',  value: 'All' },
-    { display: 'Bugs', value: 'Bug' }
+    { display: 'All',     value: 'All' },
+    { display: 'Defects', value: 'Bug' },
+    { display: 'Spikes',  value: 'Spike' },
+    { display: 'Stories', value: 'Story' },
+    { display: 'Tasks',   value: 'Task' }
   ]
 };
 
