@@ -188,13 +188,21 @@ them too. Two ways that happens:
 - a current build that has simply **never been given a Created column** — it pushes a perfectly
   valid copy that just has no created dates in it.
 
-The second is the likelier one, and it is why sync ordering matters. **Ordering is by device
-clock, and that is a known weakness**: `updatedAt` is the pushing device's `Date.now()`, and
-the receiving device compares it against its own last-edit stamp. Two machines whose clocks
-disagree — a laptop and a virtual desktop, say — can each decide the other's newer change is
-older, and the loser's edit is discarded on its next sign-in push. The created-date prompt
-catches the case that costs the most, but the general fix is a server timestamp, which is not
-done yet.
+**Which copy is newer is decided by the Firestore server's clock, not by either device's.**
+The synced document carries a `serverAt` server timestamp, and each device records the
+`serverAt` of the version it currently holds and compares incoming writes against that.
+
+It used to compare two devices' wall clocks — the pushing device wrote its own `Date.now()`
+and the receiver compared that against its own last-edit stamp. Nothing reconciled the two, so
+a laptop and a virtual desktop a few minutes apart could each conclude the other's newer change
+was older; worse, the "loser" then pushed its staler copy over the newer one on its next
+sign-in, so an edit could be lost on *both* devices. `updatedAt` is still written for any build
+that predates this, and a device falls back to it until it has seen one server timestamp —
+one push from each device is enough to leave the fallback behind for good.
+
+The document also carries a `writerId`, so a device can recognise its own write coming back:
+a server timestamp only resolves once the server has it, so your own push returns on the
+listener as something that would otherwise look like news from elsewhere.
 - The first version stored one team's rows under `td-rows`, with the team name in `td-settings`.
   Those fold into a single team the first time a newer version loads, and the old keys go.
 
