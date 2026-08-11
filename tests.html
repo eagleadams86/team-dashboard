@@ -1164,13 +1164,27 @@ async function run(TD, win) {
      'a current value wins over a leftover old one');
   is(S.normalizeSettings({ teamName: 'Kraken' }).teamName, undefined,
      'the v1 teamName field is dropped — teams carry their own names now');
-  is(S.normalizeSettings({ filters: [] }).filters.length, 2, 'an empty filter list is restored to the defaults');
-  is(S.normalizeSettings(null).filters.length, 2, 'null settings give the defaults');
-  is(S.normalizeSettings({ filters: 'nope' }).filters.length, 2, 'a non-array filter list is restored');
+  /* The out-of-the-box settings. Pinned because they are a deliberate choice —
+     what a real board settled on — and a silent edit to any of them changes
+     what every new browser measures. SAMPLE_SETTINGS above is deliberately
+     independent of these, so none of the derive() expectations move with them. */
+  const def = S.normalizeSettings(null);
+  is(def.sameDayValue, 1, 'a same-day item counts as a whole day out of the box');
+  is(def.unplannedType, 'Bug', 'defects are Jira Bugs out of the box');
+  is(def.unplannedLabel, 'Defect', 'and are called a Defect on charts — singular, it reads as a rate');
+  is(def.agedDays, 14, 'work ages after two weeks out of the box');
+  is(def.cycleTimeLabel, 'Cycle Time', 'and cycle time is called cycle time');
+  is(def.filters.map(f => f.display + '→' + f.value),
+     ['All→All', 'Defects→Bug', 'Spikes→Spike', 'Stories→Story', 'Tasks→Task'],
+     'the filter list covers the four types a Jira board actually produces');
+
+  is(S.normalizeSettings({ filters: [] }).filters.length, 5, 'an empty filter list is restored to the defaults');
+  is(S.normalizeSettings(null).filters.length, 5, 'null settings give the defaults');
+  is(S.normalizeSettings({ filters: 'nope' }).filters.length, 5, 'a non-array filter list is restored');
 
   /* Settings cross the same boundary as teams — a hand-edited backup or cloud
      doc can hold anything — so entries and scalars are coerced, not trusted. */
-  is(S.normalizeSettings({ filters: ['junk', 42, null] }).filters.length, 2,
+  is(S.normalizeSettings({ filters: ['junk', 42, null] }).filters.length, 5,
      'junk filter entries are dropped — and an emptied list gets the defaults back');
   is(S.normalizeSettings({ filters: [{ display: 'OK', value: 'ok' }, 'junk'] }).filters,
      [{ display: 'OK', value: 'ok' }], 'a junk entry is dropped, a real one kept');
@@ -1178,9 +1192,12 @@ async function run(TD, win) {
      { display: '', value: '' }, 'non-string fields inside an entry become empty strings');
   ok(S.normalizeSettings({ filters: [{ display: 'x'.repeat(500), value: 'y' }] }).filters[0].display.length <= 120,
      'an absurdly long display text is capped, like a team name');
-  is(S.normalizeSettings({ sameDayValue: 'abc' }).sameDayValue, 0.5,
+  /* Against the default rather than a literal, so moving the default doesn't
+     look like a fallback bug. */
+  is(S.normalizeSettings({ sameDayValue: 'abc' }).sameDayValue, def.sameDayValue,
      'a junk same-day value falls back to the default instead of NaN');
-  is(S.normalizeSettings({ sameDayValue: -3 }).sameDayValue, 0.5, 'so does a negative one');
+  is(S.normalizeSettings({ sameDayValue: -3 }).sameDayValue, def.sameDayValue,
+     'so does a negative one');
   is(S.normalizeSettings({ unplannedType: 42 }).unplannedType, 'Bug',
      'a non-string label setting falls back to its default');
 
