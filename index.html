@@ -3846,8 +3846,12 @@ async function refreshShareLink() {
     + ' · ' + url.length.toLocaleString() + ' characters';
 
   if (!items) {
-    warn.textContent = 'That window leaves no items at all, so the link would open on empty '
-      + 'charts. Include more history, or pick a team that has work inside it.';
+    /* Two different empties: a window that reaches back past everything, and a
+       team that simply holds nothing. Only the first has a fix in this dialog. */
+    warn.textContent = cutoff
+      ? 'That window leaves no items at all, so the link would open on empty charts. '
+        + 'Include more history, or pick a team with work inside the window.'
+      : 'There are no items in the teams you picked, so the link would open on empty charts.';
   } else if (url.length > SHARE_WARN_AT) {
     warn.textContent = 'That’s a long link — some mail apps break links this size across two '
       + 'lines. Including less history is the quickest way to shorten it; sharing fewer teams '
