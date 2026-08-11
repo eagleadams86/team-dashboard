@@ -178,13 +178,23 @@ Rows gained an optional created date (`k` on the wire, backup `version: 3`, `sch
 saved and synced state). A row without one is left exactly as it was — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before.
 
-One thing to know if you use sync: **a browser still running an older build will strip created
-dates from the synced copy.** It hydrates only the fields it knows about and pushes the rest
-back without them. That build also drops the `schema` marker, so a document arriving without
-one when this device holds created dates is detectably that case, and the app says so in a
-toast rather than losing the data quietly. The fix is to reload Flow Metrics on the other
-device. There's deliberately no automatic merge — that belongs in the sync conflict dialog,
-which is its own piece of work.
+**Created dates are never dropped silently.** If a synced copy arrives with none and this
+device has some, the app asks before taking it — the same treatment as another device clearing
+all its data — and cancelling keeps them *and* pushes them back up, so the other device gets
+them too. Two ways that happens:
+
+- a browser on an **older build**, which hydrates only the fields it knows and pushes the rest
+  back without them (it also drops the `schema` marker, so this case is named in the prompt);
+- a current build that has simply **never been given a Created column** — it pushes a perfectly
+  valid copy that just has no created dates in it.
+
+The second is the likelier one, and it is why sync ordering matters. **Ordering is by device
+clock, and that is a known weakness**: `updatedAt` is the pushing device's `Date.now()`, and
+the receiving device compares it against its own last-edit stamp. Two machines whose clocks
+disagree — a laptop and a virtual desktop, say — can each decide the other's newer change is
+older, and the loser's edit is discarded on its next sign-in push. The created-date prompt
+catches the case that costs the most, but the general fix is a server timestamp, which is not
+done yet.
 - The first version stored one team's rows under `td-rows`, with the team name in `td-settings`.
   Those fold into a single team the first time a newer version loads, and the old keys go.
 

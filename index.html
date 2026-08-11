@@ -2200,11 +2200,37 @@ window.tdCounts = (d) => ({
 /* Replace everything with a copy from the cloud. */
 window.tdAdopt = (data, updatedAt) => {
   /* Before the swap, because the comparison is against what this device holds
-     now. Only worth saying when created dates actually go backwards. */
+     now. Created dates going from "some" to "none" is the same class of event
+     as another device clearing everything: it can be deliberate, so it asks
+     rather than refusing — but it asks, because the alternative is a device
+     quietly throwing away the only copy of a column its owner pasted.
+
+     This is NOT limited to old builds. A current build that has simply never
+     been given a Created column pushes a copy with no created dates and a
+     current schema marker, and that copy would otherwise land here and win on
+     timestamp alone. That is exactly how work and home end up disagreeing. */
   const hadCreated = countCreated(state.teams);
   const incoming = hydrateState(data);
-  const losing = hadCreated > 0 && countCreated(incoming.teams) === 0
-    && !(data && data.schema >= SCHEMA);
+  const losing = hadCreated > 0 && countCreated(incoming.teams) === 0;
+
+  if (losing) {
+    const stale = !(data && data.schema >= SCHEMA);
+    const keep = !confirm(
+      'Another device’s copy of your data has no Created dates, and this device has '
+      + hadCreated + '.\n\n'
+      + (stale ? 'That device is running an older version of Flow Metrics, which removes '
+                 + 'them because it does not know about them.\n\n'
+               : 'That device has not been given a Created column.\n\n')
+      + 'Drop the Created dates here too? Cancel keeps them and restores them to your '
+      + 'other devices — lead time will stop working if you drop them.');
+    if (keep) {
+      /* Stamp this copy as the newest and send it back up, the same move the
+         cleared-everything branch makes. */
+      save();
+      if (typeof toast === 'function') toast('Kept this device’s Created dates ☁️', 6000);
+      return;
+    }
+  }
 
   state = incoming;
   if (!state.teams.length) state.teams.push({ id: newId(), name: 'My team', rows: [] });
@@ -2216,12 +2242,6 @@ window.tdAdopt = (data, updatedAt) => {
   localStorage.setItem(LS.updated, String(updatedAt || Date.now()));
   renderSettingsForm();
   renderAll();
-  /* Loud, not silent: this is data loss, and the fix is on the other device. */
-  if (losing && typeof toast === 'function') {
-    toast('Another device is running an older version and removed the Created dates from '
-      + 'your synced copy. Reload Flow Metrics there to update it, then paste your export '
-      + 'again.', 12000);
-  }
 };
 
 /* Short-lived status message. textContent only — never HTML, and never a
