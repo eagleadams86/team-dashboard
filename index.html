@@ -614,8 +614,13 @@ dialog { background: var(--surface); color: var(--text-primary);
    measure makes prose harder to read, not easier. */
 @media (min-width: 760px) {
   #shareDialog { max-width: 820px; }
+  /* No align-items: start — the two panels stretch to the taller of them, so
+     the pair reads as one row rather than as two boxes of unrelated height.
+     Which one is taller changes with the team count and the chosen history, so
+     letting them size independently makes the dialog look different every time
+     it opens. */
   #shareDialog .share-choices { display: grid; grid-template-columns: 1fr 1fr;
-    gap: 0 14px; align-items: start; }
+    gap: 0 14px; }
 }
 dialog::backdrop { background: rgba(0, 0, 0, .55); }
 dialog h2 { font-size: 16px; margin-bottom: 12px; }
