@@ -15,7 +15,7 @@ so the measures that move together are read together:
 
 | Group | Question it answers | What's plotted |
 |---|---|---|
-| **Flow** — how long work takes | How long does an item take, and how much of that was waiting? | Cycle time; lead time; flow efficiency |
+| **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); lead time |
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started) |
 | **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; defect rate — defects resolved and defects raised |
 
@@ -26,7 +26,10 @@ the table and the charts always name the same period.
 
 Each chart carries a dashed linear trend line, and four **summary tiles** above the tabs state
 the window-wide figures — average completed per week, average cycle time (pooled over the items
-in the window, so an empty week can't drag it down), the defect rate, and total net flow. Those
+in the window, so an empty week can't drag it down), the defect rate, and total net flow. Each
+group adds a small tile row of its own: Flow states the 85th-percentile cycle time and the
+median beneath it, Health the work in progress, its ratio to a month's throughput, and how much
+of it has aged. Those
 four stay visible whichever group is open. The tiles are deliberately neutral: this app has no
 targets, so no tile is ever coloured "good" or "bad". There being exactly four of them, they go
 four-across on a wide window and pair into a 2x2 on a narrower one — never three and a stray
@@ -80,9 +83,8 @@ DAE-1058   4/09/2026   4/28/2026                 Story
 DAE-1491   7/28/2026   8/5/2026                  Story
 ```
 
-The **Created** column is optional and unlocks lead time and flow efficiency. Without it
-everything else works exactly as before, and those two charts say so on their face rather than
-disappearing.
+The **Created** column is optional and unlocks lead time. Without it everything else works
+exactly as before, and that chart says so on its face rather than disappearing.
 
 **The columns are worked out from the data, not assumed by position.** Header names win when
 they're there (`Resolved`/`Completed`, `In Progress`/`Start`, `Created`, `Issue Type`);
@@ -135,8 +137,18 @@ Jira export doesn't carry it: "Flagged" is a state, not a duration, and reconstr
 duration needs the issue's status history. To add it you'd need a **Time in Status** export —
 one row per issue per status with entry and exit timestamps, or per-status day totals — plus a
 mapping of which statuses count as blocked. That's a second paste surface and a status-category
-setting, so it's deliberately out of scope rather than half-built. The same export would turn
-flow efficiency from the approximation described above into the real measure.
+setting, so it's deliberately out of scope rather than half-built.
+
+**Flow efficiency** — what share of an item's total wait was actually spent working. This app
+carried an approximation of it for a while: `cycle time ÷ lead time`, i.e. the share of the
+raised-to-delivered span that the item was in progress. It was removed, because that only
+measures the queue *before* work starts. On a team that picks work up the day it's raised — as
+the team this was built for does, its start date set by automation on the Ready → In Progress
+transition — the figure pins at ~95% and never moves, while the waiting that actually matters
+happens *inside* the in-progress span: in review, blocked, waiting on an environment. Measuring
+that needs the same **Time in Status** export as blocked time, plus a mapping of which statuses
+count as working. Until then the 85th percentile and aged work are the honest way to see the
+same problem. Half a metric that always reads 95% is worse than no metric at all.
 
 **Value delivered** and **story readiness** need data that doesn't exist in a flow export at
 all — business outcomes, and how often a story was rewritten after being picked up. Neither is
@@ -210,14 +222,16 @@ worth knowing:
   configured value. **Lead time** is `completed − created` by exactly the same rules — the
   whole wait, including the time an item sat in the backlog before anyone picked it up. Lead
   time is therefore always the longer of the two, and the gap between them is queue.
-- **Flow efficiency is pooled, and it is an approximation.** Per period it is
-  `total cycle time ÷ total lead time` over the items completed in it — not the average of the
-  per-item ratios, which lets one item raised and closed the same day report 100% and drown
-  out a real one. It is *not* the textbook measure: a true flow efficiency needs the time an
-  item spent in each individual status, so it can tell working from waiting *inside* the
-  in-progress span. A plain Jira export doesn't carry that, so this counts everything between
-  start and finish as working time and reads high when work sits blocked mid-flight. It still
-  answers the question that matters most — how much of the total wait was queue.
+- **The 85th percentile is the number to forecast with.** 85% of the items completed finished
+  within it, so it is a promise you can make about the next one. An average is not: on a
+  right-skewed distribution — which delivery data always is — the mean sits well above the
+  typical item and well below the slow tail, describing nothing. The gap between the two lines
+  is how unpredictable the work is, and predictability is usually worth more to whoever is
+  asking than raw speed.
+- **Percentiles are nearest-rank, never interpolated.** The figure is always a duration some
+  real item actually took, so "85% finished within 17 days" is a true statement about work you
+  shipped. The window figure pools every item in the window rather than averaging the
+  per-period percentiles, because a percentile of percentiles is not a percentile.
 - **A created date alone is not enough to keep a row.** An item raised and never picked up is
   backlog, not flow; counting it would make the intake series track grooming rather than work.
   The rule is unchanged: no completion and no start, no row.

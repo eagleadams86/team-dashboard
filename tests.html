@@ -476,9 +476,10 @@ async function run(TD, win) {
 
   /* the chart title carries the average rate */
   is(d.titles.defectRate, 'Bugs percentage rate (avg: 19.92%)', 'avg bug rate is 19.92%');
-  is(d.titles.cycleTime, 'Average Cycle time per week', 'the cycle time title uses the cycle-time wording');
+  is(d.titles.cycleTime, 'Cycle time per week — average and 85th percentile',
+     'the cycle time title names both series');
   is(TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { cycleTimeLabel: 'TiP' }),
-     { filterValue: '', months: 3 }).titles.cycleTime, 'Average TiP per week',
+     { filterValue: '', months: 3 }).titles.cycleTime, 'TiP per week — average and 85th percentile',
      'an acronym label keeps its capitals — "TiP" must not become "tip"');
 
   /* the summary figures the dashboard tiles read */
@@ -639,12 +640,12 @@ async function run(TD, win) {
   is(TD.linearTrend([5]), [null], 'a single point has no trend line');
 
   /* ══════════════════════════════════════════════════════════
-     The created date: lead time, flow efficiency, defect intake.
+     The created date: lead time and defect intake.
 
      Existing data has no created date, so the first thing to pin is that its
      absence produces nothing at all rather than something wrong.
      ══════════════════════════════════════════════════════════ */
-  group('lead time and flow efficiency');
+  group('lead time');
 
   is(TD.leadTimeOf({ completed: D(2015, 1, 10), started: D(2015, 1, 8) }, 0.5), null,
      'no created date means no lead time — null, not zero');
@@ -660,36 +661,12 @@ async function run(TD, win) {
   is(dLegacy.hasCreated, false, 'rows with no created date report none');
   is(dLegacy.createdCoverage, 0, 'and no coverage');
   ok(dLegacy.avgLeadTime.every(v => v === null), 'lead time is all null, never 0');
-  ok(dLegacy.flowEfficiency.every(v => v === null), 'flow efficiency is all null');
   ok(dLegacy.defectCreatedRate.every(v => v === null), 'the defects-raised series is all null');
   is(dLegacy.summary.avgLeadTime, null, 'and the tile shows nothing rather than zero');
-  is(dLegacy.summary.flowEfficiency, null, 'same for flow efficiency');
-
-  /* Flow efficiency is pooled, not the mean of per-item ratios. These two items
-     are built so the two methods disagree: item A is raised and delivered the
-     same day (ratio 1), item B waits 99 days for 1 day of work (ratio ~0.01).
-     The mean of the ratios is ~0.5; the truth — 1.5 working days out of 99.5
-     elapsed — is ~1.5%. A mean would let the trivial item drown out the real
-     one. */
-  const dEff = TD.derive([
-    { created: D(2015, 1, 5), started: D(2015, 1, 5), completed: D(2015, 1, 5), type: 'Story' },
-    { created: D(2015, 1, 1), started: D(2015, 4, 9), completed: D(2015, 4, 10), type: 'Story' }
-  ], SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: 'month' });
-  is(dEff.hasCreated, true, 'created dates are detected');
-  near(dEff.summary.flowEfficiency, 1.5 / 99.5,
-       'flow efficiency pools the totals rather than averaging the ratios');
-  ok(dEff.summary.flowEfficiency < 0.1,
-     'the mean of the ratios (~0.5) would have been wildly wrong',
-     String(dEff.summary.flowEfficiency));
-  ok(dEff.flowEfficiency.every(v => v === null || v <= 1),
-     'flow efficiency never exceeds 100%');
-
-  /* An item raised long before it was started but finished the same day it
-     started would compute over 1 without the clamp. */
-  const dClamp = TD.derive([
-    { created: D(2015, 1, 1), started: D(2015, 1, 20), completed: D(2015, 1, 20), type: 'Story' }
-  ], SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
-  ok(dClamp.flowEfficiency[0] <= 1, 'flow efficiency is clamped at 1', String(dClamp.flowEfficiency[0]));
+  is(TD.derive([
+    { created: D(2015, 1, 5), started: D(2015, 1, 5), completed: D(2015, 1, 5), type: 'Story' }
+  ], SAMPLE_SETTINGS, { filterValue: '', months: 'all' }).hasCreated, true,
+     'created dates are detected when they are there');
 
   /* Lead time is pooled per item too, matching how cycle time already works. */
   const dLead = TD.derive([
@@ -711,6 +688,53 @@ async function run(TD, win) {
   is(dIntake.defectCreatedRate[0], 0, 'a period that completed work but raised no defects is 0');
   is(dIntake.defectCreatedRate[1], null, 'a period that completed nothing has no rate at all');
   is(dIntake.defectCreatedRate[2], 1, 'one defect raised against one item completed is 100%');
+
+  /* ══════════════════════════════════════════════════════════
+     The percentile a team forecasts with. Nearest-rank, so the answer is always
+     a duration some real item actually took — "85% finished within N days" has
+     to be a true statement about shipped work, not an interpolation.
+     ══════════════════════════════════════════════════════════ */
+  group('cycle time percentile');
+
+  is(TD.percentileOf([], 85), null, 'no items means no percentile — null, not zero');
+  is(TD.percentileOf([7], 85), 7, 'one item is its own percentile');
+  is(TD.percentileOf([5, 1, 3], 50), 3, 'the input is sorted first, whatever order it arrives in');
+  is(TD.percentileOf([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 100), 10, '100th percentile is the maximum');
+  is(TD.percentileOf([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 10), 1, 'and the bottom of the range is the minimum');
+
+  /* Nearest-rank on 20 items: ceil(0.85 x 20) = 17, so the 17th smallest. */
+  const twenty = Array.from({ length: 20 }, (_, i) => i + 1);
+  is(TD.percentileOf(twenty, 85), 17, 'nearest-rank picks the 17th of 20, not an interpolated 17.15');
+
+  /* Every value it returns must be one that was in the sample. */
+  const odd = [2, 3, 5, 8, 13, 21, 34];
+  ok([10, 25, 50, 75, 85, 95, 99].every(q => odd.indexOf(TD.percentileOf(odd, q)) >= 0),
+     'a percentile is always a value some item actually took');
+
+  /* And it can never be below the median. */
+  const dPct = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+  ok(dPct.summary.p85CycleTime >= dPct.summary.medianCycleTime,
+     'the 85th percentile is at or above the median',
+     dPct.summary.p85CycleTime + ' vs ' + dPct.summary.medianCycleTime);
+  ok(dPct.summary.p85CycleTime >= dPct.summary.avgCycleTime,
+     'and above the mean on this right-skewed sample',
+     dPct.summary.p85CycleTime + ' vs ' + dPct.summary.avgCycleTime);
+  is(dPct.cyclePercentile, 85, 'the percentile in use is reported so the labels can name it');
+
+  /* The window figure pools every item, rather than averaging the per-period
+     percentiles — a percentile of percentiles is not a percentile. */
+  const allCycles = p.rows.filter(r => r.completed && r.started)
+    .map(r => TD.cycleTimeOf(r, SAMPLE_SETTINGS.sameDayValue));
+  is(dPct.summary.p85CycleTime, TD.percentileOf(allCycles, 85),
+     'the tile figure is the percentile over every item in the window');
+
+  /* Per period: null where nothing finished, so the line breaks rather than
+     dropping to a zero nothing took. */
+  const dGap = TD.derive([
+    { started: D(2015, 1, 2), completed: D(2015, 1, 5), type: 'Story' },
+    { started: D(2015, 3, 2), completed: D(2015, 3, 9), type: 'Story' }
+  ], SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: 'month' });
+  is(dGap.p85CycleTime, [3, null, 7], 'an empty period breaks the percentile line rather than plotting 0');
 
   /* ══════════════════════════════════════════════════════════
      Work in progress and aged work — reconstructed history.
