@@ -346,9 +346,10 @@ good or bad.
 
 ## Cleaning up old data
 
-Years of history make every paste, backup and share link heavier without telling you anything
-new. **Your Data → Clean up old data → Remove old items** drops the items older than a cutoff
-you choose:
+Years of history make every paste and backup heavier without telling you anything new.
+**Your Data → Clean up old data → Remove old items** drops the items older than a cutoff you
+choose. It is *not* the way to shorten a share link — the share dialog has its own history
+window for that, and it deletes nothing:
 
 - **How much to keep** — the last 3, 6 or 12 months, the last 2 or 3 years, or everything from
   a date you pick yourself.
@@ -405,12 +406,29 @@ so the figures reach the recipient without GitHub Pages, Firebase or anyone else
 them. The payload is a trimmed copy — the chosen teams plus the shared settings, because
 those drive every number on the charts — and never anything identifying.
 
+**How much history** decides how far back the link reaches, in the same words the clean-up
+dialog uses: everything, the last 3, 6 or 12 months, the last 2 or 3 years, or everything from
+a date you pick. Nothing is deleted — this only trims what rides in the URL, which is what
+makes a long history shareable without having to delete it first. Months count back from the
+newest item in the data (same anchor as the clean-up tool and the dashboard's own window), and
+an **Unfinished items** box, off by default, decides whether items with no completion date go
+along regardless of how old their start is. The line under the link reads `219 of 600 items —
+from 18 Nov 2023` so the cost of a longer window is visible before you send it; a window that
+would leave nothing at all says so.
+
 The recipient sees a standing "Read-only view" bar, the dashboard only (no Your Data or
 Settings tabs), and a link back to their own data. Nothing they do is saved, and nothing
 already in their browser is touched — `save()`, `persist()` and `saveView()` are all
 no-ops in a shared view, and sync never initialises. A link that arrives truncated (mail
 apps do this) shows an error card rather than ever falling through to the viewer's own
 data.
+
+A trimmed link carries its cutoff as `from`, and the read-only bar says "Covers work from
+18 Nov 2023 onward" — a windowed copy must never read as the team's whole history. The date
+comes out of a link, so it's re-validated before it's shown, like everything else in there.
+`from` is written only when a window was used, so an untrimmed link is byte-identical to the
+ones the app built before, and a build that predates the field ignores it: the link still
+opens, just without the line saying where the history starts.
 
 It's a **snapshot**: later edits don't appear in links already sent, and a sent link can't
 be withdrawn — treat it like emailing a spreadsheet.
@@ -600,12 +618,18 @@ and nothing else (no theme, no sync uid, no view state) — and `migrate()`, the
 exercised the way it really runs: the old `td-rows`/`td-settings` keys are planted, a second
 hidden copy of the app boots, and the suite checks the single team it folds them into.
 
-Cleanup gets the same treatment, since it's the one action with no undo: `cleanupDoomed()` is
+The share window is pinned on all four of its promises: only rows inside it go into the link,
+unfinished items stay unless the box is ticked, the app's own rows are **untouched** by
+building a link, and a windowed link really does come out shorter than the whole-history one.
+
+Cleanup gets the same treatment, since it's the one action with no undo: `outsideWindow()` is
 pinned on both sides of the cutoff (the cutoff day itself is kept), on work in progress with
 and without the box ticked, and on the case that would hurt most — an old start date with a
-recent completion, which must stay. `cleanupAnchor()` is pinned to the newest date in the data
-rather than today. One end-to-end check runs the whole reference sample past a 3-month cutoff
-and asserts every item is either kept or removed, never both.
+recent completion, which must stay. `historyAnchor()` is pinned to the newest date in the data
+rather than today, and `windowCutoff()` on each shape of answer — including a half-typed custom
+date, which must yield no cutoff rather than a guess. These three are shared with the share
+dialog, so both dialogs sit on one set of tests. One end-to-end check runs the whole reference
+sample past a 3-month cutoff and asserts every item is either kept or removed, never both.
 
 The expectations are pinned to a fixed 141-item sample, right down to the weekly throughput
 series, `10.2857…` days average cycle time in week 1, `−5` net flow in week 1, and the 19.92%

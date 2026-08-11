@@ -1074,8 +1074,45 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
     anywhere, and it doesn't touch whatever they have saved in their own browser.</p>
 
   <fieldset class="formpanel">
+    <legend>How much history</legend>
+    <div class="grid two">
+      <div>
+        <label for="shareKeep">Include</label>
+        <select id="shareKeep">
+          <option value="all" selected>Everything</option>
+          <option value="3">The last 3 months</option>
+          <option value="6">The last 6 months</option>
+          <option value="12">The last 12 months</option>
+          <option value="24">The last 2 years</option>
+          <option value="36">The last 3 years</option>
+          <option value="custom">Everything from a date I choose</option>
+        </select>
+      </div>
+      <div id="shareDateWrap" hidden>
+        <label for="shareDate">Include items completed on or after</label>
+        <input type="date" id="shareDate">
+      </div>
+    </div>
+    <p class="hint" style="margin:10px 0 0">
+      Nothing is deleted — this only decides how much of your history rides in the link,
+      which is what makes a long history shareable. Months count back from the
+      <strong>newest item in the data</strong>, the same anchor the clean-up tool uses.
+    </p>
+  </fieldset>
+
+  <fieldset class="formpanel">
     <legend>Which teams</legend>
     <div class="checklist" id="shareTeams"></div>
+  </fieldset>
+
+  <fieldset class="formpanel" id="shareWipWrap" hidden>
+    <legend>Unfinished items</legend>
+    <label class="checkline"><input type="checkbox" id="shareWip"><span>Also leave out
+      unfinished items started before the cutoff</span></label>
+    <p class="hint" style="margin:10px 0 0">
+      Off by default: an item with no completion date is still in progress, so it belongs
+      on the charts however old its start is.
+    </p>
   </fieldset>
 
   <fieldset class="formpanel">
@@ -1091,7 +1128,8 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 
   <p class="hint" style="margin-top:14px">This is a <strong>snapshot</strong>, frozen as it
     looks right now — later edits won't appear, so send a fresh link when the numbers move.
-    There's no way to withdraw one once sent, so treat it like emailing a spreadsheet.</p>
+    There's no way to withdraw one once sent, so treat it like emailing a spreadsheet. If you
+    trimmed the history, whoever opens it is told which date the copy starts from.</p>
 
   <div class="row" style="justify-content:flex-end;margin-top:18px">
     <button class="btn primary" id="shareCloseBtn" type="button">Done</button>
@@ -3535,6 +3573,50 @@ $('importFile').addEventListener('change', (e) => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   8b. HISTORY WINDOWS  (shared by the share dialog and the clean-up dialog)
+
+   Both dialogs ask the same question — "how far back?" — and must answer it
+   identically, or a link built to match a clean-up would quietly disagree with
+   it. One anchor, one cutoff, one rule for which rows fall outside.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Relative options count back from the newest date in the teams concerned, not
+   from today. Same anchor as derive()'s date window, and for the same reason:
+   someone pasting a stale export should not find that "the last 12 months"
+   means "nothing at all". */
+function historyAnchor(teams) {
+  let newest = null;
+  teams.forEach(t => t.rows.forEach(r => {
+    if (r.completed && (!newest || r.completed > newest)) newest = r.completed;
+    if (r.started   && (!newest || r.started   > newest)) newest = r.started;
+  }));
+  return newest;
+}
+
+/* `keep` is a month count, 'custom' (read the date box) or 'all' (no cutoff).
+   Returns null when no cutoff can be worked out yet — nothing to anchor to, or
+   a custom date box still empty — which both callers treat as "can't act". */
+function windowCutoff(teams, keep, customISO) {
+  if (keep === 'all') return null;
+  if (keep === 'custom') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(customISO || '')) return null;
+    const d = new Date(customISO + 'T00:00:00Z');
+    return isNaN(d) ? null : d;
+  }
+  const anchor = historyAnchor(teams);
+  return anchor ? edate(anchor, -Number(keep)) : null;
+}
+
+/* One decision, in one place: used by the clean-up preview, the deletion itself
+   and the share builder — so what a count promises and what the button does
+   can't drift apart. The completed date decides; an item with none is still in
+   progress, so it only falls outside when `wip` says to include it. */
+function outsideWindow(row, cutoff, wip) {
+  if (row.completed) return row.completed < cutoff;
+  return wip && !!row.started && row.started < cutoff;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    9. READ-ONLY SHARE LINKS  (ported from the sibling app)
 
    The whole payload rides in the URL fragment. Everything after '#' is never
@@ -3545,10 +3627,15 @@ $('importFile').addEventListener('change', (e) => {
    plain JSON (CompressionStream is missing on older Safari, and an
    uncompressed link can be read by hand when something looks wrong).
 
-   The payload is a *trimmed copy*, never `state` itself: only the chosen teams,
-   plus the shared settings — those drive every number on the charts, so a
-   viewer must see the figures under the owner's settings, not their own.
+   The payload is a *trimmed copy*, never `state` itself: only the chosen teams
+   — and, if a history window was picked, only the rows inside it — plus the
+   shared settings, which drive every number on the charts, so a viewer must see
+   the figures under the owner's settings, not their own.
    Nothing identifying goes in — no email, no sync uid, no theme.
+
+   The history window is what keeps a long history shareable: everything rides
+   in the URL, so years of items eventually make a link no mail client will
+   carry. Trimming the link is the answer; deleting the data is not.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const SHARE_FORMAT = 1;
@@ -3571,16 +3658,28 @@ async function squeeze(bytes, Stream, format) {
   return new Uint8Array(await new Response(s.readable).arrayBuffer());
 }
 
-function buildSharePayload(teamIds) {
-  const s = serializeState();
-  const teams = s.teams.filter(t => teamIds.includes(t.id));
-  return {
+/* `win` is optional: { cutoff, wip }. With one, only rows inside the window are
+   serialised — the way a long history becomes a link short enough to send
+   without deleting anything. The cutoff itself rides along as `from` so the
+   recipient's banner can say the copy is a window, not the whole story. */
+function buildSharePayload(teamIds, win) {
+  const cutoff = win && win.cutoff;
+  const teams = state.teams.filter(t => teamIds.includes(t.id)).map(t => ({
+    id: t.id,
+    name: t.name,
+    rows: serializeRows(cutoff
+      ? t.rows.filter(r => !outsideWindow(r, cutoff, !!(win && win.wip)))
+      : t.rows)
+  }));
+  const payload = {
     v: 1,
     sharedAt: Date.now(),
     label: teams.map(t => t.name).join(', '),
     teams,
-    settings: s.settings
+    settings: state.settings
   };
+  if (cutoff) payload.from = isoOf(cutoff);
+  return payload;
 }
 
 async function encodeShare(payload) {
@@ -3620,7 +3719,7 @@ window.TDShare = { encodeShare, decodeShare, buildSharePayload };
 async function openSharedView() {
   try {
     const p = await decodeShare(shareToken);
-    shareMeta = { sharedAt: p.sharedAt, label: p.label };
+    shareMeta = { sharedAt: p.sharedAt, label: p.label, from: p.from };
     /* A link is the least trusted input the app has — it arrives from someone
        else by definition. hydrateState() is the same sanitising boundary a
        synced copy crosses: hostile ids are replaced, settings normalised. */
@@ -3656,10 +3755,17 @@ function shareBanner() {
     ? new Date(shareMeta.sharedAt).toLocaleDateString(undefined,
         { day: 'numeric', month: 'short', year: 'numeric' })
     : null;
+  /* A trimmed link is still an honest one only if the trim shows: without this
+     the charts would read as the team's whole history. The date came out of a
+     link, so it is parsed here rather than trusted. */
+  const fromISO = shareMeta && typeof shareMeta.from === 'string'
+    && /^\d{4}-\d{2}-\d{2}$/.test(shareMeta.from) ? shareMeta.from : null;
+  const from = fromISO ? new Date(fromISO + 'T00:00:00Z') : null;
   return '<div class="viewbar">' +
     '<strong>👁 Read-only view' + (shareMeta && shareMeta.label ? ' — ' + escapeHtml(shareMeta.label) : '') + '</strong>' +
-    '<span class="muted">Shared' + (when ? ' on ' + when : '') + '. Nothing you do here is saved, ' +
-    'and your own data is untouched.</span>' +
+    '<span class="muted">Shared' + (when ? ' on ' + when : '') + '. ' +
+    (from && !isNaN(from) ? 'Covers work from ' + escapeHtml(prettyDate(from)) + ' onward. ' : '') +
+    'Nothing you do here is saved, and your own data is untouched.</span>' +
     '<a class="mine" href="' + escapeHtml(location.pathname) + '">Open my own data</a>' +
     '</div>';
 }
@@ -3675,15 +3781,22 @@ function openShare() {
   $('shareTeams').innerHTML = state.teams.map(t =>
     '<label class="checkline"><input type="checkbox" data-share-team="' + t.id + '"' +
     (active && t.id === active.id ? ' checked' : '') + '><span>' + escapeHtml(t.name) +
-    (t.rows.length ? '' : ' (empty)') + '</span></label>').join('');
+    (t.rows.length ? ' (' + t.rows.length + ' item' + (t.rows.length === 1 ? '' : 's') + ')' : ' (empty)') +
+    '</span></label>').join('');
   $('shareTeams').querySelectorAll('input').forEach(i => { i.onchange = refreshShareLink; });
   refreshShareLink();
   $('shareDialog').showModal();
+  $('shareDialog').scrollTop = 0;
 }
 
 function sharePicked() {
   return Array.from($('shareTeams').querySelectorAll('input:checked'))
     .map(i => i.dataset.shareTeam);
+}
+
+function shareTeamsPicked() {
+  const ids = sharePicked();
+  return state.teams.filter(t => ids.includes(t.id));
 }
 
 let shareSeq = 0;   // a slow encode must not overwrite the box after a later tick
@@ -3697,15 +3810,24 @@ async function refreshShareLink() {
     $('shareOpenBtn').disabled = on;
   };
 
-  if (!teamIds.length) {
+  const stop = (msg) => {
     link.value = '';
-    meta.textContent = 'Pick at least one team.';
+    meta.textContent = msg;
     warn.textContent = '';
     setBusy(true);
-    return;
-  }
+  };
 
-  const payload = buildSharePayload(teamIds);
+  if (!teamIds.length) return stop('Pick at least one team.');
+
+  const teams  = shareTeamsPicked();
+  const keep   = $('shareKeep').value;
+  const wip    = $('shareWip').checked;
+  const cutoff = windowCutoff(teams, keep, $('shareDate').value);
+  /* A half-typed custom date must not quietly build a whole-history link — that
+     is the one case where "no cutoff" would mean the opposite of what's asked. */
+  if (keep === 'custom' && !cutoff) return stop('Choose the date to include from.');
+
+  const payload = buildSharePayload(teamIds, cutoff ? { cutoff, wip } : null);
   const token = await encodeShare(payload);
   if (busy !== shareSeq) return;
 
@@ -3713,13 +3835,52 @@ async function refreshShareLink() {
   link.value = url;
   setBusy(false);
   const items = payload.teams.reduce((n, t) => n + t.rows.length, 0);
+  const held  = teams.reduce((n, t) => n + t.rows.length, 0);
   const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
-  meta.textContent = plural(payload.teams.length, 'team') + ', ' + plural(items, 'item')
+  /* "220 of 754" rather than a bare count, because the number that matters when
+     a link is too long is how much was left behind. */
+  meta.textContent = plural(payload.teams.length, 'team') + ', '
+    + (cutoff ? items.toLocaleString() + ' of ' + plural(held, 'item')
+                + ' — from ' + prettyDate(cutoff)
+              : plural(items, 'item'))
     + ' · ' + url.length.toLocaleString() + ' characters';
-  warn.textContent = url.length > SHARE_WARN_AT
-    ? 'That’s a long link — some mail apps break links this size across two lines. '
-      + 'Sharing fewer teams will shorten it.' : '';
+
+  if (!items) {
+    warn.textContent = 'That window leaves no items at all, so the link would open on empty '
+      + 'charts. Include more history, or pick a team that has work inside it.';
+  } else if (url.length > SHARE_WARN_AT) {
+    warn.textContent = 'That’s a long link — some mail apps break links this size across two '
+      + 'lines. Including less history is the quickest way to shorten it; sharing fewer teams '
+      + 'also helps.';
+  } else {
+    warn.textContent = '';
+  }
 }
+
+/* The custom date box opens on whatever cutoff was already on screen, so the
+   last relative choice is remembered — by the time the change event fires the
+   select no longer says what it was, and reading it back would prefill today. */
+let shareLastRelative = '12';
+
+$('shareKeep').addEventListener('change', e => {
+  const keep = e.target.value;
+  const custom = keep === 'custom';
+  $('shareDateWrap').hidden = !custom;
+  /* Meaningless without a cutoff — with "Everything" there is nothing for an
+     unfinished item to fall outside of. */
+  $('shareWipWrap').hidden = keep === 'all';
+  if (keep === 'all') $('shareWip').checked = false;
+  if (!custom && keep !== 'all') shareLastRelative = keep;
+  else if (custom && !$('shareDate').value) {
+    const anchor = historyAnchor(shareTeamsPicked());
+    $('shareDate').value = anchor
+      ? isoOf(edate(anchor, -Number(shareLastRelative)))
+      : todayLocalISO();
+  }
+  refreshShareLink();
+});
+$('shareDate').addEventListener('input', refreshShareLink);
+$('shareWip').addEventListener('change', refreshShareLink);
 
 $('shareBtn').addEventListener('click', openShare);
 $('shareCloseBtn').addEventListener('click', () => $('shareDialog').close());
@@ -3756,19 +3917,6 @@ $('shareOpenBtn').addEventListener('click', () => {
    so it only goes if the box for it is ticked.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Relative options count back from the newest date in the teams being cleaned,
-   not from today. Same anchor as derive()'s date window, and for the same
-   reason: someone pasting a stale export should not find that "keep the last 12
-   months" means "keep nothing". */
-function cleanupAnchor(teams) {
-  let newest = null;
-  teams.forEach(t => t.rows.forEach(r => {
-    if (r.completed && (!newest || r.completed > newest)) newest = r.completed;
-    if (r.started   && (!newest || r.started   > newest)) newest = r.started;
-  }));
-  return newest;
-}
-
 function cleanupTeamsPicked() {
   const ids = Array.from($('cleanupTeams').querySelectorAll('input:checked'))
     .map(i => i.dataset.cleanTeam);
@@ -3778,22 +3926,7 @@ function cleanupTeamsPicked() {
 /* The cutoff, or null when it can't be worked out yet — no teams picked, no
    dated rows to anchor to, or a custom date box that hasn't been filled in. */
 function cleanupCutoff(teams) {
-  const keep = $('cleanupKeep').value;
-  if (keep === 'custom') {
-    const v = $('cleanupDate').value;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
-    const d = new Date(v + 'T00:00:00Z');
-    return isNaN(d) ? null : d;
-  }
-  const anchor = cleanupAnchor(teams);
-  return anchor ? edate(anchor, -Number(keep)) : null;
-}
-
-/* One decision, in one place, used by both the preview and the deletion — so
-   what the count promises and what the button does can't drift apart. */
-function cleanupDoomed(row, cutoff, wip) {
-  if (row.completed) return row.completed < cutoff;
-  return wip && !!row.started && row.started < cutoff;
+  return windowCutoff(teams, $('cleanupKeep').value, $('cleanupDate').value);
 }
 
 function refreshCleanupPreview() {
@@ -3813,7 +3946,7 @@ function refreshCleanupPreview() {
 
   const per = teams.map(t => ({
     team: t,
-    going: t.rows.filter(r => cleanupDoomed(r, cutoff, wip)).length
+    going: t.rows.filter(r => outsideWindow(r, cutoff, wip)).length
   }));
   const going = per.reduce((n, p) => n + p.going, 0);
   const kept  = teams.reduce((n, t) => n + t.rows.length, 0) - going;
@@ -3890,7 +4023,7 @@ $('cleanupKeep').addEventListener('change', e => {
   $('cleanupDateWrap').hidden = !custom;
   if (!custom) cleanupLastRelative = e.target.value;
   else if (!$('cleanupDate').value) {
-    const anchor = cleanupAnchor(cleanupTeamsPicked());
+    const anchor = historyAnchor(cleanupTeamsPicked());
     $('cleanupDate').value = anchor
       ? isoOf(edate(anchor, -Number(cleanupLastRelative)))
       : todayLocalISO();
@@ -3907,7 +4040,7 @@ $('cleanupRunBtn').addEventListener('click', () => {
   if (!teams.length || !cutoff) return;
 
   let going = 0;
-  teams.forEach(t => { going += t.rows.filter(r => cleanupDoomed(r, cutoff, wip)).length; });
+  teams.forEach(t => { going += t.rows.filter(r => outsideWindow(r, cutoff, wip)).length; });
   if (!going) return;
 
   const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
@@ -3915,7 +4048,7 @@ $('cleanupRunBtn').addEventListener('click', () => {
   if (!confirm('Remove ' + plural(going, 'item') + ' from ' + scope +
                ', completed before ' + prettyDate(cutoff) + '?\n\nThis cannot be undone.')) return;
 
-  teams.forEach(t => { t.rows = t.rows.filter(r => !cleanupDoomed(r, cutoff, wip)); });
+  teams.forEach(t => { t.rows = t.rows.filter(r => !outsideWindow(r, cutoff, wip)); });
   save();
   $('parseNote').innerHTML = '';
   renderAll();
@@ -3925,8 +4058,9 @@ $('cleanupRunBtn').addEventListener('click', () => {
 });
 
 /* The two decisions worth pinning in tests.html: what the relative options
-   anchor to, and which rows a cutoff condemns. */
-window.TDCleanup = { cleanupAnchor, cleanupDoomed };
+   anchor to, and which rows a cutoff leaves out. Shared with the share dialog,
+   so these tests cover both. */
+window.TDCleanup = { historyAnchor, outsideWindow, windowCutoff };
 
 /* ═══════════════════════════════════════════════════════════════════════════
    10. BOOT
