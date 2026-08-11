@@ -380,6 +380,10 @@ select { cursor: pointer; }
    window width; collapse to one column when 2 no longer fit. */
 .grid.charts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 @media (max-width: 940px) { .grid.charts { grid-template-columns: 1fr; } }
+/* A card showing the "needs a created date" note instead of a chart has no
+   reason to stand as tall as the chart beside it. */
+.chart-card.no-chart { align-self: start; }
+
 /* A group with an odd number of charts leaves the last one half-width with dead
    space beside it. A time series reads well wide — unlike a tile — so it takes
    the full row instead. Marked in the markup rather than worked out with
@@ -868,14 +872,6 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
           </div>
         </div>
 
-        <div class="chart-card wide" id="cardFlowEfficiency">
-          <div class="chart-title" id="titleFlowEfficiency"></div>
-          <div class="chart-wrap"><canvas id="chartFlowEfficiency"></canvas></div>
-          <div class="note info needs-created" hidden>
-            Needs a <strong>Created</strong> column too — flow efficiency compares time spent
-            working on an item against the whole time it was waiting to be delivered.
-          </div>
-        </div>
       </div>
 
       <div class="grid charts" id="spanel-delivery" role="tabpanel" aria-labelledby="stab-delivery" hidden>
@@ -1601,6 +1597,22 @@ function linearTrend(values) {
 
 function mean(a) { return a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0; }
 
+/* The percentile a Kanban team forecasts with. 85 by convention: high enough to
+   be a promise worth making, low enough that the one item that took five months
+   doesn't set the number.
+
+   Nearest-rank, not interpolated — the answer is always a duration some real
+   item actually took, so "85% of our work finished within 17 days" is a true
+   statement about shipped work rather than a figure derived between two items.
+   Null, not zero, for an empty sample: no items means no answer. */
+function percentileOf(values, p) {
+  if (!values.length) return null;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const rank = Math.ceil((p / 100) * sorted.length);
+  return sorted[Math.min(sorted.length - 1, Math.max(0, rank - 1))];
+}
+const CYCLE_PERCENTILE = 85;
+
 /* How many items were open at each point in time — started by then, and either
    never finished or finished after it. Reconstructed from the same two dates
    every other metric uses, so work in progress is a history rather than just
@@ -1742,7 +1754,6 @@ function derive(rows, settings, view) {
   const byStartedWeek   = new Map();   /* keyed on the bucket start */
   const cycleByWeek     = new Map();   /* keyed on the bucket start too */
   const leadByWeek      = new Map();   /* lead times, by completed bucket */
-  const effByWeek       = new Map();   /* [cycleTotal, leadTotal], pooled */
   const defectsRaised   = new Map();   /* defects by the bucket they were RAISED in */
 
   for (const r of items) {
@@ -1774,26 +1785,16 @@ function derive(rows, settings, view) {
     if (lt != null) {
       if (!leadByWeek.has(ck)) leadByWeek.set(ck, []);
       leadByWeek.get(ck).push(lt);
-      /* Flow efficiency is pooled — total working days over total elapsed days,
-         not the mean of per-item ratios. One item raised and finished the same
-         day is 100% efficient on its own and would drag a mean of ratios up out
-         of all proportion to the work it represents. */
-      if (ct != null) {
-        const e = effByWeek.get(ck) || [0, 0];
-        e[0] += ct; e[1] += lt;
-        effByWeek.set(ck, e);
-      }
     }
   }
 
   const weeks = [], bucketLabels = [], throughput = [], unplannedRate = [],
         avgCycleTime = [], netFlow = [],
-        avgLeadTime = [], flowEfficiency = [], defectCreatedRate = [];
+        avgLeadTime = [], defectCreatedRate = [], p85CycleTime = [];
   /* Every individual cycle time inside the window, pooled — the summary tile
      averages these rather than the per-bucket means, so an empty bucket (stored
      as 0 in the series to keep the line unbroken) can't drag it down. */
   const windowCycles = [], windowLeads = [];
-  let effCycleTotal = 0, effLeadTotal = 0;
 
   for (const ws of weekStarts) {
     const key = bucketKey(ws, bucket);
@@ -1812,6 +1813,10 @@ function derive(rows, settings, view) {
 
     const cts = cycleByWeek.get(key) || [];
     avgCycleTime.push(cts.length ? mean(cts) : 0);
+    /* Null, not 0, where nothing finished: unlike the mean beside it this series
+       is new, so it has no legacy padding to preserve, and a break is honest
+       where a zero would claim everything finished instantly. */
+    p85CycleTime.push(percentileOf(cts, CYCLE_PERCENTILE));
     windowCycles.push(...cts);
 
     /* Net flow: completed this week minus started this week. */
@@ -1823,16 +1828,6 @@ function derive(rows, settings, view) {
     const lts = leadByWeek.get(key) || [];
     avgLeadTime.push(lts.length ? mean(lts) : null);
     windowLeads.push(...lts);
-
-    const eff = effByWeek.get(key);
-    if (eff && eff[1] > 0) {
-      effCycleTotal += eff[0]; effLeadTotal += eff[1];
-      /* Clamped: an item finished the day it started but raised earlier can
-         round to slightly over 1, and "104% efficient" reads as a bug. */
-      flowEfficiency.push(Math.min(1, eff[0] / eff[1]));
-    } else {
-      flowEfficiency.push(null);
-    }
 
     /* Defects raised against items completed. Null — not 0 — where nothing was
        completed: you cannot divide by an empty period, and a 0 there would
@@ -1883,7 +1878,7 @@ function derive(rows, settings, view) {
     weeks, buckets: weeks, bucketLabels,
     bucket, bucketNoun: noun, bucketNounPlural: noun + 's', partial,
     throughput, unplannedRate, avgCycleTime, netFlow,
-    avgLeadTime, flowEfficiency, defectCreatedRate,
+    avgLeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
     wip, agedCount, agedDays,
     hasCreated, createdCoverage: items.length ? withCreated / items.length : 0,
     /* Window-wide figures for the summary tiles. avgCycleTime here is the mean
@@ -1897,7 +1892,10 @@ function derive(rows, settings, view) {
       avgLeadTime: windowLeads.length ? mean(windowLeads) : null,
       /* Pooled over the whole window for the same reason it is pooled per
          bucket — the average of a set of ratios is not the ratio of the set. */
-      flowEfficiency: effLeadTotal > 0 ? Math.min(1, effCycleTotal / effLeadTotal) : null,
+      /* Over every item in the window, not the mean of the per-bucket
+         percentiles — a percentile of percentiles is not a percentile. */
+      p85CycleTime: percentileOf(windowCycles, CYCLE_PERCENTILE),
+      medianCycleTime: percentileOf(windowCycles, 50),
       currentWip: wip.length ? wip[wip.length - 1] : 0,
       agedNow: agedCount.length ? agedCount[agedCount.length - 1] : 0,
       asOf: endDate,
@@ -1915,11 +1913,11 @@ function derive(rows, settings, view) {
                ' percentage rate (avg: ' + (mean(unplannedRate) * 100).toFixed(2) + '%)',
       /* The label is used verbatim — lower-casing it turned the "TiP" setting
          into "tip", and an acronym the user chose is not ours to re-case. */
-      cycleTime: 'Average ' + cycleLabel + ' per ' + noun,
+      cycleTime: cycleLabel + ' per ' + noun + ' — average and '
+        + CYCLE_PERCENTILE + 'th percentile',
       throughput: 'Items completed per ' + noun,
       netFlow: 'Net flow per ' + noun + ' (items completed − items started)',
       leadTime: 'Average lead time per ' + noun + ' (raised to delivered)',
-      flowEfficiency: 'Flow efficiency per ' + noun + ' (working time ÷ total time)',
       wip: 'Work in progress at the end of each ' + noun,
       agedWork: 'Items in progress longer than ' + agedDays + ' days'
     },
@@ -1931,7 +1929,6 @@ function derive(rows, settings, view) {
       throughput: 'Count of closed items during ' + noun,
       netFlow: 'Items completed − items started',
       leadTime: 'Lead time (days)',
-      flowEfficiency: 'Share of lead time in progress',
       wip: 'Items open at period end',
       agedWork: 'Items older than ' + agedDays + ' days',
       x: bucket === 'month' ? 'Month'
@@ -1946,7 +1943,7 @@ window.TD = {
   weekdayNum, priorSunday, weekNumber, weekKey, edate,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats,
-  cycleTimeOf, leadTimeOf, linearTrend, openCounts, agedCounts, derive, utcDate
+  cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, utcDate
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2416,10 +2413,20 @@ function drawCharts(d) {
     options: qualOpts
   });
 
-  /* ── Average cycle time per week (with value labels) ── */
+  /* ── Cycle time per week: the average, and the percentile you forecast with ──
+     The average alone invites planning around a number most work beats and a
+     sixth of it misses badly. The percentile line is the promise you can
+     actually make. Told apart by dash and point shape as well as colour, and
+     the value labels stay on the average only — two sets of numbers over one
+     300px card is unreadable. */
   const respOpts = baseOptions(d.axisTitles.cycleTime, num1, null, d.axisTitles.x, d.partial);
   respOpts.scales.y.beginAtZero = true;
   respOpts.plugins.valueLabels = { enabled: true, color: token('--text-muted'), format: num1 };
+  respOpts.plugins.legend = {
+    display: true, position: 'top',
+    labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
+              font: { size: 11 }, filter: item => item.text !== 'Trend' }
+  };
   renderChart('chartCycleTime', {
     type: 'line',
     data: {
@@ -2430,6 +2437,14 @@ function drawCharts(d) {
         borderColor: accent,
         backgroundColor: accent,
         borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false, order: 1
+      }, {
+        label: d.cyclePercentile + 'th percentile',
+        data: d.p85CycleTime,
+        borderColor: serious,
+        backgroundColor: serious,
+        borderWidth: 2, borderDash: [2, 3],
+        pointStyle: 'triangle', pointRadius: 3, pointHoverRadius: 6,
+        tension: 0, fill: false, spanGaps: false, order: 1
       }, trendDataset(d.avgCycleTime)]
     },
     options: respOpts
@@ -2484,11 +2499,10 @@ function drawCharts(d) {
      explains what to paste, rather than the chart quietly disappearing or —
      worse — falling back to the start date and drawing a lead time that is
      secretly a cycle time. */
-  ['LeadTime', 'FlowEfficiency'].forEach(name => {
-    const card = $('card' + name);
-    card.querySelector('.chart-wrap').hidden = !d.hasCreated;
-    card.querySelector('.needs-created').hidden = d.hasCreated;
-  });
+  const leadCard = $('cardLeadTime');
+  leadCard.querySelector('.chart-wrap').hidden = !d.hasCreated;
+  leadCard.querySelector('.needs-created').hidden = d.hasCreated;
+  leadCard.classList.toggle('no-chart', !d.hasCreated);
 
   if (d.hasCreated) {
     const leadOpts = baseOptions(d.axisTitles.leadTime, num1, null, d.axisTitles.x, d.partial);
@@ -2509,30 +2523,10 @@ function drawCharts(d) {
       options: leadOpts
     });
 
-    const effOpts = baseOptions(d.axisTitles.flowEfficiency, pct1, pct0, d.axisTitles.x, d.partial);
-    effOpts.scales.y.beginAtZero = true;
-    effOpts.scales.y.max = 1;
-    renderChart('chartFlowEfficiency', {
-      type: 'line',
-      data: {
-        labels: d.bucketLabels,
-        datasets: [{
-          label: 'Flow efficiency',
-          data: d.flowEfficiency,
-          borderColor: accent,
-          backgroundColor: accent,
-          borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false,
-          spanGaps: false, order: 1
-        }, trendDataset(d.flowEfficiency)]
-      },
-      options: effOpts
-    });
   } else {
     /* Destroyed rather than left holding a stale series: the next paste may be
        a different team entirely. */
-    ['chartLeadTime', 'chartFlowEfficiency'].forEach(id => {
-      if (charts[id]) { charts[id].destroy(); delete charts[id]; }
-    });
+    if (charts.chartLeadTime) { charts.chartLeadTime.destroy(); delete charts.chartLeadTime; }
   }
 
   /* ── Work in progress, and how much of it has gone stale ──
@@ -2599,10 +2593,7 @@ function drawCharts(d) {
   describe('chartNetFlow',    d.titles.netFlow);
   describe('chartWip',       d.titles.wip);
   describe('chartAgedWork',  d.titles.agedWork);
-  if (d.hasCreated) {
-    describe('chartLeadTime',       d.titles.leadTime);
-    describe('chartFlowEfficiency', d.titles.flowEfficiency);
-  }
+  if (d.hasCreated) describe('chartLeadTime', d.titles.leadTime);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2655,15 +2646,13 @@ const METRIC_HELP = {
       + 'including the time an item sat in the backlog before anyone picked it up. Cycle '
       + 'time only starts counting once work does, so lead time is always the longer of the '
       + 'two, and the gap between them is queue. Needs a Created column in your paste.' },
-  flowEfficiency: { title: 'Flow efficiency',
-    body: 'What share of the total wait was actually spent working? Total in-progress days '
-      + 'divided by total raised-to-delivered days, pooled across the items completed in each '
-      + 'period rather than averaged per item. Low is normal — teams are often surprised how '
-      + 'low — and the gap is queue time, which is usually the cheapest thing to improve. '
-      + 'Note this is a fair approximation, not the textbook measure: a true flow efficiency '
-      + 'needs the time an item spent in each individual status, which a plain Jira export '
-      + 'does not carry. It counts everything between start and finish as working time, so '
-      + 'it reads high when work sits blocked mid-flight.' },
+  cycleTimePercentile: { title: '85th percentile cycle time',
+    body: 'The number to forecast with. 85% of the items completed finished within this many '
+      + 'days, so it is a promise you can make about the next one — where an average is a '
+      + 'figure most work beats and a sixth of it misses badly. Watch the gap between this '
+      + 'line and the average: a wide gap means the work is unpredictable even when it is '
+      + 'quick on a good day, and predictability is usually worth more to whoever is asking '
+      + 'than speed. It is a real duration some item actually took, never an interpolation.' },
   wip: { title: 'Work in progress',
     body: 'How much work is open at once? Counted at the end of each period from the same '
       + 'start and completion dates as everything else, so it is a history rather than just '
@@ -2816,7 +2805,6 @@ function renderDashboard() {
   setTitle('titleThroughput',     d.titles.throughput,     'throughput');
   setTitle('titleNetFlow',        d.titles.netFlow,        'netFlow');
   setTitle('titleLeadTime',       d.titles.leadTime,       'leadTime');
-  setTitle('titleFlowEfficiency', d.titles.flowEfficiency, 'flowEfficiency');
   setTitle('titleWip',            d.titles.wip,            'wip');
   setTitle('titleAgedWork',       d.titles.agedWork,       'agedWork');
 
@@ -2824,10 +2812,13 @@ function renderDashboard() {
      headline tiles above stay as they are — eight in one row would push every
      chart below the fold. */
   $('tilesFlow').innerHTML =
+    tile(d.cyclePercentile + 'th percentile ' + (state.settings.cycleTimeLabel || 'cycle time').toLowerCase(),
+      s.p85CycleTime == null ? '—' : num1(s.p85CycleTime),
+      d.cyclePercentile + '% of items finished within this'
+        + (s.medianCycleTime == null ? '' : '; half within ' + num1(s.medianCycleTime)),
+      'cycleTimePercentile') +
     tile('Avg lead time', s.avgLeadTime == null ? '—' : num1(s.avgLeadTime),
-      'days from raised to delivered', 'leadTime') +
-    tile('Flow efficiency', s.flowEfficiency == null ? '—' : pct1(s.flowEfficiency),
-      'share of that time actually in progress', 'flowEfficiency');
+      'days from raised to delivered', 'leadTime');
 
   /* "As of" rather than a period, because both of these are a state read at one
      moment — the newest date in the data, like every other window here. */
@@ -2990,7 +2981,7 @@ TABS.forEach(t => {
    to which group is listed here rather than read from the DOM, because the
    resize on reveal has to know before the panel is measurable. */
 const CHART_GROUPS = {
-  flow:     ['chartCycleTime', 'chartLeadTime', 'chartFlowEfficiency'],
+  flow:     ['chartCycleTime', 'chartLeadTime'],
   delivery: ['chartThroughput', 'chartNetFlow'],
   health:   ['chartWip', 'chartAgedWork', 'chartDefectRate']
 };
