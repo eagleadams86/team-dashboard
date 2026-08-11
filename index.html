@@ -4,7 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Flow Metrics · Charlie’s Epic Flow Clinic</title>
-<link rel="icon" href="favicon.ico">
+<!-- The mark is what the app measures: three weeks of flow side by side, one of them
+     a good week. It's the family tile Money Map, PAPTrack and Sprint Predictability
+     wear — midnight page, soft disc in the corner, one gradient stroke in the accent.
+     The SVG is what every current browser shows; favicon.ico is the fallback a
+     browser fetches from the site root on its own, and what a bookmark uses. The two
+     are the same picture — make_favicon.py draws this geometry — so keep them in
+     step. img-src allows data: URIs, so the SVG costs no extra request. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'> <defs><linearGradient id='g' x1='10' y1='52' x2='54' y2='12' gradientUnits='userSpaceOnUse'> <stop offset='0' stop-color='%23818cf8'/><stop offset='1' stop-color='%23a5b4fc'/></linearGradient></defs> <rect width='64' height='64' rx='14' fill='%230a0e1a'/> <circle cx='14' cy='52' r='20' fill='%23141c33'/> <path d='M18 30V46M32 18V46M46 25V46' fill='none' stroke='url(%23g)' stroke-width='8' stroke-linecap='round'/> </svg>">
+<link rel="alternate icon" href="favicon.ico?v=1">
 <!--
   Locked down to what the app actually uses: scripts from this origin, Firebase's
   CDN and Google's sign-in client; network calls only to the endpoints sync
@@ -279,6 +287,15 @@ header { position: sticky; top: 0; z-index: 20; background: var(--surface);
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .brand { font-size: 17px; font-weight: 700; letter-spacing: -.01em; margin: 0; }
 .brand span { color: var(--text-muted); font-weight: 500; }
+/* The mark from the browser tab, worn in the header too. Width and height are on
+   the element, not just in CSS, so the row is laid out at its final size before the
+   icon arrives — same final-width rule as everything else in this row.
+   The icon sits in the text's own flow (Money Map makes .brand a flex row instead;
+   don't copy that here). This brand line wraps on a phone, and as flex items the
+   title and the "· Charlie's Epic…" span become two columns — the subtitle then
+   wraps inside a narrow one beside the title rather than running on below it.
+   Mirrored in Sprint Predictability. */
+.brand img { width: 22px; height: 22px; vertical-align: middle; margin-right: 9px; }
 /* The link to the sibling app sits with the title, so it — not .brand — carries the
    auto margin that pushes the control cluster to the right edge. An <a> is inline, and
    .btn.small pins its height with min-height, which inline boxes ignore: hence
@@ -622,7 +639,11 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
      taken away only when sync genuinely can't run. -->
 <header>
   <div class="headbar">
-    <h1 class="brand">Flow&nbsp;Metrics <span>· Charlie’s Epic Flow Clinic</span></h1>
+    <!-- ?v= is not decoration: a browser holds on to a favicon for a long time, and
+         without it the header would keep showing whatever icon it cached the first
+         time. Bump it on both references whenever make_favicon.py is re-run. -->
+    <h1 class="brand"><img src="favicon.ico?v=1" width="22" height="22" alt=""
+      >Flow&nbsp;Metrics <span>· Charlie’s Epic Flow Clinic</span></h1>
     <!-- A real <a>, not a button that navigates: ⌘-click, middle-click and "open in
          new tab" all keep working, and it needs no script. It stays visible in a
          shared view — it's navigation, not an edit control. The sibling app carries

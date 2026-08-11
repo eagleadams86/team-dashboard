@@ -622,7 +622,14 @@ average bug rate in the defect rate chart title. Change the maths and the suite 
 | `privacy.html` | Privacy policy — exists because other people may sign in |
 | `firestore.rules` | Checked-in copy of the deployed security rules |
 | `.github/workflows/tests.yml` | Runs `tests.html` headless on every push |
-| `favicon.ico` | Tab icon |
+| `favicon.ico` | Tab icon — the fallback a browser fetches from the site root on its own |
+| `make_favicon.py` | Draws `favicon.ico` to match the inline SVG icon in `index.html` |
+
+The icon is three weeks of flow side by side, on the midnight tile the whole app family
+wears; the header shows the same mark. `make_favicon.py` (Pillow) keeps `favicon.ico` and
+the page's inline SVG the same picture, rather than leaving a binary nobody can review in a
+diff. Re-run it with `python3 make_favicon.py`, then bump the `?v=` on every `favicon.ico`
+reference — browsers hold on to an icon for a long time.
 
 Four themes — Midnight (default), Dark, Light, Sepia — from the shared theme pack. Palette
 changes belong in the pack, not here. 
