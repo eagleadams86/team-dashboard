@@ -713,6 +713,108 @@ async function run(TD, win) {
   is(dIntake.defectCreatedRate[2], 1, 'one defect raised against one item completed is 100%');
 
   /* ══════════════════════════════════════════════════════════
+     Work in progress and aged work — reconstructed history.
+
+     These are the only metrics read at a point in time rather than counted over
+     a span, and the sweep that computes them is the least obvious code in the
+     file. So the main assertion is equivalence against the definition written
+     out longhand, rather than against numbers worked out by hand.
+     ══════════════════════════════════════════════════════════ */
+  group('work in progress and aged work');
+
+  /* The definition, stated as plainly as possible. Slow, obviously correct, and
+     the thing the fast version has to agree with. */
+  const wipBrute = (rows, points) => points.map(p =>
+    rows.filter(r => r.started && r.started <= p && (!r.completed || r.completed > p)).length);
+  const agedBrute = (rows, points, days) => points.map(p =>
+    rows.filter(r => r.started && r.started <= p && (!r.completed || r.completed > p) &&
+      (p - r.started) / 86400000 > days).length);
+
+  /* A hand-built case first, so a failure above has something to compare to.
+     Two items open on 10 Jan; one closes on the 12th. */
+  const wRows = [
+    { started: D(2015, 1, 5),  completed: D(2015, 1, 12), type: 'Story' },
+    { started: D(2015, 1, 8),  completed: null,           type: 'Story' },
+    { started: D(2015, 1, 20), completed: D(2015, 1, 25), type: 'Story' },
+    { started: null,           completed: D(2015, 1, 9),  type: 'Story' }
+  ];
+  const wPoints = [D(2015, 1, 4), D(2015, 1, 10), D(2015, 1, 15), D(2015, 1, 22), D(2015, 1, 26)];
+  is(TD.openCounts(wRows, wPoints), [0, 2, 1, 2, 1], 'work in progress at five points in time');
+  is(TD.openCounts(wRows, wPoints), wipBrute(wRows, wPoints), 'and the sweep matches the definition');
+  ok(!wRows.some(r => !r.started && r.completed && false),
+     'an item with a completion but no start is finished work, not work in progress');
+
+  /* Equivalence over the real 141-item sample, at every grouping. This is the
+     assertion that actually protects the sweep. */
+  ['week', 'fortnight', 'month'].forEach(b => {
+    const g = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: b });
+    /* Rebuild the evaluation points the same way derive does: each period's last
+       day, clamped to the end of the data. */
+    let cur = TD.bucketStart(new Date(Math.min.apply(null,
+      p.rows.filter(r => r.completed).map(r => r.completed.getTime()))), b);
+    const points = [];
+    for (let i = 0; i < g.buckets.length; i++) {
+      const end = TD.bucketEnd(cur, b);
+      points.push(new Date(Math.min(end.getTime(), g.endDate.getTime())));
+      cur = TD.nextBucket(cur, b);
+    }
+    is(g.wip, wipBrute(p.rows, points), 'work in progress matches the definition, grouped by ' + b);
+    [0, 1, 14, 1000].forEach(days => {
+      const gd = TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { agedDays: days || 1 }),
+        { filterValue: '', months: 'all', bucket: b });
+      is(gd.agedCount, agedBrute(p.rows, points, days || 1),
+         'aged work matches the definition at ' + (days || 1) + ' days, grouped by ' + b);
+    });
+  });
+
+  /* The threshold is exclusive: an item exactly N days old is due today, not
+     yet overdue. */
+  const ageEdge = [{ started: D(2015, 1, 1), completed: null, type: 'Story' }];
+  is(TD.agedCounts(ageEdge, [D(2015, 1, 15)], 14, [1]), [0],
+     'an item exactly 14 days old is not yet aged');
+  is(TD.agedCounts(ageEdge, [D(2015, 1, 16)], 14, [1]), [1], 'at 15 days it is');
+
+  /* Bad data must not produce a negative count. */
+  const backwardsRow = [{ started: D(2015, 1, 20), completed: D(2015, 1, 10), type: 'Story' }];
+  ok(TD.openCounts(backwardsRow, [D(2015, 1, 15), D(2015, 1, 25)]).every(v => v >= 0),
+     'a completion before its start never drives work in progress negative',
+     JSON.stringify(TD.openCounts(backwardsRow, [D(2015, 1, 15), D(2015, 1, 25)])));
+
+  /* The clamp to the end of the data is what makes the last point of each
+     series equal its tile — without it the final period's end runs into the
+     future and ages every open item for free. */
+  const dW = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: 'month' });
+  is(dW.wip[dW.wip.length - 1], dW.summary.currentWip,
+     'the last work-in-progress bar is the figure on the tile');
+  is(dW.agedCount[dW.agedCount.length - 1], dW.summary.agedNow,
+     'and the last aged bar is the aged tile');
+  is(dW.summary.asOf, dW.endDate, 'both are "as of" the newest date in the data');
+
+  /* The threshold is a setting, and derive must default it rather than trusting
+     the caller — SAMPLE_SETTINGS predates it. */
+  is(dW.agedDays, 14, 'the aged threshold defaults to 14 days when the settings predate it');
+  is(TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { agedDays: 30 }),
+     { filterValue: '', months: 'all' }).agedDays, 30, 'and is used when set');
+  ok(TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { agedDays: 30 }),
+       { filterValue: '', months: 'all' }).agedCount
+     .every((v, i) => v <= TD.derive(p.rows, SAMPLE_SETTINGS,
+       { filterValue: '', months: 'all' }).agedCount[i]),
+     'a longer threshold can only ever count fewer items as aged');
+
+  /* The coaching ratio: work in progress against a month of throughput. */
+  ok(dW.summary.monthlyThroughput > 0, 'a month of throughput is counted for the ratio',
+     String(dW.summary.monthlyThroughput));
+  near(dW.summary.wipRatio, dW.summary.currentWip / dW.summary.monthlyThroughput,
+       'the WIP ratio is work in progress over that month');
+  /* The data ends on a start date months after the last completion, so the
+     trailing month genuinely holds no throughput to divide by. */
+  is(TD.derive([
+     { started: D(2015, 1, 5), completed: D(2015, 1, 6), type: 'Story' },
+     { started: D(2015, 6, 1), completed: null, type: 'Story' }
+   ], SAMPLE_SETTINGS, { filterValue: '', months: 'all' }).summary.wipRatio, null,
+     'no throughput in the last month means no ratio, not infinity');
+
+  /* ══════════════════════════════════════════════════════════
      Column detection. A real Jira export leads with an issue key and orders
      the dates however it likes, so the columns are worked out from the data.
      Getting this wrong silently corrupts every metric.

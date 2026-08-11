@@ -735,6 +735,10 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
           <label for="setUnplannedLabel">Word to use for defects on charts</label>
           <input type="text" id="setUnplannedLabel" placeholder="Bugs">
         </div>
+        <div>
+          <label for="setAgedDays">Count an in-progress item as aged after (days)</label>
+          <input type="number" id="setAgedDays" step="1" min="1" placeholder="14">
+        </div>
       </div>
       <div class="note info" style="margin-top:var(--sp-6)">
         Anything whose Type is blank, or doesn't match the defect text above, counts as
@@ -885,7 +889,19 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
       </div>
 
       <div class="grid charts" id="spanel-health" role="tabpanel" aria-labelledby="stab-health" hidden>
+        <div class="tiles group" id="tilesHealth"></div>
+
         <div class="chart-card">
+          <div class="chart-title" id="titleWip"></div>
+          <div class="chart-wrap"><canvas id="chartWip"></canvas></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title" id="titleAgedWork"></div>
+          <div class="chart-wrap"><canvas id="chartAgedWork"></canvas></div>
+        </div>
+
+        <div class="chart-card wide">
           <div class="chart-title" id="titleDefectRate"></div>
           <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
         </div>
@@ -1583,6 +1599,68 @@ function linearTrend(values) {
 
 function mean(a) { return a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0; }
 
+/* How many items were open at each point in time — started by then, and either
+   never finished or finished after it. Reconstructed from the same two dates
+   every other metric uses, so work in progress is a history rather than just
+   today's number.
+
+   A sweep rather than a scan per point: the enters and exits are sorted once
+   and two pointers walk forward, because evalPoints ascends. One render is
+   fast either way at this size; the reason to prefer it is that it's a pure
+   function that can be pinned against the brute-force definition in tests. */
+function openCounts(items, evalPoints) {
+  const enters = [], exits = [];
+  for (const r of items) {
+    /* No start date means no evidence it was ever open. An item with only a
+       completion is finished work with an unknown start, not work in progress. */
+    if (!r.started) continue;
+    enters.push(r.started.getTime());
+    /* Clamped so a row whose completion precedes its start — bad data, but it
+       reaches us — can never exit before it enters and drive the count below 0. */
+    if (r.completed) exits.push(Math.max(r.completed.getTime(), r.started.getTime()));
+  }
+  enters.sort((a, b) => a - b);
+  exits.sort((a, b) => a - b);
+  let i = 0, j = 0;
+  return evalPoints.map(p => {
+    const t = p.getTime();
+    while (i < enters.length && enters[i] <= t) i++;
+    while (j < exits.length && exits[j] <= t) j++;
+    return i - j;
+  });
+}
+
+/* How many of those had been open longer than thresholdDays at each point.
+   The condition is two-dimensional — started early enough AND still open — which
+   no single sorted array answers. The identity that makes it cheap:
+
+     aged(t) = open(t) − those that started within the last `threshold` days
+
+   and that subtracted set only ever spans a threshold-wide window of starts, so
+   it stays small however long the history is. Takes the open counts rather than
+   recomputing them, so the two series can never disagree. */
+function agedCounts(items, evalPoints, thresholdDays, wip) {
+  const open = items.filter(r => r.started)
+    .map(r => ({
+      s: r.started.getTime(),
+      e: r.completed ? Math.max(r.completed.getTime(), r.started.getTime()) : Infinity
+    }))
+    .sort((a, b) => a.s - b.s);
+  let lo = 0, hi = 0;
+  return evalPoints.map((p, k) => {
+    const t = p.getTime(), cut = t - thresholdDays * DAY_MS;
+    while (hi < open.length && open[hi].s <= t) hi++;
+    /* `<` not `<=`, so an item started exactly `threshold` days ago still counts
+       as young: its age equals the threshold, and aged means older *than* it.
+       With `<=` such an item dropped out of the young window and was reported
+       aged a day early. */
+    while (lo < open.length && open[lo].s < cut) lo++;
+    let young = 0;
+    for (let n = lo; n < hi; n++) if (open[n].e > t) young++;
+    return wip[k] - young;
+  });
+}
+
 /**
  * @param rows      [{completed: Date, started: Date|null, type: string}]
  * @param settings  {sameDayValue, unplannedType, unplannedLabel, cycleTimeLabel}
@@ -1597,6 +1675,10 @@ function derive(rows, settings, view) {
      a test fixture written before buckets existed — still means "weekly". */
   const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
   const noun   = BUCKET_NOUNS[bucket];
+  /* Defaulted here too, for the same reason: a settings object saved before
+     aged work existed must still mean the documented 14 days. */
+  const agedDays = Number(settings.agedDays) > 0
+    ? Number(settings.agedDays) : DEFAULT_SETTINGS.agedDays;
 
   /* Rows whose type doesn't match the filter drop out entirely. Note the filter
      is on work type only — the date window below never removes rows. */
@@ -1757,6 +1839,24 @@ function derive(rows, settings, view) {
       ? null : (defectsRaised.get(key) || 0) / done.length);
   }
 
+  /* Work in progress and aged work are states, not events: they're read at a
+     point in time rather than counted over a span. Each period is read at its
+     last day — clamped to the end of the data, because the final period usually
+     runs past it and letting the clock tick into the future would age every
+     open item a few days for free. The clamp is also what makes the last point
+     of each series equal its tile exactly, which is what "as of" promises. */
+  const evalPoints = weekStarts.map(b =>
+    new Date(Math.min(bucketEnd(b, bucket).getTime(), endDate.getTime())));
+  const wip = openCounts(items, evalPoints);
+  const agedCount = agedCounts(items, evalPoints, agedDays, wip);
+
+  /* The coaching rule this exists to serve compares work in progress against a
+     month's throughput, so the denominator is a month however the charts are
+     grouped — counting back from the newest date in the data, like every other
+     relative window here. */
+  const monthAgo = edate(endDate, -1);
+  const monthlyThroughput = finished.filter(r => r.completed > monthAgo && r.completed <= endDate).length;
+
   const cycleLabel = settings.cycleTimeLabel || 'Cycle time';
 
   /* The last bucket usually stops part-way through: the data ends on a Tuesday,
@@ -1782,6 +1882,7 @@ function derive(rows, settings, view) {
     bucket, bucketNoun: noun, bucketNounPlural: noun + 's', partial,
     throughput, unplannedRate, avgCycleTime, netFlow,
     avgLeadTime, flowEfficiency, defectCreatedRate,
+    wip, agedCount, agedDays,
     hasCreated, createdCoverage: items.length ? withCreated / items.length : 0,
     /* Window-wide figures for the summary tiles. avgCycleTime here is the mean
        over the pooled cycle times (per item), not over the per-bucket means —
@@ -1794,7 +1895,15 @@ function derive(rows, settings, view) {
       avgLeadTime: windowLeads.length ? mean(windowLeads) : null,
       /* Pooled over the whole window for the same reason it is pooled per
          bucket — the average of a set of ratios is not the ratio of the set. */
-      flowEfficiency: effLeadTotal > 0 ? Math.min(1, effCycleTotal / effLeadTotal) : null
+      flowEfficiency: effLeadTotal > 0 ? Math.min(1, effCycleTotal / effLeadTotal) : null,
+      currentWip: wip.length ? wip[wip.length - 1] : 0,
+      agedNow: agedCount.length ? agedCount[agedCount.length - 1] : 0,
+      asOf: endDate,
+      monthlyThroughput,
+      /* Null rather than Infinity when nothing was finished in the last month —
+         there is no ratio to state, and "∞×" is not a figure anyone can act on. */
+      wipRatio: monthlyThroughput > 0
+        ? (wip.length ? wip[wip.length - 1] : 0) / monthlyThroughput : null
     },
     itemCount: items.length,
     inProgressCount: items.length - finished.length,
@@ -1808,7 +1917,9 @@ function derive(rows, settings, view) {
       throughput: 'Items completed per ' + noun,
       netFlow: 'Net flow per ' + noun + ' (items completed − items started)',
       leadTime: 'Average lead time per ' + noun + ' (raised to delivered)',
-      flowEfficiency: 'Flow efficiency per ' + noun + ' (working time ÷ total time)'
+      flowEfficiency: 'Flow efficiency per ' + noun + ' (working time ÷ total time)',
+      wip: 'Work in progress at the end of each ' + noun,
+      agedWork: 'Items in progress longer than ' + agedDays + ' days'
     },
     axisTitles: {
       /* Deliberately short: a rotated axis title gets truncated on a narrow
@@ -1819,6 +1930,8 @@ function derive(rows, settings, view) {
       netFlow: 'Items completed − items started',
       leadTime: 'Lead time (days)',
       flowEfficiency: 'Share of lead time in progress',
+      wip: 'Items open at period end',
+      agedWork: 'Items older than ' + agedDays + ' days',
       x: bucket === 'month' ? 'Month'
         : bucket === 'fortnight' ? 'Year-Fortnight (week numbers)'
         : 'Year-Week Number'
@@ -1831,7 +1944,7 @@ window.TD = {
   weekdayNum, priorSunday, weekNumber, weekKey, edate,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats,
-  cycleTimeOf, leadTimeOf, linearTrend, derive, utcDate
+  cycleTimeOf, leadTimeOf, linearTrend, openCounts, agedCounts, derive, utcDate
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1842,6 +1955,9 @@ const DEFAULT_SETTINGS = {
   sameDayValue: 0.5,
   unplannedType: 'Bug',
   unplannedLabel: 'Bugs',
+  /* Two weeks. The usual coaching starting point, and short enough that a board
+     with a real ageing problem shows it. */
+  agedDays: 14,
   cycleTimeLabel: 'Cycle time',
   filters: [
     { display: 'All',  value: 'All' },
@@ -1945,6 +2061,10 @@ function normalizeSettings(raw) {
   delete s.plannedLabel;
   const n = Number(s.sameDayValue);
   s.sameDayValue = Number.isFinite(n) && n >= 0 ? n : DEFAULT_SETTINGS.sameDayValue;
+  /* Must be positive: a threshold of 0 would call everything open aged, and a
+     negative one is meaningless. */
+  const a = Number(s.agedDays);
+  s.agedDays = Number.isFinite(a) && a > 0 ? a : DEFAULT_SETTINGS.agedDays;
   return s;
 }
 
@@ -2413,6 +2533,53 @@ function drawCharts(d) {
     });
   }
 
+  /* ── Work in progress, and how much of it has gone stale ──
+     Both are a state read at each period's end rather than a count over it, so
+     they're plotted as bars: a line implies a value between the points, and
+     there isn't one. */
+  const wipOpts = baseOptions(d.axisTitles.wip, int0, null, d.axisTitles.x, d.partial);
+  wipOpts.scales.y.beginAtZero = true;
+  wipOpts.scales.y.ticks.precision = 0;
+  renderChart('chartWip', {
+    type: 'bar',
+    data: {
+      labels: d.bucketLabels,
+      datasets: [{
+        label: 'Work in progress',
+        data: d.wip,
+        backgroundColor: tint(accent, 0.68),
+        borderColor: accent,
+        borderWidth: 1.5,
+        order: 1
+      }, trendDataset(d.wip)]
+    },
+    options: wipOpts
+  });
+
+  const agedOpts = baseOptions(d.axisTitles.agedWork, int0, null, d.axisTitles.x, d.partial);
+  agedOpts.scales.y.beginAtZero = true;
+  agedOpts.scales.y.ticks.precision = 0;
+  renderChart('chartAgedWork', {
+    type: 'bar',
+    data: {
+      labels: d.bucketLabels,
+      /* Accent, not --serious. Orange would read as a warning, and this app
+         states figures rather than judging them — the threshold is one you set,
+         not a target it holds you to. It would also be a third meaning for that
+         colour on one dashboard, after "net flow below zero" and "defects
+         raised". */
+      datasets: [{
+        label: 'Aged items',
+        data: d.agedCount,
+        backgroundColor: tint(accent, 0.68),
+        borderColor: accent,
+        borderWidth: 1.5,
+        order: 1
+      }, trendDataset(d.agedCount)]
+    },
+    options: agedOpts
+  });
+
   /* A canvas is a bitmap to a screen reader — give each chart its title as a
      text alternative. The full series stays reachable as text in the Your Data
      tab's table, which the label points at. */
@@ -2428,6 +2595,8 @@ function drawCharts(d) {
   describe('chartCycleTime',  d.titles.cycleTime);
   describe('chartThroughput', d.titles.throughput);
   describe('chartNetFlow',    d.titles.netFlow);
+  describe('chartWip',       d.titles.wip);
+  describe('chartAgedWork',  d.titles.agedWork);
   if (d.hasCreated) {
     describe('chartLeadTime',       d.titles.leadTime);
     describe('chartFlowEfficiency', d.titles.flowEfficiency);
@@ -2492,7 +2661,22 @@ const METRIC_HELP = {
       + 'Note this is a fair approximation, not the textbook measure: a true flow efficiency '
       + 'needs the time an item spent in each individual status, which a plain Jira export '
       + 'does not carry. It counts everything between start and finish as working time, so '
-      + 'it reads high when work sits blocked mid-flight.' }
+      + 'it reads high when work sits blocked mid-flight.' },
+  wip: { title: 'Work in progress',
+    body: 'How much work is open at once? Counted at the end of each period from the same '
+      + 'start and completion dates as everything else, so it is a history rather than just '
+      + 'today’s number. The common coaching rule is to keep work in progress under half '
+      + 'a month’s throughput, and nearer a quarter for most teams — the WIP vs throughput '
+      + 'tile states that ratio. It is a rule of thumb, not a target this app holds you to, '
+      + 'which is why nothing here turns a colour when you cross it. Less work in progress '
+      + 'means shorter cycle times, for the same reason a shorter queue moves faster.' },
+  agedWork: { title: 'Aged work',
+    body: 'How many open items have been open too long? Anything still in progress beyond the '
+      + 'threshold in Settings — two weeks by default, and worth keeping under a month. Read '
+      + 'as of the newest date in your data rather than today, so a paste of last quarter’s '
+      + 'export reports that quarter. One caveat: the clean-up tool’s option to also remove '
+      + 'unfinished items deletes long-running work in progress, which is exactly what this '
+      + 'chart counts, so history before a clean-up like that will read low.' }
 };
 
 function helpBtn(key, label) {
@@ -2631,6 +2815,8 @@ function renderDashboard() {
   setTitle('titleNetFlow',        d.titles.netFlow,        'netFlow');
   setTitle('titleLeadTime',       d.titles.leadTime,       'leadTime');
   setTitle('titleFlowEfficiency', d.titles.flowEfficiency, 'flowEfficiency');
+  setTitle('titleWip',            d.titles.wip,            'wip');
+  setTitle('titleAgedWork',       d.titles.agedWork,       'agedWork');
 
   /* The Flow group's own tiles, beside the charts that expand them. The four
      headline tiles above stay as they are — eight in one row would push every
@@ -2640,6 +2826,16 @@ function renderDashboard() {
       'days from raised to delivered', 'leadTime') +
     tile('Flow efficiency', s.flowEfficiency == null ? '—' : pct1(s.flowEfficiency),
       'share of that time actually in progress', 'flowEfficiency');
+
+  /* "As of" rather than a period, because both of these are a state read at one
+     moment — the newest date in the data, like every other window here. */
+  $('tilesHealth').innerHTML =
+    tile('Work in progress', String(s.currentWip),
+      'open items as of ' + prettyDate(s.asOf), 'wip') +
+    tile('WIP vs throughput', s.wipRatio == null ? '—' : num1(s.wipRatio) + '×',
+      'against ' + s.monthlyThroughput + ' completed in the last month', 'wip') +
+    tile('Aged work', String(s.agedNow),
+      'in progress over ' + d.agedDays + ' days', 'agedWork');
 
   drawCharts(d);
   /* The panels' hidden state lives in the markup, so re-apply the chosen group
@@ -2717,6 +2913,7 @@ function renderSettingsForm() {
   $('setCycleLabel').value     = state.settings.cycleTimeLabel;
   $('setUnplannedType').value     = state.settings.unplannedType;
   $('setSameDay').value        = state.settings.sameDayValue;
+  $('setAgedDays').value       = state.settings.agedDays;
   $('setUnplannedLabel').value = state.settings.unplannedLabel;
   renderFilterRows();
 }
@@ -2793,7 +2990,7 @@ TABS.forEach(t => {
 const CHART_GROUPS = {
   flow:     ['chartCycleTime', 'chartLeadTime', 'chartFlowEfficiency'],
   delivery: ['chartThroughput', 'chartNetFlow'],
-  health:   ['chartDefectRate']
+  health:   ['chartWip', 'chartAgedWork', 'chartDefectRate']
 };
 const CHART_TABS = Object.keys(CHART_GROUPS);
 
@@ -3030,9 +3227,12 @@ $('bucketSel').addEventListener('change', e => {
 });
 
 /* settings — shared by every team */
+/* Coerced to a number on the way in; everything else is free text. */
+const NUMERIC_SETTINGS = new Set(['sameDayValue', 'agedDays']);
 const SETTING_INPUTS = {
   setCycleLabel: 'cycleTimeLabel', setUnplannedType: 'unplannedType',
-  setSameDay: 'sameDayValue', setUnplannedLabel: 'unplannedLabel'
+  setSameDay: 'sameDayValue', setUnplannedLabel: 'unplannedLabel',
+  setAgedDays: 'agedDays'
 };
 /* Every keystroke here tears down and rebuilds every chart. That was tolerable
    at four; it is not once a group holds several. The save stays immediate — only
@@ -3040,7 +3240,8 @@ const SETTING_INPUTS = {
 let settingsRedrawTimer = null;
 Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
   $(id).addEventListener('input', e => {
-    state.settings[key] = key === 'sameDayValue' ? (parseFloat(e.target.value) || 0) : e.target.value;
+    state.settings[key] = NUMERIC_SETTINGS.has(key)
+      ? (parseFloat(e.target.value) || 0) : e.target.value;
     save();
     clearTimeout(settingsRedrawTimer);
     settingsRedrawTimer = setTimeout(() => { renderDataTable(); renderDashboard(); }, 150);

@@ -17,7 +17,7 @@ so the measures that move together are read together:
 |---|---|---|
 | **Flow** — how long work takes | How long does an item take, and how much of that was waiting? | Cycle time; lead time; flow efficiency |
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started) |
-| **Health** — the state of the board | How much of what we finish is defect work? | Defect rate — defects resolved, and defects raised, against everything completed |
+| **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; defect rate — defects resolved and defects raised |
 
 **Group by week, 2 weeks or month.** The control sits beside the date window on the dashboard.
 Weekly is the default and the finest grain; monthly smooths out the lumpiness that makes a
@@ -56,7 +56,7 @@ still laid out by `auto-fit`.
 Each team keeps its own list of work items; the picker in the header chooses which one the
 dashboard is showing. Add, rename and delete teams from the **Teams** button beside that
 picker — a dialog, the same shape as the sibling app's Teams & PIs. Settings are shared by
-every team — one place to say what "unplanned" means.
+every team — one place to say what a "defect" is.
 
 The picker only appears once there are **two or more** teams: with one team it is not a
 choice. It is part of a wider rule — nothing shows until there is something behind it, so a
@@ -117,6 +117,8 @@ Everything the charts depend on, shared by all your teams:
 
 - **Defect work type** — the exact text in your Type column that means "defect"
   (`Bug` by default). Anything blank, or not matching, counts as ordinary planned work.
+- **Aged after (days)** — how long an item can sit in progress before the Aged work chart
+  counts it (`14` by default; worth keeping under a month).
 - **Same-day cycle time** — what an item that starts and finishes on one day is worth
   (`0.5` days)
 - **Word for defects on charts** (`Bugs` by default) and the **word for cycle time**
@@ -125,6 +127,20 @@ Everything the charts depend on, shared by all your teams:
   and `Bugs → Bug` out of the box
 
 Nothing else is here on purpose: a setting that changes nothing is worse than a missing one.
+
+## What isn't here, and why
+
+**Blocked time** — how long an item couldn't move because something was in its way. A plain
+Jira export doesn't carry it: "Flagged" is a state, not a duration, and reconstructing the
+duration needs the issue's status history. To add it you'd need a **Time in Status** export —
+one row per issue per status with entry and exit timestamps, or per-status day totals — plus a
+mapping of which statuses count as blocked. That's a second paste surface and a status-category
+setting, so it's deliberately out of scope rather than half-built. The same export would turn
+flow efficiency from the approximation described above into the real measure.
+
+**Value delivered** and **story readiness** need data that doesn't exist in a flow export at
+all — business outcomes, and how often a story was rewritten after being picked up. Neither is
+derivable from dates.
 
 ### Settings you've already saved keep winning
 
@@ -205,6 +221,25 @@ worth knowing:
 - **A created date alone is not enough to keep a row.** An item raised and never picked up is
   backlog, not flow; counting it would make the intake series track grooming rather than work.
   The rule is unchanged: no completion and no start, no row.
+- **Work in progress and aged work are states, not counts.** Every other metric counts events
+  over a period; these two are read at a single moment — each period's last day — and
+  reconstructed from the same start and completion dates as everything else, so you get a
+  history rather than just today's number. That's also why they're drawn as bars: a line
+  between two readings would imply a value in between, and there isn't one.
+- **The reading point is clamped to the end of your data.** The last period usually runs past
+  it, and letting the clock tick into the future would age every open item a few days for
+  free. The clamp is also what makes the last bar of each series equal the tile above it.
+- **Aged means older *than* the threshold.** An item exactly 14 days old is due today, not
+  overdue.
+- **The WIP-vs-throughput ratio** compares work in progress against a month's completions,
+  however the charts are grouped. The coaching rule is to keep it under 0.5, nearer 0.25 for
+  most teams — that lives in the ⓘ text and nowhere else. Nothing turns a colour when you
+  cross it, because this app states figures rather than grading them, and a rule of thumb from
+  a coaching email is not a target you set.
+- **One caveat on aged work:** the clean-up tool's option to *also remove unfinished items*
+  deletes long-running work in progress, which is exactly what this chart counts. History
+  before a clean-up like that will read low. Removing completed items — the normal case —
+  doesn't affect it, because those had already left the board.
 - **Unfinished items count as work started, and nothing else.** They move net flow but add
   nothing to throughput, the bug rate or the cycle-time average, all three of which key off
   a completion. Dropping them — which an earlier version did — made net flow read
