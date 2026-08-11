@@ -382,8 +382,10 @@ select { cursor: pointer; }
 @media (max-width: 940px) { .grid.charts { grid-template-columns: 1fr; } }
 /* A group with an odd number of charts leaves the last one half-width with dead
    space beside it. A time series reads well wide — unlike a tile — so it takes
-   the full row instead. No-op for an even group. */
-.grid.charts > .chart-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+   the full row instead. Marked in the markup rather than worked out with
+   :nth-child, which counts the group's tile row as a sibling and so gets the
+   parity wrong the moment a group has tiles. */
+.chart-card.wide { grid-column: 1 / -1; }
 
 /* dashboard controls strip */
 .controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;
@@ -802,11 +804,13 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 
     <div id="dashEmpty" class="card empty" hidden>
       <h2>No data yet</h2>
-      <p>Head to the <strong>Your Data</strong> tab and paste your work items — three columns:</p>
-      <pre>Completed Date   Start Date   Type
-2015-01-21       2015-01-14
-2015-01-26       2015-01-14   Bug
-2015-01-26       2015-01-21   Story</pre>
+      <p>Head to the <strong>Your Data</strong> tab and paste your work items — a completed
+      date, a start date and a type. Add a created date too and you get lead time and flow
+      efficiency as well:</p>
+      <pre>Created      Start Date   Completed    Type
+2015-01-02   2015-01-14   2015-01-21   Story
+2015-01-09   2015-01-14   2015-01-26   Bug
+2015-01-11   2015-01-21   2015-01-26   Story</pre>
     </div>
 
     <!-- Rows exist but nothing plots. Its own card, not #dashEmpty: that one
@@ -840,9 +844,31 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 
     <div id="dashCharts">
       <div class="grid charts" id="spanel-flow" role="tabpanel" aria-labelledby="stab-flow">
+        <div class="tiles group" id="tilesFlow"></div>
         <div class="chart-card">
           <div class="chart-title" id="titleCycleTime"></div>
           <div class="chart-wrap"><canvas id="chartCycleTime"></canvas></div>
+        </div>
+
+        <!-- Both of these need a created date, which an older paste won't have.
+             They hold a card either way rather than vanishing, so the answer to
+             "where is lead time?" is on screen instead of missing. -->
+        <div class="chart-card" id="cardLeadTime">
+          <div class="chart-title" id="titleLeadTime"></div>
+          <div class="chart-wrap"><canvas id="chartLeadTime"></canvas></div>
+          <div class="note info needs-created" hidden>
+            Add a <strong>Created</strong> column to your paste to see lead time — how long
+            work takes from being raised, not just from being started.
+          </div>
+        </div>
+
+        <div class="chart-card wide" id="cardFlowEfficiency">
+          <div class="chart-title" id="titleFlowEfficiency"></div>
+          <div class="chart-wrap"><canvas id="chartFlowEfficiency"></canvas></div>
+          <div class="note info needs-created" hidden>
+            Needs a <strong>Created</strong> column too — flow efficiency compares time spent
+            working on an item against the whole time it was waiting to be delivered.
+          </div>
         </div>
       </div>
 
@@ -1292,15 +1318,21 @@ function splitCsvLine(line) {
 
 function looksLikeHeader(cells) {
   const joined = cells.join(' ').toLowerCase();
-  return /complet|start|type|date|key|resolv|status/.test(joined) && !/\d{4}/.test(joined);
+  return /complet|start|type|date|key|resolv|status|creat/.test(joined) && !/\d{4}/.test(joined);
 }
 
 /* Header names are the strongest signal when they're there. "Created" is only
    accepted as a start date if nothing better matched — in a flow-metrics export
-   it usually is the start, but "In Progress" beats it whenever both exist. */
+   it usually is the start, but "In Progress" beats it whenever both exist.
+
+   That fallback is load-bearing and must not move: every paste made before lead
+   time existed is a Created/Resolved pair where Created IS the start proxy.
+   Adding a `created` role on top of it must leave those pastes computing the
+   same cycle times they always did — see detectColumns. */
 const HEADER_PATTERNS = {
   completed: [/complet|resolv|closed|done|finish/i, /end\s*date/i],
   started:   [/start|begin|in.?progress/i, /created/i],
+  created:   [/creat|raised|reported|logged|opened|submitted/i],
   type:      [/(issue\s*)?type|kind|category/i]
 };
 
@@ -1334,36 +1366,83 @@ function columnStats(rows, order) {
 }
 
 /**
- * Works out which column is which. Returns { completed, started, type },
+ * Works out which column is which. Returns { completed, started, created, type },
  * each a column index or -1.
+ *
+ * `started` and `created` can legitimately be the SAME index: an export with a
+ * Created column and no In Progress column is the two-column case every paste
+ * made before lead time existed is in, and there Created is the start proxy.
+ * Cycle time keeps working; lead time comes out equal to it, which is honest,
+ * and the parse note says so.
  */
 function detectColumns(rows, header, order) {
   const stats = columnStats(rows, order);
+  /* Only the strict start patterns — "In Progress"/"Start"/"Begin" — so that a
+     Created column can be recognised as created first, and then fall back into
+     the started slot only if nothing better claimed it. */
+  const startedStrict = header
+    ? header.findIndex(h => /start|begin|in.?progress/i.test(String(h || ''))) : -1;
   const map = {
     completed: matchHeader(header, 'completed'),
-    started:   matchHeader(header, 'started'),
+    started:   startedStrict,
+    created:   -1,
     type:      matchHeader(header, 'type')
   };
-  const taken = () => [map.completed, map.started, map.type].filter(i => i >= 0);
+  const createdByHeader = matchHeader(header, 'created');
+  if (createdByHeader >= 0 && createdByHeader !== map.completed && createdByHeader !== map.started) {
+    map.created = createdByHeader;
+  }
+  /* The historic fallback, unchanged in effect: with no start column, Created
+     is the start. Both roles then point at the same index. */
+  if (map.started < 0 && map.created >= 0) map.started = map.created;
+
+  /* A Set, not a list: started and created may share an index, and a list would
+     make the type detector below think one more column was consumed than is. */
+  const taken = () => new Set([map.completed, map.started, map.created, map.type].filter(i => i >= 0));
 
   /* Columns that hold dates. 0.6 rather than 1.0 because a stray "in progress"
      or "-" in a date column shouldn't disqualify it. */
   const dateCols = stats.filter(s => s.filled && s.dateRate >= 0.6).map(s => s.index);
-  const freeDates = dateCols.filter(i => !taken().includes(i));
+  const freeDates = dateCols.filter(i => !taken().has(i));
 
-  if (map.completed < 0 && map.started < 0 && freeDates.length >= 2) {
-    const [a, b] = freeDates;
-    /* Which of the two is the completion? Not position — an export can put them
-       either way round. On rows where both are present, the completion is the
-       later one, because work finishes after it starts. */
+  /* On rows where both columns are present, how often does a finish after b?
+     Only rows with both are counted, so a sparse completion column — every WIP
+     row is blank — can't drag the comparison about. */
+  const laterVotes = (a, b) => {
     let aLater = 0, bLater = 0;
     for (const r of rows) {
       const da = parseDate(r[a], order), db = parseDate(r[b], order);
       if (!da || !db) continue;
       if (da > db) aLater++; else if (db > da) bLater++;
     }
-    if (bLater > aLater) { map.completed = b; map.started = a; }
-    else                 { map.completed = a; map.started = b; }
+    return [aLater, bLater];
+  };
+
+  if (map.completed < 0 && map.started < 0 && freeDates.length === 3) {
+    /* Three free date columns is the shape that carries a created date:
+       created ≤ started ≤ completed. Rank by how many of the others each beats
+       on the later-vote, rather than by position. */
+    const score = freeDates.map(i => ({
+      i, wins: freeDates.filter(j => j !== i && laterVotes(i, j)[0] > laterVotes(i, j)[1]).length
+    }));
+    score.sort((x, y) => y.wins - x.wins || x.i - y.i);
+    map.completed = score[0].i;
+    map.started   = score[1].i;
+    map.created   = score[2].i;
+  } else if (map.completed < 0 && map.started < 0 && freeDates.length >= 2) {
+    const [a, b] = freeDates;
+    /* Which of the two is the completion? Not position — an export can put them
+       either way round. On rows where both are present, the completion is the
+       later one, because work finishes after it starts.
+
+       Note what does NOT happen here: the earlier column is not read as a
+       created date. Two free date columns is the historic shape and keeps its
+       historic meaning, and with four or more one of them is probably a due or
+       updated date — reading that as Created would put a plausible wrong number
+       on the chart, where declining to guess just shows an empty state you can
+       fix by re-pasting. Always fail toward under-reading. */
+    if (laterVotes(a, b)[1] > laterVotes(a, b)[0]) { map.completed = b; map.started = a; }
+    else                                           { map.completed = a; map.started = b; }
   } else if (map.completed < 0 && freeDates.length) {
     map.completed = freeDates[0];
   } else if (map.started < 0 && freeDates.length) {
@@ -1377,7 +1456,7 @@ function detectColumns(rows, header, order) {
        perfectly normal type column and was being rejected. The 20 cap keeps a
        long free-text column (a summary, a reporter) out of it. */
     const candidates = stats.filter(s =>
-      s.filled && s.dateRate < 0.6 && !taken().includes(s.index) && s.distinct <= 20 &&
+      s.filled && s.dateRate < 0.6 && !taken().has(s.index) && s.distinct <= 20 &&
       /* Rejected only on positive evidence of being an identifier: every value
          distinct, over enough rows to mean something. Two rows of one type each
          are all-distinct too, and that is not grounds to throw the column away. */
@@ -1416,15 +1495,17 @@ function parsePastedRows(text, order) {
 
   const at = (cells, i) => (i >= 0 && cells[i] != null ? String(cells[i]).trim() : '');
 
-  const rows = [], badCompleted = [], badStarted = [];
-  let unfinished = 0, undated = 0;
+  const rows = [], badCompleted = [], badStarted = [], badCreated = [];
+  let unfinished = 0, undated = 0, createdAfterStarted = 0;
 
   raw.forEach((cells, i) => {
     const lineNo = i + 1 + (skippedHeader ? 1 : 0);
     const rawCompleted = at(cells, cols.completed);
     const rawStarted   = at(cells, cols.started);
+    const rawCreated   = at(cells, cols.created);
     const completed = parseDate(rawCompleted, resolved);
     const started   = parseDate(rawStarted, resolved);
+    const created   = parseDate(rawCreated, resolved);
     const type      = at(cells, cols.type);
 
     /* An empty completion date is not an error — it is work in progress, and it
@@ -1436,6 +1517,11 @@ function parsePastedRows(text, order) {
       return;
     }
     if (!started && rawStarted !== '') badStarted.push({ line: lineNo, text: cells.join(' | ') });
+    if (!created && rawCreated !== '') badCreated.push({ line: lineNo, text: cells.join(' | ') });
+    /* Work cannot start before it is raised. A row like that means the created
+       column was read off something else — a due date, an updated date — so the
+       count is reported rather than the rows being quietly kept. */
+    if (created && started && created > started) createdAfterStarted++;
 
     /* A row with neither date says nothing about flow — nothing to count. Not an
        error (an untouched backlog item is a normal thing to have in an export),
@@ -1444,10 +1530,11 @@ function parsePastedRows(text, order) {
     if (!completed && !started) { undated++; return; }
     if (!completed) unfinished++;
 
-    rows.push({ completed: completed || null, started: started || null, type });
+    rows.push({ completed: completed || null, started: started || null, created: created || null, type });
   });
 
-  return { rows, badCompleted, badStarted, unfinished, undated, skippedHeader, dateOrder: resolved, columns: cols };
+  return { rows, badCompleted, badStarted, badCreated, unfinished, undated, createdAfterStarted,
+           skippedHeader, dateOrder: resolved, columns: cols };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1463,6 +1550,16 @@ function parsePastedRows(text, order) {
 function cycleTimeOf(row, sameDayValue) {
   if (!row.completed || !row.started) return null;
   const days = diffDays(row.completed, row.started);
+  return Math.max(0, days === 0 ? sameDayValue : days);
+}
+
+/* Lead time in days: raised to delivered, where cycle time is started to
+   delivered. Structurally identical to cycleTimeOf on purpose — flow efficiency
+   divides one by the other, and two different conventions for "same day" or
+   "unmeasurable" would show up as a ratio nobody could explain. */
+function leadTimeOf(row, sameDayValue) {
+  if (!row.completed || !row.created) return null;
+  const days = diffDays(row.completed, row.created);
   return Math.max(0, days === 0 ? sameDayValue : days);
 }
 
@@ -1550,16 +1647,32 @@ function derive(rows, settings, view) {
     if (weekStarts.length > 1200) break;               /* runaway guard */
   }
 
-  /* Bucket once, read four times. */
+  /* Does this data carry created dates at all? Everything downstream of it —
+     lead time, flow efficiency, the defects-raised series — shows an empty
+     state rather than a wrong number when it doesn't. */
+  const withCreated = items.filter(r => r.created).length;
+  const hasCreated = withCreated > 0;
+
+  /* Bucket once, read many times. */
   const byCompletedWeek = new Map();   /* keyed on the bucket start */
   const byStartedWeek   = new Map();   /* keyed on the bucket start */
   const cycleByWeek     = new Map();   /* keyed on the bucket start too */
+  const leadByWeek      = new Map();   /* lead times, by completed bucket */
+  const effByWeek       = new Map();   /* [cycleTotal, leadTotal], pooled */
+  const defectsRaised   = new Map();   /* defects by the bucket they were RAISED in */
 
   for (const r of items) {
     /* Started counts every item that has a start date, finished or not. */
     if (r.started) {
       const sk = bucketKey(bucketStart(r.started, bucket), bucket);
       byStartedWeek.set(sk, (byStartedWeek.get(sk) || 0) + 1);
+    }
+    /* Intake keys off the created date, not the completion — a defect raised
+       this month counts this month even if it is still open, which is the whole
+       point of measuring what comes in against what goes out. */
+    if (r.created && isUnplanned(r)) {
+      const rk = bucketKey(bucketStart(r.created, bucket), bucket);
+      defectsRaised.set(rk, (defectsRaised.get(rk) || 0) + 1);
     }
     if (!r.completed) continue;
 
@@ -1572,14 +1685,31 @@ function derive(rows, settings, view) {
       if (!cycleByWeek.has(ck)) cycleByWeek.set(ck, []);
       cycleByWeek.get(ck).push(ct);
     }
+
+    const lt = leadTimeOf(r, sameDay);
+    if (lt != null) {
+      if (!leadByWeek.has(ck)) leadByWeek.set(ck, []);
+      leadByWeek.get(ck).push(lt);
+      /* Flow efficiency is pooled — total working days over total elapsed days,
+         not the mean of per-item ratios. One item raised and finished the same
+         day is 100% efficient on its own and would drag a mean of ratios up out
+         of all proportion to the work it represents. */
+      if (ct != null) {
+        const e = effByWeek.get(ck) || [0, 0];
+        e[0] += ct; e[1] += lt;
+        effByWeek.set(ck, e);
+      }
+    }
   }
 
   const weeks = [], bucketLabels = [], throughput = [], unplannedRate = [],
-        avgCycleTime = [], netFlow = [];
+        avgCycleTime = [], netFlow = [],
+        avgLeadTime = [], flowEfficiency = [], defectCreatedRate = [];
   /* Every individual cycle time inside the window, pooled — the summary tile
      averages these rather than the per-bucket means, so an empty bucket (stored
      as 0 in the series to keep the line unbroken) can't drag it down. */
-  const windowCycles = [];
+  const windowCycles = [], windowLeads = [];
+  let effCycleTotal = 0, effLeadTotal = 0;
 
   for (const ws of weekStarts) {
     const key = bucketKey(ws, bucket);
@@ -1602,6 +1732,29 @@ function derive(rows, settings, view) {
 
     /* Net flow: completed this week minus started this week. */
     netFlow.push(done.length - (byStartedWeek.get(key) || 0));
+
+    /* The created-date series break rather than pad. A lead time of zero days is
+       impossible, so a 0 would be a claim, not a gap — and linearTrend already
+       skips nulls, so a break doesn't drag the trend line. */
+    const lts = leadByWeek.get(key) || [];
+    avgLeadTime.push(lts.length ? mean(lts) : null);
+    windowLeads.push(...lts);
+
+    const eff = effByWeek.get(key);
+    if (eff && eff[1] > 0) {
+      effCycleTotal += eff[0]; effLeadTotal += eff[1];
+      /* Clamped: an item finished the day it started but raised earlier can
+         round to slightly over 1, and "104% efficient" reads as a bug. */
+      flowEfficiency.push(Math.min(1, eff[0] / eff[1]));
+    } else {
+      flowEfficiency.push(null);
+    }
+
+    /* Defects raised against items completed. Null — not 0 — where nothing was
+       completed: you cannot divide by an empty period, and a 0 there would
+       claim no defects were raised when several may have been. */
+    defectCreatedRate.push(!hasCreated || done.length === 0
+      ? null : (defectsRaised.get(key) || 0) / done.length);
   }
 
   const cycleLabel = settings.cycleTimeLabel || 'Cycle time';
@@ -1628,6 +1781,8 @@ function derive(rows, settings, view) {
     weeks, buckets: weeks, bucketLabels,
     bucket, bucketNoun: noun, bucketNounPlural: noun + 's', partial,
     throughput, unplannedRate, avgCycleTime, netFlow,
+    avgLeadTime, flowEfficiency, defectCreatedRate,
+    hasCreated, createdCoverage: items.length ? withCreated / items.length : 0,
     /* Window-wide figures for the summary tiles. avgCycleTime here is the mean
        over the pooled cycle times (per item), not over the per-bucket means —
        and null, not 0, when nothing in the window has one. */
@@ -1635,7 +1790,11 @@ function derive(rows, settings, view) {
       avgThroughput: mean(throughput),
       avgCycleTime: windowCycles.length ? mean(windowCycles) : null,
       unplannedRateAvg: mean(unplannedRate),
-      netFlowTotal: netFlow.reduce((a, b) => a + b, 0)
+      netFlowTotal: netFlow.reduce((a, b) => a + b, 0),
+      avgLeadTime: windowLeads.length ? mean(windowLeads) : null,
+      /* Pooled over the whole window for the same reason it is pooled per
+         bucket — the average of a set of ratios is not the ratio of the set. */
+      flowEfficiency: effLeadTotal > 0 ? Math.min(1, effCycleTotal / effLeadTotal) : null
     },
     itemCount: items.length,
     inProgressCount: items.length - finished.length,
@@ -1647,7 +1806,9 @@ function derive(rows, settings, view) {
          into "tip", and an acronym the user chose is not ours to re-case. */
       cycleTime: 'Average ' + cycleLabel + ' per ' + noun,
       throughput: 'Items completed per ' + noun,
-      netFlow: 'Net flow per ' + noun + ' (items completed − items started)'
+      netFlow: 'Net flow per ' + noun + ' (items completed − items started)',
+      leadTime: 'Average lead time per ' + noun + ' (raised to delivered)',
+      flowEfficiency: 'Flow efficiency per ' + noun + ' (working time ÷ total time)'
     },
     axisTitles: {
       /* Deliberately short: a rotated axis title gets truncated on a narrow
@@ -1656,6 +1817,8 @@ function derive(rows, settings, view) {
       cycleTime: cycleLabel + ' (days)',
       throughput: 'Count of closed items during ' + noun,
       netFlow: 'Items completed − items started',
+      leadTime: 'Lead time (days)',
+      flowEfficiency: 'Share of lead time in progress',
       x: bucket === 'month' ? 'Month'
         : bucket === 'fortnight' ? 'Year-Fortnight (week numbers)'
         : 'Year-Week Number'
@@ -1668,7 +1831,7 @@ window.TD = {
   weekdayNum, priorSunday, weekNumber, weekKey, edate,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats,
-  cycleTimeOf, linearTrend, derive, utcDate
+  cycleTimeOf, leadTimeOf, linearTrend, derive, utcDate
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1729,15 +1892,29 @@ function hydrateRows(raw) {
   return raw.map(r => ({
     completed: date(r && r.c),
     started:   date(r && r.s),
+    /* When the export has one. Lead time and flow efficiency are the only
+       things that read it, and both say so rather than falling back to the
+       start date — a lead time that is secretly a cycle time is worse than
+       no lead time at all. */
+    created:   date(r && r.k),
     /* Only ever a string: a hand-edited backup or cloud doc can put anything
        here, and a non-string would round-trip back out through serializeRows. */
     type:      typeof (r && r.t) === 'string' ? r.t : ''
   }))
   /* An item with no completion is work in progress, not a broken row — keep it,
-     it still counts as work started. Only a row with neither date is useless. */
+     it still counts as work started. A created date alone is backlog that was
+     raised and never picked up: it says nothing about flow, so the rule stays
+     "neither of the two flow dates, no row". */
   .filter(r => r.completed || r.started);
 }
-const serializeRows = rows => rows.map(r => ({ c: isoOf(r.completed), s: isoOf(r.started), t: r.type }));
+/* `k` is left out when there's no created date, so a team that has never pasted
+   one serialises byte-identically to before and its first save after upgrading
+   doesn't rewrite the whole synced document. */
+const serializeRows = rows => rows.map(r => {
+  const out = { c: isoOf(r.completed), s: isoOf(r.started), t: r.type };
+  if (r.created) out.k = isoOf(r.created);
+  return out;
+});
 
 function normalizeSettings(raw) {
   const s = Object.assign({}, DEFAULT_SETTINGS, raw && typeof raw === 'object' ? raw : {});
@@ -1773,12 +1950,25 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and to the cloud. Dates become ISO
    strings; nothing else changes. */
+/* SCHEMA 3 added the per-row created date. The marker rides into localStorage
+   and the synced document, but deliberately NOT into a share link — a share
+   payload's keys are fixed and pinned by a test, and a viewer needs no schema.
+
+   It exists to catch one thing: a browser still running an older build will
+   hydrate a new document, drop every created date it doesn't know about, and
+   push the stripped copy back on its next edit. That build also drops this
+   marker, so a document arriving without one when this device holds created
+   dates is exactly that case — see tdAdopt. */
+const SCHEMA = 3;
 function serializeState() {
   return {
+    schema: SCHEMA,
     teams: state.teams.map(t => ({ id: t.id, name: t.name, rows: serializeRows(t.rows) })),
     settings: state.settings
   };
 }
+const countCreated = teams =>
+  teams.reduce((n, t) => n + t.rows.filter(r => r.created).length, 0);
 function hydrateState(raw) {
   return {
     teams: sanitizeTeams(raw && raw.teams),
@@ -1881,7 +2071,8 @@ window.tdHasData = hasData;
 /* Pure helpers tests.html pins. Kept beside the sync hooks because they are the
    same boundary: everything here decides what a copy from outside is allowed to
    turn into. */
-window.TDState = { sanitizeTeams, hydrateState, normalizeSettings, hasData, isBackup, ID_OK };
+window.TDState = { sanitizeTeams, hydrateState, normalizeSettings, hasData, isBackup, ID_OK,
+  serializeRows, hydrateRows, SCHEMA };
 window.tdCounts = (d) => ({
   teams: (d && d.teams) ? d.teams.length : 0,
   items: (d && d.teams) ? d.teams.reduce((n, t) => n + ((t.rows && t.rows.length) || 0), 0) : 0
@@ -1889,7 +2080,14 @@ window.tdCounts = (d) => ({
 
 /* Replace everything with a copy from the cloud. */
 window.tdAdopt = (data, updatedAt) => {
-  state = hydrateState(data);
+  /* Before the swap, because the comparison is against what this device holds
+     now. Only worth saying when created dates actually go backwards. */
+  const hadCreated = countCreated(state.teams);
+  const incoming = hydrateState(data);
+  const losing = hadCreated > 0 && countCreated(incoming.teams) === 0
+    && !(data && data.schema >= SCHEMA);
+
+  state = incoming;
   if (!state.teams.length) state.teams.push({ id: newId(), name: 'My team', rows: [] });
   if (!state.teams.some(t => t.id === view.activeTeamId)) {
     view.activeTeamId = state.teams[0].id;
@@ -1899,17 +2097,25 @@ window.tdAdopt = (data, updatedAt) => {
   localStorage.setItem(LS.updated, String(updatedAt || Date.now()));
   renderSettingsForm();
   renderAll();
+  /* Loud, not silent: this is data loss, and the fix is on the other device. */
+  if (losing && typeof toast === 'function') {
+    toast('Another device is running an older version and removed the Created dates from '
+      + 'your synced copy. Reload Flow Metrics there to update it, then paste your export '
+      + 'again.', 12000);
+  }
 };
 
 /* Short-lived status message. textContent only — never HTML, and never a
    control: it's pointer-events:none, so nothing in it could be clicked. */
 let toastTimer = null;
-window.toast = (msg) => {
+/* ms is optional: 2.6s suits a confirmation, and nothing like long enough for a
+   warning about data being lost on another device. */
+window.toast = (msg, ms) => {
   const el = $('toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms || 2600);
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2047,21 +2253,44 @@ const int0 = v => String(Math.round(v));
 function drawCharts(d) {
   const accent = token('--accent'), serious = token('--serious');
 
-  /* ── Defect rate per week ── */
+  /* ── Defect rate per week ──
+     Two series when the data can carry both: defects resolved as a share of
+     everything completed, and defects raised against the same denominator.
+     Resolved is the line this chart has always drawn and keeps its exact
+     styling; raised is drawn with a different colour AND a different dash AND a
+     different point shape, so the two are told apart by texture rather than by
+     colour alone. Accent-vs-serious is the pair the net flow chart already
+     uses, chosen because it isn't the red/green axis. */
   const qualOpts = baseOptions(d.axisTitles.defectRate, pct1, pct0, d.axisTitles.x, d.partial);
   qualOpts.scales.y.beginAtZero = true;
+  const defectSets = [{
+    label: state.settings.unplannedLabel + ' resolved',
+    data: d.unplannedRate,
+    borderColor: accent,
+    backgroundColor: accent,
+    borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false, order: 1
+  }, trendDataset(d.unplannedRate)];
+  if (d.hasCreated) {
+    /* Only a legend when there are two things to tell apart, and it carries the
+       point style so the swatch itself is the key to the texture. */
+    qualOpts.plugins.legend = {
+      display: true, position: 'top',
+      labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
+                font: { size: 11 }, filter: item => item.text !== 'Trend' }
+    };
+    defectSets.push({
+      label: state.settings.unplannedLabel + ' raised',
+      data: d.defectCreatedRate,
+      borderColor: serious,
+      backgroundColor: serious,
+      borderWidth: 2, borderDash: [2, 3],
+      pointStyle: 'triangle', pointRadius: 3, pointHoverRadius: 6,
+      tension: 0, fill: false, spanGaps: false, order: 1
+    });
+  }
   renderChart('chartDefectRate', {
     type: 'line',
-    data: {
-      labels: d.bucketLabels,
-      datasets: [{
-        label: state.settings.unplannedLabel + ' rate',
-        data: d.unplannedRate,
-        borderColor: accent,
-        backgroundColor: accent,
-        borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false, order: 1
-      }, trendDataset(d.unplannedRate)]
-    },
+    data: { labels: d.bucketLabels, datasets: defectSets },
     options: qualOpts
   });
 
@@ -2128,11 +2357,68 @@ function drawCharts(d) {
     options: netOpts
   });
 
+  /* ── Lead time and flow efficiency ──
+     Both need a created date. Without one the canvas is hidden and the card
+     explains what to paste, rather than the chart quietly disappearing or —
+     worse — falling back to the start date and drawing a lead time that is
+     secretly a cycle time. */
+  ['LeadTime', 'FlowEfficiency'].forEach(name => {
+    const card = $('card' + name);
+    card.querySelector('.chart-wrap').hidden = !d.hasCreated;
+    card.querySelector('.needs-created').hidden = d.hasCreated;
+  });
+
+  if (d.hasCreated) {
+    const leadOpts = baseOptions(d.axisTitles.leadTime, num1, null, d.axisTitles.x, d.partial);
+    leadOpts.scales.y.beginAtZero = true;
+    renderChart('chartLeadTime', {
+      type: 'line',
+      data: {
+        labels: d.bucketLabels,
+        datasets: [{
+          label: 'Avg lead time',
+          data: d.avgLeadTime,
+          borderColor: accent,
+          backgroundColor: accent,
+          borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false,
+          spanGaps: false, order: 1
+        }, trendDataset(d.avgLeadTime)]
+      },
+      options: leadOpts
+    });
+
+    const effOpts = baseOptions(d.axisTitles.flowEfficiency, pct1, pct0, d.axisTitles.x, d.partial);
+    effOpts.scales.y.beginAtZero = true;
+    effOpts.scales.y.max = 1;
+    renderChart('chartFlowEfficiency', {
+      type: 'line',
+      data: {
+        labels: d.bucketLabels,
+        datasets: [{
+          label: 'Flow efficiency',
+          data: d.flowEfficiency,
+          borderColor: accent,
+          backgroundColor: accent,
+          borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false,
+          spanGaps: false, order: 1
+        }, trendDataset(d.flowEfficiency)]
+      },
+      options: effOpts
+    });
+  } else {
+    /* Destroyed rather than left holding a stale series: the next paste may be
+       a different team entirely. */
+    ['chartLeadTime', 'chartFlowEfficiency'].forEach(id => {
+      if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+    });
+  }
+
   /* A canvas is a bitmap to a screen reader — give each chart its title as a
      text alternative. The full series stays reachable as text in the Your Data
      tab's table, which the label points at. */
   const describe = (id, text) => {
     const c = document.getElementById(id);
+    if (!c) return;
     c.setAttribute('role', 'img');
     c.setAttribute('aria-label', text + '. ' + d.buckets.length + ' ' + d.bucketNoun +
       (d.buckets.length === 1 ? '' : 's') + ' ending ' + prettyDate(d.endDate) +
@@ -2142,6 +2428,10 @@ function drawCharts(d) {
   describe('chartCycleTime',  d.titles.cycleTime);
   describe('chartThroughput', d.titles.throughput);
   describe('chartNetFlow',    d.titles.netFlow);
+  if (d.hasCreated) {
+    describe('chartLeadTime',       d.titles.leadTime);
+    describe('chartFlowEfficiency', d.titles.flowEfficiency);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2188,7 +2478,21 @@ const METRIC_HELP = {
   netFlow: { title: 'Net flow',
     body: 'Is our completion pace consistent? Items completed minus items started. '
       + 'Around zero is the goal: persistently below zero means more work starts than '
-      + 'finishes and work in progress is piling up; persistently above zero drains it.' }
+      + 'finishes and work in progress is piling up; persistently above zero drains it.' },
+  leadTime: { title: 'Lead time',
+    body: 'How long from an idea being raised to the customer having it — the whole wait, '
+      + 'including the time an item sat in the backlog before anyone picked it up. Cycle '
+      + 'time only starts counting once work does, so lead time is always the longer of the '
+      + 'two, and the gap between them is queue. Needs a Created column in your paste.' },
+  flowEfficiency: { title: 'Flow efficiency',
+    body: 'What share of the total wait was actually spent working? Total in-progress days '
+      + 'divided by total raised-to-delivered days, pooled across the items completed in each '
+      + 'period rather than averaged per item. Low is normal — teams are often surprised how '
+      + 'low — and the gap is queue time, which is usually the cheapest thing to improve. '
+      + 'Note this is a fair approximation, not the textbook measure: a true flow efficiency '
+      + 'needs the time an item spent in each individual status, which a plain Jira export '
+      + 'does not carry. It counts everything between start and finish as working time, so '
+      + 'it reads high when work sits blocked mid-flight.' }
 };
 
 function helpBtn(key, label) {
@@ -2321,10 +2625,21 @@ function renderDashboard() {
   const setTitle = (id, text, key) => {
     $(id).innerHTML = '<span>' + escapeHtml(text) + '</span>' + helpBtn(key, text);
   };
-  setTitle('titleDefectRate', d.titles.defectRate, 'defectRate');
-  setTitle('titleCycleTime',  d.titles.cycleTime,  'cycleTime');
-  setTitle('titleThroughput', d.titles.throughput, 'throughput');
-  setTitle('titleNetFlow',    d.titles.netFlow,    'netFlow');
+  setTitle('titleDefectRate',     d.titles.defectRate,     'defectRate');
+  setTitle('titleCycleTime',      d.titles.cycleTime,      'cycleTime');
+  setTitle('titleThroughput',     d.titles.throughput,     'throughput');
+  setTitle('titleNetFlow',        d.titles.netFlow,        'netFlow');
+  setTitle('titleLeadTime',       d.titles.leadTime,       'leadTime');
+  setTitle('titleFlowEfficiency', d.titles.flowEfficiency, 'flowEfficiency');
+
+  /* The Flow group's own tiles, beside the charts that expand them. The four
+     headline tiles above stay as they are — eight in one row would push every
+     chart below the fold. */
+  $('tilesFlow').innerHTML =
+    tile('Avg lead time', s.avgLeadTime == null ? '—' : num1(s.avgLeadTime),
+      'days from raised to delivered', 'leadTime') +
+    tile('Flow efficiency', s.flowEfficiency == null ? '—' : pct1(s.flowEfficiency),
+      'share of that time actually in progress', 'flowEfficiency');
 
   drawCharts(d);
   /* The panels' hidden state lives in the markup, so re-apply the chosen group
@@ -2354,6 +2669,7 @@ function renderDataTable() {
     return '<tr>' +
       '<td>' + (r.completed ? isoOf(r.completed) : '<span class="hint">in progress</span>') + '</td>' +
       '<td>' + (r.started ? isoOf(r.started) : '<span class="hint">—</span>') + '</td>' +
+      '<td>' + (r.created ? isoOf(r.created) : '<span class="hint">—</span>') + '</td>' +
       '<td>' + (escapeHtml(r.type) || '<span class="hint">—</span>') + '</td>' +
       '<td class="num">' + (ct == null ? '—' : num1(ct)) + '</td>' +
       '<td class="num">' +
@@ -2363,7 +2679,7 @@ function renderDataTable() {
 
   $('dataTable').innerHTML =
     '<div class="table-cap"><div class="table-scroll"><table class="data">' +
-    '<thead><tr><th>Completed</th><th>Started</th><th>Type</th>' +
+    '<thead><tr><th>Completed</th><th>Started</th><th>Created</th><th>Type</th>' +
     '<th>' + escapeHtml(state.settings.cycleTimeLabel) + ' (days)</th>' +
     '<th>' + bucketHead + '</th></tr></thead>' +
     '<tbody>' + body + '</tbody></table></div></div>';
@@ -2475,7 +2791,7 @@ TABS.forEach(t => {
    to which group is listed here rather than read from the DOM, because the
    resize on reveal has to know before the panel is measurable. */
 const CHART_GROUPS = {
-  flow:     ['chartCycleTime'],
+  flow:     ['chartCycleTime', 'chartLeadTime', 'chartFlowEfficiency'],
   delivery: ['chartThroughput', 'chartNetFlow'],
   health:   ['chartDefectRate']
 };
@@ -2600,10 +2916,33 @@ function showParseNote(res, mode, team) {
       ' no dates at all and ' + (res.undated === 1 ? 'was' : 'were') + ' ignored — nothing started, ' +
       'nothing finished, so nothing to plot.' : '') +
     '<br>Read <strong>' + colName(res.columns.completed) + '</strong> as the completed date, ' +
-    '<strong>' + colName(res.columns.started) + '</strong> as the start date and ' +
-    '<strong>' + colName(res.columns.type) + '</strong> as the work type; ' +
+    '<strong>' + colName(res.columns.started) + '</strong> as the start date' +
+    (res.columns.created >= 0 && res.columns.created !== res.columns.started
+      ? ', <strong>' + colName(res.columns.created) + '</strong> as the created date' : '') +
+    ' and <strong>' + colName(res.columns.type) + '</strong> as the work type; ' +
     'dates as <strong>' + (res.dateOrder === 'mdy' ? 'month first' : 'day first') + '</strong>.' +
+    /* The two-column case: Created is standing in as the start date, which is
+       what this app has always done with it. Lead time then equals cycle time,
+       and that needs saying before someone reads it as a finding. */
+    (res.columns.created >= 0 && res.columns.created === res.columns.started
+      ? '<br>That column was read as <strong>both</strong> the created and the start date, so '
+        + 'lead time will match cycle time. Export a separate <em>In Progress</em> column to '
+        + 'tell the two apart.'
+      : '') +
+    (res.columns.created < 0
+      ? '<br>No created date in this paste — lead time and flow efficiency need one. Add a '
+        + '<em>Created</em> column and paste again to see them.'
+      : '') +
     '</div>';
+  /* Work cannot start before it was raised, so this is the loudest available
+     signal that the created column was read off the wrong thing. */
+  if (res.createdAfterStarted) {
+    html += '<div class="note warn" style="margin-top:var(--sp-4)"><strong>Check the created ' +
+      'column:</strong> ' + res.createdAfterStarted + ' row' +
+      (res.createdAfterStarted === 1 ? ' has a created date' : 's have created dates') +
+      ' after their start date, which cannot happen. That column may be a due or updated ' +
+      'date rather than when the work was raised.</div>';
+  }
   el.innerHTML = html;
 }
 
@@ -2760,7 +3099,7 @@ function todayLocalISO() {
    safety net — one deletion away is exactly when a backup is worth taking. */
 function downloadBackup() {
   const payload = Object.assign(
-    { app: 'team-dashboard', version: 2, exported: new Date().toISOString() },
+    { app: 'team-dashboard', version: 3, exported: new Date().toISOString() },
     serializeState()
   );
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
