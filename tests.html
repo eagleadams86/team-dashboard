@@ -12,12 +12,16 @@
      http://localhost (python3 -m http.server 8013); file:// iframes are blocked
      in some browsers.
 
-     Two honest caveats about "read-only": the iframe boots the real app, which
-     writes its own td-* keys in THIS origin's localStorage (localhost — your
-     deployed data lives on a different origin and is never touched). And the
-     iframe is marked data-td-tests, which index.html checks so the sync module
-     never initialises inside the harness — without that, an origin that had
-     ever signed in would start real sync traffic mid-test. */
+     This page is NOT read-only about storage: it plants known state through
+     tdAdopt(), and booting the app in the iframe writes this origin's td-* keys
+     on its own. That is harmless on localhost and destructive anywhere else, so
+     the gate at the bottom of the script refuses to run — and never creates the
+     iframe — unless the host really is localhost. GitHub Pages publishes this
+     file alongside the app, so "anywhere else" is a page anyone can open.
+
+     The iframe is also marked data-td-tests, which index.html checks so the sync
+     module never initialises inside the harness — without that, an origin that
+     had ever signed in would start real sync traffic mid-test. */
   body { background: var(--bg); color: var(--text-primary); margin: 0;
          font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
   .wrap { max-width: 900px; margin: 0 auto; padding: 28px 20px 60px; }
@@ -43,16 +47,18 @@
 <div class="wrap">
   <h1>Flow Metrics — pure-function tests</h1>
   <p class="sub">
-    Runs against the real <code>index.html</code> in a hidden iframe — your deployed data is
-    on another origin and can't be touched, and sync stays off inside the harness.
-    The <code>derive()</code> expectations are pinned to a fixed 141-item sample, so a
-    passing run means the metrics still come out exactly as they always have.
+    Runs against the real <code>index.html</code> in a hidden iframe, and plants test data in
+    it — so it only runs on <code>localhost</code>, where those keys are a scratch copy.
+    Sync stays off inside the harness. The <code>derive()</code> expectations are pinned to a
+    fixed 141-item sample, so a passing run means the metrics still come out exactly as they
+    always have.
   </p>
   <div id="summary">Loading app…</div>
   <table><tbody id="out"></tbody></table>
 </div>
-<!-- data-td-tests: index.html's sync module checks for this and stays off. -->
-<iframe id="app" src="index.html" data-td-tests style="position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px" aria-hidden="true"></iframe>
+<!-- The iframe is built in script, not written here: booting the app is itself a
+     write to this origin's storage, so it must happen only after the localhost
+     check below has passed. -->
 
 <script>
 /* ── The reference sample: 141 items. Every expectation below is pinned to this
@@ -1429,7 +1435,7 @@ async function run(TD, win) {
     : 'All ' + passed + ' tests passed';
 }
 
-document.getElementById('app').addEventListener('load', function () {
+function onAppLoad() {
   const w = this.contentWindow;
   if (!w.TD || !w.TDState || !w.TDCleanup) {
     document.getElementById('summary').className = 'bad';
@@ -1443,7 +1449,52 @@ document.getElementById('app').addEventListener('load', function () {
     sum.className = 'bad';
     sum.textContent = failed + ' of ' + (passed + failed) + ' failed';
   });
-});
+}
+
+/* ── The localhost gate ─────────────────────────────────────────────────────
+   This suite is not read-only about storage: it plants known state through
+   tdAdopt(), and merely booting the app in the iframe writes this origin's
+   td-* keys. On localhost those keys are a scratch copy that exists for the
+   tests. On the published site — GitHub Pages serves this file too, at
+   /team-dashboard/tests.html — they are the real saved teams, and a run would
+   quietly replace them with two-item test data.
+
+   So the harness refuses to start anywhere else, rather than trusting whoever
+   opened the page to know which origin they are on. Nothing above this line
+   runs on its own; the iframe is created here or not at all.
+
+   '' covers file://, which has no host: the suite can't work there either way
+   (iframes from file:// are blocked), and its storage is a throwaway opaque
+   origin, so it gets the ordinary "serve it over localhost" message rather
+   than a warning about data it cannot reach. */
+const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]', ''];
+
+if (LOCAL_HOSTS.includes(location.hostname)) {
+  const frame = document.createElement('iframe');
+  frame.id = 'app';
+  /* index.html's sync module checks for this attribute and stays off — without
+     it, an origin that had ever signed in would start real sync traffic. */
+  frame.setAttribute('data-td-tests', '');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
+  frame.addEventListener('load', onAppLoad);
+  frame.src = 'index.html';           /* set before append: one load event, the real one */
+  document.body.appendChild(frame);
+} else {
+  const sum = document.getElementById('summary');
+  sum.className = 'bad';
+  sum.textContent = 'Not run here — this page would overwrite your data.';
+  document.getElementById('out').innerHTML =
+    '<tr><td class="msg" style="white-space:normal;font-family:inherit;font-size:13px">' +
+    'The suite plants test data in the app to check it, which on <strong>' +
+    location.hostname.replace(/[<&]/g, '') + '</strong> would mean your real saved teams. ' +
+    'It only runs on <code>localhost</code>, against a copy of the app served from the ' +
+    'repo folder:<br><br><code>cd ~/claude-team-dashboard &amp;&amp; python3 -m http.server 8013' +
+    '</code><br>then open <code>http://localhost:8013/tests.html</code>.<br><br>' +
+    'Nothing has been changed by opening this page. Your data is where you left it — ' +
+    '<a href="index.html">back to the dashboard</a>.' +
+    '</td></tr>';
+}
 </script>
 </body>
 </html>

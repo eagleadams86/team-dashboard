@@ -593,10 +593,26 @@ copies to drift. It must be served over `http://localhost`, not opened as a file
 marked `data-td-tests`, which the sync module checks so no sign-in session ever boots inside
 the harness.
 
+**It only runs on localhost, and enforces that itself.** The suite is not read-only about
+storage: it plants known state through `tdAdopt()`, and merely booting the app in the iframe
+writes this origin's `td-*` keys. On localhost those keys are a scratch copy. But GitHub Pages
+publishes every file in the repo, so `tests.html` is also live at
+`/team-dashboard/tests.html` — where the same run would replace **real** saved teams with
+two-item test data. A gate at the bottom of the script checks `location.hostname` against
+`localhost` / `127.0.0.1` / `[::1]` and, anywhere else, refuses: it never creates the iframe,
+explains why, and says how to run the suite properly. Nothing above that gate touches storage
+on its own, so opening the published copy is now harmless.
+
+(The alternative was keeping `tests.html` off the published site, via a Jekyll exclude or a
+move into a subfolder. The guard was chosen instead because it is self-documenting and travels
+with the file — a fork, a local copy, or a future host can't lose it.)
+
 The suite also runs on every push:
 [`.github/workflows/tests.yml`](.github/workflows/tests.yml) serves the folder, opens
 `tests.html` in headless Chromium and fails the build if the summary goes red or the page
 throws — so a suite that only ever ran when someone remembered to open it can't silently rot.
+CI reaches it at `http://localhost:8013`, so the localhost gate lets it through; if that ever
+changed, the run would time out waiting for a summary and fail loudly rather than skip.
 
 Beyond the metrics it covers `detectColumns()` (a leading key column, the dates either way
 round, header names beating position, a free-text summary not being mistaken for the type),
