@@ -22,12 +22,14 @@
 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com https://api.github.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
 <!--
-  Flow Metrics — four weekly flow metrics from your work items. (The repo, the
+  Flow Metrics — weekly flow metrics from your work items. (The repo, the
   Firebase project, the backup marker and the Pages path are all still
   "team-dashboard": the app was renamed on screen, its identifiers were not.)
 
-  Paste completed/started dates for your work items and it derives the four
-  weekly flow metrics: Quality, Responsiveness, Productivity, Predictability.
+  Paste completed/started dates for your work items and it derives the standard
+  Kanban measures: throughput, cycle time, defect rate and net flow. The charts
+  are grouped into Flow, Delivery and Health — by what the data means, so the
+  ones that move together are read together.
 
   Single page, no build step, no account required. localStorage is the source
   of truth; signing in with Google (optional) mirrors it to Firestore so other
@@ -331,6 +333,21 @@ html[data-first-run] #teamSel { display: none; }
    apart from the two data tabs — but only while the row fits on one line
    (same rule as the sibling app's All teams tab). */
 @media (min-width: 470px) { #tab-settings { margin-left: auto; } }
+
+/* Chart-group sub-tabs. Deliberately NOT the filled pill above: an underlined
+   row reads as subordinate by construction, so two tablists on one screen can't
+   be mistaken for one. Same manners as .tab otherwise — roving tabindex, arrow
+   keys, aria-selected. */
+.subtabs { display: flex; gap: 4px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.subtab { background: transparent; border: 0; border-bottom: 2px solid transparent;
+  border-radius: 0; margin-bottom: -1px; padding: 7px 12px; cursor: pointer;
+  font: inherit; font-size: var(--fs-base); font-weight: var(--fw-medium);
+  color: var(--text-secondary); }
+.subtab:hover { color: var(--text-primary); }
+.subtab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent);
+  font-weight: var(--fw-semibold); }
+
 :focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
 /* .grid sets display:grid, which beats the UA rule for [hidden] — force it. */
 [hidden] { display: none !important; }
@@ -359,10 +376,14 @@ select { cursor: pointer; }
    row still line up. */
 .grid.two > div { display: flex; flex-direction: column; justify-content: flex-end; }
 .grid.two > div > label { flex: 0 0 auto; }
-/* Charts sit in a fixed 2x2 grid so the four metrics stay paired, whatever the
+/* Charts sit in a fixed two-column grid so the metrics stay paired, whatever the
    window width; collapse to one column when 2 no longer fit. */
 .grid.charts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 @media (max-width: 940px) { .grid.charts { grid-template-columns: 1fr; } }
+/* A group with an odd number of charts leaves the last one half-width with dead
+   space beside it. A time series reads well wide — unlike a tile — so it takes
+   the full row instead. No-op for an even group. */
+.grid.charts > .chart-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
 
 /* dashboard controls strip */
 .controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;
@@ -392,6 +413,10 @@ select { cursor: pointer; }
    vary in count, so auto-fit is still right there. */
 @media (max-width: 720px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 400px) { .tiles { grid-template-columns: 1fr; } }
+/* A tile row inside a chart group. Here the count DOES vary by group, so this is
+   the auto-fit case the rule above excludes, and it spans both chart columns. */
+.tiles.group { grid-column: 1 / -1; margin-bottom: 4px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 .tile { display: grid; grid-row: span 3; grid-template-rows: subgrid; align-content: start;
   border: 1px solid var(--border); border-left-width: 4px;
   border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface-alt); }
@@ -697,7 +722,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
           </select>
         </div>
         <div>
-          <label for="setUnplannedType">Unplanned work type — the exact text in your Type column</label>
+          <label for="setUnplannedType">Defect work type — the exact text in your Type column</label>
           <input type="text" id="setUnplannedType" placeholder="Bug">
         </div>
         <div>
@@ -705,17 +730,13 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
           <input type="number" id="setSameDay" step="0.1" min="0">
         </div>
         <div>
-          <label for="setPlannedLabel">Planned work legend label</label>
-          <input type="text" id="setPlannedLabel" placeholder="Stories">
-        </div>
-        <div>
-          <label for="setUnplannedLabel">Unplanned work legend label</label>
+          <label for="setUnplannedLabel">Word to use for defects on charts</label>
           <input type="text" id="setUnplannedLabel" placeholder="Bugs">
         </div>
       </div>
       <div class="note info" style="margin-top:var(--sp-6)">
-        Anything whose Type is blank, or doesn't match the unplanned text above, counts as
-        <em>planned</em> work.
+        Anything whose Type is blank, or doesn't match the defect text above, counts as
+        ordinary planned work.
       </div>
     </div>
 
@@ -796,28 +817,44 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
          what to make of it. Rendered by renderDashboard(). -->
     <div id="dashTiles" class="tiles" hidden></div>
 
-    <!-- Chart order matches the tile order above — productivity, responsiveness,
-         quality, predictability — so the tile you read and the chart that expands
-         it sit in the same position in their row. -->
-    <div id="dashCharts" class="grid charts">
-      <div class="chart-card">
-        <div class="chart-title" id="titleProductivity"></div>
-        <div class="chart-wrap"><canvas id="chartProductivity"></canvas></div>
+    <!-- Charts are grouped by what the data means rather than by metric family:
+         Flow is how long work takes, Delivery is how much comes out, Health is
+         the state of the board. Charts that move together sit together, so a
+         group can be read as one picture. -->
+    <div class="subtabs" role="tablist" aria-label="Chart groups" id="dashSubtabs">
+      <button class="subtab" role="tab" id="stab-flow" aria-controls="spanel-flow"
+        aria-selected="true" tabindex="0">Flow</button>
+      <button class="subtab" role="tab" id="stab-delivery" aria-controls="spanel-delivery"
+        aria-selected="false" tabindex="-1">Delivery</button>
+      <button class="subtab" role="tab" id="stab-health" aria-controls="spanel-health"
+        aria-selected="false" tabindex="-1">Health</button>
+    </div>
+
+    <div id="dashCharts">
+      <div class="grid charts" id="spanel-flow" role="tabpanel" aria-labelledby="stab-flow">
+        <div class="chart-card">
+          <div class="chart-title" id="titleCycleTime"></div>
+          <div class="chart-wrap"><canvas id="chartCycleTime"></canvas></div>
+        </div>
       </div>
 
-      <div class="chart-card">
-        <div class="chart-title" id="titleResponsiveness"></div>
-        <div class="chart-wrap"><canvas id="chartResponsiveness"></canvas></div>
+      <div class="grid charts" id="spanel-delivery" role="tabpanel" aria-labelledby="stab-delivery" hidden>
+        <div class="chart-card">
+          <div class="chart-title" id="titleThroughput"></div>
+          <div class="chart-wrap"><canvas id="chartThroughput"></canvas></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title" id="titleNetFlow"></div>
+          <div class="chart-wrap"><canvas id="chartNetFlow"></canvas></div>
+        </div>
       </div>
 
-      <div class="chart-card">
-        <div class="chart-title" id="titleQuality"></div>
-        <div class="chart-wrap"><canvas id="chartQuality"></canvas></div>
-      </div>
-
-      <div class="chart-card">
-        <div class="chart-title" id="titlePredictability"></div>
-        <div class="chart-wrap"><canvas id="chartPredictability"></canvas></div>
+      <div class="grid charts" id="spanel-health" role="tabpanel" aria-labelledby="stab-health" hidden>
+        <div class="chart-card">
+          <div class="chart-title" id="titleDefectRate"></div>
+          <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
+        </div>
       </div>
     </div>
 
@@ -1516,21 +1553,21 @@ function derive(rows, settings, view) {
     inProgressCount: items.length - finished.length,
     startDate, endDate,
     titles: {
-      quality: (settings.unplannedLabel || 'Unplanned') +
+      defectRate: (settings.unplannedLabel || 'Unplanned') +
                ' percentage rate (avg: ' + (mean(unplannedRate) * 100).toFixed(2) + '%)',
       /* The label is used verbatim — lower-casing it turned the "TiP" setting
          into "tip", and an acronym the user chose is not ours to re-case. */
-      responsiveness: 'Average ' + cycleLabel + ' per week',
-      productivity: 'Throughput history trend (completed items per week)',
-      predictability: 'Net flow per week (items completed − items started)'
+      cycleTime: 'Average ' + cycleLabel + ' per week',
+      throughput: 'Items completed per week',
+      netFlow: 'Net flow per week (items completed − items started)'
     },
     axisTitles: {
       /* Deliberately short: a rotated axis title gets truncated on a narrow
          screen, and the chart title above already says the rest. */
-      quality: 'Unplanned work rate',
-      responsiveness: cycleLabel + ' (days)',
-      productivity: 'Count of closed items during week',
-      predictability: 'Items completed − items started'
+      defectRate: 'Defect rate',
+      cycleTime: cycleLabel + ' (days)',
+      throughput: 'Count of closed items during week',
+      netFlow: 'Items completed − items started'
     }
   };
 }
@@ -1549,7 +1586,6 @@ window.TD = {
 const DEFAULT_SETTINGS = {
   sameDayValue: 0.5,
   unplannedType: 'Bug',
-  plannedLabel: 'Stories',
   unplannedLabel: 'Bugs',
   cycleTimeLabel: 'Cycle time',
   filters: [
@@ -1561,7 +1597,8 @@ const DEFAULT_SETTINGS = {
 /* activeTeamId lives here, not in the synced payload: which team you happen to
    be looking at is a position on this device, not shared data. Syncing it would
    make switching team on the laptop yank the phone to the same team. */
-const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', activeTeamId: null };
+const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', activeTeamId: null,
+  chartTab: 'flow' };
 
 const LS = {
   state: 'td-state', view: 'td-view', theme: 'td-theme',
@@ -1631,9 +1668,12 @@ function normalizeSettings(raw) {
   delete s.defectType;
   /* Same treatment for the scalars: a non-string label would render as its
      default, and a junk same-day value would put NaN in every cycle time. */
-  for (const k of ['cycleTimeLabel', 'unplannedType', 'plannedLabel', 'unplannedLabel']) {
+  for (const k of ['cycleTimeLabel', 'unplannedType', 'unplannedLabel']) {
     if (typeof s[k] !== 'string') s[k] = DEFAULT_SETTINGS[k];
   }
+  /* Was a settings field that nothing ever read. Dropped rather than left to
+     ride along in every saved and synced copy for ever. */
+  delete s.plannedLabel;
   const n = Number(s.sameDayValue);
   s.sameDayValue = Number.isFinite(n) && n >= 0 ? n : DEFAULT_SETTINGS.sameDayValue;
   return s;
@@ -1903,10 +1943,10 @@ const int0 = v => String(Math.round(v));
 function drawCharts(d) {
   const accent = token('--accent'), serious = token('--serious');
 
-  /* ── Quality: unplanned work rate per week ── */
-  const qualOpts = baseOptions(d.axisTitles.quality, pct1, pct0);
+  /* ── Defect rate per week ── */
+  const qualOpts = baseOptions(d.axisTitles.defectRate, pct1, pct0);
   qualOpts.scales.y.beginAtZero = true;
-  renderChart('chartQuality', {
+  renderChart('chartDefectRate', {
     type: 'line',
     data: {
       labels: d.weeks,
@@ -1921,11 +1961,11 @@ function drawCharts(d) {
     options: qualOpts
   });
 
-  /* ── Responsiveness: average cycle time per week (with value labels) ── */
-  const respOpts = baseOptions(d.axisTitles.responsiveness, num1);
+  /* ── Average cycle time per week (with value labels) ── */
+  const respOpts = baseOptions(d.axisTitles.cycleTime, num1);
   respOpts.scales.y.beginAtZero = true;
   respOpts.plugins.valueLabels = { enabled: true, color: token('--text-muted'), format: num1 };
-  renderChart('chartResponsiveness', {
+  renderChart('chartCycleTime', {
     type: 'line',
     data: {
       labels: d.weeks,
@@ -1940,13 +1980,13 @@ function drawCharts(d) {
     options: respOpts
   });
 
-  /* ── Productivity: throughput per week ── */
-  const prodOpts = baseOptions(d.axisTitles.productivity, int0);
+  /* ── Throughput per week ── */
+  const prodOpts = baseOptions(d.axisTitles.throughput, int0);
   prodOpts.scales.y.beginAtZero = true;
   /* Counts are whole numbers: without this Chart.js picks fractional steps on a
      short axis and int0 rounds several of them to the same label. */
   prodOpts.scales.y.ticks.precision = 0;
-  renderChart('chartProductivity', {
+  renderChart('chartThroughput', {
     type: 'line',
     data: {
       labels: d.weeks,
@@ -1961,14 +2001,14 @@ function drawCharts(d) {
     options: prodOpts
   });
 
-  /* ── Predictability: net flow per week ──
+  /* ── Net flow per week ──
      Blue above zero, orange below. Deliberately not the red/green pair: the
      coaching goal is "keep around zero", so neither sign is good or bad, and
      RAG would assert otherwise. */
   const netColours = d.netFlow.map(v => (v < 0 ? serious : accent));
-  const netOpts = baseOptions(d.axisTitles.predictability, int0);
+  const netOpts = baseOptions(d.axisTitles.netFlow, int0);
   netOpts.scales.y.ticks.precision = 0;
-  renderChart('chartPredictability', {
+  renderChart('chartNetFlow', {
     type: 'bar',
     data: {
       labels: d.weeks,
@@ -1994,10 +2034,10 @@ function drawCharts(d) {
       (d.weeks.length === 1 ? '' : 's') + ' ending ' + prettyDate(d.endDate) +
       '. Every underlying item is listed on the Your Data tab.');
   };
-  describe('chartQuality',        d.titles.quality);
-  describe('chartResponsiveness', d.titles.responsiveness);
-  describe('chartProductivity',   d.titles.productivity);
-  describe('chartPredictability', d.titles.predictability);
+  describe('chartDefectRate', d.titles.defectRate);
+  describe('chartCycleTime',  d.titles.cycleTime);
+  describe('chartThroughput', d.titles.throughput);
+  describe('chartNetFlow',    d.titles.netFlow);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2029,18 +2069,20 @@ function renderTitle() {
    The dimension framing that used to sit above every chart (and was removed to
    fit all four on screen) lives here instead: on demand, one press away. */
 const METRIC_HELP = {
-  quality: { title: 'Quality — how well',
-    body: 'How much unplanned work do we carry? Plots unplanned work — anything whose '
-      + 'Type matches the unplanned text in Settings — as a share of everything completed, '
-      + 'week by week. Trending down is the good direction.' },
-  responsiveness: { title: 'Responsiveness — how fast',
-    body: 'How long does an item take from starting to finishing? The average cycle time '
-      + 'of the items completed each week, in days. Steady and falling is the good direction.' },
-  productivity: { title: 'Productivity — how much',
-    body: 'What pace do we deliver at? The count of items completed each week. Read the '
-      + 'trend line rather than any single week — throughput is naturally lumpy.' },
-  predictability: { title: 'Predictability — how repeatable',
-    body: 'Is our completion pace consistent? Items completed minus items started, per week. '
+  defectRate: { title: 'Defect rate',
+    body: 'How much of what we finish is defect work? Plots items whose Type matches the '
+      + 'defect text in Settings as a share of everything completed. Lower is better — but '
+      + 'a rate near zero in a maturing team usually means defects are being logged '
+      + 'somewhere other than the board, not that there are none.' },
+  cycleTime: { title: 'Cycle time',
+    body: 'How long does an item take once work has actually started? The average of the '
+      + 'items completed in each period, in days. Steady and falling is the good direction — '
+      + 'and steady matters more than fast, because it is what makes a forecast possible.' },
+  throughput: { title: 'Throughput',
+    body: 'What pace do we deliver at? The count of items completed in each period. Read the '
+      + 'trend line rather than any single point — throughput is naturally lumpy.' },
+  netFlow: { title: 'Net flow',
+    body: 'Is our completion pace consistent? Items completed minus items started. '
       + 'Around zero is the goal: persistently below zero means more work starts than '
       + 'finishes and work in progress is piling up; persistently above zero drains it.' }
 };
@@ -2123,6 +2165,9 @@ function renderDashboard() {
   $('dashNothing').hidden = plottable || !rows.length;
   $('dashCharts').hidden = !plottable;
   $('dashTiles').hidden = !plottable;
+  /* The group tablist goes with the charts it switches between — left standing
+     over an empty-state card it would offer three tabs onto nothing. */
+  $('dashSubtabs').hidden = !plottable;
 
   if (!plottable) {
     if (rows.length && !rows.some(r => r.completed)) {
@@ -2153,26 +2198,30 @@ function renderDashboard() {
   $('dashTiles').innerHTML =
     tile('Completed per week', num1(s.avgThroughput),
       'items per week over ' + d.weeks.length + ' week' + (d.weeks.length === 1 ? '' : 's'),
-      'productivity') +
+      'throughput') +
     tile('Avg ' + (state.settings.cycleTimeLabel || 'cycle time'),
       s.avgCycleTime == null ? '—' : num1(s.avgCycleTime),
-      'days from start to finish', 'responsiveness') +
+      'days from start to finish', 'cycleTime') +
     tile((state.settings.unplannedLabel || 'Unplanned') + ' rate', pct1(s.unplannedRateAvg),
-      'share of completed work', 'quality') +
+      'share of completed work', 'defectRate') +
     tile('Net flow', (s.netFlowTotal > 0 ? '+' : '') + s.netFlowTotal,
-      'completed − started; aim near 0', 'predictability');
+      'completed − started; aim near 0', 'netFlow');
 
   /* Titles hold user-chosen label text, so they're escaped; the ⓘ restores the
      coaching framing the standing eyebrow text used to carry. */
   const setTitle = (id, text, key) => {
     $(id).innerHTML = '<span>' + escapeHtml(text) + '</span>' + helpBtn(key, text);
   };
-  setTitle('titleQuality',        d.titles.quality,        'quality');
-  setTitle('titleResponsiveness', d.titles.responsiveness, 'responsiveness');
-  setTitle('titleProductivity',   d.titles.productivity,   'productivity');
-  setTitle('titlePredictability', d.titles.predictability, 'predictability');
+  setTitle('titleDefectRate', d.titles.defectRate, 'defectRate');
+  setTitle('titleCycleTime',  d.titles.cycleTime,  'cycleTime');
+  setTitle('titleThroughput', d.titles.throughput, 'throughput');
+  setTitle('titleNetFlow',    d.titles.netFlow,    'netFlow');
 
   drawCharts(d);
+  /* The panels' hidden state lives in the markup, so re-apply the chosen group
+     after every render — and this is what resizes the canvases that were 0×0
+     while their panel was hidden. */
+  selectChartTab(view.chartTab);
 }
 
 function renderDataTable() {
@@ -2237,7 +2286,6 @@ function renderSettingsForm() {
   $('setCycleLabel').value     = state.settings.cycleTimeLabel;
   $('setUnplannedType').value     = state.settings.unplannedType;
   $('setSameDay').value        = state.settings.sameDayValue;
-  $('setPlannedLabel').value   = state.settings.plannedLabel;
   $('setUnplannedLabel').value = state.settings.unplannedLabel;
   renderFilterRows();
 }
@@ -2305,6 +2353,48 @@ TABS.forEach(t => {
     if (!next) return;
     $('tab-' + next).focus();
     selectTab(next);
+  });
+});
+
+/* Chart groups — the same tablist manners one level down. Which canvas belongs
+   to which group is listed here rather than read from the DOM, because the
+   resize on reveal has to know before the panel is measurable. */
+const CHART_GROUPS = {
+  flow:     ['chartCycleTime'],
+  delivery: ['chartThroughput', 'chartNetFlow'],
+  health:   ['chartDefectRate']
+};
+const CHART_TABS = Object.keys(CHART_GROUPS);
+
+function selectChartTab(name) {
+  if (!CHART_GROUPS[name]) name = CHART_TABS[0];
+  view.chartTab = name;
+  CHART_TABS.forEach(t => {
+    const sel = t === name;
+    const tab = $('stab-' + t);
+    tab.setAttribute('aria-selected', String(sel));
+    tab.tabIndex = sel ? 0 : -1;
+    $('spanel-' + t).hidden = !sel;
+  });
+  /* Same reason as selectTab: a canvas that was hidden measured 0×0, and only a
+     resize once it is on screen gives it its real size. */
+  CHART_GROUPS[name].forEach(id => { if (charts[id]) charts[id].resize(); });
+}
+
+CHART_TABS.forEach(t => {
+  const tab = $('stab-' + t);
+  tab.addEventListener('click', () => { selectChartTab(t); saveView(); });
+  tab.addEventListener('keydown', e => {
+    const step = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' }[e.key];
+    if (step === undefined) return;
+    e.preventDefault();
+    const i = CHART_TABS.indexOf(t);
+    const next = step === 'first' ? CHART_TABS[0]
+      : step === 'last' ? CHART_TABS[CHART_TABS.length - 1]
+      : CHART_TABS[(i + step + CHART_TABS.length) % CHART_TABS.length];
+    $('stab-' + next).focus();
+    selectChartTab(next);
+    saveView();
   });
 });
 
@@ -2484,14 +2574,18 @@ $('monthsSel').addEventListener('change', e => { view.months = e.target.value; s
 /* settings — shared by every team */
 const SETTING_INPUTS = {
   setCycleLabel: 'cycleTimeLabel', setUnplannedType: 'unplannedType',
-  setSameDay: 'sameDayValue', setPlannedLabel: 'plannedLabel', setUnplannedLabel: 'unplannedLabel'
+  setSameDay: 'sameDayValue', setUnplannedLabel: 'unplannedLabel'
 };
+/* Every keystroke here tears down and rebuilds every chart. That was tolerable
+   at four; it is not once a group holds several. The save stays immediate — only
+   the redraw waits for a pause in the typing. */
+let settingsRedrawTimer = null;
 Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
   $(id).addEventListener('input', e => {
     state.settings[key] = key === 'sameDayValue' ? (parseFloat(e.target.value) || 0) : e.target.value;
     save();
-    renderDataTable();
-    renderDashboard();
+    clearTimeout(settingsRedrawTimer);
+    settingsRedrawTimer = setTimeout(() => { renderDataTable(); renderDashboard(); }, 150);
   });
 });
 
