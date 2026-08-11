@@ -736,10 +736,10 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
         <div>
           <label for="setCycleLabel">Word to use for cycle time on charts</label>
           <select id="setCycleLabel">
-            <option>Cycle time</option>
+            <option>Cycle Time</option>
             <option>Time in Process</option>
             <option>TiP</option>
-            <option>In process time</option>
+            <option>In Process Time</option>
           </select>
         </div>
         <div>
@@ -1748,6 +1748,8 @@ function derive(rows, settings, view) {
      a test fixture written before buckets existed — still means "weekly". */
   const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
   const noun   = BUCKET_NOUNS[bucket];
+  /* Titles are Title Case, so the grouping word needs a capitalised form. */
+  const Noun   = noun.charAt(0).toUpperCase() + noun.slice(1);
   /* Defaulted here too, for the same reason: a settings object saved before
      aged work existed must still mean the documented 14 days. */
   const agedDays = Number(settings.agedDays) > 0
@@ -1980,18 +1982,21 @@ function derive(rows, settings, view) {
       wip: 'Work in progress',
       agedWork: 'Aged work'
     },
+    /* Title Case, matching the dialog headings — minor words stay lowercase
+       unless they lead, so it is "per Week" and "Work in Progress". The user's
+       own labels are dropped in exactly as typed either way: re-casing them
+       turned the "TiP" setting into "tip" once, and an acronym someone chose is
+       not ours to rewrite. */
     titles: {
       defectRate: (settings.unplannedLabel || 'Unplanned') +
-               ' percentage rate (avg: ' + (mean(unplannedRate) * 100).toFixed(2) + '%)',
-      /* The label is used verbatim — lower-casing it turned the "TiP" setting
-         into "tip", and an acronym the user chose is not ours to re-case. */
-      cycleTime: cycleLabel + ' per ' + noun + ' — average and '
-        + CYCLE_PERCENTILE + 'th percentile',
-      throughput: 'Items completed per ' + noun,
-      netFlow: 'Net flow per ' + noun + ' (items completed − items started)',
-      leadTime: 'Average lead time per ' + noun + ' (raised to delivered)',
-      wip: 'Work in progress at the end of each ' + noun,
-      agedWork: 'Items in progress longer than ' + agedDays + ' days'
+               ' Percentage Rate (Avg: ' + (mean(unplannedRate) * 100).toFixed(2) + '%)',
+      cycleTime: cycleLabel + ' per ' + Noun + ' — Average and '
+        + CYCLE_PERCENTILE + 'th Percentile',
+      throughput: 'Items Completed per ' + Noun,
+      netFlow: 'Net Flow per ' + Noun + ' (Items Completed − Items Started)',
+      leadTime: 'Average Lead Time per ' + Noun + ' (Raised to Delivered)',
+      wip: 'Work in Progress at the End of Each ' + Noun,
+      agedWork: 'Items in Progress Longer Than ' + agedDays + ' Days'
     },
     axisTitles: {
       /* Deliberately short: a rotated axis title gets truncated on a narrow
@@ -2029,7 +2034,7 @@ const DEFAULT_SETTINGS = {
   /* Two weeks. The usual coaching starting point, and short enough that a board
      with a real ageing problem shows it. */
   agedDays: 14,
-  cycleTimeLabel: 'Cycle time',
+  cycleTimeLabel: 'Cycle Time',
   filters: [
     { display: 'All',  value: 'All' },
     { display: 'Bugs', value: 'Bug' }
@@ -2129,6 +2134,12 @@ function normalizeSettings(raw) {
   /* Was a settings field that nothing ever read. Dropped rather than left to
      ride along in every saved and synced copy for ever. */
   delete s.plannedLabel;
+  /* Two of the cycle-time wordings were sentence case before the headings went
+     Title Case. A saved value that no longer matches any <option> leaves the
+     select showing blank, so carry the old spellings across. Anything the user
+     typed themselves is left exactly as it is. */
+  const CYCLE_LABEL_RECASE = { 'Cycle time': 'Cycle Time', 'In process time': 'In Process Time' };
+  if (CYCLE_LABEL_RECASE[s.cycleTimeLabel]) s.cycleTimeLabel = CYCLE_LABEL_RECASE[s.cycleTimeLabel];
   const n = Number(s.sameDayValue);
   s.sameDayValue = Number.isFinite(n) && n >= 0 ? n : DEFAULT_SETTINGS.sameDayValue;
   /* Must be positive: a threshold of 0 would call everything open aged, and a
