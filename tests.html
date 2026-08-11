@@ -476,6 +476,20 @@ async function run(TD, win) {
 
   /* the chart title carries the average rate */
   is(d.titles.defectRate, 'Bugs percentage rate (avg: 19.92%)', 'avg bug rate is 19.92%');
+
+  /* Every chart heads its card with what it IS, above the sentence saying what
+     it plots — and every name must have a help entry behind it, since the ⓘ
+     that opens one sits on the name. */
+  is(Object.keys(d.names).sort(),
+     ['agedWork', 'cycleTime', 'defectRate', 'leadTime', 'netFlow', 'throughput', 'wip'],
+     'every chart has a name of its own');
+  ok(Object.keys(d.names).every(k => d.titles[k]),
+     'and a sentence under it saying what it plots');
+  is(d.names.cycleTime, 'Cycle time', 'the cycle time name is the configured word for it');
+  is(TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { cycleTimeLabel: 'TiP' }),
+     { filterValue: '', months: 3 }).names.cycleTime, 'TiP',
+     'so renaming it to an acronym renames the card heading too');
+  is(d.names.wip, 'Work in progress', 'the rest are the standard metric names');
   is(d.titles.cycleTime, 'Cycle time per week — average and 85th percentile',
      'the cycle time title names both series');
   is(TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { cycleTimeLabel: 'TiP' }),
