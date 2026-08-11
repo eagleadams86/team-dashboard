@@ -962,24 +962,45 @@ async function run(TD, win) {
     ['Key\tCreated\tIn Progress\tResolved\tType',
      'A-1\t2015-01-20\t2015-01-14\t2015-01-21\tStory',
      'A-2\t2015-01-02\t2015-01-14\t2015-01-26\tStory'].join('\n'), 'auto');
-  is(backwards.createdOutOfOrder.length, 1, 'a created date after the start date is caught');
-  is(backwards.createdOutOfOrder[0].line, 2, 'and reported with the line it is on, so it can be found');
+  is(backwards.raisedAfterStart.length, 1, 'a ticket raised after its work began is caught');
+  is(backwards.raisedAfterStart[0].line, 2, 'and reported with the line it is on, so it can be found');
   is(backwards.rows.length, 2, 'the row itself is kept — only the one unusable field goes');
-  is(backwards.rows[0].created, null, 'the impossible created date is dropped, not stored');
+  is(backwards.rows[0].created, null, 'its created date is dropped, not stored');
   is(TD.leadTimeOf(backwards.rows[0], 0.5), null,
-     'so it contributes no lead time, rather than one shorter than its own cycle time');
-  ok(TD.cycleTimeOf(backwards.rows[0], 0.5) != null,
-     'while its cycle time is untouched — the row is still perfectly good flow data');
+     'so it contributes no lead time — there was no wait between the request and the work');
+  is(TD.cycleTimeOf(backwards.rows[0], 0.5), 7,
+     'while its cycle time is kept in full: the adjusted start is the better estimate');
   is(backwards.rows[1].created.toISOString().slice(0, 10), '2015-01-02',
      'a row whose dates are in order keeps its created date');
 
-  /* No start date, but raised after it was finished — equally impossible. */
+  /* No start date, but raised after it was resolved — same treatment. */
   const afterDone = TD.parsePastedRows(
     ['Key\tCreated\tIn Progress\tResolved\tType',
      'A-1\t2015-02-20\t\t2015-01-21\tStory'].join('\n'), 'auto');
-  is(afterDone.createdOutOfOrder.length, 1,
-     'a created date after the completion is caught even with no start date');
+  is(afterDone.raisedAfterStart.length, 1,
+     'a created date after the resolution is caught even with no start date');
   is(afterDone.rows[0].created, null, 'and dropped the same way');
+
+  /* ── A start date edited to after the resolution ──────────────────────────
+     The start date is the one field of the three a person can change, so it is
+     the one that can be wrong. Left alone it is silently absorbed: cycleTimeOf
+     floors the negative span at 0, and a zero-day cycle time that never
+     happened drags the average down where nobody can see it. */
+  is(TD.cycleTimeOf({ started: D(2015, 2, 20), completed: D(2015, 1, 21) }, 0.5), 0,
+     'a start after the completion would otherwise compute as a zero-day cycle time');
+  const startLate = TD.parsePastedRows(
+    ['Key\tCreated\tIn Progress\tResolved\tType',
+     'A-1\t2015-01-02\t2015-02-20\t2015-01-21\tStory',
+     'A-2\t2015-01-02\t2015-01-14\t2015-01-21\tStory'].join('\n'), 'auto');
+  is(startLate.startAfterDone.length, 1, 'a start date later than the resolution is caught');
+  is(startLate.startAfterDone[0].line, 2, 'and reported with its line');
+  is(startLate.rows.length, 2, 'the row is kept — it did complete, and still counts as throughput');
+  is(startLate.rows[0].started, null, 'but the provably wrong start date is dropped');
+  is(TD.cycleTimeOf(startLate.rows[0], 0.5), null,
+     'so it contributes no cycle time at all, rather than a fake zero');
+  is(startLate.raisedAfterStart.length, 0,
+     'and it is not also reported as a late-raised ticket — one row, one explanation');
+  is(TD.cycleTimeOf(startLate.rows[1], 0.5), 7, 'the sound row beside it is untouched');
 
   const badCreated = TD.parsePastedRows(
     ['Key\tCreated\tIn Progress\tResolved\tType',

@@ -120,7 +120,8 @@ keys off a completion date.
 | Completion date empty | Kept — it's work in progress |
 | Start date unreadable | Kept, without a start date |
 | Created date unreadable | Kept, without a created date |
-| Created date later than the start or the completion | Kept, and the **created date dropped** |
+| Start date later than the resolution | Kept, and the **start date dropped** |
+| Ticket created after its work had started | Kept, and the **created date dropped** |
 | No completion and no start | Dropped — untouched backlog says nothing about flow |
 | A date that cannot exist (31 Feb, month 13) | Rejected rather than silently rolled over |
 
@@ -129,13 +130,38 @@ in the export rather than hunt for it — the listing includes whatever identifi
 carries, so a Jira key comes back with it. Long lists are capped, but the count above each list
 is always the true total.
 
-The out-of-order case is worth explaining. `created ≤ started ≤ completed` is the one hard
-ordering these dates have, and a created date later than the work it describes would produce a
-lead time *shorter* than the same item's cycle time — a wait cannot be less than the work inside
-it. So that one field is dropped rather than kept: the row still counts for throughput, cycle
-time and everything else, it just contributes no lead time it couldn't legitimately have. A
-handful of those is data — a ticket raised after work had already started. A large share is a
-mismapped column, and the app says which it looks like.
+### The three dates are not equally trustworthy
+
+`created ≤ started ≤ completed` is the one hard ordering these dates have, and **which end of it
+breaks tells you something specific** — because in a normal Jira setup:
+
+- **Created** is written by Jira and cannot be edited.
+- **Resolved** is written by Jira and cannot be edited.
+- **The start date** is set by automation when work moves to In Progress, but *can* be adjusted
+  by hand afterwards.
+
+So the start date is the only one of the three that can be wrong, and both ordering checks are
+really checks on it.
+
+**Start date later than the resolution.** Work cannot finish before it starts, so this is a bad
+adjustment however it was meant. It has to be caught rather than tolerated: cycle time floors a
+negative span at zero, so a row like this would otherwise contribute a **zero-day cycle time
+that never happened** and drag the average down where nobody could see it. The start date is
+dropped — the row still completed, so it still counts for throughput; it just no longer claims
+to know when it started.
+
+**Ticket created after its work had started.** Since Created can't be edited and the automation
+stamps the start on the transition, `created ≤ started` holds by construction — so a violation
+means someone moved the start date by hand, almost always to record that work truly began before
+the ticket existed. That makes the adjusted date the *better* estimate of when work started, so
+**cycle time keeps it in full**. Lead time doesn't: it measures the wait from a request to its
+delivery, and here the work was already under way when the request was made, so there is no such
+wait to measure. Keeping it would also produce a lead time shorter than the same row's cycle
+time.
+
+A handful of those is ordinary. A large share is either a mismapped column or a team that
+routinely raises tickets after starting the work — different problems, both worth knowing, and
+the app says so rather than calling it a few odd rows.
 
 There's no inline row editing — to fix something, correct it at the source and paste again.
 
