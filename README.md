@@ -406,6 +406,13 @@ so the figures reach the recipient without GitHub Pages, Firebase or anyone else
 them. The payload is a trimmed copy — the chosen teams plus the shared settings, because
 those drive every number on the charts — and never anything identifying.
 
+This dialog carries more than any other, so on a screen 760px or wider it opens **820px wide
+with its two choices side by side** rather than stacked. That is the point of the extra width —
+widening a single column only makes the lines longer. It takes the dialog from 764px tall to
+621px, which is the difference between opening already scrolled on a laptop and not. Below that
+it stacks and behaves as before, and no other dialog changes: the ⓘ help window is a paragraph
+of prose, and a wider measure makes prose harder to read, not easier.
+
 **How much history** decides how far back the link reaches, in the same words the clean-up
 dialog uses: everything, the last 3, 6 or 12 months, the last 2 or 3 years, or everything from
 a date you pick. Nothing is deleted — this only trims what rides in the URL, which is what
