@@ -964,7 +964,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 
 <!-- ── Backup / restore — opened from the header, like the sibling app ────── -->
 <dialog id="dataDialog" aria-labelledby="dataDialogTitle">
-  <h2 id="dataDialogTitle">Back up &amp; restore</h2>
+  <h2 id="dataDialogTitle">Back Up &amp; Restore</h2>
   <p>
     One JSON file holding every team, their work items and your shared settings — a copy
     you keep, independent of this browser and of any Google account.
@@ -989,7 +989,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
      then commit. Every control refreshes the preview, so the destructive button
      is never the thing that tells you what it is about to do. -->
 <dialog id="cleanupDialog" aria-labelledby="cleanupTitle">
-  <h2 id="cleanupTitle">Clean up old data</h2>
+  <h2 id="cleanupTitle">Clean Up Old Data</h2>
   <p>Choose how much history to keep. Nothing goes until you press
     <strong>Remove items</strong> — the summary below only says what that press would do.</p>
 
@@ -1047,7 +1047,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 
 <!-- ── Share a read-only link — the sibling app's feature, same shape ─────── -->
 <dialog id="shareDialog" aria-labelledby="shareDialogTitle">
-  <h2 id="shareDialogTitle">Share a read-only link</h2>
+  <h2 id="shareDialogTitle">Share a Read-Only Link</h2>
   <p>Anyone opening this link sees the figures you pick, with no way to change
     them and no sign-in. The data travels <em>inside</em> the link itself — it isn't uploaded
     anywhere, and it doesn't touch whatever they have saved in their own browser.</p>
@@ -1089,7 +1089,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 <!-- Reconciling two copies at first sign-in. Deliberately a question rather than
      a timestamp guess: guessing once wiped a browser's data in the sibling app. -->
 <dialog id="syncChoiceDialog" aria-labelledby="syncChoiceTitle">
-  <h2 id="syncChoiceTitle">Which copy do you want to keep?</h2>
+  <h2 id="syncChoiceTitle">Which Copy Do You Want to Keep?</h2>
   <p id="syncChoiceBody"></p>
   <div class="btn-row" style="margin-top:var(--sp-6)">
     <button class="btn primary" id="syncKeepDeviceBtn" type="button">Keep this device's</button>
@@ -2717,36 +2717,40 @@ function renderTitle() {
 /* ── ⓘ help — the sibling app's pattern ─────────────────────────────────────
    The dimension framing that used to sit above every chart (and was removed to
    fit all four on screen) lives here instead: on demand, one press away. */
+/* Dialog headings are Title Case, with the minor words — a, an, the, and, or,
+   per, to, in, of, at — left lowercase unless they lead. These titles fill the
+   help dialog's heading, so they follow the same rule as the headings written
+   into the markup for every other dialog. */
 const METRIC_HELP = {
-  defectRate: { title: 'Defect rate',
+  defectRate: { title: 'Defect Rate',
     body: 'How much of what we finish is defect work? Plots items whose Type matches the '
       + 'defect text in Settings as a share of everything completed. Lower is better — but '
       + 'a rate near zero in a maturing team usually means defects are being logged '
       + 'somewhere other than the board, not that there are none.' },
-  cycleTime: { title: 'Cycle time',
+  cycleTime: { title: 'Cycle Time',
     body: 'How long does an item take once work has actually started? The average of the '
       + 'items completed in each period, in days. Steady and falling is the good direction — '
       + 'and steady matters more than fast, because it is what makes a forecast possible.' },
   throughput: { title: 'Throughput',
     body: 'What pace do we deliver at? The count of items completed in each period. Read the '
       + 'trend line rather than any single point — throughput is naturally lumpy.' },
-  netFlow: { title: 'Net flow',
+  netFlow: { title: 'Net Flow',
     body: 'Is our completion pace consistent? Items completed minus items started. '
       + 'Around zero is the goal: persistently below zero means more work starts than '
       + 'finishes and work in progress is piling up; persistently above zero drains it.' },
-  leadTime: { title: 'Lead time',
+  leadTime: { title: 'Lead Time',
     body: 'How long from an idea being raised to the customer having it — the whole wait, '
       + 'including the time an item sat in the backlog before anyone picked it up. Cycle '
       + 'time only starts counting once work does, so lead time is always the longer of the '
       + 'two, and the gap between them is queue. Needs a Created column in your paste.' },
-  cycleTimePercentile: { title: '85th percentile cycle time',
+  cycleTimePercentile: { title: '85th Percentile Cycle Time',
     body: 'The number to forecast with. 85% of the items completed finished within this many '
       + 'days, so it is a promise you can make about the next one — where an average is a '
       + 'figure most work beats and a sixth of it misses badly. Watch the gap between this '
       + 'line and the average: a wide gap means the work is unpredictable even when it is '
       + 'quick on a good day, and predictability is usually worth more to whoever is asking '
       + 'than speed. It is a real duration some item actually took, never an interpolation.' },
-  wip: { title: 'Work in progress',
+  wip: { title: 'Work in Progress',
     body: 'How much work is open at once? Counted at the end of each period from the same '
       + 'start and completion dates as everything else, so it is a history rather than just '
       + 'today’s number. The common coaching rule is to keep work in progress under half '
@@ -2754,7 +2758,7 @@ const METRIC_HELP = {
       + 'tile states that ratio. It is a rule of thumb, not a target this app holds you to, '
       + 'which is why nothing here turns a colour when you cross it. Less work in progress '
       + 'means shorter cycle times, for the same reason a shorter queue moves faster.' },
-  agedWork: { title: 'Aged work',
+  agedWork: { title: 'Aged Work',
     body: 'How many open items have been open too long? Anything still in progress beyond the '
       + 'threshold in Settings — two weeks by default, and worth keeping under a month. Read '
       + 'as of the newest date in your data rather than today, so a paste of last quarter’s '
