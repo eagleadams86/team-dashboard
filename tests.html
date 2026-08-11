@@ -210,7 +210,7 @@ const SAMPLE_SETTINGS = {
   sameDayValue: 0.5,
   unplannedType: 'Bug',
   unplannedLabel: 'Bugs',
-  cycleTimeLabel: 'Cycle time'
+  cycleTimeLabel: 'Cycle Time'
 };
 
 let passed = 0, failed = 0;
@@ -475,7 +475,7 @@ async function run(TD, win) {
   is(d.netFlow[1], 1, 'week 2 net flow = 1');
 
   /* the chart title carries the average rate */
-  is(d.titles.defectRate, 'Bugs percentage rate (avg: 19.92%)', 'avg bug rate is 19.92%');
+  is(d.titles.defectRate, 'Bugs Percentage Rate (Avg: 19.92%)', 'avg bug rate is 19.92%');
 
   /* Every chart heads its card with what it IS, above the sentence saying what
      it plots — and every name must have a help entry behind it, since the ⓘ
@@ -485,16 +485,28 @@ async function run(TD, win) {
      'every chart has a name of its own');
   ok(Object.keys(d.names).every(k => d.titles[k]),
      'and a sentence under it saying what it plots');
-  is(d.names.cycleTime, 'Cycle time', 'the cycle time name is the configured word for it');
+  is(d.names.cycleTime, 'Cycle Time', 'the cycle time name is the configured word for it');
   is(TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { cycleTimeLabel: 'TiP' }),
      { filterValue: '', months: 3 }).names.cycleTime, 'TiP',
      'so renaming it to an acronym renames the card heading too');
+
+  /* Two of the wordings were sentence case before the headings went Title Case.
+     A saved value that matches no <option> leaves the select blank, so the old
+     spellings are carried across on load. */
+  is(win.TDState.normalizeSettings({ cycleTimeLabel: 'Cycle time' }).cycleTimeLabel, 'Cycle Time',
+     'an older saved "Cycle time" is carried over to the Title Case wording');
+  is(win.TDState.normalizeSettings({ cycleTimeLabel: 'In process time' }).cycleTimeLabel,
+     'In Process Time', 'and so is "In process time"');
+  is(win.TDState.normalizeSettings({ cycleTimeLabel: 'TiP' }).cycleTimeLabel, 'TiP',
+     'a wording that was already right is left alone');
+  is(win.TDState.normalizeSettings({ cycleTimeLabel: 'Elapsed days' }).cycleTimeLabel,
+     'Elapsed days', 'and one the user typed themselves is never re-cased');
   is(d.names.wip, 'Work in progress', 'the rest are the standard metric names');
-  is(d.titles.cycleTime, 'Cycle time per week — average and 85th percentile',
-     'the cycle time title names both series');
+  is(d.titles.cycleTime, 'Cycle Time per Week — Average and 85th Percentile',
+     'the cycle time title names both series, in Title Case like every heading');
   is(TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { cycleTimeLabel: 'TiP' }),
-     { filterValue: '', months: 3 }).titles.cycleTime, 'TiP per week — average and 85th percentile',
-     'an acronym label keeps its capitals — "TiP" must not become "tip"');
+     { filterValue: '', months: 3 }).titles.cycleTime, 'TiP per Week — Average and 85th Percentile',
+     'an acronym label keeps its capitals — "TiP" must not become "tip" or "Tip"');
 
   /* the summary figures the dashboard tiles read */
   near(d.summary.avgThroughput, 124 / 14, 'summary: avg throughput is the mean of the weekly counts');
@@ -623,7 +635,7 @@ async function run(TD, win) {
   is(gMo.bucketNounPlural, 'months', 'and so does its plural');
   is(gMo.axisTitles.x, 'Month', 'the x-axis title says which grouping is on screen');
   is(gWk.axisTitles.x, 'Year-Week Number', 'the weekly x-axis title is the original wording');
-  ok(/per month$/.test(gMo.titles.throughput), 'chart titles say the grouping', gMo.titles.throughput);
+  ok(/per Month$/.test(gMo.titles.throughput), 'chart titles say the grouping', gMo.titles.throughput);
 
   /* Fortnight anchoring is a property of the calendar, not of the window. Two
      different windows must put the same date in the same bucket, or bars slide
