@@ -268,6 +268,70 @@ async function run(TD, win) {
   is(iso(TD.edate(D(2015, 3, 31), -1)), '2015-02-28', 'EDATE clamps 31 Mar back to 28 Feb');
   is(iso(TD.edate(D(2015, 1, 15), -1)), '2014-12-15', 'EDATE crosses the year boundary');
 
+  /* ══════════════════════════════════════════════════════════
+     Bucket helpers. The dashboard groups by week, fortnight or calendar month;
+     'week' must stay exactly what the four functions above always did.
+     ══════════════════════════════════════════════════════════ */
+  group('bucket helpers');
+
+  const bs = (y, m, d, b) => iso(TD.bucketStart(D(y, m, d), b));
+
+  is(bs(2015, 2, 13, 'week'), '2015-02-08', 'a week starts on the prior Sunday');
+  is(bs(2015, 2, 13, 'month'), '2015-02-01', 'a month starts on the 1st');
+  is(bs(2015, 2, 13, 'fortnight'), '2015-02-01', 'a fortnight starts on its own anchor Sunday');
+  is(bs(2015, 2, 8, 'fortnight'), '2015-02-01', '8 Feb shares a fortnight with 1 Feb');
+  is(bs(2015, 2, 15, 'fortnight'), '2015-02-15', '15 Feb starts the next fortnight');
+
+  /* Every week-cased helper must be the untouched original. */
+  let weekDrift = 0;
+  for (let i = 0; i < 400; i++) {
+    const d = TD.utcDate(2015, 1, 1); d.setUTCDate(d.getUTCDate() + i);
+    if (iso(TD.bucketStart(d, 'week')) !== iso(TD.priorSunday(d))) weekDrift++;
+    if (TD.bucketKey(TD.bucketStart(d, 'week'), 'week') !== TD.weekKey(TD.priorSunday(d))) weekDrift++;
+    if (TD.bucketLabel(TD.bucketStart(d, 'week'), 'week') !== TD.weekKey(TD.priorSunday(d))) weekDrift++;
+  }
+  is(weekDrift, 0, "the 'week' bucket is priorSunday/weekKey exactly, over 400 consecutive days");
+
+  /* New Year: the week containing 2 Jan 2025 belongs to 2024, and a fortnight
+     keyed off its start Sunday inherits that rule rather than re-deriving it. */
+  is(TD.bucketKey(TD.bucketStart(D(2025, 1, 2), 'week'), 'week'), '2024-53',
+     'the week straddling New Year keeps the old year');
+  is(TD.bucketKey(TD.bucketStart(D(2025, 1, 2), 'fortnight'), 'fortnight'), '2024-52',
+     'a fortnight straddling New Year keeps the old year too');
+  is(TD.bucketKey(TD.bucketStart(D(2025, 1, 2), 'month'), 'month'), '2025-01',
+     'a month is the calendar month, whatever the week says');
+
+  is(bs(2024, 2, 29, 'month'), '2024-02-01', 'a leap day is in February');
+  is(iso(TD.bucketEnd(D(2024, 2, 1), 'month')), '2024-02-29', 'February 2024 ends on the 29th');
+  is(iso(TD.bucketEnd(D(2015, 2, 8), 'week')), '2015-02-14', 'a week ends on the Saturday');
+  is(iso(TD.bucketEnd(D(2015, 2, 1), 'fortnight')), '2015-02-14', 'a fortnight ends 13 days later');
+
+  /* Fortnights are anchored to a fixed epoch, not to the window on screen. The
+     property that matters: which fortnight a date is in depends only on the
+     date. Anchoring to the window start would slide every bar sideways when the
+     months control changed, and two views of the same team wouldn't line up. */
+  is(iso(TD.bucketStart(TD.FORTNIGHT_EPOCH, 'fortnight')), iso(TD.FORTNIGHT_EPOCH),
+     'the fortnight epoch is its own bucket start');
+  let fnBad = 0;
+  for (let i = 0; i < 3000; i++) {
+    const d = TD.utcDate(2014, 6, 1); d.setUTCDate(d.getUTCDate() + i);
+    const b = TD.bucketStart(d, 'fortnight');
+    /* idempotent, and d really is inside the 14 days it claims */
+    if (iso(TD.bucketStart(b, 'fortnight')) !== iso(b)) fnBad++;
+    if (d < b || d > TD.bucketEnd(b, 'fortnight')) fnBad++;
+    if (iso(TD.nextBucket(b, 'fortnight')) !== iso(TD.bucketEnd(b, 'fortnight')) &&
+        TD.nextBucket(b, 'fortnight') - TD.bucketEnd(b, 'fortnight') !== 86400000) fnBad++;
+  }
+  is(fnBad, 0, 'a fortnight bucket is stable and contains its date, over 3000 consecutive days');
+
+  /* Negative modulo: a date before the 1970 epoch must step back a week, not
+     forward. */
+  is(bs(1969, 12, 25, 'fortnight'), '1969-12-21', 'fortnights work before the epoch');
+
+  is(TD.bucketLabel(D(2015, 2, 1), 'fortnight'), '2015-06/07',
+     'a fortnight label names both of its weeks');
+  is(TD.bucketKey(D(2015, 2, 1), 'month'), '2015-02', 'a month key is YYYY-MM');
+
   /* ────────────────────────────────────────────────────────── */
   group('Date parsing');
 
@@ -489,6 +553,90 @@ async function run(TD, win) {
     { filterValue: '', months: 3 });
   ok(dLabel.titles.defectRate.startsWith('Incidents '), 'the defect label drives the defect rate title',
      dLabel.titles.defectRate);
+
+  /* ══════════════════════════════════════════════════════════
+     Grouping by week / fortnight / month.
+
+     The gate for the whole bucket refactor is the first assertion here: not
+     passing a bucket must mean exactly what the app did before buckets
+     existed. Every pinned number above is asserted without a bucket, so if
+     this holds and those hold, weekly maths has not moved.
+     ══════════════════════════════════════════════════════════ */
+  group('derive() — grouping');
+
+  is(TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 3, bucket: 'week' }),
+     TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 3 }),
+     'no bucket means week, down to the last field');
+  is(TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 3, bucket: 'nonsense' }),
+     TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 3 }),
+     'an unknown bucket falls back to week rather than throwing');
+
+  const gAll = b => TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: b });
+  const gWk = gAll('week'), gFn = gAll('fortnight'), gMo = gAll('month');
+  const total = a => a.reduce((x, y) => x + y, 0);
+
+  /* Conservation. Regrouping the same items must not create or destroy any of
+     them — this catches a bucket-boundary bug that a hand-computed expectation
+     would sail past, because it doesn't depend on knowing the right answer. */
+  is(total(gFn.throughput), total(gWk.throughput), 'fortnights complete the same items as weeks');
+  is(total(gMo.throughput), total(gWk.throughput), 'months complete the same items as weeks');
+
+  /* Throughput is conserved because the axis floor IS the earliest completion's
+     bucket, so no completion can fall off the front. Net flow is NOT, and must
+     not be asserted to be: the started tally only counts starts landing in a
+     plotted bucket, and a coarser bucket reaches further back — a month begins
+     on the 1st where a week begins on a Sunday — so it sweeps up starts the
+     weekly axis never saw. What must hold is that each grouping adds up
+     against its own axis. */
+  const startsOnAxis = g => p.rows.filter(r => r.started &&
+    g.buckets.indexOf(TD.bucketKey(TD.bucketStart(r.started, g.bucket), g.bucket)) >= 0).length;
+  [gWk, gFn, gMo].forEach(g => {
+    is(total(g.netFlow), total(g.throughput) - startsOnAxis(g),
+       'net flow adds up against its own axis, grouped by ' + g.bucketNoun);
+  });
+  is(gMo.summary.avgCycleTime, gWk.summary.avgCycleTime,
+     'the pooled cycle time is per item, so grouping cannot move it');
+  is(gMo.itemCount, gWk.itemCount, 'the item count is the window, not the grouping');
+
+  ok(gMo.buckets.length < gFn.buckets.length && gFn.buckets.length < gWk.buckets.length,
+     'coarser grouping means fewer buckets',
+     gWk.buckets.length + ' weeks, ' + gFn.buckets.length + ' fortnights, ' + gMo.buckets.length + ' months');
+
+  is(gWk.weeks, gWk.buckets, 'weeks is the same array as buckets, under the old name');
+  is(gWk.bucketLabels, gWk.buckets, 'a weekly label is its key, so the axis is unchanged');
+  is(gMo.bucketNoun, 'month', 'the noun follows the grouping');
+  is(gMo.bucketNounPlural, 'months', 'and so does its plural');
+  is(gMo.axisTitles.x, 'Month', 'the x-axis title says which grouping is on screen');
+  is(gWk.axisTitles.x, 'Year-Week Number', 'the weekly x-axis title is the original wording');
+  ok(/per month$/.test(gMo.titles.throughput), 'chart titles say the grouping', gMo.titles.throughput);
+
+  /* Fortnight anchoring is a property of the calendar, not of the window. Two
+     different windows must put the same date in the same bucket, or bars slide
+     sideways whenever the months control changes. */
+  const fnShort = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 1, bucket: 'fortnight' });
+  ok(fnShort.buckets.every(k => gFn.buckets.indexOf(k) >= 0),
+     'a 1-month window uses the same fortnight buckets as an all-time one',
+     JSON.stringify(fnShort.buckets) + '\n  vs ' + JSON.stringify(gFn.buckets));
+
+  /* A trailing period that stops part-way is reported rather than dropped —
+     dropping it would hide the most recent data. */
+  const dPartial = TD.derive([
+    { completed: D(2015, 1, 5), started: D(2015, 1, 2), type: 'Story' },
+    { completed: D(2015, 3, 4), started: D(2015, 3, 2), type: 'Story' }
+  ], SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: 'month' });
+  is(dPartial.buckets[dPartial.buckets.length - 1], '2015-03', 'the part-finished month is still plotted');
+  is(dPartial.partial && dPartial.partial.daysCovered, 4, 'and it reports how much of itself it covers');
+  is(dPartial.partial && dPartial.partial.daysInBucket, 31, 'out of the whole month');
+  is(TD.derive([{ completed: D(2015, 1, 31), started: D(2015, 1, 2), type: 'Story' }],
+     SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: 'month' }).partial, null,
+     'a month whose data runs to the last day is not partial');
+
+  /* A window shorter than one bucket must still plot, and linearTrend must not
+     invent a line through a single point. */
+  const dOne = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 1, bucket: 'month' });
+  ok(dOne.buckets.length >= 1 && dOne.buckets.length <= 2,
+     'a 1-month window grouped by month is one or two buckets', String(dOne.buckets.length));
+  is(TD.linearTrend([5]), [null], 'a single point has no trend line');
 
   /* ══════════════════════════════════════════════════════════
      Column detection. A real Jira export leads with an issue key and orders

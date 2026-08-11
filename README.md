@@ -15,9 +15,14 @@ so the measures that move together are read together:
 
 | Group | Question it answers | What's plotted |
 |---|---|---|
-| **Flow** — how long work takes | How long does an item take once started? | Average cycle time per week |
-| **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per week; net flow (completed minus started) |
-| **Health** — the state of the board | How much of what we finish is defect work? | Defect rate — defects as a share of everything completed, per week |
+| **Flow** — how long work takes | How long does an item take once started? | Average cycle time per period |
+| **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started) |
+| **Health** — the state of the board | How much of what we finish is defect work? | Defect rate — defects as a share of everything completed, per period |
+
+**Group by week, 2 weeks or month.** The control sits beside the date window on the dashboard.
+Weekly is the default and the finest grain; monthly smooths out the lumpiness that makes a
+single week hard to read. The grouping also drives the last column of the Your Data table, so
+the table and the charts always name the same period.
 
 Each chart carries a dashed linear trend line, and four **summary tiles** above the tabs state
 the window-wide figures — average completed per week, average cycle time (pooled over the items
@@ -143,18 +148,36 @@ worth knowing:
 
 - **Weeks start on Sunday.** Week keys are `YEAR-WW`, where the week containing 1 January is
   week 1. Written out by hand, because JavaScript has no week-number function.
+- **Fortnights are anchored to a fixed date** — the first Sunday of 1970 — not to whatever
+  window is on screen. Which fortnight a date falls in is therefore a property of the calendar,
+  and switching from 3 months to 12 doesn't slide every bar one week sideways. Months are
+  plain calendar months.
+- **The axis snaps outward to whole periods.** A 3-month window starting on the 5th, grouped
+  by month, plots the whole of that month. The window note states the dates you asked for; the
+  chart draws complete periods, because half a bar is worse than a slightly wider window.
+- **A part-finished last period is plotted and labelled, not dropped.** The data usually stops
+  mid-period, so the final bar is genuinely lower and always will be. Dropping it would hide
+  the most recent data — the first thing anyone looks at — and would disagree with what Jira
+  says the team finished this month. Instead the window note and the tooltip say how much of
+  the period is covered ("Last month covers 5 of 31 days").
+- **Throughput is conserved when you regroup; net flow is not.** Regrouping can't lose a
+  completion, because the axis starts at the earliest completed period by definition. It can
+  change the *started* tally, because a coarser period reaches further back — a month begins
+  on the 1st where a week begins on a Sunday — and sweeps up starts the weekly axis never
+  saw. Net flow moving when you change the grouping is the metric behaving correctly, not a
+  bug.
 - **The date window trims the axis, not the data.** "Show data for most recent 3 months" moves
   where the chart starts; every item still counts toward the weeks that remain. That's
-  deliberate. The axis also never starts before the team's first completed week — a window
-  longer than the data doesn't pad empty weeks in front, which would read as real
-  zero-throughput weeks and dilute the tile averages for a young team.
+  deliberate. The axis also never starts before the team's first completed period — a window
+  longer than the data doesn't pad empty periods in front, which would read as real
+  zero-throughput periods and dilute the tile averages for a young team.
 - **Cycle time** is `completed − started`, floored at 0, with same-day items taking the
   configured value.
 - **Unfinished items count as work started, and nothing else.** They move net flow but add
   nothing to throughput, the bug rate or the cycle-time average, all three of which key off
   a completion. Dropping them — which an earlier version did — made net flow read
   systematically too positive.
-- **A week with no unplanned work scores 0%**, not blank; a week with no completions has an
+- **A period with no defect work scores 0%**, not blank; a period with no completions has an
   average cycle time of 0.
 - **A team whose items are all still in progress has nothing to chart yet, and the dashboard
   says exactly that** — "Nothing finished yet", not a complaint about the filter. The filter
