@@ -789,6 +789,14 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
           <option value="all">All</option>
         </select>
       </div>
+      <div class="field">
+        <label for="bucketSel">Group by</label>
+        <select id="bucketSel">
+          <option value="week">Week</option>
+          <option value="fortnight">2 weeks</option>
+          <option value="month">Month</option>
+        </select>
+      </div>
       <div class="window" id="windowNote"></div>
     </div>
 
@@ -1091,6 +1099,60 @@ function edate(d, months) {
   const target = new Date(Date.UTC(y, m, 1));
   const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
   return utcDate(target.getUTCFullYear(), target.getUTCMonth() + 1, Math.min(day, lastDay));
+}
+
+/* ── Buckets ─────────────────────────────────────────────────────────────────
+   The dashboard groups by week, fortnight or calendar month. Everything below
+   takes that as a parameter so derive() has one axis to walk whichever is
+   chosen, and 'week' reduces to exactly what the four functions above did.
+
+   Sunday 4 Jan 1970 — the first Sunday of the epoch. Fortnights count from a
+   fixed date rather than from the start of whatever window is on screen, so
+   which fortnight a date falls in is a property of the calendar. Anchoring to
+   the window would slide every bar sideways when you switched 3 months to 6,
+   and two screenshots of the same team would not line up. */
+const FORTNIGHT_EPOCH = utcDate(1970, 1, 4);
+const BUCKET_NOUNS = { week: 'week', fortnight: 'fortnight', month: 'month' };
+
+/* The first day of the bucket containing d. */
+function bucketStart(d, bucket) {
+  if (bucket === 'month') return utcDate(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+  const sun = priorSunday(d);
+  if (bucket !== 'fortnight') return sun;
+  const weeks = diffDays(sun, FORTNIGHT_EPOCH) / 7;       /* always a whole number */
+  /* ((n % 2) + 2) % 2 rather than n % 2: JS keeps the sign, so a date before
+     1970 would otherwise step forward a week instead of back. */
+  return addDays(sun, -(((weeks % 2) + 2) % 2) * 7);
+}
+
+/* d must be a bucket start. */
+function nextBucket(d, bucket) {
+  return bucket === 'month' ? edate(d, 1) : addDays(d, bucket === 'fortnight' ? 14 : 7);
+}
+
+/* The last day inside the bucket, not the first day of the next one. */
+function bucketEnd(d, bucket) { return addDays(nextBucket(d, bucket), -1); }
+
+/* The key a bucket is stored under. Weeks and fortnights both key off their
+   start Sunday through weekKey, so the New Year rule above covers both. */
+function bucketKey(d, bucket) {
+  if (bucket === 'month') {
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+  }
+  return weekKey(d);
+}
+
+/* What the x-axis draws. Identical to the key for weeks, so a weekly axis is
+   unchanged; a fortnight shows both of its week numbers rather than looking
+   like a week that skipped one. */
+function bucketLabel(d, bucket) {
+  if (bucket === 'month') {
+    return d.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', year: 'numeric' });
+  }
+  if (bucket === 'fortnight') {
+    return weekKey(d) + '/' + String(weekNumber(addDays(d, 7))).padStart(2, '0');
+  }
+  return weekKey(d);
 }
 
 function isoOf(d) { return d ? d.toISOString().slice(0, 10) : ''; }
@@ -1426,13 +1488,18 @@ function mean(a) { return a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0
 
 /**
  * @param rows      [{completed: Date, started: Date|null, type: string}]
- * @param settings  {sameDayValue, unplannedType, plannedLabel, unplannedLabel, cycleTimeLabel}
- * @param view      {filterValue: string ('' = no filter), months: number|'all'}
+ * @param settings  {sameDayValue, unplannedType, unplannedLabel, cycleTimeLabel}
+ * @param view      {filterValue: string ('' = no filter), months: number|'all',
+ *                   bucket: 'week'|'fortnight'|'month' (default 'week')}
  */
 function derive(rows, settings, view) {
   const sameDay   = Number(settings.sameDayValue);
   const unplannedStr = String(settings.unplannedType || '').trim().toLowerCase();
   const filterVal = String(view.filterValue || '').trim().toLowerCase();
+  /* Defaulted here rather than relying on the caller, so an old saved view — or
+     a test fixture written before buckets existed — still means "weekly". */
+  const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
+  const noun   = BUCKET_NOUNS[bucket];
 
   /* Rows whose type doesn't match the filter drop out entirely. Note the filter
      is on work type only — the date window below never removes rows. */
@@ -1461,42 +1528,42 @@ function derive(rows, settings, view) {
   /* "All" means no start bound at all. */
   const startDate = view.months === 'all' ? null : edate(endDate, -Number(view.months));
 
-  /* The prior Sundays either end of the window. */
-  const startPS = startDate ? priorSunday(startDate) : null;
-  const endPS   = priorSunday(endDate);
+  /* The bucket starts either end of the window. */
+  const startPS = startDate ? bucketStart(startDate, bucket) : null;
+  const endPS   = bucketStart(endDate, bucket);
 
-  /* First week is the window start, or the earliest completed week if the window
-     is "All"; then +7 until the window (or the data) runs out. */
-  const completedSundays = finished.map(r => priorSunday(r.completed));
+  /* First bucket is the window start, or the earliest completed bucket if the
+     window is "All"; then step until the window (or the data) runs out. */
+  const completedSundays = finished.map(r => bucketStart(r.completed, bucket));
   const maxCompletedPS = new Date(Math.max.apply(null, completedSundays.map(d => d.getTime())));
   const minCompletedPS = new Date(Math.min.apply(null, completedSundays.map(d => d.getTime())));
   const limit = new Date(Math.min(endPS.getTime(), maxCompletedPS.getTime()));
 
-  /* A window longer than the data must not pad empty weeks in front of the
-     team's first completion — they would read as real zero-throughput weeks and
+  /* A window longer than the data must not pad empty buckets in front of the
+     team's first completion — they would read as real zero-throughput periods and
      drag every tile average down. The axis starts no earlier than the first
-     completed week, the same floor "All" uses. */
+     completed bucket, the same floor "All" uses. */
   const firstWeek = startPS && startPS > minCompletedPS ? startPS : minCompletedPS;
   const weekStarts = [];
-  for (let w = firstWeek; w <= limit; w = addDays(w, 7)) {
+  for (let w = firstWeek; w <= limit; w = nextBucket(w, bucket)) {
     weekStarts.push(w);
     if (weekStarts.length > 1200) break;               /* runaway guard */
   }
 
   /* Bucket once, read four times. */
-  const byCompletedWeek = new Map();   /* keyed on the week-start Sunday */
-  const byStartedWeek   = new Map();   /* keyed on the week-start Sunday */
-  const cycleByWeek     = new Map();   /* keyed on the week-start Sunday too */
+  const byCompletedWeek = new Map();   /* keyed on the bucket start */
+  const byStartedWeek   = new Map();   /* keyed on the bucket start */
+  const cycleByWeek     = new Map();   /* keyed on the bucket start too */
 
   for (const r of items) {
     /* Started counts every item that has a start date, finished or not. */
     if (r.started) {
-      const sk = weekKey(priorSunday(r.started));
+      const sk = bucketKey(bucketStart(r.started, bucket), bucket);
       byStartedWeek.set(sk, (byStartedWeek.get(sk) || 0) + 1);
     }
     if (!r.completed) continue;
 
-    const ck = weekKey(priorSunday(r.completed));
+    const ck = bucketKey(bucketStart(r.completed, bucket), bucket);
     if (!byCompletedWeek.has(ck)) byCompletedWeek.set(ck, []);
     byCompletedWeek.get(ck).push(r);
 
@@ -1507,21 +1574,23 @@ function derive(rows, settings, view) {
     }
   }
 
-  const weeks = [], throughput = [], unplannedRate = [], avgCycleTime = [], netFlow = [];
+  const weeks = [], bucketLabels = [], throughput = [], unplannedRate = [],
+        avgCycleTime = [], netFlow = [];
   /* Every individual cycle time inside the window, pooled — the summary tile
-     averages these rather than the weekly means, so an empty week (stored as 0
-     in the weekly series to keep the line unbroken) can't drag it down. */
+     averages these rather than the per-bucket means, so an empty bucket (stored
+     as 0 in the series to keep the line unbroken) can't drag it down. */
   const windowCycles = [];
 
   for (const ws of weekStarts) {
-    const key = weekKey(ws);
+    const key = bucketKey(ws, bucket);
     weeks.push(key);
+    bucketLabels.push(bucketLabel(ws, bucket));
 
     const done = byCompletedWeek.get(key) || [];
 
     throughput.push(done.length);
 
-    /* Planned vs unplanned, and the rate. A week with no unplanned work is 0,
+    /* Planned vs unplanned, and the rate. A bucket with no unplanned work is 0,
        not blank — a gap in the line would read as missing data. */
     const unplanned = done.filter(isUnplanned).length;
     const planned   = done.length - unplanned;
@@ -1537,12 +1606,31 @@ function derive(rows, settings, view) {
 
   const cycleLabel = settings.cycleTimeLabel || 'Cycle time';
 
+  /* The last bucket usually stops part-way through: the data ends on a Tuesday,
+     the month it lands in has three more weeks to run. Its bars are therefore
+     lower than a full period's and always will be. Weekly that is a small lie
+     the app has always told; monthly it can look like the team fell off a
+     cliff, so say so rather than dropping the bucket — dropping it would hide
+     the most recent data, which is the first thing anyone looks at, and would
+     disagree with what Jira says the team finished this month. */
+  const lastStart = weekStarts[weekStarts.length - 1];
+  const lastEnd = lastStart ? bucketEnd(lastStart, bucket) : null;
+  const partial = lastEnd && endDate < lastEnd ? {
+    label: bucketLabels[bucketLabels.length - 1],
+    daysCovered: diffDays(endDate, lastStart) + 1,
+    daysInBucket: diffDays(lastEnd, lastStart) + 1
+  } : null;
+
   return {
     empty: weeks.length === 0,
-    weeks, throughput, unplannedRate, avgCycleTime, netFlow,
+    /* `buckets` is the name the code uses; `weeks` is the same array under the
+       name every caller and every pinned test already knows it by. */
+    weeks, buckets: weeks, bucketLabels,
+    bucket, bucketNoun: noun, bucketNounPlural: noun + 's', partial,
+    throughput, unplannedRate, avgCycleTime, netFlow,
     /* Window-wide figures for the summary tiles. avgCycleTime here is the mean
-       over the pooled cycle times (per item), not over the weekly means — and
-       null, not 0, when nothing in the window has one. */
+       over the pooled cycle times (per item), not over the per-bucket means —
+       and null, not 0, when nothing in the window has one. */
     summary: {
       avgThroughput: mean(throughput),
       avgCycleTime: windowCycles.length ? mean(windowCycles) : null,
@@ -1557,17 +1645,20 @@ function derive(rows, settings, view) {
                ' percentage rate (avg: ' + (mean(unplannedRate) * 100).toFixed(2) + '%)',
       /* The label is used verbatim — lower-casing it turned the "TiP" setting
          into "tip", and an acronym the user chose is not ours to re-case. */
-      cycleTime: 'Average ' + cycleLabel + ' per week',
-      throughput: 'Items completed per week',
-      netFlow: 'Net flow per week (items completed − items started)'
+      cycleTime: 'Average ' + cycleLabel + ' per ' + noun,
+      throughput: 'Items completed per ' + noun,
+      netFlow: 'Net flow per ' + noun + ' (items completed − items started)'
     },
     axisTitles: {
       /* Deliberately short: a rotated axis title gets truncated on a narrow
          screen, and the chart title above already says the rest. */
       defectRate: 'Defect rate',
       cycleTime: cycleLabel + ' (days)',
-      throughput: 'Count of closed items during week',
-      netFlow: 'Items completed − items started'
+      throughput: 'Count of closed items during ' + noun,
+      netFlow: 'Items completed − items started',
+      x: bucket === 'month' ? 'Month'
+        : bucket === 'fortnight' ? 'Year-Fortnight (week numbers)'
+        : 'Year-Week Number'
     }
   };
 }
@@ -1575,6 +1666,7 @@ function derive(rows, settings, view) {
 /* Exposed for tests.html, which drives the real app in a hidden iframe. */
 window.TD = {
   weekdayNum, priorSunday, weekNumber, weekKey, edate,
+  bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats,
   cycleTimeOf, linearTrend, derive, utcDate
 };
@@ -1598,7 +1690,7 @@ const DEFAULT_SETTINGS = {
    be looking at is a position on this device, not shared data. Syncing it would
    make switching team on the laptop yank the phone to the same team. */
 const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', activeTeamId: null,
-  chartTab: 'flow' };
+  chartTab: 'flow', bucket: 'week' };
 
 const LS = {
   state: 'td-state', view: 'td-view', theme: 'td-theme',
@@ -1875,8 +1967,10 @@ const valueLabels = {
 Chart.register(valueLabels);
 
 /* tickFormat defaults to tipFormat — pass it separately when the axis wants
-   rounder numbers than the tooltip. */
-function baseOptions(yTitle, tipFormat, tickFormat) {
+   rounder numbers than the tooltip. xTitle and partial come from derive(), so
+   the axis says which grouping is on screen and the tooltip owns up to a final
+   period that hasn't finished yet. */
+function baseOptions(yTitle, tipFormat, tickFormat, xTitle, partial) {
   const yFormat = tickFormat || tipFormat;
   const grid = token('--chart-grid'), tickCol = token('--chart-tick'), textCol = token('--text-secondary');
   return {
@@ -1897,12 +1991,22 @@ function baseOptions(yTitle, tipFormat, tickFormat) {
         borderWidth: 1,
         padding: 10,
         displayColors: false,
-        callbacks: { label: c => c.dataset.label + ': ' + tipFormat(c.parsed.y) }
+        callbacks: {
+          label: c => c.dataset.label + ': ' + tipFormat(c.parsed.y),
+          /* Only on the last point, and only when it really is short. */
+          footer: items => {
+            if (!partial || !items.length) return '';
+            const last = items[0].chart.data.labels.length - 1;
+            if (items[0].dataIndex !== last) return '';
+            return 'Partial — covers ' + partial.daysCovered + ' of '
+              + partial.daysInBucket + ' days';
+          }
+        }
       }
     },
     scales: {
       x: {
-        title: { display: true, text: 'Year-Week Number', color: textCol, font: { size: 11 } },
+        title: { display: true, text: xTitle || 'Year-Week Number', color: textCol, font: { size: 11 } },
         grid: { color: grid, drawBorder: false },
         ticks: { color: tickCol, font: { size: 10 }, maxRotation: 60, minRotation: 0, autoSkipPadding: 8 }
       },
@@ -1944,12 +2048,12 @@ function drawCharts(d) {
   const accent = token('--accent'), serious = token('--serious');
 
   /* ── Defect rate per week ── */
-  const qualOpts = baseOptions(d.axisTitles.defectRate, pct1, pct0);
+  const qualOpts = baseOptions(d.axisTitles.defectRate, pct1, pct0, d.axisTitles.x, d.partial);
   qualOpts.scales.y.beginAtZero = true;
   renderChart('chartDefectRate', {
     type: 'line',
     data: {
-      labels: d.weeks,
+      labels: d.bucketLabels,
       datasets: [{
         label: state.settings.unplannedLabel + ' rate',
         data: d.unplannedRate,
@@ -1962,13 +2066,13 @@ function drawCharts(d) {
   });
 
   /* ── Average cycle time per week (with value labels) ── */
-  const respOpts = baseOptions(d.axisTitles.cycleTime, num1);
+  const respOpts = baseOptions(d.axisTitles.cycleTime, num1, null, d.axisTitles.x, d.partial);
   respOpts.scales.y.beginAtZero = true;
   respOpts.plugins.valueLabels = { enabled: true, color: token('--text-muted'), format: num1 };
   renderChart('chartCycleTime', {
     type: 'line',
     data: {
-      labels: d.weeks,
+      labels: d.bucketLabels,
       datasets: [{
         label: 'Avg ' + (state.settings.cycleTimeLabel || 'cycle time'),
         data: d.avgCycleTime,
@@ -1981,7 +2085,7 @@ function drawCharts(d) {
   });
 
   /* ── Throughput per week ── */
-  const prodOpts = baseOptions(d.axisTitles.throughput, int0);
+  const prodOpts = baseOptions(d.axisTitles.throughput, int0, null, d.axisTitles.x, d.partial);
   prodOpts.scales.y.beginAtZero = true;
   /* Counts are whole numbers: without this Chart.js picks fractional steps on a
      short axis and int0 rounds several of them to the same label. */
@@ -1989,7 +2093,7 @@ function drawCharts(d) {
   renderChart('chartThroughput', {
     type: 'line',
     data: {
-      labels: d.weeks,
+      labels: d.bucketLabels,
       datasets: [{
         label: 'Throughput',
         data: d.throughput,
@@ -2006,12 +2110,12 @@ function drawCharts(d) {
      coaching goal is "keep around zero", so neither sign is good or bad, and
      RAG would assert otherwise. */
   const netColours = d.netFlow.map(v => (v < 0 ? serious : accent));
-  const netOpts = baseOptions(d.axisTitles.netFlow, int0);
+  const netOpts = baseOptions(d.axisTitles.netFlow, int0, null, d.axisTitles.x, d.partial);
   netOpts.scales.y.ticks.precision = 0;
   renderChart('chartNetFlow', {
     type: 'bar',
     data: {
-      labels: d.weeks,
+      labels: d.bucketLabels,
       datasets: [{
         label: 'Net flow',
         data: d.netFlow,
@@ -2030,8 +2134,8 @@ function drawCharts(d) {
   const describe = (id, text) => {
     const c = document.getElementById(id);
     c.setAttribute('role', 'img');
-    c.setAttribute('aria-label', text + '. ' + d.weeks.length + ' week' +
-      (d.weeks.length === 1 ? '' : 's') + ' ending ' + prettyDate(d.endDate) +
+    c.setAttribute('aria-label', text + '. ' + d.buckets.length + ' ' + d.bucketNoun +
+      (d.buckets.length === 1 ? '' : 's') + ' ending ' + prettyDate(d.endDate) +
       '. Every underlying item is listed on the Your Data tab.');
   };
   describe('chartDefectRate', d.titles.defectRate);
@@ -2155,7 +2259,8 @@ function renderDashboard() {
   renderTitle();
 
   const rows = activeRows();
-  const d = derive(rows, state.settings, { filterValue: currentFilterValue(), months: view.months });
+  const d = derive(rows, state.settings,
+    { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket });
   const plottable = !d.empty && d.weeks.length > 0;
 
   /* Three states, three surfaces: the charts when something plots; the paste
@@ -2191,13 +2296,17 @@ function renderDashboard() {
     ? 'Showing <strong>' + prettyDate(d.startDate) + '</strong> to <strong>' + prettyDate(d.endDate) + '</strong>'
     : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(d.endDate) + '</strong>';
   $('windowNote').innerHTML = span + '<br>' +
-    d.weeks.length + ' weeks &middot; ' + d.itemCount + ' items' +
-    (d.inProgressCount ? ' (' + d.inProgressCount + ' in progress)' : '');
+    d.buckets.length + ' ' + (d.buckets.length === 1 ? d.bucketNoun : d.bucketNounPlural) +
+    ' &middot; ' + d.itemCount + ' items' +
+    (d.inProgressCount ? ' (' + d.inProgressCount + ' in progress)' : '') +
+    (d.partial ? '<br>Last ' + d.bucketNoun + ' covers ' + d.partial.daysCovered
+      + ' of ' + d.partial.daysInBucket + ' days' : '');
 
   const s = d.summary;
   $('dashTiles').innerHTML =
-    tile('Completed per week', num1(s.avgThroughput),
-      'items per week over ' + d.weeks.length + ' week' + (d.weeks.length === 1 ? '' : 's'),
+    tile('Completed per ' + d.bucketNoun, num1(s.avgThroughput),
+      'items per ' + d.bucketNoun + ' over ' + d.buckets.length + ' ' + d.bucketNoun
+        + (d.buckets.length === 1 ? '' : 's'),
       'throughput') +
     tile('Avg ' + (state.settings.cycleTimeLabel || 'cycle time'),
       s.avgCycleTime == null ? '—' : num1(s.avgCycleTime),
@@ -2236,6 +2345,10 @@ function renderDataTable() {
   /* Unfinished items sort to the top — they're the ones still in play. */
   const key = r => (r.completed || r.started || new Date(0)).getTime() + (r.completed ? 0 : 1e12);
   const sorted = rows.slice().sort((a, b) => key(b) - key(a));
+  /* The last column follows the dashboard's grouping control, so the table and
+     the charts always name the same period. */
+  const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
+  const bucketHead = bucket.charAt(0).toUpperCase() + bucket.slice(1);
   const body = sorted.map(r => {
     const ct = cycleTimeOf(r, Number(state.settings.sameDayValue));
     return '<tr>' +
@@ -2243,14 +2356,16 @@ function renderDataTable() {
       '<td>' + (r.started ? isoOf(r.started) : '<span class="hint">—</span>') + '</td>' +
       '<td>' + (escapeHtml(r.type) || '<span class="hint">—</span>') + '</td>' +
       '<td class="num">' + (ct == null ? '—' : num1(ct)) + '</td>' +
-      '<td class="num">' + (r.completed ? weekKey(priorSunday(r.completed)) : '—') + '</td>' +
+      '<td class="num">' +
+        (r.completed ? bucketLabel(bucketStart(r.completed, bucket), bucket) : '—') + '</td>' +
       '</tr>';
   }).join('');
 
   $('dataTable').innerHTML =
     '<div class="table-cap"><div class="table-scroll"><table class="data">' +
     '<thead><tr><th>Completed</th><th>Started</th><th>Type</th>' +
-    '<th>' + escapeHtml(state.settings.cycleTimeLabel) + ' (days)</th><th>Week</th></tr></thead>' +
+    '<th>' + escapeHtml(state.settings.cycleTimeLabel) + ' (days)</th>' +
+    '<th>' + bucketHead + '</th></tr></thead>' +
     '<tbody>' + body + '</tbody></table></div></div>';
 }
 
@@ -2570,6 +2685,10 @@ $('teamRows').addEventListener('click', e => {
 /* dashboard controls */
 $('filterSel').addEventListener('change', e => { view.filterDisplay = e.target.value; saveView(); renderDashboard(); });
 $('monthsSel').addEventListener('change', e => { view.months = e.target.value; saveView(); renderDashboard(); });
+/* The data table's last column follows this too, so it re-renders as well. */
+$('bucketSel').addEventListener('change', e => {
+  view.bucket = e.target.value; saveView(); renderDataTable(); renderDashboard();
+});
 
 /* settings — shared by every team */
 const SETTING_INPUTS = {
@@ -3123,6 +3242,7 @@ if (viewOnly) {
      instructions — and never the visitor's own teams. */
   $('dashEmpty').innerHTML = '<h2>Opening shared view&hellip;</h2>';
   $('monthsSel').value = view.months;
+  $('bucketSel').value = view.bucket;
   selectTab('dashboard');
   openSharedView();
 } else {
@@ -3132,6 +3252,7 @@ if (viewOnly) {
   saveView();
 
   $('monthsSel').value = view.months;
+  $('bucketSel').value = view.bucket;
   $('dateOrder').value = view.dateOrder;
   renderSettingsForm();
   renderAll();
