@@ -1564,8 +1564,11 @@ function parsePastedRows(text, order) {
     /* The ticket was raised after its work had already begun. Since Created
        cannot be edited and the automation stamps the start on the transition,
        created ≤ started holds by construction — so a violation means the start
-       date was moved by hand, which is usually someone recording that work had
-       truly started earlier than the ticket existed.
+       date was set some other way: a person recording that work truly began
+       earlier, or whatever raised the ticket back-dating it. Deliberately not
+       phrased as "edited by hand" — a job that raises tickets overnight and
+       back-dates them trips this too, and sending someone to ask a colleague
+       about a scheduled task wastes their time.
 
        That makes the adjusted date the BETTER estimate of when work began, so
        cycle time keeps it. Lead time does not: it measures the wait from a
@@ -3156,8 +3159,9 @@ function showParseNote(res, mode, team) {
           + 'date was dropped, and those rows count as completed but contribute no cycle '
           + 'time. Worth correcting at the source' },
     { rows: res.raisedAfterStart,
-      what: 'work that began before the ticket existed, so the start date has been adjusted '
-          + 'by hand — usually because the ticket was raised after work had truly started. '
+      what: 'work that began before the ticket existed, so the start date did not come from '
+          + 'the usual Ready → In Progress transition — most often because the ticket was '
+          + 'raised after work had truly started. '
           + 'Their cycle time is kept, since the adjusted date is the better estimate of '
           + 'when work began; their lead time is not, because there was no wait between the '
           + 'request and the work' }
