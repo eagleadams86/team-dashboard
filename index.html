@@ -1515,7 +1515,9 @@ function parsePastedRows(text, order) {
 
   const at = (cells, i) => (i >= 0 && cells[i] != null ? String(cells[i]).trim() : '');
 
-  const rows = [], badCompleted = [], badStarted = [], badCreated = [], createdOutOfOrder = [];
+  const rows = [], badCompleted = [], badStarted = [], badCreated = [];
+  /* Two different orderings, two different meanings — see the checks below. */
+  const startAfterDone = [], raisedAfterStart = [];
   let unfinished = 0, undated = 0;
 
   raw.forEach((cells, i) => {
@@ -1539,19 +1541,40 @@ function parsePastedRows(text, order) {
     if (!started && rawStarted !== '') badStarted.push({ line: lineNo, text: cells.join(' | ') });
     if (!created && rawCreated !== '') badCreated.push({ line: lineNo, text: cells.join(' | ') });
 
-    /* created ≤ started ≤ completed is the one hard ordering the dates have.
-       A created date later than the work it describes usually means the column
-       was read off something else — a due date, an updated date — or that the
-       ticket was raised after the work had already begun.
+    /* created ≤ started ≤ completed is the one hard ordering these dates have,
+       and which end of it breaks tells you something specific — because the
+       three fields are not equally trustworthy. Created and Resolved are
+       written by Jira and cannot be edited. The start date is set by automation
+       on the Ready → In Progress transition but CAN be adjusted afterwards, so
+       it is the only one of the three that can be wrong. Both checks below are
+       really checks on that one field. */
+    let usableStarted = started, usableCreated = created;
 
-       The date is dropped rather than kept, because keeping it produces a lead
-       time SHORTER than the same item's cycle time, and a wait cannot be less
-       than the work inside it. Everything else about the row is fine and is
-       kept: only the one unusable field goes, and the row is listed so it can
-       be found in the export. */
-    let usableCreated = created;
-    if (created && ((started && created > started) || (completed && created > completed))) {
-      createdOutOfOrder.push({ line: lineNo, text: cells.join(' | ') });
+    /* Work cannot finish before it starts, so this is a bad adjustment however
+       it was meant. It has to be caught rather than tolerated: cycleTimeOf
+       floors a negative span at 0, so a row like this quietly contributes a
+       zero-day cycle time and drags the average down where nobody can see it.
+       The row still completed — it counts for throughput — it just no longer
+       claims to know when it started. */
+    if (started && completed && started > completed) {
+      startAfterDone.push({ line: lineNo, text: cells.join(' | ') });
+      usableStarted = null;
+    }
+
+    /* The ticket was raised after its work had already begun. Since Created
+       cannot be edited and the automation stamps the start on the transition,
+       created ≤ started holds by construction — so a violation means the start
+       date was moved by hand, which is usually someone recording that work had
+       truly started earlier than the ticket existed.
+
+       That makes the adjusted date the BETTER estimate of when work began, so
+       cycle time keeps it. Lead time does not: it measures the wait from a
+       request to its delivery, and here the work was already under way when the
+       request was made, so there is no such wait to measure. Keeping it would
+       also produce a lead time shorter than the same row's cycle time. */
+    const startRef = usableStarted || completed;
+    if (created && startRef && created > startRef) {
+      raisedAfterStart.push({ line: lineNo, text: cells.join(' | ') });
       usableCreated = null;
     }
 
@@ -1562,12 +1585,12 @@ function parsePastedRows(text, order) {
     if (!completed && !started) { undated++; return; }
     if (!completed) unfinished++;
 
-    rows.push({ completed: completed || null, started: started || null,
+    rows.push({ completed: completed || null, started: usableStarted || null,
                 created: usableCreated || null, type });
   });
 
-  return { rows, badCompleted, badStarted, badCreated, createdOutOfOrder, unfinished, undated,
-           skippedHeader, dateOrder: resolved, columns: cols };
+  return { rows, badCompleted, badStarted, badCreated, startAfterDone, raisedAfterStart,
+           unfinished, undated, skippedHeader, dateOrder: resolved, columns: cols };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3127,9 +3150,17 @@ function showParseNote(res, mode, team) {
       what: 'a start date that could not be read, and were kept without one' },
     { rows: res.badCreated,
       what: 'a created date that could not be read, and were kept without one' },
-    { rows: res.createdOutOfOrder,
-      what: 'a created date later than the work itself, which cannot happen — the created '
-          + 'date was dropped on those rows and everything else about them kept' }
+    { rows: res.startAfterDone,
+      what: 'a start date later than the date they were resolved. Resolved is written by '
+          + 'Jira and cannot be edited, so it is the start date that is wrong — the start '
+          + 'date was dropped, and those rows count as completed but contribute no cycle '
+          + 'time. Worth correcting at the source' },
+    { rows: res.raisedAfterStart,
+      what: 'work that began before the ticket existed, so the start date has been adjusted '
+          + 'by hand — usually because the ticket was raised after work had truly started. '
+          + 'Their cycle time is kept, since the adjusted date is the better estimate of '
+          + 'when work began; their lead time is not, because there was no wait between the '
+          + 'request and the work' }
   ].filter(g => g.rows.length);
 
   if (!res.rows.length && !skipped.length && !kept.length) {
@@ -3155,11 +3186,11 @@ function showParseNote(res, mode, team) {
       'Correct these at the source and paste again.' + listOf(skipped) + '</div>';
   }
   if (kept.length) {
-    /* A handful of out-of-order rows is data — a ticket raised after the work
-       had started. A large share of them is a mismapped column, which is a
-       different problem with a different fix, so say which one this looks like
-       rather than leaving the reader to guess. */
-    const ooo = res.createdOutOfOrder.length;
+    /* A handful of late-raised tickets is ordinary. A large share is either a
+       mismapped column or a team that habitually raises tickets after starting
+       the work — different problems, both worth knowing, and neither of them
+       "a few odd rows". */
+    const ooo = res.raisedAfterStart.length;
     const seen = res.rows.length + skipped.length;
     const mismapped = ooo && seen && (ooo / seen) > 0.2;
     html += '<div class="note caution" style="margin-top:var(--sp-4)">' +
@@ -3167,9 +3198,10 @@ function showParseNote(res, mode, team) {
       kept.map(g => '<div style="margin-top:var(--sp-5)">' + g.rows.length + plural(g.rows.length) +
         ' had ' + g.what + '.' + listOf(g.rows) + '</div>').join('') +
       (mismapped ? '<div style="margin-top:var(--sp-5)">That is ' + Math.round(ooo / seen * 100)
-        + '% of the paste, which looks less like odd tickets than like the wrong column: '
-        + 'check whether column ' + (res.columns.created + 1) + ' is a due or updated date '
-        + 'rather than when the work was raised.</div>' : '') +
+        + '% of the paste, which is too many to be the odd late ticket. Either column '
+        + (res.columns.created + 1) + ' is a due or updated date rather than when the work '
+        + 'was raised, or this team routinely raises its tickets after starting the work — '
+        + 'in which case lead time will not tell you much.</div>' : '') +
       '</div>';
   }
   /* Which column was read as what is the single most damaging thing to get wrong
