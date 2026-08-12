@@ -574,6 +574,10 @@ legend { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
    free to reserve a horizontal scrollbar it never needs — a 15px white stripe
    under a two-line list, which is exactly what it looked like. */
 .checklist { display: grid; gap: 7px; max-height: 200px; overflow: hidden auto; }
+/* The count sits opposite the one control that changes the whole list.
+   Mirrored in Sprint Velocity and Golf Handicap. */
+.checklist-head { display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; margin-bottom: 8px; }
 label.checkline { display: flex; gap: 8px; align-items: center; font-size: 14px;
   font-weight: 400; color: var(--text-primary); margin: 0; min-height: 24px; }
 .checkline input { flex: none; }
@@ -1121,6 +1125,10 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 
   <fieldset class="formpanel">
     <legend>Which Teams</legend>
+    <div class="checklist-head">
+      <span class="hint" id="shareTeamCount" role="status"></span>
+      <button type="button" class="btn small" id="shareSelectAll">Select all</button>
+    </div>
     <div class="checklist" id="shareTeams"></div>
   </fieldset>
   </div>
@@ -3803,7 +3811,10 @@ function openShare() {
     (active && t.id === active.id ? ' checked' : '') + '><span>' + escapeHtml(t.name) +
     (t.rows.length ? ' (' + t.rows.length + ' item' + (t.rows.length === 1 ? '' : 's') + ')' : ' (empty)') +
     '</span></label>').join('');
-  $('shareTeams').querySelectorAll('input').forEach(i => { i.onchange = refreshShareLink; });
+  $('shareTeams').querySelectorAll('input').forEach(i => {
+    i.onchange = () => { syncSelectAll(); refreshShareLink(); };
+  });
+  syncSelectAll();
   refreshShareLink();
   $('shareDialog').showModal();
   $('shareDialog').scrollTop = 0;
@@ -3813,6 +3824,29 @@ function sharePicked() {
   return Array.from($('shareTeams').querySelectorAll('input:checked'))
     .map(i => i.dataset.shareTeam);
 }
+
+const shareBoxes = () => Array.from($('shareTeams').querySelectorAll('input'));
+
+/* One button rather than an All/None pair: with everything ticked the only
+   useful thing it can do is clear the lot, so it says so. The count beside it
+   is what makes that readable at a glance once there are more than a few
+   teams. Hidden below two, where selecting wholesale means nothing. */
+function syncSelectAll() {
+  const boxes = shareBoxes();
+  const picked = boxes.filter(i => i.checked).length;
+  const btn = $('shareSelectAll');
+  btn.textContent = (boxes.length && picked === boxes.length) ? 'Select none' : 'Select all';
+  btn.hidden = boxes.length < 2;
+  $('shareTeamCount').textContent = `${picked} of ${boxes.length} selected`;
+}
+
+$('shareSelectAll').addEventListener('click', () => {
+  const boxes = shareBoxes();
+  const turnOn = boxes.some(i => !i.checked);
+  boxes.forEach(i => { i.checked = turnOn; });
+  syncSelectAll();
+  refreshShareLink();
+});
 
 function shareTeamsPicked() {
   const ids = sharePicked();
