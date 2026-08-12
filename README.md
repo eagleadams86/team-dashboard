@@ -600,7 +600,13 @@ copies to drift. It must be served over `http://localhost`, not opened as a file
 marked `data-td-tests`, which the sync module checks so no sign-in session ever boots inside
 the harness.
 
-**It only runs on localhost, and enforces that itself.** The suite is not read-only about
+**It only runs on localhost, and enforces that itself.** `file://` is deliberately not treated
+as local: it has no hostname, and the empty string used to sit in that allow-list on the
+reasoning that the suite couldn't run there anyway — which sent it down the iframe branch, where
+the frame silently fails to load and the page blamed the app. Opening it off disk now gets the
+advice that fixes it.
+
+ The suite is not read-only about
 storage: it plants known state through `tdAdopt()`, and merely booting the app in the iframe
 writes this origin's `td-*` keys. On localhost those keys are a scratch copy. But GitHub Pages
 publishes every file in the repo, so `tests.html` is also live at

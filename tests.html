@@ -1467,7 +1467,7 @@ function onAppLoad() {
    (iframes from file:// are blocked), and its storage is a throwaway opaque
    origin, so it gets the ordinary "serve it over localhost" message rather
    than a warning about data it cannot reach. */
-const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]', ''];
+const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
 
 if (LOCAL_HOSTS.includes(location.hostname)) {
   const frame = document.createElement('iframe');
@@ -1481,15 +1481,26 @@ if (LOCAL_HOSTS.includes(location.hostname)) {
   frame.src = 'index.html';           /* set before append: one load event, the real one */
   document.body.appendChild(frame);
 } else {
+  /* Two reasons to be here, needing different sentences: a published copy
+     (where planting test data would mean the reader's real teams) and a file://
+     copy off disk (where it simply cannot work — browsers block file:// frames).
+     Both end at the same instruction. */
+  const onDisk = location.protocol === 'file:';
   const sum = document.getElementById('summary');
   sum.className = 'bad';
-  sum.textContent = 'Not run here — this page would overwrite your data.';
+  sum.textContent = onDisk
+    ? 'Not run from a file — this page needs a local server.'
+    : 'Not run here — this page would overwrite your data.';
   document.getElementById('out').innerHTML =
     '<tr><td class="msg" style="white-space:normal;font-family:inherit;font-size:13px">' +
-    'The suite plants test data in the app to check it, which on <strong>' +
-    location.hostname.replace(/[<&]/g, '') + '</strong> would mean your real saved teams. ' +
-    'It only runs on <code>localhost</code>, against a copy of the app served from the ' +
-    'repo folder:<br><br><code>cd ~/claude-team-dashboard &amp;&amp; python3 -m http.server 8013' +
+    (onDisk
+      ? 'The suite loads the app in a hidden frame to test it, and a browser blocks that '
+        + 'frame when the page is opened straight off disk — so the tests would have nothing '
+        + 'to run against. Serve the folder instead:'
+      : 'The suite plants test data in the app to check it, which on <strong>'
+        + location.hostname.replace(/[<&]/g, '') + '</strong> would mean your real saved teams. '
+        + 'It only runs on <code>localhost</code>, against a copy of the app served from the '
+        + 'repo folder:') + '<br><br><code>cd ~/claude-team-dashboard &amp;&amp; python3 -m http.server 8013' +
     '</code><br>then open <code>http://localhost:8013/tests.html</code>.<br><br>' +
     'Nothing has been changed by opening this page. Your data is where you left it — ' +
     '<a href="index.html">back to the dashboard</a>.' +
