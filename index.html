@@ -1097,6 +1097,15 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 
   <div class="share-choices">
   <fieldset class="formpanel">
+    <legend>Which Teams</legend>
+    <div class="checklist-head">
+      <span class="hint" id="shareTeamCount" role="status"></span>
+      <button type="button" class="btn small" id="shareSelectAll">Select all</button>
+    </div>
+    <div class="checklist" id="shareTeams"></div>
+  </fieldset>
+
+  <fieldset class="formpanel">
     <legend>How Much History</legend>
     <div class="grid two">
       <div>
@@ -1121,15 +1130,6 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
       which is what makes a long history shareable. Months count back from the
       <strong>newest item in the data</strong>, the same anchor the clean-up tool uses.
     </p>
-  </fieldset>
-
-  <fieldset class="formpanel">
-    <legend>Which Teams</legend>
-    <div class="checklist-head">
-      <span class="hint" id="shareTeamCount" role="status"></span>
-      <button type="button" class="btn small" id="shareSelectAll">Select all</button>
-    </div>
-    <div class="checklist" id="shareTeams"></div>
   </fieldset>
   </div>
 
