@@ -1599,6 +1599,21 @@ function detectColumns(rows, header, order) {
  * @param text   pasted rows
  * @param order  'auto' | 'dmy' | 'mdy'
  */
+/* A work-item type is a short Jira category label — "Story", "Bug", "Tech Debt".
+   This app only ever saves numbers and dates plus that one short label per row,
+   so a cell that doesn't look like a label is dropped outright rather than
+   truncated: a Jira summary or description cut to 40 characters would still
+   store sensitive words from a work system, and an empty type just means the
+   row sits outside the work-type filters. Control characters go regardless.
+   Applied at BOTH boundaries — the paste (here) and hydrateRows (a saved copy,
+   the cloud document, a backup, a share link) — so a long text can't enter the
+   saved data from either direction. */
+function cleanWorkType(t) {
+  if (typeof t !== 'string') return '';
+  const s = t.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim();
+  return s.length > 40 ? '' : s;
+}
+
 function parsePastedRows(text, order) {
   /* Trim spaces but never tabs: in a tab-separated paste a leading tab is an
      empty first cell — a work-in-progress row in a completed-first export.
@@ -1630,7 +1645,7 @@ function parsePastedRows(text, order) {
     const completed = parseDate(rawCompleted, resolved);
     const started   = parseDate(rawStarted, resolved);
     const created   = parseDate(rawCreated, resolved);
-    const type      = at(cells, cols.type);
+    const type      = cleanWorkType(at(cells, cols.type));
 
     /* An empty completion date is not an error — it is work in progress, and it
        counts: the "started this week" tally never looks at completion at all.
@@ -2152,7 +2167,7 @@ function derive(rows, settings, view) {
 window.TD = {
   weekdayNum, priorSunday, weekNumber, weekKey, edate,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
-  parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats,
+  parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
   cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, utcDate
 };
 
@@ -2241,9 +2256,10 @@ function hydrateRows(raw) {
        it says so rather than falling back to the start date — a lead time that
        is secretly a cycle time is worse than no lead time at all. */
     created:   date(r && r.k),
-    /* Only ever a string: a hand-edited backup or cloud doc can put anything
-       here, and a non-string would round-trip back out through serializeRows. */
-    type:      typeof (r && r.t) === 'string' ? r.t : ''
+    /* Same guard as the paste: a hand-edited backup or cloud doc can put
+       anything here, and only a short label-shaped string may round-trip back
+       out through serializeRows — see cleanWorkType. */
+    type:      cleanWorkType(r && r.t)
   }))
   /* An item with no completion is work in progress, not a broken row — keep it,
      it still counts as work started. A created date alone is backlog that was
@@ -2280,9 +2296,12 @@ function normalizeSettings(raw) {
   if (typeof s.defectType === 'string' && !(raw && raw.unplannedType)) s.unplannedType = s.defectType;
   delete s.defectType;
   /* Same treatment for the scalars: a non-string label would render as its
-     default, and a junk same-day value would put NaN in every cycle time. */
+     default, and a junk same-day value would put NaN in every cycle time. The
+     length cap is the one team names get — these are short labels, and a
+     hand-edited copy shouldn't be able to smuggle a document in as one. */
   for (const k of ['cycleTimeLabel', 'unplannedType', 'unplannedLabel']) {
     if (typeof s[k] !== 'string') s[k] = DEFAULT_SETTINGS[k];
+    s[k] = s[k].slice(0, 120);
   }
   /* Was a settings field that nothing ever read. Dropped rather than left to
      ride along in every saved and synced copy for ever. */

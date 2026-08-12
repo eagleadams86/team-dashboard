@@ -461,6 +461,32 @@ async function run(TD, win) {
   is(iso(pt.rows[2].completed), '2026-07-29', 'a month-first date past the 12th parses');
   is(pt.rows[0].type, 'Task', 'the type column still comes through');
 
+  /* Only numbers and dates plus a short type label are ever saved. A cell that
+     doesn't look like a Jira category label — a summary, a description, anything
+     long — is dropped outright at both boundaries, not truncated: 40 characters
+     of a work item's summary would still be 40 characters of a work system's
+     text in the saved copy. */
+  group('Work-type guard');
+
+  is(TD.cleanWorkType('Story'), 'Story', 'a plain type passes');
+  is(TD.cleanWorkType('Tech Debt'), 'Tech Debt', 'a two-word type passes');
+  is(TD.cleanWorkType('Bug, urgent'), 'Bug, urgent', 'the pinned quoted-CSV type still passes');
+  is(TD.cleanWorkType('  Spike  '), 'Spike', 'whitespace is trimmed');
+  is(TD.cleanWorkType('a\tb\nc'), 'a b c', 'control characters collapse to spaces');
+  is(TD.cleanWorkType('Fix the login page NPE when the session token has already expired'),
+     '', 'a summary-length cell is dropped whole, never truncated');
+  is(TD.cleanWorkType(123), '', 'a non-string is dropped');
+  is(TD.parsePastedRows(
+       '2015-01-21\t2015-01-14\t\tCustomer reported that the export breaks on names with accents',
+       'auto').rows[0].type,
+     '', 'a summary landing in the type column is not saved from a paste');
+  const hydratedLong = win.TDState.sanitizeTeams([{ id: 't1', name: 'A', rows: [
+    { c: '2015-01-21', s: '2015-01-14', t: 'Customer reported that the export breaks on names with accents' },
+    { c: '2015-01-22', s: '2015-01-15', t: 'Bug' }
+  ] }])[0].rows;
+  is(hydratedLong[0].type, '', 'nor from a saved copy, cloud document or backup');
+  is(hydratedLong[1].type, 'Bug', 'while a real type label rides through untouched');
+
   const pb = TD.parsePastedRows('Completed\tStarted\tType\nnot-a-date\t2015-01-14\t\n2015-01-21\tnope\t\n2015-01-22\t\t', 'auto');
   is(pb.rows.length, 2, 'a bad completion date drops the row, a bad start date does not');
   is(pb.badCompleted.length, 1, 'one bad completion date counted');

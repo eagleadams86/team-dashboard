@@ -146,6 +146,15 @@ an error — it's work you've begun, and it counts on the net flow chart as work
 Rows with *no* dates at all — untouched backlog — are ignored, and the count is reported so a
 paste of 260 rows that becomes 170 items explains itself.
 
+**Only dates and a short type label are ever saved.** The paste is read for its dates and its
+work type on the spot and then discarded — ticket keys, summaries and everything else in the
+export are never stored. The work type itself is held to a short category label ("Story",
+"Bug", "Tech Debt"): a cell longer than a label — a summary that landed in the wrong column,
+say — is dropped whole rather than truncated, so no fragment of a work system's text can end
+up in the saved or synced copy. The same guard runs again whenever a saved copy, cloud
+document, backup or share link is read back in. There are deliberately no free-text or
+comment fields anywhere in the app.
+
 ### What Happens to Bad Data
 
 A bad *cell* costs you that field, not the whole row — with one exception, because every metric
