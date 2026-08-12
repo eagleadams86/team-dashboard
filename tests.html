@@ -1382,6 +1382,26 @@ async function run(TD, win) {
   is(round.teams[0].rows[0].type, 'Bug', 'the type survives');
   is(round.settings.unplannedType, 'Incident', 'settings survive');
 
+  /* Nothing the boundary produces may hold `undefined`. localStorage drops such a
+     key silently, so a local copy looks perfect — but setDoc() walks the live object
+     and Firestore rejects the WHOLE document over one of them (invalid-argument).
+     That is how Sprint Velocity lost sync on 2026-08-12, off one new optional field
+     absent from every copy saved before it existed. Checked by key, not by value:
+     `x === undefined` passes whether the key is there or not. */
+  const deepUndef = (v, path) => (v && typeof v === 'object')
+    ? Object.keys(v).flatMap(k => v[k] === undefined ? [path + '.' + k] : deepUndef(v[k], path + '.' + k))
+    : [];
+  is(deepUndef(round, 'state').join(','), '', 'a hydrated copy holds no undefined anywhere');
+  /* The shapes most likely to produce one: a copy saved before a settings field
+     existed, and rows carrying only one of the two flow dates. */
+  const sparse = S.hydrateState({
+    teams: [{ id: 'team-b', name: 'Beta', rows: [{ s: '2015-02-01' }, { c: '2015-02-09' }] }],
+    settings: { wipLimit: 5 }
+  });
+  is(deepUndef(sparse, 'state').join(','), '', 'so does one hydrated from a sparse older copy');
+  is(deepUndef({ teams: sparse.teams.map(t => ({ id: t.id, name: t.name, rows: S.serializeRows(t.rows) })) },
+               'serialized').join(','), '', 'and so does what serializeRows sends back out');
+
   /* Two teams must not be able to see each other's numbers. */
   const teamA = TD.parsePastedRows('2015-01-21\t2015-01-14\t\n2015-01-22\t2015-01-15\t', 'auto').rows;
   const teamB = TD.parsePastedRows('2015-01-21\t2015-01-14\tBug', 'auto').rows;

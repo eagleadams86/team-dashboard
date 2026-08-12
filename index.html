@@ -4489,9 +4489,21 @@ let syncError = null;
 
 function describeSyncError(e) {
   const code = String((e && e.code) || e || '');
-  if (code.includes('invalid-argument')) return {
-    reason: 'There’s more data here than can be synced in one go.',
-    fix: 'Delete a team you no longer need — sync picks up again on the next change.' };
+  /* Firestore reports two unrelated things as invalid-argument: a document over the
+     1 MiB cap, and a value it can't store (an `undefined` anywhere in the object).
+     This branch used to assume the first, so an app bug would have told the user to
+     delete a team — the worst advice this app is capable of giving. The size wording
+     is now used only when Firestore's own message says size; anything else says the
+     fault is here, and asks for nothing to be deleted. */
+  if (code.includes('invalid-argument')) {
+    const detail = String((e && e.message) || '');
+    if (/maximum allowed size|exceeds|too large|longer than|bytes/i.test(detail)) return {
+      reason: 'There’s more data here than can be synced in one go.',
+      fix: 'Delete a team you no longer need — sync picks up again on the next change.' };
+    return {
+      reason: 'The cloud refused this copy of your data — that’s a fault in the app, not in what you entered.',
+      fix: 'Nothing is lost: everything is still here and still saved. Reloading the page usually clears it.' };
+  }
   if (code.includes('permission-denied') || code.includes('unauthenticated')) return {
     reason: 'Google refused the sign-in for this data.',
     fix: 'Signing out and back in usually clears it.' };
@@ -4683,13 +4695,27 @@ async function startSync() {
   });
 }
 
+/* The cloud copy goes through JSON, exactly as save() writes the local one, so the
+   two are the same bytes by construction rather than nearly so.
+
+   Not tidiness: setDoc() walks the LIVE object and Firestore rejects the whole
+   document if it finds a single `undefined` anywhere in it (code invalid-argument),
+   where localStorage would simply drop that key and carry on. Sprint Velocity lost
+   sync to exactly that on 2026-08-12 — one new optional setting, absent from every
+   copy saved before it existed, written back as undefined by its id sanitiser. The
+   local copy looked perfect throughout, which is what made it hard to see. This
+   file's own boundary (sanitizeTeams / hydrateRows / normalizeSettings) rebuilds
+   fresh literals with concrete defaults and reaches no undefined today; the guard is
+   so that the next optional field can't quietly change that. */
+const forCloud = (s) => JSON.parse(JSON.stringify(s));
+
 async function pushNow() {
   if (!user) return;
   /* updatedAt stays for a build that predates serverAt and still orders by it;
      serverAt is what this build compares. writerId lets us tell our own write
      apart from another device's when it comes back on the listener. */
   await Fs.setDoc(docRef(), {
-    data: window.tdGet(),
+    data: forCloud(window.tdGet()),
     updatedAt: localTs() || Date.now(),
     serverAt: Fs.serverTimestamp(),
     writerId: deviceId()

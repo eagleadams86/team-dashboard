@@ -603,6 +603,18 @@ gives the cause and the remedy — a silent failure would leave the app claiming
 nothing had left the browser for weeks. There's no retry button on purpose: Firestore retries
 the transient causes itself, and the next successful save clears the state.
 
+Two rules in the push are load-bearing, both learned from a real outage in the sibling app.
+**The cloud copy goes through JSON, exactly as the local save does** (`forCloud()`): `setDoc()`
+walks the live object and Firestore rejects the *whole document* if it finds a single
+`undefined` anywhere in it, where localStorage would simply drop that key — so a local copy
+can look perfect while nothing reaches the cloud. This file's boundary rebuilds fresh literals
+with concrete defaults and reaches no `undefined` today, and the tests pin that by *key*
+(`x === undefined` passes whether the key exists or not); the round trip is there so the next
+optional field can't quietly change it. And **`invalid-argument` does not mean "too big"** —
+Firestore uses that one code for both an oversized document and a value it can't store, so the
+"delete a team" advice appears only when Firestore's own message mentions size. A remedy that
+destroys data must never be the guess.
+
 ## Running It
 
 Single page, no build step, no accounts required. Open `index.html` directly, or serve the
