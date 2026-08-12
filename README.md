@@ -41,7 +41,7 @@ identifiable at a glance across a room in a stand-up; the sentence under it answ
 how?". The **ⓘ button** sits on the name and opens a plain-English note on what the figure means
 and which direction is good.
 
-## One of a pair
+## One of a Pair
 
 This app shares its look and behaviour with
 [Sprint Predictability](https://eagleadams86.github.io/sprint-velocity/), its sibling: the same
@@ -71,7 +71,7 @@ buttons all appear the moment rows exist (`renderEmptyState()`).
 Which team you're looking at is a position on *this* device and deliberately isn't synced:
 switching team on the laptop shouldn't yank the phone to the same team.
 
-## Getting your data in
+## Getting Your Data In
 
 The **Your Data** tab takes a paste from Jira, a CSV or any other export and loads it into the
 team currently selected in the header. Paste the export as it comes — a Jira export looks like this
@@ -110,7 +110,7 @@ an error — it's work you've begun, and it counts on the net flow chart as work
 Rows with *no* dates at all — untouched backlog — are ignored, and the count is reported so a
 paste of 260 rows that becomes 170 items explains itself.
 
-### What happens to bad data
+### What Happens to Bad Data
 
 A bad *cell* costs you that field, not the whole row — with one exception, because every metric
 keys off a completion date.
@@ -131,7 +131,7 @@ in the export rather than hunt for it — the listing includes whatever identifi
 carries, so a Jira key comes back with it. Long lists are capped, but the count above each list
 is always the true total.
 
-### The three dates are not equally trustworthy
+### The Three Dates Are Not Equally Trustworthy
 
 `created ≤ started ≤ completed` is the one hard ordering these dates have, and **which end of it
 breaks tells you something specific** — because in a normal Jira setup:
@@ -187,7 +187,7 @@ Everything the charts depend on, shared by all your teams:
 
 Nothing else is here on purpose: a setting that changes nothing is worse than a missing one.
 
-## What isn't here, and why
+## What Isn't Here, and Why
 
 **Blocked time** — how long an item couldn't move because something was in its way. A plain
 Jira export doesn't carry it: "Flagged" is a state, not a duration, and reconstructing the
@@ -211,7 +211,7 @@ same problem. Half a metric that always reads 95% is worse than no metric at all
 all — business outcomes, and how often a story was rewritten after being picked up. Neither is
 derivable from dates.
 
-### Settings you've already saved keep winning
+### Settings You've Already Saved Keep Winning
 
 Defaults only fill in what isn't saved. A browser that has used the app before keeps whatever
 was set there, so a changed default doesn't reach it — **the values above show up on a fresh
@@ -230,7 +230,7 @@ re-entered:
 - A `plannedLabel` setting existed, with an input and a saved value, but nothing on screen ever
   read it. It is dropped on load rather than left riding along in every backup and synced copy.
 
-### Created dates and older versions of the app
+### Created Dates and Older Versions of the App
 
 Rows gained an optional created date (`k` on the wire, backup `version: 3`, `schema: 3` in the
 saved and synced state). A row without one is left exactly as it was — no `k` key is written —
@@ -264,7 +264,7 @@ listener as something that would otherwise look like news from elsewhere.
 - The first version stored one team's rows under `td-rows`, with the team name in `td-settings`.
   Those fold into a single team the first time a newer version loads, and the old keys go.
 
-## How the numbers are worked out
+## How the Numbers Are Worked Out
 
 `derive()` in [index.html](index.html) is the only place any figure is computed. The parts
 worth knowing:
@@ -344,7 +344,7 @@ Net-flow bars use the theme's accent for positive and `--serious` for negative �
 not the red/green pair, because the coaching goal is "keep around zero", so neither sign is
 good or bad.
 
-## Cleaning up old data
+## Cleaning Up Old Data
 
 Years of history make every paste and backup heavier without telling you anything new.
 **Your Data → Clean up old data → Remove old items** drops the items older than a cutoff you
@@ -374,7 +374,7 @@ as the Back up button — one press away from a deletion is exactly when a backu
 
 Removing items only removes items. The team itself survives, even if it ends up empty.
 
-## Back up & restore
+## Back Up & Restore
 
 The **Back up** button in the header opens a dialog (the same shape as the sibling app's)
 that writes one JSON file holding
@@ -397,7 +397,7 @@ isn't a backup is refused outright and leaves your data alone.
 **Two things are deliberately not in the file:** your theme, and which team you were looking
 at. Both are positions on this device rather than data — the same reason they don't sync.
 
-## Sharing a read-only link
+## Sharing a Read-Only Link
 
 The **Share** button in the header builds a link that shows someone the teams you pick,
 read-only — no sign-in, no way to change anything, and (ported from the sibling app) the
@@ -440,7 +440,7 @@ opens, just without the line saying where the history starts.
 It's a **snapshot**: later edits don't appear in links already sent, and a sent link can't
 be withdrawn — treat it like emailing a spreadsheet.
 
-## Cross-device sync (Firebase, free tier — optional)
+## Cross-Device Sync (Firebase, Free Tier — Optional)
 
 Signing in with Google is entirely optional and does one thing: puts the same teams on your
 other devices. Without it the app is fully usable and fully local.
@@ -472,7 +472,7 @@ To recreate the setup from scratch (e.g. in a fork):
    project has `http://localhost`, `http://localhost:5000` and `https://eagleadams86.github.io`
    registered — serving locally on any other port means adding it here first.
 
-### Why sign-in doesn't use Firebase's popup
+### Why Sign-In Doesn't Use Firebase's Popup
 
 Firebase's `signInWithPopup` opens the popup at `<project>.firebaseapp.com/__/auth/handler` and
 only redirects on to Google from there. A proxy that blocks that first hop kills sign-in
@@ -513,7 +513,7 @@ The config object is not a secret; access is controlled by the rules, which rest
 user to their own document. Each person who signs in gets their own private data — sharing
 the app means sharing the URL, not the data. There is deliberately no shared-workspace model.
 
-### About the `apiKey` in this file
+### About the `apiKey` in This File
 
 GitHub secret scanning flags it as a "Google API Key — public leak". **That alert is expected
 and has been closed as won't-fix** (the same alert exists, and is closed, on every one of these
@@ -553,7 +553,7 @@ gives the cause and the remedy — a silent failure would leave the app claiming
 nothing had left the browser for weeks. There's no retry button on purpose: Firestore retries
 the transient causes itself, and the next successful save clears the state.
 
-## Running it
+## Running It
 
 Single page, no build step, no accounts required. Open `index.html` directly, or serve the
 folder:
@@ -572,8 +572,7 @@ endpoints sync uses plus `api.github.com` (the Recent-changes box). **Any new ex
 endpoint has to be added there too**, or it fails only in production.
 
 `accounts.google.com` appears in `script-src`, `connect-src` *and* `frame-src` because sign-in
-goes through Google Identity Services — see [Why sign-in doesn't use Firebase's
-popup](#why-sign-in-doesnt-use-firebases-popup) above.
+goes through Google Identity Services — see [Why Sign-In Doesn't Use Firebase's Popup](#why-sign-in-doesnt-use-firebases-popup) above.
 
 Note for anyone comparing against the sibling apps: this one no longer allows `apis.google.com`
 and no longer produces the `gen_204` telemetry noise those apps document, because the auth

@@ -705,7 +705,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
   <!-- ══════════════════ YOUR DATA ══════════════════ -->
   <section class="panel" id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden>
     <div class="card">
-      <h2>Paste work items for <span id="pasteTeamName">this team</span></h2>
+      <h2>Paste Work Items for <span id="pasteTeamName">This Team</span></h2>
       <p class="hint">
         Needs a <strong>completed date</strong>, a <strong>start date</strong> and a
         <strong>work type</strong> somewhere in each row. Paste the export as it comes — extra
@@ -746,13 +746,13 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
          them to act on — see renderEmptyState(). A first run should show the paste
          box and nothing else. -->
     <div class="card" id="loadedCard" hidden>
-      <h2>Loaded data <span class="hint" id="rowCount"></span></h2>
+      <h2>Loaded Data <span class="hint" id="rowCount"></span></h2>
       <p class="hint">Read-only — to correct a row, fix it in your source and paste again.</p>
       <div id="dataTable" style="margin-top:var(--sp-5)"></div>
     </div>
 
     <div class="card" id="cleanupCard" hidden>
-      <h2>Clean up old data</h2>
+      <h2>Clean Up Old Data</h2>
       <p class="hint">
         Work items pile up, and years of them make every paste and every backup heavier
         without telling you anything new. This drops the ones older than a cutoff you pick.
@@ -769,7 +769,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
   <!-- ══════════════════ SETTINGS ══════════════════ -->
   <section class="panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
     <div class="card">
-      <h2>Labels &amp; work types</h2>
+      <h2>Labels &amp; Work Types</h2>
       <p class="hint">Shared by every team. Team names live behind the <strong>Teams</strong> button in the header.</p>
       <div class="grid two" style="margin-top:var(--sp-6)">
         <div>
@@ -805,7 +805,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
     </div>
 
     <div class="card">
-      <h2>Work type filter list</h2>
+      <h2>Work Type Filter List</h2>
       <p class="hint">
         The choices in the Work Type filter on the dashboard. <strong>Display</strong> is what you pick;
         <strong>Value</strong> is the text matched against your Type column. Leave the
@@ -865,7 +865,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
     </div>
 
     <div id="dashEmpty" class="card empty" hidden>
-      <h2>No data yet</h2>
+      <h2>No Data Yet</h2>
       <p>Head to the <strong>Your Data</strong> tab and paste your work items — a completed
       date, a start date and a type. Add a created date too and you get lead time and flow
       efficiency as well:</p>
@@ -976,7 +976,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
     <a href="https://eagleadams86.github.io/sprint-velocity/">Sprint Predictability — the sibling app</a></p>
 
   <details class="changelog" id="cl-box">
-    <summary>Recent changes</summary>
+    <summary>Recent Changes</summary>
     <ol id="cl-list"><li>Loading&hellip;</li></ol>
   </details>
 
@@ -1033,7 +1033,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
     <strong>Remove items</strong> — the summary below only says what that press would do.</p>
 
   <fieldset class="formpanel">
-    <legend>How much to keep</legend>
+    <legend>How Much to Keep</legend>
     <div class="grid two">
       <div>
         <label for="cleanupKeep">Keep</label>
@@ -1059,12 +1059,12 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
   </fieldset>
 
   <fieldset class="formpanel">
-    <legend>Which teams</legend>
+    <legend>Which Teams</legend>
     <div class="checklist" id="cleanupTeams"></div>
   </fieldset>
 
   <fieldset class="formpanel">
-    <legend>Unfinished items</legend>
+    <legend>Unfinished Items</legend>
     <label class="checkline"><input type="checkbox" id="cleanupWip"><span>Also remove
       unfinished items started before the cutoff</span></label>
     <p class="hint" style="margin:10px 0 0">
@@ -1093,7 +1093,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 
   <div class="share-choices">
   <fieldset class="formpanel">
-    <legend>How much history</legend>
+    <legend>How Much History</legend>
     <div class="grid two">
       <div>
         <label for="shareKeep">Include</label>
@@ -1120,13 +1120,13 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
   </fieldset>
 
   <fieldset class="formpanel">
-    <legend>Which teams</legend>
+    <legend>Which Teams</legend>
     <div class="checklist" id="shareTeams"></div>
   </fieldset>
   </div>
 
   <fieldset class="formpanel" id="shareWipWrap" hidden>
-    <legend>Unfinished items</legend>
+    <legend>Unfinished Items</legend>
     <label class="checkline"><input type="checkbox" id="shareWip"><span>Also leave out
       unfinished items started before the cutoff</span></label>
     <p class="hint" style="margin:10px 0 0">
@@ -1136,7 +1136,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
   </fieldset>
 
   <fieldset class="formpanel">
-    <legend>Your link</legend>
+    <legend>Your Link</legend>
     <input type="text" id="shareLink" readonly aria-label="Read-only share link">
     <p class="hint" id="shareMeta" role="status" style="margin:8px 0 0"></p>
     <p class="warn" id="shareWarn" role="status"></p>
@@ -2821,7 +2821,7 @@ function currentFilterValue() {
 function renderTitle() {
   const t = activeTeam();
   const name = t ? t.name.trim() : '';
-  $('pasteTeamName').textContent = name || 'this team';
+  $('pasteTeamName').textContent = name || 'This Team';
 }
 
 /* ── ⓘ help — the sibling app's pattern ─────────────────────────────────────
@@ -3748,7 +3748,7 @@ async function openSharedView() {
     view.activeTeamId = state.teams[0].id;
     $('shareBar').innerHTML = shareBanner();
     $('dashEmpty').innerHTML =
-      '<h2>Nothing to plot for this team</h2><p>The shared copy has no work items for it.</p>';
+      '<h2>Nothing to Plot for This Team</h2><p>The shared copy has no work items for it.</p>';
     renderAll();
   } catch (e) {
     console.warn('share link could not be read', e);
@@ -3761,7 +3761,7 @@ function renderShareError() {
   $('teamSel').hidden = true;
   $('panel-dashboard').innerHTML =
     '<div class="card empty">' +
-    '<h2>This shared link couldn’t be opened</h2>' +
+    '<h2>This Shared Link Couldn’t Be Opened</h2>' +
     '<p>It looks incomplete — links are long, and mail apps sometimes cut them in half or ' +
     'wrap them across two lines. Ask whoever sent it for a fresh copy, and paste the ' +
     'whole thing in one go.</p>' +
@@ -4113,7 +4113,7 @@ if (viewOnly) {
     + 'already had saved in this browser has been changed.';
   /* Decoding is async, so hold a neutral card rather than the paste-your-data
      instructions — and never the visitor's own teams. */
-  $('dashEmpty').innerHTML = '<h2>Opening shared view&hellip;</h2>';
+  $('dashEmpty').innerHTML = '<h2>Opening Shared View&hellip;</h2>';
   $('monthsSel').value = view.months;
   $('bucketSel').value = view.bucket;
   selectTab('dashboard');
