@@ -2032,15 +2032,20 @@ function derive(rows, settings, view) {
     daysInBucket: diffDays(lastEnd, lastStart) + 1
   } : null;
 
-  /* The delivery band answers "is our pace steady", which no average can. It is
-     read over whole periods only: a part-period is not a slow period, it is an
-     incomplete observation, and letting it set the low edge would report a floor
-     the team never actually delivered at. Nothing is hidden by this — the bar is
-     still on the chart and the window note still says how much of the period it
-     covers. Note this is deliberately stricter than the average beside it, which
-     has always counted the part-period; that figure is left alone rather than
-     quietly redefined. Null both ends when the only period is a partial one:
-     no whole period means no band, the same stance percentileOf takes. */
+  /* Whole periods, for the two figures that describe what a period looks like:
+     the average count and the band around it. A part-period is not a slow
+     period, it is an incomplete observation, so counting it reports a pace and
+     a floor the team never actually worked at. Nothing is hidden by this — the
+     bar is still on the chart and the window note still says how much of the
+     period it covers.
+
+     Deliberately NOT applied to the rest, which are not per-period counts and
+     so are not distorted by a short one: the pooled cycle and lead times average
+     over items, the unplanned rate averages a scale-free ratio, and net flow is
+     a total of what happened rather than a claim about a typical period.
+
+     Empty when the only period is a partial one, which the two readers below
+     turn into null rather than 0 — the same stance percentileOf takes. */
   const wholeThroughput = partial ? throughput.slice(0, -1) : throughput.slice();
 
   return {
@@ -2058,7 +2063,15 @@ function derive(rows, settings, view) {
        over the pooled cycle times (per item), not over the per-bucket means —
        and null, not 0, when nothing in the window has one. */
     summary: {
-      avgThroughput: mean(throughput),
+      /* Whole periods only, like the band below. A part-period's count is not a
+         low count, it is an unfinished one, so averaging it in reports a pace
+         the team never worked at. Note this is a claim about COUNTS: the
+         unplanned rate beside it still averages every period including the
+         part one, and correctly — a rate is scale-free, so a half-finished
+         period observes it just as well as a whole one, where the same period
+         cannot observe a weekly count at all. Null, not 0, when no period has
+         finished: mean([]) is 0, which would read as a real pace of nothing. */
+      avgThroughput: wholeThroughput.length ? mean(wholeThroughput) : null,
       avgCycleTime: windowCycles.length ? mean(windowCycles) : null,
       unplannedRateAvg: mean(unplannedRate),
       netFlowTotal: netFlow.reduce((a, b) => a + b, 0),
@@ -2884,7 +2897,11 @@ const METRIC_HELP = {
       + 'and steady matters more than fast, because it is what makes a forecast possible.' },
   throughput: { title: 'Throughput',
     body: 'What pace do we deliver at? The count of items completed in each period. Read the '
-      + 'trend line rather than any single point — throughput is naturally lumpy.' },
+      + 'trend line rather than any single point — throughput is naturally lumpy. The average '
+      + 'on the tile counts whole periods only: when your data stops part-way through a period '
+      + 'that last bar is still plotted, but it is left out of the average, because a period '
+      + 'that has not finished happening is an incomplete observation rather than a slow one. '
+      + 'The steady delivery tile reads the same whole periods.' },
   netFlow: { title: 'Net Flow',
     body: 'Is our completion pace consistent? Items completed minus items started. '
       + 'Around zero is the goal: persistently below zero means more work starts than '
@@ -2911,8 +2928,8 @@ const METRIC_HELP = {
       + 'narrow band is what makes a forecast possible, exactly as it does for cycle time. '
       + 'Only whole periods count: a part-period is an incomplete observation rather than a '
       + 'slow one, so the last bar on the chart is left out of the band when the data stops '
-      + 'part-way through it. That makes this stricter than the average above, which has '
-      + 'always counted that period.' },
+      + 'part-way through it. The average above counts the same whole periods, so the two '
+      + 'always agree about which periods they are describing.' },
   startedCompleted: { title: 'Started vs Completed',
     body: 'The two counts net flow is the difference of. A net figure of +2 reads the same '
       + 'whether it came from 12 started and 10 completed or from 2 and 0, and those are very '
@@ -3042,16 +3059,19 @@ function renderDashboard() {
     : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(d.endDate) + '</strong>';
   $('windowNote').innerHTML = span + '<br>' +
     d.buckets.length + ' ' + (d.buckets.length === 1 ? d.bucketNoun : d.bucketNounPlural) +
-    ' &middot; ' + d.itemCount + ' items' +
+    ' &middot; ' + d.itemCount + ' item' + (d.itemCount === 1 ? '' : 's') +
     (d.inProgressCount ? ' (' + d.inProgressCount + ' in progress)' : '') +
     (d.partial ? '<br>Last ' + d.bucketNoun + ' covers ' + d.partial.daysCovered
       + ' of ' + d.partial.daysInBucket + ' days' : '');
 
   const s = d.summary;
   $('dashTiles').innerHTML =
-    tile('Completed per ' + d.bucketNoun, num1(s.avgThroughput),
-      'items per ' + d.bucketNoun + ' over ' + d.buckets.length + ' ' + d.bucketNoun
-        + (d.buckets.length === 1 ? '' : 's'),
+    tile('Completed per ' + d.bucketNoun,
+      s.avgThroughput == null ? '&mdash;' : num1(s.avgThroughput),
+      s.avgThroughput == null
+        ? 'needs one whole ' + d.bucketNoun + ' of data'
+        : 'items per ' + d.bucketNoun + ' over ' + s.wholePeriods + ' whole '
+          + (s.wholePeriods === 1 ? d.bucketNoun : d.bucketNounPlural),
       'throughput') +
     tile('Avg ' + (state.settings.cycleTimeLabel || 'cycle time'),
       s.avgCycleTime == null ? '—' : num1(s.avgCycleTime),

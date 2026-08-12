@@ -25,9 +25,10 @@ single week hard to read. The grouping also drives the last column of the Your D
 the table and the charts always name the same period.
 
 Each chart carries a dashed linear trend line, and four **summary tiles** above the tabs state
-the window-wide figures — average completed per week, average cycle time (pooled over the items
-in the window, so an empty week can't drag it down), the defect rate, and total net flow. Each
-group then adds a small tile row of its own, stating what its charts can't:
+the window-wide figures — average completed per week (over whole weeks only, see below), average
+cycle time (pooled over the items in the window, so an empty week can't drag it down), the
+defect rate, and total net flow. Each group then adds a small tile row of its own, stating what
+its charts can't:
 
 - **Flow** — the 85th-percentile cycle time, with the median beneath it, and average lead time.
 - **Delivery** — **steady delivery**, the band most whole periods land in (15th to 85th
@@ -40,15 +41,35 @@ app has no targets, so no tile is ever coloured "good" or "bad". There being exa
 headline row, they go four-across on a wide window and pair into a 2x2 on a narrower one — never
 three and a stray fourth; the group rows vary in count and are laid out by `auto-fit` instead.
 
-The delivery band is the one figure in the app computed over **whole periods only**. Everything
-else — the averages, the totals, the charts — counts the final part-period as it stands and says
-so in the window note. A band is a different kind of claim: it asserts what a period looks like,
-and a period the data stops part-way through isn't a slow period, it's an incomplete
-observation. Letting it set the low edge would report a floor the team never delivered at. So
-the last bar is dropped from the band alone, the ⓘ says so, and when there is no whole period
-yet the band reads "—" rather than inventing one. That does make it stricter than the average
-sitting directly above it, which has always counted that period — a deliberate difference, not
-an oversight.
+### Whole Periods, and Which Figures Use Them
+
+Your data usually stops part-way through a period — the export runs to a Tuesday, the month it
+lands in has three weeks left. That last bar is genuinely lower than a full period's and always
+will be. The chart still plots it and the window note still says how much of the period it
+covers ("Last week covers 4 of 7 days"), because dropping it would hide the most recent data,
+which is the first thing anyone looks at.
+
+**The two figures that describe what a typical period looks like skip it**: *completed per
+period* and *steady delivery*. A period that hasn't finished happening is an incomplete
+observation rather than a slow one, so averaging it in reports a pace the team never worked at,
+and letting it set the band's low edge reports a floor they never delivered at. Both tiles name
+the count they used ("over 13 whole weeks"), both read "—" when no period has finished yet, and
+the ⓘ on each says so.
+
+**Everything else counts it**, because nothing else is a per-period count:
+
+- **Cycle time and lead time** average over *items*, not periods. An item that finished on the
+  Tuesday took exactly as long as it took.
+- **The defect rate** averages a scale-free *ratio*. A period that stops early observes its own
+  ratio perfectly well — 3 defects in 6 items is 50%, whether that took two days or seven.
+- **Net flow, started and completed** are *totals* of what happened in the window, not claims
+  about a typical period.
+- **Work in progress and aged work** are read at a point in time, and that point is already
+  clamped to the end of your data (see below).
+
+The line is drawn at "is this a count per period?", not at "is this important". It's the only
+place in the app where two tiles sitting side by side use different divisors, which is why both
+of them state theirs on the tile.
 
 Each chart card heads with **what it is** — CYCLE TIME, THROUGHPUT, AGED WORK — and carries the
 detail on a second line beneath: which grouping, which series, the window average. The name is
@@ -297,7 +318,10 @@ worth knowing:
   mid-period, so the final bar is genuinely lower and always will be. Dropping it would hide
   the most recent data — the first thing anyone looks at — and would disagree with what Jira
   says the team finished this month. Instead the window note and the tooltip say how much of
-  the period is covered ("Last month covers 5 of 31 days").
+  the period is covered ("Last month covers 5 of 31 days"). It is excluded from the two
+  per-period figures that would be distorted by it — the completed-per-period average and the
+  steady delivery band — and counted everywhere else; see
+  [Whole Periods](#whole-periods-and-which-figures-use-them) for why the line falls there.
 - **Throughput is conserved when you regroup; net flow is not.** Regrouping can't lose a
   completion, because the axis starts at the earliest completed period by definition. It can
   change the *started* tally, because a coarser period reaches further back — a month begins
