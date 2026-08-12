@@ -812,6 +812,62 @@ async function run(TD, win) {
   is(dGap.p85CycleTime, [3, null, 7], 'an empty period breaks the percentile line rather than plotting 0');
 
   /* ══════════════════════════════════════════════════════════
+     The Delivery tiles. The band is the only figure in the app that drops a
+     period on purpose, so what it drops is pinned rather than assumed.
+     ══════════════════════════════════════════════════════════ */
+  group('delivery band and the started/completed pair');
+
+  const dDel = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+
+  is(dDel.throughputBand, [15, 85], 'the band edges are reported so the label can name them');
+  is(dDel.throughputBand[0] + dDel.throughputBand[1], 100,
+     'and they mirror each other around the middle');
+
+  /* The pair and the difference must agree — a tile that disagreed with the
+     tile above it would be worse than no tile. */
+  is(dDel.summary.completedTotal - dDel.summary.startedTotal, dDel.summary.netFlowTotal,
+     'completed minus started is exactly the net flow total already on screen');
+  is(dDel.summary.completedTotal, dDel.throughput.reduce((a, b) => a + b, 0),
+     'completed total is the sum of the bars on the throughput chart');
+  is(dDel.summary.startedTotal, dDel.started.reduce((a, b) => a + b, 0),
+     'started total is the sum of the started series');
+
+  /* Whole periods only. Four steady whole months — 8, 10, 9, 12 — and then a
+     part-month that stops on the 2nd with one item in it. The figures are
+     chosen so the two readings actually disagree: a band that counted the
+     part-month would floor at 1, which is a month this team never had. */
+  const bandRows = [];
+  const push = (y, m, d2, n) => { for (let i = 0; i < n; i++)
+    bandRows.push({ started: D(y, m, 1), completed: D(y, m, d2), type: 'Story' }); };
+  push(2025, 1, 15, 8); push(2025, 2, 15, 10); push(2025, 3, 15, 9); push(2025, 4, 15, 12);
+  push(2025, 5, 2, 1);                    /* May stops on the 2nd — a part-month */
+  const dBand = TD.derive(bandRows, SAMPLE_SETTINGS,
+    { filterValue: '', months: 'all', bucket: 'month' });
+
+  is(dBand.throughput, [8, 10, 9, 12, 1], 'all five months are still plotted, part-month included');
+  ok(dBand.partial != null, 'and the last of them is flagged as partial',
+     JSON.stringify(dBand.partial));
+  is(dBand.summary.wholePeriods, 4, 'the band reads 4 whole months, not 5');
+  is(dBand.summary.throughputLow, TD.percentileOf([8, 10, 9, 12], 15),
+     'the low edge is the 15th percentile of the whole months only');
+  is(dBand.summary.throughputHigh, TD.percentileOf([8, 10, 9, 12], 85),
+     'and the high edge the 85th of the same four');
+  is(dBand.summary.throughputLow, 8, 'so the floor is the slowest whole month, 8');
+  is(TD.percentileOf(dBand.throughput, 15), 1,
+     'where counting the part-month would have reported a floor of 1 — a month that never happened');
+  ok(dBand.summary.throughputHigh >= dBand.summary.throughputLow,
+     'the band never reads backwards');
+
+  /* Nothing whole to read: null both ends rather than a figure invented from a
+     period that has not finished happening. */
+  const dOnlyPartial = TD.derive(
+    [{ started: D(2025, 5, 1), completed: D(2025, 5, 2), type: 'Story' }],
+    SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: 'month' });
+  is(dOnlyPartial.summary.wholePeriods, 0, 'a lone part-month leaves no whole period');
+  is(dOnlyPartial.summary.throughputLow, null, 'so the band reads null rather than 0');
+  is(dOnlyPartial.summary.throughputHigh, null, 'at both ends');
+
+  /* ══════════════════════════════════════════════════════════
      Work in progress and aged work — reconstructed history.
 
      These are the only metrics read at a point in time rather than counted over

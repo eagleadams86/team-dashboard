@@ -933,6 +933,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
       </div>
 
       <div class="grid charts" id="spanel-delivery" role="tabpanel" aria-labelledby="stab-delivery" hidden>
+        <div class="tiles group" id="tilesDelivery"></div>
         <div class="chart-card">
           <div class="chart-name" id="nameThroughput"></div>
           <div class="chart-title" id="titleThroughput"></div>
@@ -1758,6 +1759,12 @@ function percentileOf(values, p) {
   return sorted[Math.min(sorted.length - 1, Math.max(0, rank - 1))];
 }
 const CYCLE_PERCENTILE = 85;
+/* The edges of the delivery band, mirrored around the middle and tied to the
+   cycle time percentile so the app holds one convention rather than two: the
+   same 85 that says "most items finish within this many days" says "most
+   periods deliver at most this many items", and its mirror says "at least". */
+const THROUGHPUT_HIGH_PERCENTILE = CYCLE_PERCENTILE;
+const THROUGHPUT_LOW_PERCENTILE  = 100 - CYCLE_PERCENTILE;
 
 /* How many items were open at each point in time — started by then, and either
    never finished or finished after it. Reconstructed from the same two dates
@@ -1937,7 +1944,7 @@ function derive(rows, settings, view) {
   }
 
   const weeks = [], bucketLabels = [], throughput = [], unplannedRate = [],
-        avgCycleTime = [], netFlow = [],
+        avgCycleTime = [], netFlow = [], started = [],
         avgLeadTime = [], defectCreatedRate = [], p85CycleTime = [];
   /* Every individual cycle time inside the window, pooled — the summary tile
      averages these rather than the per-bucket means, so an empty bucket (stored
@@ -1967,8 +1974,14 @@ function derive(rows, settings, view) {
     p85CycleTime.push(percentileOf(cts, CYCLE_PERCENTILE));
     windowCycles.push(...cts);
 
-    /* Net flow: completed this week minus started this week. */
-    netFlow.push(done.length - (byStartedWeek.get(key) || 0));
+    /* Net flow: completed this week minus started this week. The started side is
+       kept as a series of its own as well as folded into the difference — the
+       Delivery tiles state the two counts the net figure is made of, which one
+       signed number cannot: +2 reads the same whether it came from 12 and 10 or
+       from 2 and 0, and those are not the same period. */
+    const startedHere = byStartedWeek.get(key) || 0;
+    started.push(startedHere);
+    netFlow.push(done.length - startedHere);
 
     /* The created-date series break rather than pad. A lead time of zero days is
        impossible, so a 0 would be a claim, not a gap — and linearTrend already
@@ -2019,14 +2032,26 @@ function derive(rows, settings, view) {
     daysInBucket: diffDays(lastEnd, lastStart) + 1
   } : null;
 
+  /* The delivery band answers "is our pace steady", which no average can. It is
+     read over whole periods only: a part-period is not a slow period, it is an
+     incomplete observation, and letting it set the low edge would report a floor
+     the team never actually delivered at. Nothing is hidden by this — the bar is
+     still on the chart and the window note still says how much of the period it
+     covers. Note this is deliberately stricter than the average beside it, which
+     has always counted the part-period; that figure is left alone rather than
+     quietly redefined. Null both ends when the only period is a partial one:
+     no whole period means no band, the same stance percentileOf takes. */
+  const wholeThroughput = partial ? throughput.slice(0, -1) : throughput.slice();
+
   return {
     empty: weeks.length === 0,
     /* `buckets` is the name the code uses; `weeks` is the same array under the
        name every caller and every pinned test already knows it by. */
     weeks, buckets: weeks, bucketLabels,
     bucket, bucketNoun: noun, bucketNounPlural: noun + 's', partial,
-    throughput, unplannedRate, avgCycleTime, netFlow,
+    throughput, unplannedRate, avgCycleTime, netFlow, started,
     avgLeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
+    throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
     wip, agedCount, agedDays,
     hasCreated, createdCoverage: items.length ? withCreated / items.length : 0,
     /* Window-wide figures for the summary tiles. avgCycleTime here is the mean
@@ -2038,6 +2063,14 @@ function derive(rows, settings, view) {
       unplannedRateAvg: mean(unplannedRate),
       netFlowTotal: netFlow.reduce((a, b) => a + b, 0),
       avgLeadTime: windowLeads.length ? mean(windowLeads) : null,
+      /* The two counts behind net flow, and the band the periods sit in. Counted
+         over the same buckets the charts plot, so each tile equals the sum of
+         the bars beside it. */
+      completedTotal: throughput.reduce((a, b) => a + b, 0),
+      startedTotal: started.reduce((a, b) => a + b, 0),
+      throughputLow:  percentileOf(wholeThroughput, THROUGHPUT_LOW_PERCENTILE),
+      throughputHigh: percentileOf(wholeThroughput, THROUGHPUT_HIGH_PERCENTILE),
+      wholePeriods: wholeThroughput.length,
       /* Pooled over the whole window for the same reason it is pooled per
          bucket — the average of a set of ratios is not the ratio of the set. */
       /* Over every item in the window, not the mean of the per-bucket
@@ -2868,6 +2901,24 @@ const METRIC_HELP = {
       + 'line and the average: a wide gap means the work is unpredictable even when it is '
       + 'quick on a good day, and predictability is usually worth more to whoever is asking '
       + 'than speed. It is a real duration some item actually took, never an interpolation.' },
+  throughputBand: { title: 'Steady Delivery',
+    body: 'Is our pace steady? The band most periods land in: ' + THROUGHPUT_HIGH_PERCENTILE
+      + '% of whole periods delivered at least the first figure, and ' + THROUGHPUT_HIGH_PERCENTILE
+      + '% delivered at most the second, so the middle '
+      + (THROUGHPUT_HIGH_PERCENTILE - THROUGHPUT_LOW_PERCENTILE)
+      + '% of them sat between the two. Two teams averaging five a week are not the same team if one '
+      + 'runs 4 to 6 and the other 0 to 15, and the average alone cannot tell them apart — a '
+      + 'narrow band is what makes a forecast possible, exactly as it does for cycle time. '
+      + 'Only whole periods count: a part-period is an incomplete observation rather than a '
+      + 'slow one, so the last bar on the chart is left out of the band when the data stops '
+      + 'part-way through it. That makes this stricter than the average above, which has '
+      + 'always counted that period.' },
+  startedCompleted: { title: 'Started vs Completed',
+    body: 'The two counts net flow is the difference of. A net figure of +2 reads the same '
+      + 'whether it came from 12 started and 10 completed or from 2 and 0, and those are very '
+      + 'different periods — one is a team at pace, the other is a team barely moving. Started '
+      + 'counts every item with a start date whether or not it has finished, so the pair also '
+      + 'says how much of what was picked up in this window is still open.' },
   wip: { title: 'Work in Progress',
     body: 'How much work is open at once? Counted at the end of each period from the same '
       + 'start and completion dates as everything else, so it is a history rather than just '
@@ -3030,6 +3081,24 @@ function renderDashboard() {
       'cycleTimePercentile') +
     tile('Avg lead time', s.avgLeadTime == null ? '—' : num1(s.avgLeadTime),
       'days from raised to delivered', 'leadTime');
+
+  /* The Delivery group's own tiles. Neither restates a headline tile: the band
+     answers "is it steady", which the average up there cannot, and the pair of
+     counts is what the single net flow number is the difference of. */
+  const [bandLow, bandHigh] = d.throughputBand;
+  $('tilesDelivery').innerHTML =
+    tile('Steady delivery',
+      s.throughputLow == null ? '&mdash;'
+        : s.throughputLow === s.throughputHigh ? String(s.throughputLow)
+        : s.throughputLow + '&ndash;' + s.throughputHigh,
+      s.throughputLow == null
+        ? 'needs one whole ' + d.bucketNoun + ' of data'
+        : 'items per ' + d.bucketNoun + ' in most ' + d.bucketNounPlural + ' — '
+          + bandLow + 'th to ' + bandHigh + 'th percentile of ' + s.wholePeriods + ' whole '
+          + (s.wholePeriods === 1 ? d.bucketNoun : d.bucketNounPlural),
+      'throughputBand') +
+    tile('Started vs completed', s.startedTotal + ' / ' + s.completedTotal,
+      'items started and items completed in this window', 'startedCompleted');
 
   /* "As of" rather than a period, because both of these are a state read at one
      moment — the newest date in the data, like every other window here. */

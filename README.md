@@ -27,13 +27,28 @@ the table and the charts always name the same period.
 Each chart carries a dashed linear trend line, and four **summary tiles** above the tabs state
 the window-wide figures — average completed per week, average cycle time (pooled over the items
 in the window, so an empty week can't drag it down), the defect rate, and total net flow. Each
-group adds a small tile row of its own: Flow states the 85th-percentile cycle time and the
-median beneath it, Health the work in progress, its ratio to a month's throughput, and how much
-of it has aged. Those
-four stay visible whichever group is open. The tiles are deliberately neutral: this app has no
-targets, so no tile is ever coloured "good" or "bad". There being exactly four of them, they go
-four-across on a wide window and pair into a 2x2 on a narrower one — never three and a stray
-fourth.
+group then adds a small tile row of its own, stating what its charts can't:
+
+- **Flow** — the 85th-percentile cycle time, with the median beneath it, and average lead time.
+- **Delivery** — **steady delivery**, the band most whole periods land in (15th to 85th
+  percentile of the per-period counts), and **started vs completed**, the two counts net flow is
+  the difference of.
+- **Health** — work in progress, its ratio to a month's throughput, and how much of it has aged.
+
+The headline four stay visible whichever group is open. The tiles are deliberately neutral: this
+app has no targets, so no tile is ever coloured "good" or "bad". There being exactly four in the
+headline row, they go four-across on a wide window and pair into a 2x2 on a narrower one — never
+three and a stray fourth; the group rows vary in count and are laid out by `auto-fit` instead.
+
+The delivery band is the one figure in the app computed over **whole periods only**. Everything
+else — the averages, the totals, the charts — counts the final part-period as it stands and says
+so in the window note. A band is a different kind of claim: it asserts what a period looks like,
+and a period the data stops part-way through isn't a slow period, it's an incomplete
+observation. Letting it set the low edge would report a floor the team never delivered at. So
+the last bar is dropped from the band alone, the ⓘ says so, and when there is no whole period
+yet the band reads "—" rather than inventing one. That does make it stricter than the average
+sitting directly above it, which has always counted that period — a deliberate difference, not
+an oversight.
 
 Each chart card heads with **what it is** — CYCLE TIME, THROUGHPUT, AGED WORK — and carries the
 detail on a second line beneath: which grouping, which series, the window average. The name is
@@ -51,9 +66,9 @@ other**, next to the title — one click either way, from anywhere on the page �
 still cross-link at the foot of the page, where a **Recent
 changes** box lists the last ten changes to this file, fetched from GitHub when
 expanded. If a chrome rule changes in one app, it should change in the other too — with one
-noted exception: how many tile columns there are. This app always has exactly four tiles and
-so states its column counts outright, while the sibling's tile groups vary in size and are
-still laid out by `auto-fit`.
+noted exception: how many tile columns there are. This app's headline row always has exactly
+four tiles and so states its column counts outright, while the sibling's tile groups vary in
+size and are still laid out by `auto-fit` — as this app's own per-group tile rows are.
 
 ## Teams
 
@@ -308,6 +323,16 @@ worth knowing:
   real item actually took, so "85% finished within 17 days" is a true statement about work you
   shipped. The window figure pools every item in the window rather than averaging the
   per-period percentiles, because a percentile of percentiles is not a percentile.
+- **The same 85 governs the delivery band.** The steady-delivery tile reads the 15th and 85th
+  percentiles of the per-period counts, mirrored around the middle so one convention serves
+  both metrics: 85% of periods delivered at least the low figure, 85% at most the high one, and
+  the middle 70% sat between them. It answers the half of the Delivery question an average
+  can't — two teams averaging five a week are not the same team if one runs 4 to 6 and the
+  other 0 to 15, and only the second needs explaining to whoever is asking for a date.
+- **Started vs completed is the pair net flow hides.** A net figure of +2 reads identically
+  whether it came from 12 started and 10 completed or from 2 and 0, and those are a team at
+  pace and a team barely moving. Started counts every item with a start date whether or not it
+  finished, so the pair also says how much of what was picked up in the window is still open.
 - **A created date alone is not enough to keep a row.** An item raised and never picked up is
   backlog, not flow; counting it would make the intake series track grooming rather than work.
   The rule is unchanged: no completion and no start, no row.
