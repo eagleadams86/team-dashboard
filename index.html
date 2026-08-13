@@ -35,9 +35,11 @@
   "team-dashboard": the app was renamed on screen, its identifiers were not.)
 
   Paste completed/started dates for your work items and it derives the standard
-  Kanban measures: throughput, cycle time, defect rate and net flow. The charts
-  are grouped into Flow, Delivery and Health — by what the data means, so the
-  ones that move together are read together.
+  Kanban measures: throughput, cycle time, work in progress and work item age
+  lead the page, with lead time, net flow and the unplanned rate beside the
+  charts that expand them. The charts are grouped into Flow, Delivery and
+  Health — by what the data means, so the ones that move together are read
+  together.
 
   Single page, no build step, no account required. localStorage is the source
   of truth; signing in with Google (optional) mirrors it to Firestore so other
@@ -3125,6 +3127,26 @@ function renderDashboard() {
       + ' of ' + d.partial.daysInBucket + ' days' : '');
 
   const s = d.summary;
+  /* Four headline tiles, one per dimension a kanban team can act on: the pace,
+     how predictable that pace is, how much is in flight, and what has been in
+     flight too long.
+
+     Cycle time reads as the percentile rather than the average because the
+     average is the one figure here nobody can forecast with — cycle times are
+     skewed, so the mean lands where most items beat it and a minority miss it
+     badly. The average is still a tile, beside the chart that plots both lines.
+
+     The last two used to sit two clicks away under Health, and they are the
+     only figures on the dashboard that describe the board as it stands rather
+     than as it performed: work in progress is the load everything else follows
+     from, and aged work is the only number here that names something to do
+     today. Net flow and the unplanned rate move down to the charts that expand
+     them — both are readings on the past week, and neither says what to pick
+     up this morning.
+
+     Those two read "as of" a date rather than over a period, because each is a
+     state read at one moment — the newest date in the data, like every other
+     window here — where the two beside them describe a stretch of weeks. */
   $('dashTiles').innerHTML =
     tile('Completed per ' + d.bucketNoun,
       s.avgThroughput == null ? '&mdash;' : num1(s.avgThroughput),
@@ -3133,13 +3155,15 @@ function renderDashboard() {
         : 'items per ' + d.bucketNoun + ' over ' + s.wholePeriods + ' whole '
           + (s.wholePeriods === 1 ? d.bucketNoun : d.bucketNounPlural),
       'throughput') +
-    tile('Avg ' + (state.settings.cycleTimeLabel || 'cycle time'),
-      s.avgCycleTime == null ? '—' : num1(s.avgCycleTime),
-      'days from start to finish', 'cycleTime') +
-    tile((state.settings.unplannedLabel || 'Unplanned') + ' rate', pct1(s.unplannedRateAvg),
-      'share of completed work', 'defectRate') +
-    tile('Net flow', (s.netFlowTotal > 0 ? '+' : '') + s.netFlowTotal,
-      'completed − started; aim near 0', 'netFlow');
+    tile(d.cyclePercentile + 'th percentile ' + (state.settings.cycleTimeLabel || 'cycle time').toLowerCase(),
+      s.p85CycleTime == null ? '—' : num1(s.p85CycleTime),
+      d.cyclePercentile + '% of items finished within this'
+        + (s.medianCycleTime == null ? '' : '; half within ' + num1(s.medianCycleTime)),
+      'cycleTimePercentile') +
+    tile('Work in progress', String(s.currentWip),
+      'open items as of ' + prettyDate(s.asOf), 'wip') +
+    tile('Aged work', String(s.agedNow),
+      'in progress over ' + d.agedDays + ' days', 'agedWork');
 
   /* Both lines hold user-chosen label text, so both are escaped. The ⓘ goes on
      the name, which is what it explains. */
@@ -3150,21 +3174,24 @@ function renderDashboard() {
   };
   Object.keys(d.names).forEach(k => setTitle(k, d.names[k], d.titles[k]));
 
-  /* The Flow group's own tiles, beside the charts that expand them. The four
-     headline tiles above stay as they are — eight in one row would push every
-     chart below the fold. */
+  /* The Flow group's own tiles: the two averages, each beside the chart that
+     plots it. The average cycle time sits here rather than in the headline row
+     because the percentile above already answers the question worth asking of
+     a headline — what can I promise about the next item — and this answers a
+     different one: what a typical item costs. That is the same distinction the
+     two lines on the cycle time chart draw, so the tile belongs with them. */
   $('tilesFlow').innerHTML =
-    tile(d.cyclePercentile + 'th percentile ' + (state.settings.cycleTimeLabel || 'cycle time').toLowerCase(),
-      s.p85CycleTime == null ? '—' : num1(s.p85CycleTime),
-      d.cyclePercentile + '% of items finished within this'
-        + (s.medianCycleTime == null ? '' : '; half within ' + num1(s.medianCycleTime)),
-      'cycleTimePercentile') +
+    tile('Avg ' + (state.settings.cycleTimeLabel || 'cycle time'),
+      s.avgCycleTime == null ? '—' : num1(s.avgCycleTime),
+      'days from start to finish', 'cycleTime') +
     tile('Avg lead time', s.avgLeadTime == null ? '—' : num1(s.avgLeadTime),
       'days from raised to delivered', 'leadTime');
 
-  /* The Delivery group's own tiles. Neither restates a headline tile: the band
-     answers "is it steady", which the average up there cannot, and the pair of
-     counts is what the single net flow number is the difference of. */
+  /* The Delivery group's own tiles. None restates a headline tile: the band
+     answers "is it steady", which the average up there cannot; net flow says
+     which way work in progress is moving, where the headline tile says where it
+     stands; and the pair of counts is what the single net flow number is the
+     difference of. */
   const [bandLow, bandHigh] = d.throughputBand;
   $('tilesDelivery').innerHTML =
     tile('Steady delivery',
@@ -3177,18 +3204,20 @@ function renderDashboard() {
           + bandLow + 'th to ' + bandHigh + 'th percentile of ' + s.wholePeriods + ' whole '
           + (s.wholePeriods === 1 ? d.bucketNoun : d.bucketNounPlural),
       'throughputBand') +
+    tile('Net flow', (s.netFlowTotal > 0 ? '+' : '') + s.netFlowTotal,
+      'completed − started; aim near 0', 'netFlow') +
     tile('Started vs completed', s.startedTotal + ' / ' + s.completedTotal,
       'items started and items completed in this window', 'startedCompleted');
 
-  /* "As of" rather than a period, because both of these are a state read at one
-     moment — the newest date in the data, like every other window here. */
+  /* The Health group's own tiles. The counts these two read against — work in
+     progress and aged work — are headline tiles now, so what is left here is
+     what each chart needs to be read BY: the coaching ratio that says whether
+     the work in progress figure is a lot, and the rate the defect chart plots. */
   $('tilesHealth').innerHTML =
-    tile('Work in progress', String(s.currentWip),
-      'open items as of ' + prettyDate(s.asOf), 'wip') +
     tile('WIP vs throughput', s.wipRatio == null ? '—' : num1(s.wipRatio) + '×',
       'against ' + s.monthlyThroughput + ' completed in the last month', 'wip') +
-    tile('Aged work', String(s.agedNow),
-      'in progress over ' + d.agedDays + ' days', 'agedWork');
+    tile((state.settings.unplannedLabel || 'Unplanned') + ' rate', pct1(s.unplannedRateAvg),
+      'share of completed work', 'defectRate');
 
   drawCharts(d);
   /* The panels' hidden state lives in the markup, so re-apply the chosen group

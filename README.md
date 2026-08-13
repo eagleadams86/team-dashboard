@@ -25,16 +25,36 @@ single week hard to read. The grouping also drives the last column of the Your D
 the table and the charts always name the same period.
 
 Each chart carries a dashed linear trend line, and four **summary tiles** above the tabs state
-the window-wide figures — average completed per week (over whole weeks only, see below), average
-cycle time (pooled over the items in the window, so an empty week can't drag it down), the
-defect rate, and total net flow. Each group then adds a small tile row of its own, stating what
-its charts can't:
+the window-wide figures — one for each dimension a kanban team can act on:
 
-- **Flow** — the 85th-percentile cycle time, with the median beneath it, and average lead time.
+| Tile | Question it answers |
+|---|---|
+| **Completed per period** | What pace do we deliver at? (over whole periods only, see below) |
+| **85th percentile cycle time** | What can I promise about the next item? (with the median beneath it) |
+| **Work in progress** | How much is in flight right now? |
+| **Aged work** | What has been in flight too long — i.e. what do I do today? |
+
+Those are the four flow metrics a kanban team is normally coached on, and the last two are the
+only figures here that describe the board as it *stands* rather than as it performed. Cycle time
+reads as the **85th percentile rather than the average** deliberately: cycle times are skewed, so
+the mean lands where most items beat it and a minority miss it badly — it is the one figure on
+the page nobody can forecast with. The average is still a tile, beside the chart that plots both
+lines.
+
+Each group then adds a small tile row of its own, stating what its charts can't:
+
+- **Flow** — average cycle time (pooled over the items in the window, so an empty week can't
+  drag it down) and average lead time.
 - **Delivery** — **steady delivery**, the band most whole periods land in (15th to 85th
-  percentile of the per-period counts), and **started vs completed**, the two counts net flow is
-  the difference of.
-- **Health** — work in progress, its ratio to a month's throughput, and how much of it has aged.
+  percentile of the per-period counts); total **net flow**; and **started vs completed**, the two
+  counts net flow is the difference of.
+- **Health** — the ratio of work in progress to a month's throughput, and the defect rate.
+
+Net flow and the defect rate sit with their charts rather than in the headline row because both
+are readings on the period just gone, and neither says what to pick up this morning. Net flow in
+particular says which *way* work in progress is moving, where the headline tile says where it
+stands — and a net figure of +2 reads the same from 12 started and 10 completed as from 2 and 0,
+which is why the pair of counts sits beside it.
 
 The headline four stay visible whichever group is open. The tiles are deliberately neutral: this
 app has no targets, so no tile is ever coloured "good" or "bad". There being exactly four in the
@@ -67,9 +87,9 @@ the ⓘ on each says so.
 - **Work in progress and aged work** are read at a point in time, and that point is already
   clamped to the end of your data (see below).
 
-The line is drawn at "is this a count per period?", not at "is this important". It's the only
-place in the app where two tiles sitting side by side use different divisors, which is why both
-of them state theirs on the tile.
+The line is drawn at "is this a count per period?", not at "is this important". It does mean two
+tiles in the same row can be counted over different sets of periods — steady delivery over whole
+ones, net flow beside it over all of them — which is why each tile states the count it used.
 
 Each chart card heads with **what it is** — CYCLE TIME, THROUGHPUT, AGED WORK — and carries the
 detail on a second line beneath: which grouping, which series, the window average. The name is
@@ -348,7 +368,8 @@ worth knowing:
   configured value. **Lead time** is `completed − created` by exactly the same rules — the
   whole wait, including the time an item sat in the backlog before anyone picked it up. Lead
   time is therefore always the longer of the two, and the gap between them is queue.
-- **The 85th percentile is the number to forecast with.** 85% of the items completed finished
+- **The 85th percentile is the number to forecast with**, which is why it, rather than the
+  average, is the cycle time figure in the headline row. 85% of the items completed finished
   within it, so it is a promise you can make about the next one. An average is not: on a
   right-skewed distribution — which delivery data always is — the mean sits well above the
   typical item and well below the slow tail, describing nothing. The gap between the two lines
