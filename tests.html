@@ -594,6 +594,18 @@ async function run(TD, win) {
      'a wording that was already right is left alone');
   is(win.TDState.normalizeSettings({ cycleTimeLabel: 'Elapsed days' }).cycleTimeLabel,
      'Elapsed days', 'and one the user typed themselves is never re-cased');
+
+  /* Only the keys this app knows survive the settings boundary — a stray key on
+     a hand-edited backup or cloud document must not ride along into every saved
+     and synced copy, because that is exactly how text the app never asked for
+     would get stored. */
+  const strayS = win.TDState.normalizeSettings({ agedDays: 21,
+    smuggled: 'DAE-1023 Customer export breaks on accented names' });
+  is('smuggled' in strayS, false, 'a stray settings key is dropped at the boundary');
+  is(strayS.agedDays, 21, 'while every known key still comes through');
+  is(Object.keys(strayS).sort().join(','),
+     'agedDays,cycleTimeLabel,filters,sameDayValue,unplannedLabel,unplannedType',
+     'and the surviving keys are exactly the known set');
   is(d.names.wip, 'Work in progress', 'the rest are the standard metric names');
   is(d.titles.cycleTime, 'Cycle Time per Week — Average and 85th Percentile',
      'the cycle time title names both series, in Title Case like every heading');

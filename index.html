@@ -2337,7 +2337,14 @@ function normalizeSettings(raw) {
      negative one is meaningless. */
   const a = Number(s.agedDays);
   s.agedDays = Number.isFinite(a) && a > 0 ? a : DEFAULT_SETTINGS.agedDays;
-  return s;
+  /* Only the keys this app knows leave this function — the same whitelist rule
+     rows and teams already live by (hydrateRows and sanitizeTeams both build
+     fresh objects). Without this, any stray key on a hand-edited backup or
+     cloud document would ride along into every saved and synced copy for ever,
+     which is exactly how text this app never asked for would get stored. */
+  const out = {};
+  for (const k of Object.keys(DEFAULT_SETTINGS)) out[k] = s[k];
+  return out;
 }
 
 /* The shape that goes to localStorage and to the cloud. Dates become ISO
@@ -2391,17 +2398,32 @@ function migrate() {
 function loadState() {
   const migrated = migrate();
   if (migrated) { state = hydrateState(migrated); persist(); return; }
-  let raw = null;
-  try { raw = JSON.parse(localStorage.getItem(LS.state) || 'null'); } catch (e) { /* fall through */ }
+  let stored = null, raw = null;
+  try { stored = localStorage.getItem(LS.state); raw = JSON.parse(stored || 'null'); }
+  catch (e) { /* fall through */ }
   state = hydrateState(raw);
+  /* If the boundary changed anything — a stray key pruned, an over-long type
+     dropped — the cleaned copy is written straight back, so nothing the
+     whitelist rejected sits in localStorage waiting for the next edit.
+     Deliberately persist(), not save(): this is a repair of the stored shape,
+     not an edit, so it must not stamp this device's copy as newest and race a
+     genuinely newer cloud document. The cloud copy heals on the next real
+     save, which always serialises from the pruned state. */
+  if (stored !== null && JSON.stringify(serializeState()) !== stored) persist();
   /* A brand-new browser gets one empty team so there's somewhere to paste into.
      hasData() below deliberately doesn't count it — see the note there. */
   if (!state.teams.length) state.teams.push({ id: newId(), name: 'My team', rows: [] });
 }
 
 function loadView() {
-  try { view = Object.assign({}, DEFAULT_VIEW, JSON.parse(localStorage.getItem(LS.view) || '{}')); }
-  catch (e) { view = Object.assign({}, DEFAULT_VIEW); }
+  /* Same whitelist rule as settings: only the keys DEFAULT_VIEW names are read
+     back, so a stray key in a hand-edited copy can't sit in localStorage for
+     ever. This key never syncs, but the rule is the rule everywhere. */
+  let raw = {};
+  try { raw = JSON.parse(localStorage.getItem(LS.view) || '{}') || {}; }
+  catch (e) { /* defaults */ }
+  view = {};
+  for (const k of Object.keys(DEFAULT_VIEW)) view[k] = (k in raw) ? raw[k] : DEFAULT_VIEW[k];
 }
 
 /* Both writers are view-mode chokepoints: in a shared view the state in memory
