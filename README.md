@@ -171,10 +171,12 @@ keys off a completion date.
 | No completion and no start | Dropped — untouched backlog says nothing about flow |
 | A date that cannot exist (31 Feb, month 13) | Rejected rather than silently rolled over |
 
-**Every problem row is listed back with its line number and the line itself**, so you can find it
-in the export rather than hunt for it — the listing includes whatever identifier your paste
-carries, so a Jira key comes back with it. Long lists are capped, but the count above each list
-is always the true total.
+**Every problem row is listed back with its line number and only the cells the app reads** —
+the work type and the three dates, never the whole pasted line. The line also carries the
+ticket key and can carry a summary, and neither belongs on screen any more than in storage;
+the line number is how you find the row in your export, which still has every identifying
+detail — where it belongs. Long lists are capped, but the count above each list is always the
+true total.
 
 ### The Three Dates Are Not Equally Trustworthy
 

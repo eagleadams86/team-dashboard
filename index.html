@@ -1632,6 +1632,25 @@ function parsePastedRows(text, order) {
 
   const at = (cells, i) => (i >= 0 && cells[i] != null ? String(cells[i]).trim() : '');
 
+  /* What a problem row is echoed back as: ONLY the cells this app reads — the
+     work type and the three dates — never the whole pasted line. The line also
+     carries the ticket key and can carry a summary, and neither belongs on
+     screen any more than it belongs in storage: the pasted text comes out of a
+     work system, and this app's rule is numbers and dates plus a short type
+     label, everywhere. Each echoed cell goes through the same cleanWorkType
+     guard as the saved type, so even a mismapped column can't put a long text
+     back on screen. The line number is how the row is then found in the export
+     itself, which still has every identifying detail — where it belongs. */
+  const refOf = (cells) => {
+    const cell = (i) => cleanWorkType(at(cells, i));
+    const parts = [];
+    const t = cell(cols.type);      if (t) parts.push(t);
+    const k = cell(cols.created);   if (k) parts.push('created ' + k);
+    const s = cell(cols.started);   if (s) parts.push('started ' + s);
+    const c = cell(cols.completed); if (c) parts.push('resolved ' + c);
+    return parts.join(' · ') || '(no readable cells)';
+  };
+
   const rows = [], badCompleted = [], badStarted = [], badCreated = [];
   /* Two different orderings, two different meanings — see the checks below. */
   const startAfterDone = [], raisedAfterStart = [];
@@ -1652,11 +1671,11 @@ function parsePastedRows(text, order) {
        Dropping these rows made net flow read systematically too positive. Text
        in the cell that *isn't* a date is still an error. */
     if (!completed && rawCompleted !== '') {
-      badCompleted.push({ line: lineNo, text: cells.join(' | ') });
+      badCompleted.push({ line: lineNo, text: refOf(cells) });
       return;
     }
-    if (!started && rawStarted !== '') badStarted.push({ line: lineNo, text: cells.join(' | ') });
-    if (!created && rawCreated !== '') badCreated.push({ line: lineNo, text: cells.join(' | ') });
+    if (!started && rawStarted !== '') badStarted.push({ line: lineNo, text: refOf(cells) });
+    if (!created && rawCreated !== '') badCreated.push({ line: lineNo, text: refOf(cells) });
 
     /* created ≤ started ≤ completed is the one hard ordering these dates have,
        and which end of it breaks tells you something specific — because the
@@ -1674,7 +1693,7 @@ function parsePastedRows(text, order) {
        The row still completed — it counts for throughput — it just no longer
        claims to know when it started. */
     if (started && completed && started > completed) {
-      startAfterDone.push({ line: lineNo, text: cells.join(' | ') });
+      startAfterDone.push({ line: lineNo, text: refOf(cells) });
       usableStarted = null;
     }
 
@@ -1694,7 +1713,7 @@ function parsePastedRows(text, order) {
        also produce a lead time shorter than the same row's cycle time. */
     const startRef = usableStarted || completed;
     if (created && startRef && created > startRef) {
-      raisedAfterStart.push({ line: lineNo, text: cells.join(' | ') });
+      raisedAfterStart.push({ line: lineNo, text: refOf(cells) });
       usableCreated = null;
     }
 

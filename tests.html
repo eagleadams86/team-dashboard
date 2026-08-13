@@ -495,6 +495,24 @@ async function run(TD, win) {
   is(pb.rows[0].started, null, 'the row with a bad start date is kept without one');
   is(pb.rows[1].started, null, 'an empty start date is legitimate, not an error');
 
+  /* A problem row is echoed back as only the cells this app reads — type and
+     dates — never the whole pasted line, which also carries the ticket key and
+     can carry a summary. The line number is how the row is found in the export,
+     which is where the identifying detail belongs. */
+  const pe = TD.parsePastedRows(
+    'Key\tSummary\tCreated\tIn Progress\tResolved\tIssue Type\n' +
+    'DAE-1023\tCustomer data export breaks on accented names\t6/1/2026 9:32\t4/17/2026 0:00\t4/20/2026 10:25\tStory\n' +
+    'DAE-858\tAnother sensitive summary here\tnot-a-date\t3/11/2026 0:00\t3/12/2026 0:27\tBug', 'auto');
+  is(pe.raisedAfterStart.length, 1, 'the late-raised row is still caught');
+  const echoed = pe.raisedAfterStart.concat(pe.badCreated).map(b => b.text).join(' ');
+  is(echoed.includes('DAE-1023') || echoed.includes('DAE-858'), false,
+     'a problem line never echoes the ticket key');
+  is(echoed.includes('Customer') || echoed.includes('summary'), false,
+     'nor the summary');
+  is(pe.raisedAfterStart[0].text.includes('Story')
+     && pe.raisedAfterStart[0].text.includes('created 6/1/2026 9:32'), true,
+     'what it does echo is the type and the dates, labelled');
+
   /* ────────────────────────────────────────────────────────── */
   group('Cycle time');
 
