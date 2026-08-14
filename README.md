@@ -485,6 +485,20 @@ isn't a backup is refused outright and leaves your data alone.
 **Two things are deliberately not in the file:** your theme, and which team you were looking
 at. Both are positions on this device rather than data — the same reason they don't sync.
 
+### Starting Again
+
+Folded away at the foot of the same dialog, under **Start again**, is **Delete all data** —
+the whole-board version of Clean up old data. It's behind a fold on purpose: the one
+irreversible action in the app shouldn't sit a mis-click away from Download backup.
+
+Pressing it opens a confirmation of its own that says exactly how much is going ("This
+deletes 2 teams and 3 items"), warns you when you're signed in that the copy in your Google
+account goes too, and offers the same JSON download as a last chance to keep any of it.
+
+**Your settings and your theme survive.** Starting fresh isn't asking to lose the type
+labels, filters and ageing threshold you spent time tuning — those are configuration, not
+data. What's left is exactly what a brand-new browser gets: one empty team to paste into.
+
 ## Sharing a Read-Only Link
 
 The **Share** button in the header builds a link that shows someone the teams you pick,

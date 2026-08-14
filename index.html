@@ -590,6 +590,15 @@ label.checkline { display: flex; gap: 8px; align-items: center; font-size: 14px;
    than hidden — this collapses them, margin included, while they hold nothing. */
 .warn:empty, #shareMeta:empty { display: none; }
 
+/* "Start again" inside the backup dialog. Folded away deliberately: the one
+   irreversible action in the app should take a deliberate open, not sit a
+   mis-click away from Download backup. Same pattern in the sibling apps. */
+details.danger-zone { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+details.danger-zone > summary { cursor: pointer; font-size: 13px; font-weight: 600;
+  color: var(--text-secondary); }
+details.danger-zone > summary:hover { color: var(--text-primary); }
+details.danger-zone p { color: var(--text-secondary); font-size: 13px; }
+
 /* read-only share view: a standing bar above the tabs, so a borrowed link never
    reads as your own data. The focus colour, not amber — a shared view is just a
    different mode, not something needing attention. */
@@ -687,7 +696,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
       <option value="midnight" selected>✦ Midnight</option>
       <option value="sepia">📜 Sepia</option>
     </select>
-    <button class="btn small" id="dataBtn" type="button" title="Back up or restore your data">Back up</button>
+    <button class="btn small" id="dataBtn" type="button" title="Back up, restore or clear your data">Back up</button>
     <button class="btn small" id="shareBtn" type="button" title="Create a read-only link to show someone your figures">Share</button>
     <button class="btn small" id="syncBtn" type="button" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
   </div>
@@ -1025,8 +1034,33 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
     holds and be asked to confirm first — and if you're signed in, the restored copy becomes
     the one your other devices get.
   </div>
+  <details class="danger-zone">
+    <summary>Start Again</summary>
+    <p style="margin-top:10px">Deletes every team and every work item in this browser. Your
+      settings and your theme are kept.</p>
+    <div class="row">
+      <button class="btn danger" id="clearBtn" type="button">Delete all data</button>
+    </div>
+  </details>
   <div class="row" style="justify-content:flex-end;margin-top:18px">
     <button class="btn primary" id="dataCloseBtn" type="button">Close</button>
+  </div>
+</dialog>
+
+<!-- ── Confirming a delete-all ───────────────────────────────────────────────
+     Its own dialog rather than a confirm(): this is the one action with no way
+     back, so it gets room to say exactly how much is going, whether it reaches
+     the other devices, and to offer the backup that is the only route back. -->
+<dialog id="clearDialog" aria-labelledby="clearTitle">
+  <h2 id="clearTitle">Delete All Data?</h2>
+  <p id="clearBody"></p>
+  <p class="warn" id="clearSyncWarn" role="status"></p>
+  <div class="row spread" style="margin-top:18px">
+    <button class="btn" id="clearBackupBtn" type="button">&#11015; Download backup first</button>
+    <span class="row">
+      <button class="btn" id="clearCancel" type="button">Cancel</button>
+      <button class="btn danger" id="clearConfirm" type="button">Delete everything</button>
+    </span>
   </div>
 </dialog>
 
@@ -3479,7 +3513,7 @@ function closeOnBackdropClick(dlg) {
 }
 /* Every dialog except the sync reconciliation one, which deliberately refuses
    to be dismissed — picking which copy of your data to keep has to be a choice. */
-['dataDialog', 'helpDialog', 'manageDialog'].forEach(id => closeOnBackdropClick($(id)));
+['dataDialog', 'clearDialog', 'helpDialog', 'manageDialog'].forEach(id => closeOnBackdropClick($(id)));
 
 /* theme */
 const THEMES = [...$('themeSel').options].map(o => o.value);
@@ -3808,6 +3842,56 @@ $('importFile').addEventListener('change', (e) => {
     e.target.value = '';
   };
   reader.readAsText(file);
+});
+
+/* ── Delete all data ────────────────────────────────────────────────────────
+   Folded behind "Start again" in the backup dialog and confirmed in a dialog of
+   its own, because it is the only action here with nothing behind it but a
+   backup file. Clean-up next door is the surgical version of this; this one is
+   the whole board.
+
+   Settings deliberately SURVIVE. Someone starting fresh is not asking to lose
+   the type labels, filters and ageing threshold they spent time tuning — those
+   are configuration, not data. The theme survives too: it lives under its own
+   key rather than in `state`. What is left behind is exactly what a brand-new
+   browser gets: one empty team to paste into. */
+const clearDialog = $('clearDialog');
+
+$('clearBtn').addEventListener('click', () => {
+  /* Closed first rather than stacked: a confirmation is the whole screen's
+     business, and backing out of it should not drop you into the dialog you
+     started from as though nothing had been asked. */
+  $('dataDialog').close();
+  const c = window.tdCounts(serializeState());
+  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  $('clearBody').textContent =
+    `This deletes ${plural(c.teams, 'team')} and ${plural(c.items, 'item')}. Your settings and `
+    + `your theme are kept. There is no undo — a downloaded backup is the only way to get any `
+    + `of it back.`;
+  /* Said plainly, because "clear this browser" and "clear every device I own"
+     are very different acts and the button looks identical either way. */
+  const signedIn = typeof window.tdSignedIn === 'function' && window.tdSignedIn();
+  $('clearSyncWarn').textContent = signedIn
+    ? 'You are signed in, so this also clears the copy in your Google account. Your other devices will ask before clearing themselves.'
+    : '';
+  clearDialog.showModal();
+});
+
+$('clearBackupBtn').addEventListener('click', downloadBackup);
+$('clearCancel').addEventListener('click', () => clearDialog.close());
+$('clearConfirm').addEventListener('click', () => {
+  state.teams = [{ id: newId(), name: 'My team', rows: [] }];
+  view.activeTeamId = state.teams[0].id;   // the team it pointed at no longer exists
+  save();                 // the one write path, so this pushes to the cloud too
+  saveView();
+  /* …but save() debounces its push, and a delete must not sit in that window:
+     clearing then closing the tab inside 1.2s would leave the cloud copy intact,
+     to resurrect everything on the next sign-in. */
+  if (window.cloudFlush) window.cloudFlush();
+  clearDialog.close();
+  $('parseNote').innerHTML = '';
+  renderAll();
+  window.toast('Everything deleted — starting fresh');
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -4508,6 +4592,11 @@ if (FIREBASE_CONFIG && GOOGLE_CLIENT_ID && !window.tdViewOnly && !inTestHarness)
 
 let A, Fs, auth, db, user = null, unsub = null, pushTimer = null, tokenClient = null;
 
+/* The classic script above can't see `user` (this is a module), and the
+   delete-all dialog has to tell the truth about whether deleting reaches the
+   user's other devices. Same hook as Golf Handicap's ghSignedIn. */
+window.tdSignedIn = () => !!user;
+
 /* Google's sign-in client is a classic script, not a module — it hangs
    window.google off the page once it's in. Resolves as soon as that's true. */
 function loadGis() {
@@ -4851,7 +4940,18 @@ window.cloudPush = () => {
   pushTimer = setTimeout(() => { pushTimer = null; pushNow().catch(setSyncError); }, 1200);
 };
 
-/* The debounce means "edit, then close the tab inside 1.2s" would leave the
+/* Skips the debounce. "Delete all data" calls this so the cleared state reaches
+   the cloud before the tab can be closed — otherwise the next sign-in would pour
+   everything straight back. */
+window.cloudFlush = () => {
+  if (!user) return;
+  clearTimeout(pushTimer);
+  pushTimer = null;
+  pushNow().catch(setSyncError);
+};
+
+/* The same window, closed for ordinary edits too. The debounce means "edit, then
+   close the tab inside 1.2s" would leave the
    push scheduled but never sent — localStorage has the change, the cloud
    doesn't, and the other devices stay stale until the NEXT edit on this one.
    Flush a pending push the moment the page is hidden; pagehide too, for the
