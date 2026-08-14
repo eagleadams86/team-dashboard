@@ -19,6 +19,13 @@ so the measures that move together are read together:
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started) |
 | **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; defect rate — defects resolved and defects raised |
 
+Charts sit two to a row at any window wide enough for the pair. A group with an odd number of
+them — Health, with three — leaves the last chart alone on its row: it keeps a single column's
+width and sits **centred**, rather than stretching the full width. A chart drawn twice as wide as
+the ones above it reads as the more important one, which it isn't, and its bars stop being
+comparable with theirs at a glance. On a narrow window every chart is full width, so there is
+nothing to centre.
+
 **Group by week, 2 weeks or month.** The control sits beside the date window on the dashboard.
 Weekly is the default and the finest grain; monthly smooths out the lumpiness that makes a
 single week hard to read. The grouping also drives the last column of the Your Data table, so

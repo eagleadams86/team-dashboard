@@ -403,12 +403,20 @@ select { cursor: pointer; }
    reason to stand as tall as the chart beside it. */
 .chart-card.no-chart { align-self: start; }
 
-/* A group with an odd number of charts leaves the last one half-width with dead
-   space beside it. A time series reads well wide — unlike a tile — so it takes
-   the full row instead. Marked in the markup rather than worked out with
-   :nth-child, which counts the group's tile row as a sibling and so gets the
-   parity wrong the moment a group has tiles. */
-.chart-card.wide { grid-column: 1 / -1; }
+/* A group with an odd number of charts leaves the last one alone on its row. It
+   keeps a column's width and sits centred, rather than stretching across: a
+   chart drawn at twice its siblings' width reads as the more important one,
+   which it isn't, and its x-axis stops being comparable with theirs at a glance.
+   calc mirrors the grid — two columns and one 18px gap. Marked in the markup
+   rather than worked out with :nth-child, which counts the group's tile row as a
+   sibling and so gets the parity wrong the moment a group has tiles. The width
+   only applies above the one-column breakpoint: below it there is nothing to
+   centre, and the auto margins would shrink the card to fit its contents rather
+   than fill the row. */
+.chart-card.solo { grid-column: 1 / -1; }
+@media (min-width: 941px) {
+  .chart-card.solo { width: calc(50% - 9px); margin-inline: auto; }
+}
 
 /* dashboard controls strip */
 .controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;
@@ -973,7 +981,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
           <div class="chart-wrap"><canvas id="chartAgedWork"></canvas></div>
         </div>
 
-        <div class="chart-card wide">
+        <div class="chart-card solo">
           <div class="chart-name" id="nameDefectRate"></div>
           <div class="chart-title" id="titleDefectRate"></div>
           <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
