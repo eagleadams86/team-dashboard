@@ -567,8 +567,11 @@ async function run(TD, win) {
   is(d.netFlow[0], -5, 'week 1 net flow = -5 (7 completed, 12 started)');
   is(d.netFlow[1], 1, 'week 2 net flow = 1');
 
-  /* the chart title carries the average rate */
-  is(d.titles.defectRate, 'Bugs Percentage Rate (Avg: 19.92%)', 'avg bug rate is 19.92%');
+  /* The chart title carries the window's pooled share — 25 bugs of the 124
+     completions, the same figure as the tile — not the 19.92% average of the
+     weekly rates, which weighed a quiet week's ratio the same as a busy one's. */
+  is(d.titles.defectRate, 'Bugs Percentage Rate (Overall: 20.16%)',
+     'the title states the pooled share, 25 of 124');
 
   /* Every chart heads its card with what it IS, above the sentence saying what
      it plots — and every name must have a help entry behind it, since the ⓘ
@@ -623,7 +626,9 @@ async function run(TD, win) {
   ok(d.summary.avgThroughput !== 124 / 14,
      'and not the mean over all 14, which would count a week that has not finished');
   is(d.summary.netFlowTotal, 11, 'summary: net flow total is the sum of the weekly net flows');
-  near(d.summary.unplannedRateAvg, 0.1992, 'summary: avg unplanned rate matches the chart title', 0.0001);
+  near(d.summary.unplannedShare, 25 / 124, 'summary: the defect share is pooled — 25 bugs of 124 completed');
+  ok(Math.abs(d.summary.unplannedShare - 0.1992) > 0.001,
+     'and it is NOT the 19.92% mean of the weekly rates the chart plots');
   ok(d.summary.avgCycleTime > 0, 'summary: pooled avg cycle time is a real figure',
      String(d.summary.avgCycleTime));
   is(TD.derive([{ completed: TD.utcDate(2015, 2, 10), started: null, type: '' }],
@@ -938,13 +943,30 @@ async function run(TD, win) {
      'counting the part-month would have dragged it to 6.8, a pace this team never worked at',
      String(dBand.summary.avgThroughput));
 
-  /* Only the per-period counts are trimmed. A rate is scale-free — a month that
-     stops early observes its ratio perfectly well — so the unplanned rate still
-     averages every period, part-month included. */
+  /* Only the per-period counts are trimmed. A share is scale-free — a month
+     that stops early observes it perfectly well — so the defect share pools
+     every completion, part-month included. And it POOLS rather than averaging
+     the per-period rates: 1 bug of 2 one week, an idle week, then 2 bugs of 2
+     is 3 bugs of 4 completions — 75% — where the mean of the weekly rates
+     (50%, dragged by an idle week that observed nothing at all) is a figure
+     no set of completed items ever showed. */
+  const poolRows = [
+    { started: D(2026, 7, 6),  completed: D(2026, 7, 8),  type: 'Story' },
+    { started: D(2026, 7, 6),  completed: D(2026, 7, 9),  type: 'Bug' },
+    { started: D(2026, 7, 20), completed: D(2026, 7, 22), type: 'Bug' },
+    { started: D(2026, 7, 20), completed: D(2026, 7, 23), type: 'Bug' }
+  ];
+  const dPool = TD.derive(poolRows, SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+  is(dPool.throughput, [2, 0, 2], 'two working weeks around an idle one');
+  near(dPool.unplannedRate.reduce((a, b) => a + b, 0) / 3, 0.5,
+     'the mean of the weekly rates would read 50%');
+  near(dPool.summary.unplannedShare, 0.75, 'the tile reads the true share: 3 bugs of 4 completions');
+  ok(/Overall: 75\.00%/.test(dPool.titles.defectRate),
+     'and the chart title quotes the same pooled figure', dPool.titles.defectRate);
+  /* The part-month's completions still count — pooling is what makes that safe. */
   const dRate = TD.derive(bandRows, SAMPLE_SETTINGS,
     { filterValue: '', months: 'all', bucket: 'month' });
-  near(dRate.summary.unplannedRateAvg, dRate.unplannedRate.reduce((a, b) => a + b, 0) / 5,
-     'the unplanned rate still averages all 5 periods, part-month included');
+  is(dRate.summary.unplannedShare, 0, 'all 40 band items are Stories, so the share is 0 — not null');
 
   /* Nothing whole to read: null both ends rather than a figure invented from a
      period that has not finished happening. */
@@ -1321,6 +1343,31 @@ async function run(TD, win) {
   is(wipLead.unfinished, 1, 'it is counted as work in progress');
   is(wipLead.badStarted.length, 0, 'nothing about it is reported as an error');
 
+  /* Starts newer than the last completion. The axis used to stop at the last
+     completed bucket, so a paste made mid-week — things started, nothing
+     finished yet — dropped the newest bucket whole: work in progress was read
+     days before the date the tile claimed, the started tally missed the new
+     items, and net flow read too positive. The newest bucket must be on the
+     axis even though its throughput is zero — that zero is true. */
+  const dTrail = TD.derive([
+    { started: D(2026, 8, 3),  completed: D(2026, 8, 7), type: 'Story' },
+    { started: D(2026, 8, 10), completed: null,          type: 'Story' },
+    { started: D(2026, 8, 11), completed: null,          type: 'Story' }
+  ], SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+  is(dTrail.buckets, ['2026-32', '2026-33'], 'the started-only week is on the axis');
+  is(dTrail.throughput, [1, 0], 'with a true zero throughput, not hidden');
+  is(dTrail.summary.startedTotal, 3, 'every start in the window is counted');
+  is(dTrail.summary.netFlowTotal, -2, 'so net flow is 1 completed − 3 started');
+  is(dTrail.summary.currentWip, 2, 'work in progress counts the items started since the last completion');
+  is(iso(dTrail.summary.asOf), '2026-08-11', '"as of" is the newest date in the data');
+  is(dTrail.wip[dTrail.wip.length - 1], dTrail.summary.currentWip,
+     'and the last bar still equals the tile — the series really is evaluated there');
+  ok(dTrail.partial != null && dTrail.partial.daysCovered === 3,
+     'the started-only week reports itself as partial, Sun–Tue',
+     JSON.stringify(dTrail.partial));
+  near(dTrail.summary.avgThroughput, 1,
+     'so the pace figures still read whole periods only — the trailing part-week does not drag them');
+
   /* ══════════════════════════════════════════════════════════
      Multi-team state. These are the boundary: everything here decides what a
      copy arriving from the cloud is allowed to turn into.
@@ -1349,6 +1396,24 @@ async function run(TD, win) {
      '', 'a non-string type from outside becomes an empty string');
   ok(S.sanitizeTeams([{ id: 'a', name: 'x'.repeat(500) }])[0].name.length <= 120,
      'an absurdly long name is capped');
+
+  /* The ordering rules the paste enforces, applied to the other door the same
+     data can come through. A copy this app saved already satisfies
+     created ≤ started ≤ completed, but a hand-edited backup or cloud doc can
+     say anything — and a start after its completion would otherwise reach
+     cycleTimeOf, floor at 0, and quietly drag the average down. */
+  const hydratedBackwards = S.sanitizeTeams([{ id: 'a', name: 'X', rows: [
+    { c: '2015-01-10', s: '2015-01-20', t: 'Story' },
+    { c: '2015-01-10', s: '2015-01-05', k: '2015-01-08', t: 'Story' },
+    { c: '2015-01-10', s: '2015-01-05', k: '2015-01-02', t: 'Story' }
+  ] }])[0].rows;
+  is(hydratedBackwards[0].started, null,
+     'a hand-edited start after its completion is dropped, same as at the paste boundary');
+  is(iso(hydratedBackwards[0].completed), '2015-01-10', 'the row itself survives — it still completed');
+  is(hydratedBackwards[1].created, null,
+     'a created date after the start is dropped too — no lead time shorter than its cycle time');
+  is(iso(hydratedBackwards[1].started), '2015-01-05', 'without touching the dates that do make sense');
+  is(iso(hydratedBackwards[2].created), '2015-01-02', 'a row in the right order keeps all three');
 
   /* ────────────────────────────────────────────────────────── */
   group('normalizeSettings');

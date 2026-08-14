@@ -28,7 +28,9 @@ file records what is specific to this repo and what must never regress.
   new diagnostic or preview must not repeat raw pasted cells; point at the source
   export with a line number instead.
 - **Whitelists at every boundary**: `sanitizeTeams()` and `hydrateRows()` rebuild
-  teams/rows from known keys; `normalizeSettings()` returns only
+  teams/rows from known keys. `hydrateRows()` also applies the paste boundary's
+  date-ordering rules (started ≤ completed, created ≤ start) so a hand-edited
+  copy can't smuggle a backwards span in as a 0-day cycle time; `normalizeSettings()` returns only
   `Object.keys(DEFAULT_SETTINGS)`; `loadView()` reads only `DEFAULT_VIEW`'s keys.
   A stray key on a hand-edited backup or cloud document must never ride along
   into the saved/synced copies. **A new stored field must be added to the right

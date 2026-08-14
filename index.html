@@ -1917,11 +1917,17 @@ function derive(rows, settings, view) {
   const endPS   = bucketStart(endDate, bucket);
 
   /* First bucket is the window start, or the earliest completed bucket if the
-     window is "All"; then step until the window (or the data) runs out. */
+     window is "All"; then step to the bucket holding the newest date in the
+     data — a completion OR a start. The axis used to stop at the last
+     completion instead, which silently dropped a trailing bucket holding only
+     starts: a paste made mid-week, with items started since the last thing
+     finished, reported too few items started, a net flow that read too
+     positive, and a work-in-progress count taken days before the date the
+     tile claimed. A trailing zero-throughput bar is true — nothing finished —
+     where the front padding the floor below prevents would not be. */
   const completedSundays = finished.map(r => bucketStart(r.completed, bucket));
-  const maxCompletedPS = new Date(Math.max.apply(null, completedSundays.map(d => d.getTime())));
   const minCompletedPS = new Date(Math.min.apply(null, completedSundays.map(d => d.getTime())));
-  const limit = new Date(Math.min(endPS.getTime(), maxCompletedPS.getTime()));
+  const limit = endPS;
 
   /* A window longer than the data must not pad empty buckets in front of the
      team's first completion — they would read as real zero-throughput periods and
@@ -1986,6 +1992,7 @@ function derive(rows, settings, view) {
      averages these rather than the per-bucket means, so an empty bucket (stored
      as 0 in the series to keep the line unbroken) can't drag it down. */
   const windowCycles = [], windowLeads = [];
+  let unplannedTotal = 0;
 
   for (const ws of weekStarts) {
     const key = bucketKey(ws, bucket);
@@ -2001,6 +2008,7 @@ function derive(rows, settings, view) {
     const unplanned = done.filter(isUnplanned).length;
     const planned   = done.length - unplanned;
     unplannedRate.push(unplanned > 0 ? unplanned / (planned + unplanned) : 0);
+    unplannedTotal += unplanned;
 
     const cts = cycleByWeek.get(key) || [];
     avgCycleTime.push(cts.length ? mean(cts) : 0);
@@ -2084,6 +2092,16 @@ function derive(rows, settings, view) {
      turn into null rather than 0 — the same stance percentileOf takes. */
   const wholeThroughput = partial ? throughput.slice(0, -1) : throughput.slice();
 
+  /* The window's defect share: pooled — defects completed over everything
+     completed — NOT the mean of the per-bucket rates the chart plots. The
+     average of a set of ratios is not the ratio of the set: it weighed a quiet
+     bucket's one-of-one the same as a busy bucket's four-of-ten, and a bucket
+     in which nothing completed contributed a 0% that was never observed at
+     all, dragging the figure toward zero. Null when nothing completed in the
+     window — no share to state. */
+  const completedTotal = throughput.reduce((a, b) => a + b, 0);
+  const unplannedShare = completedTotal > 0 ? unplannedTotal / completedTotal : null;
+
   return {
     empty: weeks.length === 0,
     /* `buckets` is the name the code uses; `weeks` is the same array under the
@@ -2102,26 +2120,24 @@ function derive(rows, settings, view) {
       /* Whole periods only, like the band below. A part-period's count is not a
          low count, it is an unfinished one, so averaging it in reports a pace
          the team never worked at. Note this is a claim about COUNTS: the
-         unplanned rate beside it still averages every period including the
-         part one, and correctly — a rate is scale-free, so a half-finished
+         defect share beside it pools every completion including the part
+         period's, and correctly — a share is scale-free, so a half-finished
          period observes it just as well as a whole one, where the same period
          cannot observe a weekly count at all. Null, not 0, when no period has
          finished: mean([]) is 0, which would read as a real pace of nothing. */
       avgThroughput: wholeThroughput.length ? mean(wholeThroughput) : null,
       avgCycleTime: windowCycles.length ? mean(windowCycles) : null,
-      unplannedRateAvg: mean(unplannedRate),
+      unplannedShare,
       netFlowTotal: netFlow.reduce((a, b) => a + b, 0),
       avgLeadTime: windowLeads.length ? mean(windowLeads) : null,
       /* The two counts behind net flow, and the band the periods sit in. Counted
          over the same buckets the charts plot, so each tile equals the sum of
          the bars beside it. */
-      completedTotal: throughput.reduce((a, b) => a + b, 0),
+      completedTotal,
       startedTotal: started.reduce((a, b) => a + b, 0),
       throughputLow:  percentileOf(wholeThroughput, THROUGHPUT_LOW_PERCENTILE),
       throughputHigh: percentileOf(wholeThroughput, THROUGHPUT_HIGH_PERCENTILE),
       wholePeriods: wholeThroughput.length,
-      /* Pooled over the whole window for the same reason it is pooled per
-         bucket — the average of a set of ratios is not the ratio of the set. */
       /* Over every item in the window, not the mean of the per-bucket
          percentiles — a percentile of percentiles is not a percentile. */
       p85CycleTime: percentileOf(windowCycles, CYCLE_PERCENTILE),
@@ -2157,8 +2173,11 @@ function derive(rows, settings, view) {
        turned the "TiP" setting into "tip" once, and an acronym someone chose is
        not ours to rewrite. */
     titles: {
+      /* "Overall", not "Avg": the figure is the window's pooled share — the
+         same number as the tile — not the average of the plotted points. */
       defectRate: (settings.unplannedLabel || 'Unplanned') +
-               ' Percentage Rate (Avg: ' + (mean(unplannedRate) * 100).toFixed(2) + '%)',
+               ' Percentage Rate (Overall: ' +
+               (unplannedShare == null ? '—' : (unplannedShare * 100).toFixed(2) + '%') + ')',
       cycleTime: cycleLabel + ' per ' + Noun + ' — Average and '
         + CYCLE_PERCENTILE + 'th Percentile',
       throughput: 'Items Completed per ' + Noun,
@@ -2270,18 +2289,30 @@ function sanitizeTeams(teams) {
 function hydrateRows(raw) {
   if (!Array.isArray(raw)) return [];
   const date = v => { if (!v) return null; const d = new Date(v + 'T00:00:00Z'); return isNaN(d) ? null : d; };
-  return raw.map(r => ({
-    completed: date(r && r.c),
-    started:   date(r && r.s),
+  return raw.map(r => {
+    const completed = date(r && r.c);
+    let started = date(r && r.s);
     /* When the export has one. Lead time is the only thing that reads it, and
        it says so rather than falling back to the start date — a lead time that
        is secretly a cycle time is worse than no lead time at all. */
-    created:   date(r && r.k),
-    /* Same guard as the paste: a hand-edited backup or cloud doc can put
-       anything here, and only a short label-shaped string may round-trip back
-       out through serializeRows — see cleanWorkType. */
-    type:      cleanWorkType(r && r.t)
-  }))
+    let created = date(r && r.k);
+    /* The same ordering rules parsePastedRows applies, because this is the
+       other door the same data can come through. A copy this app saved already
+       satisfies created ≤ started ≤ completed — the paste enforced it — but a
+       hand-edited backup or cloud doc can say anything, and a start after its
+       completion would otherwise reach cycleTimeOf, floor at 0, and drag the
+       average down where nobody can see it. Null the offending date, keep the
+       row: it still counts for whatever its remaining dates support. */
+    if (started && completed && started > completed) started = null;
+    if (created && (started || completed) && created > (started || completed)) created = null;
+    return {
+      completed, started, created,
+      /* Same guard as the paste: a hand-edited backup or cloud doc can put
+         anything here, and only a short label-shaped string may round-trip back
+         out through serializeRows — see cleanWorkType. */
+      type: cleanWorkType(r && r.t)
+    };
+  })
   /* An item with no completion is work in progress, not a broken row — keep it,
      it still counts as work started. A created date alone is backlog that was
      raised and never picked up: it says nothing about flow, so the rule stays
@@ -3216,7 +3247,8 @@ function renderDashboard() {
   $('tilesHealth').innerHTML =
     tile('WIP vs throughput', s.wipRatio == null ? '—' : num1(s.wipRatio) + '×',
       'against ' + s.monthlyThroughput + ' completed in the last month', 'wip') +
-    tile((state.settings.unplannedLabel || 'Unplanned') + ' rate', pct1(s.unplannedRateAvg),
+    tile((state.settings.unplannedLabel || 'Unplanned') + ' rate',
+      s.unplannedShare == null ? '—' : pct1(s.unplannedShare),
       'share of completed work', 'defectRate');
 
   drawCharts(d);

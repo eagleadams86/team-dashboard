@@ -80,8 +80,11 @@ the ⓘ on each says so.
 
 - **Cycle time and lead time** average over *items*, not periods. An item that finished on the
   Tuesday took exactly as long as it took.
-- **The defect rate** averages a scale-free *ratio*. A period that stops early observes its own
-  ratio perfectly well — 3 defects in 6 items is 50%, whether that took two days or seven.
+- **The defect rate** is the *pooled share* — defects completed over everything completed in the
+  window, not the average of the per-period rates the chart plots. Averaging the rates weighed a
+  quiet week's one-of-one the same as a busy week's four-of-ten, and counted a week in which
+  nothing finished as a 0% that was never observed at all. A period that stops early still
+  counts every completion it does have — a share is scale-free.
 - **Net flow, started and completed** are *totals* of what happened in the window, not claims
   about a typical period.
 - **Work in progress and aged work** are read at a point in time, and that point is already
@@ -363,7 +366,10 @@ worth knowing:
   where the chart starts; every item still counts toward the weeks that remain. That's
   deliberate. The axis also never starts before the team's first completed period — a window
   longer than the data doesn't pad empty periods in front, which would read as real
-  zero-throughput periods and dilute the tile averages for a young team.
+  zero-throughput periods and dilute the tile averages for a young team. At the other end it
+  runs to the **newest date in the data, completion or start**: a week in which things started
+  but nothing finished yet is plotted with a true zero, so the started tally, net flow and the
+  work-in-progress tile all see it — and "as of" on the tiles means the date it says.
 - **Cycle time** is `completed − started`, floored at 0, with same-day items taking the
   configured value. **Lead time** is `completed − created` by exactly the same rules — the
   whole wait, including the time an item sat in the backlog before anyone picked it up. Lead
