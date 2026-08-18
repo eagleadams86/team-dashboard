@@ -819,6 +819,22 @@ reference — browsers hold on to an icon for a long time.
 Four themes — Midnight (default), Dark, Light, Sepia — from the shared theme pack. Palette
 changes belong in the pack, not here. 
 
+## Origins
+
+The first version of this app was modelled on the **Team Dashboard v5** spreadsheet from
+[Focused Objective](https://github.com/FocusedObjective/FocusedObjective.Resources), the
+freely published collection of forecasting and flow-metrics tools by Troy Magennis. It is
+worth a look in its own right, and so is the rest of that repo.
+
+The metrics themselves belong to nobody: cycle time, lead time, throughput, net flow, work
+in progress, aged work and the 85th percentile are standard Kanban measures that predate
+the spreadsheet and are set out across the flow-metrics literature. What is here is an
+independent reimplementation of them in HTML and JavaScript: the formulas, the layout and
+every chart were built from scratch, and a handful of short field labels read the same only
+because they name the same thing. It has since grown well past the original: any number of teams,
+its own Flow / Delivery / Health grouping, a date window and period picker, read-only share
+links, cross-device sync, four themes and a test suite.
+
 ## Ownership and Licence
 
 Flow Metrics is an independent personal project by Charles Adams — built on personally owned
