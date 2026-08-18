@@ -818,3 +818,22 @@ reference — browsers hold on to an icon for a long time.
 
 Four themes — Midnight (default), Dark, Light, Sepia — from the shared theme pack. Palette
 changes belong in the pack, not here. 
+
+## Ownership and Licence
+
+Flow Metrics is an independent personal project by Charles Adams — built on personally owned
+hardware, with a personally paid-for Claude subscription, in a personal GitHub account, and
+syncing (when you turn it on) through a Firebase project he owns. No employer equipment,
+funding or code went into it.
+
+It holds no employer information either, and that is a property of the design rather than a
+promise: there is no free-text field anywhere in the app, and the storage whitelist admits
+only numbers, dates and short fixed labels. Text you paste in is parsed in the browser and
+thrown away — ticket keys, summaries and comments are never stored, transmitted or
+committed. Adding a stored field means adding it to that whitelist, or it is deliberately
+stripped.
+
+Share it freely: it is [MIT licensed](LICENSE), so anyone — including a company you work
+for — may use, modify and redistribute it. Running it inside an organisation conveys no
+ownership of it; permission comes from that licence, granted by the author as copyright
+holder. [NOTICE](NOTICE) records this in full.
