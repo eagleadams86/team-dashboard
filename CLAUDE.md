@@ -68,7 +68,19 @@ file records what is specific to this repo and what must never regress.
   is mirrored in the other, including the cross-`applink`.
 - Theme: `theme.css` is a copy from `~/claude-theme-pack` (the source of truth
   for ALL apps) — never diverge it locally; palette changes go through the
-  pack's `tokens.json` + contrast gate.
+  pack's `tokens.json` + contrast gate. **All three pages LINK it.** Until
+  2026-08-18 `index.html` instead carried a verbatim inline copy of all 74
+  tokens so it would also work over `file://`, while `privacy.html` and
+  `tests.html` linked the file — the palette twice, in two mechanisms, with the
+  inline copy winning. Nothing had drifted, but a pack change would have
+  silently done nothing to the app while updating its own privacy page: drift
+  with a delay fuse. The cost of linking is that `index.html` no longer stands
+  alone — `theme.css` has to sit beside it, and opening the HTML off disk
+  without it gives an unstyled page. Don't re-inline to "restore" `file://`.
+  What stays in the app's own `<style>`, after the link so it still wins:
+  `color-scheme` per theme, the per-theme `--shadow` values and `--chrome-h`.
+  **The pack has no `--shadow` token at all**, so those are additions, not
+  overrides.
 - **README.md is the index** — keep it current with any meaningful change.
 - Commit subjects are user-facing (the "Recent changes" box lists them
   verbatim) — plain English a non-developer can read.
