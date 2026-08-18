@@ -185,6 +185,13 @@ up in the saved or synced copy. The same guard runs again whenever a saved copy,
 document, backup or share link is read back in. There are deliberately no free-text or
 comment fields anywhere in the app.
 
+**The few labels you do type are capped at 120 characters where they're written**, not just
+on the next load — team names, the defect and cycle-time words, and both columns of the work
+type filter. `maxlength` stops ordinary typing past the cap but not a paste, and the object
+you type into is the one that goes to `localStorage` and the cloud, so the cap is applied at
+the keystroke as well as in `normalizeSettings()`. Typed numbers (the ageing threshold, the
+same-day value) are clamped at zero the same way.
+
 ### What Happens to Bad Data
 
 A bad *cell* costs you that field, not the whole row — with one exception, because every metric
@@ -676,12 +683,16 @@ destroys data must never be the guess.
 
 ## Running It
 
-Single page, no build step, no accounts required. Open `index.html` directly, or serve the
-folder:
+Single page, no build step, no accounts required. Serve the folder:
 
 ```bash
 python3 -m http.server 8013
 ```
+
+`index.html` no longer stands alone: the palette is linked as `theme.css` rather than
+inlined, so opening the file off disk without `theme.css` beside it gives an unstyled page.
+Copying both files to a folder and opening `index.html` over `file://` still works; a server
+is simplest, and the tests need one anyway.
 
 Your data lives in `localStorage`, and leaves the browser only if you sign in.
 [`privacy.html`](privacy.html) is the privacy policy — keep it and its effective date current
@@ -790,7 +801,7 @@ average bug rate in the defect rate chart title. Change the maths and the suite 
 |---|---|
 | `index.html` | The whole app — inline CSS and JS |
 | `chart.min.js` | Chart.js 4.4.1, vendored (no CDN) |
-| `theme.css` | Copy of the palette from [claude-theme-pack](https://github.com/eagleadams86/claude-theme-pack); also inlined into `index.html` so it works over `file://` |
+| `theme.css` | Copy of the palette from [claude-theme-pack](https://github.com/eagleadams86/claude-theme-pack); **linked** by `index.html`, `privacy.html` and `tests.html` — since 2026-08-18 it is not also inlined, so the palette lives in one place and a pack change reaches the app |
 | `tests.html` | Pure-function tests |
 | `privacy.html` | Privacy policy — exists because other people may sign in |
 | `firestore.rules` | Checked-in copy of the deployed security rules |
