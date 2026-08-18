@@ -114,9 +114,9 @@ This app shares its look and behaviour with
 sticky header, button tabs (with arrow-key navigation), summary tiles, ⓘ help dialogs,
 read-only share links, theme picker and footer. **Each app's header carries a link to the
 other**, next to the title — one click either way, from anywhere on the page — and both
-still cross-link at the foot of the page, where a **Recent
-changes** box lists the last ten changes to this file, fetched from GitHub when
-expanded. If a chrome rule changes in one app, it should change in the other too — with one
+still cross-link at the foot of the page, where a **How it works** link to that app's README
+also sits and a **Recent changes** box lists the last ten changes to this file, fetched from
+GitHub when expanded. If a chrome rule changes in one app, it should change in the other too — with one
 noted exception: how many tile columns there are. This app's headline row always has exactly
 four tiles and so states its column counts outright, while the sibling's tile groups vary in
 size and are still laid out by `auto-fit` — as this app's own per-group tile rows are.
@@ -696,7 +696,8 @@ is simplest, and the tests need one anyway.
 
 Your data lives in `localStorage`, and leaves the browser only if you sign in.
 [`privacy.html`](privacy.html) is the privacy policy — keep it and its effective date current
-if what the app stores, or where it sends it, ever changes.
+if what the app stores, or where it sends it, ever changes. The footer links to it, and to
+this README on GitHub as **How it works**, for anyone wanting more than the in-app ⓘ dialogs.
 
 A Content-Security-Policy `<meta>` at the top of `index.html` restricts the page to its own
 scripts plus Firebase's CDN and Google's sign-in client, and network access to the handful of
