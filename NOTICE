@@ -12,8 +12,7 @@ independent personal project:
   * Developed in the author's personal GitHub account (eagleadams86), and it
     syncs — optionally — through a Firebase project the author owns and pays
     for personally.
-  * No employer equipment, facilities, funding, source code, libraries or
-    other resources were used at any point.
+  * No employer equipment, funding, source code or libraries were used.
   * No employer confidential or proprietary information is present in this
     repository or in the application. This is enforced by the design, not
     only by convention: the app stores nothing but numbers, dates and short
