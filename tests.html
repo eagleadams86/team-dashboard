@@ -1677,6 +1677,46 @@ async function run(TD, win) {
      'nothing without an old completion is removed');
 
   /* ────────────────────────────────────────────────────────── */
+  group('write boundary — live edits are capped before save() serialises them');
+
+  /* The hydrate caps guard the way back IN; these drive the app's real input
+     handlers, because save() serialises the live object — an uncapped value
+     written there would reach localStorage and the cloud before any hydrate
+     saw it. maxlength can't be the pin: assigning .value from script skips it,
+     exactly as a paste outgrows it. Each input is put back through the same
+     handler afterwards, so the state the later groups see is unchanged. */
+  const doc = win.document;
+  const typeInto = (el, text) => {
+    const before = el.value;
+    el.value = text;
+    el.dispatchEvent(new win.Event('input', { bubbles: true }));
+    return before;
+  };
+  const overlong = 'x'.repeat(500);
+
+  const typeInput = doc.getElementById('setUnplannedType');
+  const prevType = typeInto(typeInput, overlong);
+  is(win.tdGet().settings.unplannedType.length, 120,
+     'a settings label typed too long is capped at 120 as it is written');
+  typeInto(typeInput, prevType);
+
+  const sameDayInput = doc.getElementById('setSameDay');
+  const prevSameDay = typeInto(sameDayInput, '-3');
+  is(win.tdGet().settings.sameDayValue, 0, 'a typed negative number is clamped to 0');
+  typeInto(sameDayInput, prevSameDay);
+
+  const teamInput = doc.querySelector('#teamRows input[data-team]');
+  const prevName = typeInto(teamInput, overlong);
+  is(win.tdGet().teams[0].name.length, 120, 'a team name is capped at 120 as it is written');
+  typeInto(teamInput, prevName);
+
+  const filterInput = doc.querySelector('#filterRows input[data-i="1"][data-k="display"]');
+  const prevDisplay = typeInto(filterInput, overlong);
+  is(win.tdGet().settings.filters[1].display.length, 120,
+     'a work-type cell is capped at 120 as it is written');
+  typeInto(filterInput, prevDisplay);
+
+  /* ────────────────────────────────────────────────────────── */
   group('migrate — v1 single-team data folds into a team on first load');
 
   /* migrate() runs inside loadState() at boot, so it is exercised the way it
