@@ -82,8 +82,9 @@ file records what is specific to this repo and what must never regress.
   **The pack has no `--shadow` token at all**, so those are additions, not
   overrides.
 - **README.md is the index** — keep it current with any meaningful change.
-- Commit subjects are user-facing (the "Recent changes" box lists them
-  verbatim) — plain English a non-developer can read.
+- Commit subjects are plain English a non-developer can read. The in-app
+  "Recent changes" box that listed them verbatim was removed 2026-08-18,
+  across the whole app family; the habit stands.
 - After changes: browser-test locally (preview server, port 8013), run
   tests.html, commit, push, verify the Pages deploy and CI, spot-check live —
   then stop the preview server.
