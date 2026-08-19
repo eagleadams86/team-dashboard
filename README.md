@@ -563,6 +563,28 @@ opens, just without the line saying where the history starts.
 It's a **snapshot**: later edits don't appear in links already sent, and a sent link can't
 be withdrawn — treat it like emailing a spreadsheet.
 
+## Working Offline
+
+The app keeps a copy of itself on your device, so it opens with no network at all — on a
+train, on hotel wifi, or when the work VPN is being difficult. Your teams and work items
+were always local, so once the page loads everything works: pasting, the charts, cleanup,
+export. Sync is the one thing that can't — it needs the network by definition, and picks up
+again on its own when you're back.
+
+What's kept is only the app's own public files — the page, the stylesheet, the chart
+library and the icon, the same files anyone can read on GitHub. **Nothing of yours is ever
+put there**, which matters more than it sounds: every one of these apps shares a single
+browser origin, so that cache is not private to this app.
+
+The network is always tried **first**, and the stored copy is used only when it genuinely
+doesn't answer (or takes more than five seconds). So you can't be left running an old
+version while you're online — and if a device does end up behind, the version check
+described under [Back Up & Restore](#back-up--restore) stops it misreading anything.
+
+`sw-kill.js` sits in the repo unused, as an escape hatch: copying it over `sw.js` and
+pushing makes every installed copy uninstall itself and go back to being an ordinary
+online-only page.
+
 ## Cross-Device Sync (Firebase, Free Tier — Optional)
 
 Signing in with Google is entirely optional and does one thing: puts the same teams on your
@@ -708,8 +730,10 @@ this README on GitHub as **How it works**, for anyone wanting more than the in-a
 
 A Content-Security-Policy `<meta>` at the top of `index.html` restricts the page to its own
 scripts plus Firebase's CDN and Google's sign-in client, and network access to the handful of
-endpoints sync uses plus `api.github.com` (the Recent-changes box). **Any new external
-endpoint has to be added there too**, or it fails only in production.
+endpoints sync uses. It also spells out `worker-src 'self'` for `sw.js` rather than letting
+that resolve through the fallback chain, which would otherwise inherit `script-src`'s
+external hosts. **Any new external endpoint has to be added there too**, or it fails only in
+production.
 
 `accounts.google.com` appears in `script-src`, `connect-src` *and* `frame-src` because sign-in
 goes through Google Identity Services — see [Why Sign-In Doesn't Use Firebase's Popup](#why-sign-in-doesnt-use-firebases-popup) above.
@@ -810,6 +834,8 @@ average bug rate in the defect rate chart title. Change the maths and the suite 
 | `index.html` | The whole app — inline CSS and JS |
 | `chart.min.js` | Chart.js 4.4.1, vendored (no CDN) |
 | `theme.css` | Copy of the palette from [claude-theme-pack](https://github.com/eagleadams86/claude-theme-pack); **linked** by `index.html`, `privacy.html` and `tests.html` — since 2026-08-18 it is not also inlined, so the palette lives in one place and a pack change reaches the app |
+| `sw.js` | Service worker: keeps the app's own public files on your device so it opens offline |
+| `sw-kill.js` | The escape hatch — copy it over `sw.js` and push to uninstall every installed worker |
 | `tests.html` | Pure-function tests |
 | `privacy.html` | Privacy policy — exists because other people may sign in |
 | `firestore.rules` | Checked-in copy of the deployed security rules |

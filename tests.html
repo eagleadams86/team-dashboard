@@ -1753,6 +1753,99 @@ async function run(TD, win) {
   else localStorage.removeItem('td-state');
 
   /* ────────────────────────────────────────────────────────── */
+  group('offline — the service worker');
+
+  /* Read as TEXT rather than exercised as a live worker, and that is the point
+     rather than a shortcut: the registration is frame-guarded, so this suite
+     never installs one — a suite that did would start testing whatever code
+     that worker had cached instead of the files on disk.
+
+     What is worth asserting is the SHAPE of the thing: that its cache list is
+     only ever public files, and that it stays small and same-origin. Cache
+     Storage is origin-wide, shared with Sprint Velocity and financial-plan, so
+     "nothing private is ever cached" is the single promise holding that up. */
+  const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const [swRes, killRes, appRes] = await Promise.all(
+    [fetch('sw.js'), fetch('sw-kill.js'), fetch('index.html')]);
+  ok(swRes.ok, 'sw.js is missing');
+  ok(killRes.ok, 'sw-kill.js is missing — the escape hatch has to exist BEFORE it is needed');
+  const SW_SRC = await swRes.text();
+  const KILL_SRC = await killRes.text();
+  const APP_SRC = await appRes.text();
+  const SW = stripComments(SW_SRC);
+
+  const shellMatch = SW_SRC.match(/const SHELL = \[([\s\S]*?)\]/);
+  ok(!!shellMatch, 'could not find the SHELL list in sw.js');
+  const shell = [...shellMatch[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).sort();
+  /* Exact equality, not "contains". A new entry has to be added here too, which
+     is the moment to ask whether the file is genuinely public. */
+  is(shell, ['./', 'chart.min.js', 'favicon.ico', 'privacy.html', 'theme.css'],
+     'the offline shell list holds only files that are already public');
+  const banned = [/\.json$/, /^tests\.html$/, /\.py$/, /CLAUDE/i, /README/i, /NOTICE/i, /data/i];
+  let leaked = null;
+  for (const entry of shell) for (const pat of banned) if (pat.test(entry)) leaked = entry;
+  is(leaked, null, 'nothing private is on the shell list');
+
+  ok(!/https?:\/\//.test(SW),
+     'sw.js names no off-origin URL in executable code — it must only ever see this origin');
+  /* No CSP applies to a worker on Pages, so these are not merely untidy here. */
+  ok(!SW.includes('eval(') && !SW.includes('importScripts(') && !SW.includes('new Function('),
+     'sw.js has no eval/importScripts/new Function — it runs with no CSP at all');
+
+  ok(/startsWith\(PREFIX\)/.test(SW),
+     'activate deletes only caches with this app’s prefix — caches.keys() is origin-wide');
+  ok(/const PREFIX = 'td-shell-';/.test(SW_SRC), 'and the prefix is this app’s, not a sibling’s');
+
+  ok(/Promise\.race/.test(SW) && /cache\.match/.test(SW),
+     'the worker is network-first: a race with the cache as fallback');
+  ok(!/caches\.match\(req\)\s*\.then\(\s*\(?r\)?\s*=>\s*r\s*\|\|/.test(SW),
+     'and not cache-first — the whole design rests on the network being tried first');
+  ok(/!res\.ok && cached/.test(SW),
+     'a same-origin error reply with a cached copy in hand serves the cache');
+
+  /* install fires ONCE per script version, so a cache evicted later would never
+     be rebuilt if install were the only thing that filled it. */
+  ok(/addEventListener\(\s*'message'/.test(SW) && /'shell-check'/.test(SW),
+     'the worker accepts a shell-check message so the page can repair the cache');
+  ok(/if \(reg\.active\) reg\.active\.postMessage\(\{ type: 'shell-check' \}\)/.test(APP_SRC),
+     'and the page asks for that check on load');
+  ok(!/addAll/.test(SW),
+     'no addAll — it rejects the whole precache on a single 404, silently');
+  ok(/e\.data\.type !== 'shell-check'\) return;/.test(SW),
+     'the message handler rejects anything but shell-check');
+  ok(!/e\.data\.(url|urls|path|cache|key)/.test(SW),
+     'and never reads a URL or cache name out of a message');
+
+  /* The markup asks for favicon.ico?v=1, so the key has to be the path alone. */
+  ok(/favicon\.ico\?v=1/.test(APP_SRC), 'the favicon cache-buster is still there');
+  ok(/let p = url\.pathname;/.test(SW_SRC) && /SHELL_PATHS\.has\(p\)/.test(SW_SRC),
+     'shellKey matches on the path alone, so the cache-buster still hits the cached file');
+
+  const KILL = stripComments(KILL_SRC);
+  ok(/unregister\(\)/.test(KILL), 'sw-kill.js unregisters itself');
+  ok(!/addEventListener\(\s*'fetch'/.test(KILL),
+     'sw-kill.js intercepts nothing — inert is the entire point');
+  ok(!/cache\.put|addAll/.test(KILL), 'sw-kill.js never caches anything');
+  ok(/startsWith\('td-shell-'\)/.test(KILL),
+     'sw-kill.js clears only this app’s caches, never a sibling’s');
+
+  const cspMatch = APP_SRC.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/);
+  ok(!!cspMatch, 'no CSP meta tag found');
+  ok(/worker-src 'self'/.test(cspMatch[1]),
+     "the CSP spells out worker-src 'self' rather than leaning on the fallback chain");
+  ok(!/worker-src[^;]*https?:/.test(cspMatch[1]), 'and admits no off-origin host there');
+  ok(/window\.top !== window\.self/.test(APP_SRC),
+     'registration skips frames, or this suite would install a worker on itself');
+  ok(/if \(window\.tdViewOnly\) return;/.test(APP_SRC),
+     'a shared view — or a page halted on newer data — installs no worker');
+  ok(/window\.addEventListener\('load', function \(\) \{/.test(APP_SRC),
+     'and it waits for load rather than competing with first paint');
+  ok(/k\.startsWith\('td-shell-'\)/.test(APP_SRC),
+     'the halt’s Reload clears only this app’s caches before reloading');
+  ok(/reg\.unregister\(\)/.test(APP_SRC),
+     'and unregisters the worker first, or the reload is answered from the same stale cache');
+
+  /* ────────────────────────────────────────────────────────── */
   group('a copy from a newer build is refused, not quietly stripped');
 
   /* The braces to the service worker's belt. hydrateState() keeps only the keys
@@ -1799,8 +1892,7 @@ async function run(TD, win) {
 
   /* The two paths that cannot be run live — one halts inside a sync callback,
      the other is FileReader UI — are pinned as source instead. */
-  const APP_SRC = await (await fetch('index.html')).text();
-  const adoptAt = APP_SRC.indexOf('window.tdAdopt =');
+  const adoptAt = APP_SRC.indexOf('window.tdAdopt =');   // read once, by the group above
   const adopt = APP_SRC.slice(adoptAt, adoptAt + 2000);
   const guard = adopt.search(/\(\(data && data\.schema\) \|\| 1\) > SCHEMA/);
   const store = adopt.indexOf('JSON.stringify(data)');
