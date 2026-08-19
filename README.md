@@ -136,6 +136,51 @@ buttons all appear the moment rows exist (`renderEmptyState()`).
 Which team you're looking at is a position on *this* device and deliberately isn't synced:
 switching team on the laptop shouldn't yank the phone to the same team.
 
+## The Demo — Trying It Without Pasting Anything
+
+**Load sample data** isn't filler to fill the screen: it's this app's demo, and the rule is
+that **every feature has to be reachable from it**. Three teams, about nine months of
+made-up work items ending today, and one of the three deliberately short of a column.
+
+The button sits on both empty surfaces — beside *Load pasted rows* on the Your Data tab,
+which is where a first run opens, and on the empty dashboard, which is what you get if you
+press Dashboard before pasting. Pressing it switches you to the dashboard, and it disappears
+once anything holds data.
+
+It lands on **Heron**, because Kingfisher's board is the prettier one and says less — the
+reason this app reads the 85th percentile rather than the average is only visible on a team
+that has a tail.
+
+| Team | What it's there to show |
+|---|---|
+| **Kingfisher** | The healthy board. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. The baseline the other two read against. |
+| **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold**, and a defect rate about two and a half times Kingfisher's. |
+| **Wagtail** | A newer team: four months of history and **no created dates at all**, so the lead-time chart's "add a Created column" face is reachable, and the date window has a team it visibly runs past. Also proves each team's data stands on its own. |
+
+Every team carries all four work types, so the **work type filter** does something whichever
+team you're on. The span is long enough that **Clean up old data** has real answers — a
+3-month cutoff would drop items from all three teams, a 12-month one from none — and that
+the 6, 9 and 12-month **date windows** each change the picture.
+
+**The dates are counted from the day you load it**, so the demo is live whenever it's opened
+rather than stale from the day it was written, and the work in progress is genuinely in
+progress. The randomness is **seeded**: the same numbers every time, on every device, so it
+can be pinned by a test and talked through twice.
+
+Two things it deliberately doesn't demo: **bad rows and the parse report**. Those are
+responses to input rather than properties of a dataset — you meet them the moment you paste
+anything of your own — and baking permanent errors into the demo would leave every first run
+showing a red note.
+
+It asks before it loads and adds alongside anything you already have, with one exception:
+the empty `My team` the app creates on a first run is dropped, but only if it's untouched —
+still the only team, still empty, still under that name. To get rid of the demo afterwards,
+use **Teams** to delete the three, or *Start again* in the Back up dialog.
+
+The demo group in `tests.html` pins every finding in that table. **Adding a feature means
+adding the data that demonstrates it, a row in this table, and a test** — a feature the demo
+can't reach is a feature nobody you share this with will find.
+
 ## Getting Your Data In
 
 The **Your Data** tab takes a paste from Jira, a CSV or any other export and loads it into the

@@ -601,6 +601,14 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
       <div class="btn-row" style="margin-top:var(--sp-6)">
         <button class="btn primary" id="btnLoad">Load pasted rows</button>
         <button class="btn" id="btnAppend" hidden>Append to existing</button>
+        <!-- The demo is offered on BOTH empty surfaces, because there are two and
+             either can be the first one you see: a first run opens on this tab
+             (selectTab at boot picks 'data' when there are no rows), while
+             #dashEmpty is what you get if you press Dashboard before pasting.
+             The button was on the dashboard card alone to begin with — i.e. on
+             the one tab a first run never lands on, which is exactly the way a
+             feature goes unfound. -->
+        <button class="btn" id="btnSampleData" type="button">Load sample data</button>
         <button class="btn danger" id="btnClear" hidden>Clear this team's data</button>
       </div>
       <!-- role="status": the result of a load — including its data errors — is
@@ -740,6 +748,15 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 2015-01-02   2015-01-14   2015-01-21   Story
 2015-01-09   2015-01-14   2015-01-26   Bug
 2015-01-11   2015-01-21   2015-01-26   Story</pre>
+      <!-- The sibling app offers the same thing beside "Add your first team", and
+           for the same reason: an empty dashboard teaches nothing about what the
+           charts are for. Second, not primary — pasting your own export is still
+           what this screen is asking you to do. -->
+      <div class="btn-row" style="justify-content:center;margin-top:var(--sp-6)">
+        <button class="btn" id="btnSample" type="button">Load sample data</button>
+      </div>
+      <p class="hint" style="margin-top:var(--sp-4)">Three teams and nine months of made-up
+      work items, so every chart has something behind it. You can delete it later.</p>
     </div>
 
     <!-- Rows exist but nothing plots. Its own card, not #dashEmpty: that one
@@ -3415,6 +3432,10 @@ function renderEmptyState() {
   $('btnClear').hidden   = !rows;
   $('loadedCard').hidden = !rows;
   $('cleanupCard').hidden = !state.teams.some(t => t.rows.length);
+  /* The demo is a first-run affordance, so it goes the moment ANY team holds
+     something — not just this one. Left standing beside "Load pasted rows" on a
+     working app it is clutter, and a mis-click that quietly adds three teams. */
+  $('btnSampleData').hidden = state.teams.some(t => t.rows.length);
   document.documentElement.removeAttribute('data-first-run');
 }
 
@@ -3674,6 +3695,7 @@ function doLoad(mode) {
   if (mode !== 'append') $('pasteBox').value = '';
 }
 
+[$('btnSample'), $('btnSampleData')].forEach(b => b.addEventListener('click', loadSample));
 $('btnLoad').addEventListener('click', () => doLoad('replace'));
 $('btnAppend').addEventListener('click', () => doLoad('append'));
 $('btnClear').addEventListener('click', () => {
@@ -4499,6 +4521,167 @@ $('cleanupRunBtn').addEventListener('click', () => {
    anchor to, and which rows a cutoff leaves out. Shared with the share dialog,
    so these tests cover both. */
 window.TDCleanup = { historyAnchor, outsideWindow, windowCutoff };
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   9c. THE DEMO
+   ═══════════════════════════════════════════════════════════════════════════
+
+   The sample data is this app's DEMO, not filler to fill the screen — it is what
+   someone sent a share link explores, and what the app is shown with. The rule,
+   the same one the sibling app carries: EVERY feature must be reachable from it,
+   and a feature is not finished until the demo exercises it. Adding one means
+   adding the data that shows it off, a line in the roster below, a row in the
+   README's demo table, and a test in the demo group of tests.html.
+
+   THE ROSTER, and the one thing each team is here to show:
+
+     Kingfisher  the healthy board — short cycle times, low WIP, few defects.
+                 The baseline the other two read against.
+     Heron       the board the metrics exist to catch: a long tail, so the 85th
+                 percentile lands far above the median (the app's whole argument
+                 for reading p85 rather than the average) · nine items in flight
+                 with five of them past the ageing threshold · a defect rate
+                 twice Kingfisher's.
+     Wagtail     a newer team with FOUR MONTHS of history and NO CREATED DATES,
+                 so the lead-time chart's "this needs a created column" face is
+                 reachable, and so the date window has a team it visibly runs
+                 past. Also proves each team's data stands alone.
+
+   Two things this deliberately does NOT demo: bad rows and the parse report.
+   Those are responses to input rather than properties of a dataset — you see
+   them the moment you paste anything of your own — and baking permanent errors
+   into the demo would leave every first run showing a red note.
+
+   Every figure below is load-bearing. The dates are counted from TODAY, so the
+   demo is live whenever it is opened rather than stale from the day it was
+   written, and the work in progress is genuinely in progress. The randomness is
+   SEEDED — same numbers every time, on every device — because a demo that
+   reshuffles itself cannot be pinned by a test or talked through twice. */
+
+/* mulberry32 — small, fast, and good enough for shaping a demo. Seeded so the
+   dataset is identical on every run; never swap this for Math.random(). */
+function seededRandom(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* The teams, as profiles rather than as thousands of literal rows. `weeks` of
+   history at `perWeek` completions each; `cycle` days from start to finish, with
+   `tailChance` of the item instead taking `tail` days — that tail is the whole
+   reason the 85th percentile is the headline figure. `wait` is the days a ticket
+   sat before anyone started it, which is what lead time measures over and above
+   cycle time. `wip` lists the ages, in days, of the items still in flight: any
+   past the 14-day default is aged work. `types` is a weighted bag. */
+const DEMO_TEAMS = [
+  { name: 'Team Kingfisher', seed: 20260819, dated: true,
+    weeks: 40, perWeek: [4, 7], cycle: [2, 6], tailChance: 0.05, tail: [8, 14],
+    wait: [1, 4], wip: [3, 5, 8, 11],
+    types: ['Story', 'Story', 'Story', 'Story', 'Story', 'Story',
+            'Task', 'Task', 'Bug', 'Spike'] },
+  { name: 'Team Heron', seed: 71104, dated: true,
+    weeks: 40, perWeek: [3, 6], cycle: [3, 8], tailChance: 0.18, tail: [22, 48],
+    wait: [2, 9], wip: [4, 9, 13, 17, 21, 26, 31, 38, 45],
+    /* A twenty-slot bag so the defect share can be tuned finer than tenths — the
+       bag's LENGTH doesn't move the seeded sequence, only which type each draw
+       lands on, so the dates stay identical however this is retuned. Three in
+       twenty puts Heron's rate around a quarter in the default window: a team
+       with a quality problem, which is the point. Two in ten read over 40%,
+       which looks made up and starts an argument about the data rather than
+       about the flow. */
+    types: ['Story', 'Story', 'Story', 'Story', 'Story',
+            'Story', 'Story', 'Story', 'Story', 'Story',
+            'Bug', 'Bug', 'Bug', 'Task', 'Task', 'Task', 'Task', 'Task',
+            'Spike', 'Spike'] },
+  { name: 'Team Wagtail', seed: 5150, dated: false,
+    weeks: 16, perWeek: [2, 4], cycle: [2, 7], tailChance: 0.08, tail: [10, 18],
+    wait: [0, 0], wip: [2, 6, 16],
+    types: ['Story', 'Story', 'Story', 'Story', 'Story',
+            'Task', 'Task', 'Task', 'Spike', 'Bug'] }
+];
+
+/* Built as PASTE TEXT and run through parsePastedRows(), not hand-assembled into
+   row objects. The demo therefore comes in through exactly the boundary a real
+   export does — it cannot produce a row shape the parser would never make, and
+   the type labels go through the same guard as anything typed or synced. */
+function demoPaste(profile) {
+  const rnd = seededRandom(profile.seed);
+  const between = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+  const pick = (list) => list[Math.floor(rnd() * list.length)];
+
+  const midnight = Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+  const iso = (offset) => new Date(midnight + offset * DAY_MS).toISOString().slice(0, 10);
+
+  /* Wagtail's paste has no Created column at all, rather than a column of blanks:
+     a team that has never exported one is the case lead time has to handle, and
+     detectColumns() should be seeing the three-column shape it would really get. */
+  const row = (created, started, completed, type) => (profile.dated
+    ? [created, started, completed, type] : [started, completed, type]).join('\t');
+
+  const lines = [profile.dated ? 'Created\tIn Progress\tResolved\tIssue Type'
+                               : 'In Progress\tResolved\tIssue Type'];
+
+  for (let w = profile.weeks; w >= 1; w--) {
+    const n = between(profile.perWeek[0], profile.perWeek[1]);
+    for (let i = 0; i < n; i++) {
+      const done = -(w * 7) + between(0, 6);
+      const cycle = rnd() < profile.tailChance
+        ? between(profile.tail[0], profile.tail[1])
+        : between(profile.cycle[0], profile.cycle[1]);
+      const start = done - cycle;
+      lines.push(row(iso(start - between(profile.wait[0], profile.wait[1])),
+                     iso(start), iso(done), pick(profile.types)));
+    }
+  }
+  /* Started, never completed — work in progress. It contributes nothing to
+     throughput or cycle time and everything to the WIP and aged-work tiles. */
+  profile.wip.forEach(age => {
+    lines.push(row(iso(-age - between(1, 5)), iso(-age), '', pick(profile.types)));
+  });
+
+  return lines.join('\n');
+}
+
+function loadSample() {
+  if (!confirm(
+      'Load the demo? Three teams and about nine months of work items, ending today.\n\n'
+    + 'Kingfisher is a healthy board. Heron is the one the metrics exist to catch — a long '
+    + 'tail on cycle time, and five items aged past the threshold. Wagtail is newer and has '
+    + 'no created dates, so you can see what lead time does without them.\n\n'
+    + 'It is added alongside anything you already have, and you can delete it later.')) return;
+
+  /* A first run auto-creates an empty "My team" (hydrateState), so loading the
+     demo would otherwise leave a stray empty team in the picker for ever. Drop it
+     — but ONLY when it is untouched: still the only team, still empty, still
+     named what the app named it. A team someone has renamed or put data in is
+     theirs, and the demo adds alongside rather than replacing, as it says. */
+  if (state.teams.length === 1 && !state.teams[0].rows.length && state.teams[0].name === 'My team')
+    state.teams = [];
+
+  let landOn = null;
+  DEMO_TEAMS.forEach(profile => {
+    const parsed = parsePastedRows(demoPaste(profile), 'auto');
+    const team = { id: newId(), name: profile.name, rows: parsed.rows };
+    state.teams.push(team);
+    /* Land on Heron. Kingfisher's board is the prettier one and says less: the
+       reason this app reads the 85th percentile rather than the average is only
+       visible on a team that has a tail, and Heron is that team. */
+    if (profile.name === 'Team Heron') landOn = team;
+  });
+
+  if (landOn) { view.activeTeamId = landOn.id; saveView(); }
+  save();
+  renderAll();
+  /* A first run is on the Your Data tab, and that is where one of the two buttons
+     lives — so without this the demo loads three teams of charts behind a tab the
+     reader is not looking at, and appears to have done nothing. */
+  selectTab('dashboard');
+  window.toast('Demo loaded — three teams, each with a different flow story', 6000);
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    10. BOOT

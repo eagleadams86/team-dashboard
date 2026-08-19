@@ -170,6 +170,36 @@ file records what is specific to this repo and what must never regress.
   `color-scheme` per theme, the per-theme `--shadow` values and `--chrome-h`.
   **The pack has no `--shadow` token at all**, so those are additions, not
   overrides.
+- **THE SAMPLE DATA IS THE DEMO, and a feature isn't finished until it reaches
+  it.** `loadSample()` (section 9c) is what someone sent a share link explores and
+  what the app is shown with, so every feature must be visible from it. Adding one
+  means adding the data that demonstrates it, a line in the roster comment above
+  `loadSample()`, a row in the README's demo table, and an assertion in the demo
+  group of tests.html — that group exists because these are ordinary-looking
+  figures a later edit would tidy without noticing. The same rule runs in Sprint
+  Velocity; it was added to both on 2026-08-19 after Charles loaded a sample and
+  couldn't find the feature it was meant to show.
+  - Every figure in `DEMO_TEAMS` is load-bearing: **Heron's tail is the app's
+    central argument** (p85 ≈ 23 days against a median of 5 — tidy that away and
+    nothing on screen justifies reading p85 rather than the average); Wagtail has
+    **no created dates**, which is the only way the lead-time chart's own
+    explanation is reachable; the span stays around nine months so Clean up old
+    data and the 6/9/12-month windows all have answers.
+  - Dates are counted from `Date.now()`, so the demo is live whenever it is
+    opened. The generator is **seeded** (`seededRandom`) — never swap it for
+    `Math.random()`, or the dataset reshuffles on every device and no test can
+    pin it. A type bag's LENGTH doesn't move the sequence, only which type each
+    draw lands on, so the mix can be retuned without moving a single date.
+  - It is built as **paste text run through `parsePastedRows()`**, not
+    hand-assembled row objects — the demo comes in through the same boundary a
+    real export does and cannot produce a shape the parser would never make.
+- **`tdAdopt()` asks before dropping Created dates, and a hidden iframe's
+  `confirm()` auto-dismisses to "keep them" — which makes the adopt DECLINE.**
+  tests.html therefore plants state through its own `plant()` helper, which stubs
+  `confirm`, and resets to an empty app at the top of `run()`. Without that, any
+  browser whose app happened to hold created dates (anyone who has pressed Load
+  sample data on localhost) failed share-payload tests that have nothing to do
+  with created dates. Don't call `win.tdAdopt` directly from a test.
 - **README.md is the index** — keep it current with any meaningful change.
 - Commit subjects are plain English a non-developer can read. The in-app
   "Recent changes" box that listed them verbatim was removed 2026-08-18,

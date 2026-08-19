@@ -301,6 +301,20 @@ async function run(TD, win) {
   const D = (y, m, d) => TD.utcDate(y, m, d);
   const iso = d => (d ? d.toISOString().slice(0, 10) : null);
 
+  /* Every tdAdopt() below plants known state, and tdAdopt ASKS before dropping
+     Created dates — a hidden iframe's confirm() is auto-dismissed, which reads
+     as "keep them" and makes the adopt decline. So a browser whose app happens
+     to hold created dates (anyone who has pressed Load sample data on localhost)
+     would fail tests that have nothing to do with created dates. Answer that
+     question for the suite, in one place, and start from a known-empty app so a
+     run's result never depends on what the last person did in the app. */
+  const plant = (data) => {
+    const real = win.confirm;
+    win.confirm = () => true;
+    try { return win.tdAdopt(data); } finally { win.confirm = real; }
+  };
+  plant({ teams: [], settings: {} });
+
   /* ────────────────────────────────────────────────────────── */
   group('date functions');
 
@@ -1573,7 +1587,7 @@ async function run(TD, win) {
      built from the app's live state, so the harness plants a known state first
      — through tdAdopt, the same door a cloud copy comes in by. (This writes
      td-* keys on this origin, which the note at the top already owns up to.) */
-  win.tdAdopt({
+  plant({
     teams: [
       { id: 'team-a', name: 'Alpha', rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Bug' }] },
       { id: 'team-b', name: 'Bravo', rows: [{ c: '2015-02-21', s: '2015-02-14', t: '' }] }
@@ -1596,7 +1610,7 @@ async function run(TD, win) {
 
   /* The point of the window: a link carries the rows inside it and no others,
      so a history too long to send can be shortened without deleting anything. */
-  win.tdAdopt({
+  plant({
     teams: [{ id: 'team-a', name: 'Alpha', rows: [
       { c: '2015-01-21', s: '2015-01-14', t: 'Bug' },
       { c: '2015-05-13', s: '2015-05-04', t: '' },
@@ -1937,6 +1951,123 @@ async function run(TD, win) {
   is(win.TDShare.buildSharePayload(win.tdGet().teams.map(t => t.id)).v,
      win.TDShare.SHARE_PAYLOAD_V,
      'and the builder stamps the version the decoder checks for');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the demo — every feature has to be reachable from Load sample data');
+
+  /* The sample data is this app's demo: what someone sent a share link explores,
+     and what the app is shown with. So each finding below is a feature that is
+     ONLY visible from the demo if these figures hold, and they are ordinary
+     enough that a later edit would tidy them without noticing. A NEW FEATURE
+     MEANS A NEW TEST HERE.
+
+     loadSample() confirms, saves, renders and toasts. confirm and the two view
+     calls are stubbed for the length of it — save() is left alone, since this
+     suite already writes this origin's td-* keys and says so at the top. */
+  function loadDemo() {
+    const real = { confirm: win.confirm, renderAll: win.renderAll, toast: win.toast };
+    win.confirm = () => true; win.renderAll = () => {}; win.toast = () => {};
+    try { win.loadSample(); } finally { Object.assign(win, real); }
+    /* tdGet() serialises; derive() needs live rows. Back through sanitizeTeams,
+       which is the same door a saved or synced copy comes in by — so what these
+       tests measure is what the app would measure after a reload, not a shape
+       that only exists in memory. */
+    return win.TDState.sanitizeTeams(win.tdGet().teams);
+  }
+  const demoOf = (teams, name) => teams.find(t => t.name === name);
+  const settle = (rows, months) => TD.derive(rows, win.TDState.normalizeSettings({}),
+    { filterValue: null, months: months || 'all', bucket: 'week' });
+
+  plant({ teams: [], settings: {} });
+  const demo = loadDemo();
+
+  is(demo.map(t => t.name), ['Team Kingfisher', 'Team Heron', 'Team Wagtail'],
+     'three teams, so the team picker itself is visible — it hides below two');
+
+  /* Heron is the reason this app reads the 85th percentile rather than the
+     average. If its tail is ever tidied away, the app's central argument stops
+     being demonstrable on the one screen anybody is shown. */
+  const heron = settle(demoOf(demo, 'Team Heron').rows);
+  const king  = settle(demoOf(demo, 'Team Kingfisher').rows);
+  ok(heron.summary.p85CycleTime >= heron.summary.medianCycleTime * 3,
+     'Heron has a long tail — p85 is at least 3x its median',
+     heron.summary.p85CycleTime + ' vs ' + heron.summary.medianCycleTime);
+  ok(king.summary.p85CycleTime <= king.summary.medianCycleTime * 2,
+     'Kingfisher does not — the two teams have to read differently',
+     king.summary.p85CycleTime + ' vs ' + king.summary.medianCycleTime);
+
+  is([king.summary.agedNow, heron.summary.agedNow], [0, 6],
+     'and only Heron has aged work, so the Aged work tile has both faces');
+  is(demo.map(t => t.rows.filter(r => !r.completed).length), [4, 9, 3],
+     'every team has work in progress, so WIP and net flow are never empty');
+
+  ok(heron.summary.unplannedShare >= king.summary.unplannedShare * 2,
+     'Heron\u2019s defect rate is at least double Kingfisher\u2019s',
+     heron.summary.unplannedShare + ' vs ' + king.summary.unplannedShare);
+
+  /* Lead time is the one chart that can be genuinely unavailable, and the app
+     says so on its face rather than hiding. That face needs a team without
+     created dates to be reachable at all. */
+  const wag = demoOf(demo, 'Team Wagtail');
+  is(wag.rows.filter(r => r.created).length, 0,
+     'Wagtail has no created dates, so the lead-time chart shows its own explanation');
+  is(settle(wag.rows).summary.avgLeadTime, null, 'and its lead time reads as unavailable');
+  ok(demoOf(demo, 'Team Kingfisher').rows.every(r => r.created),
+     'while Kingfisher has one on every row, so lead time plots for it');
+
+  /* All four work types on every team, or the dashboard filter is a control that
+     does nothing on whichever team you happen to be looking at. */
+  demo.forEach(t => {
+    const types = new Set(t.rows.map(r => r.type));
+    is(['Bug', 'Spike', 'Story', 'Task'].filter(x => types.has(x)),
+       ['Bug', 'Spike', 'Story', 'Task'],
+       'the work type filter has all four types on ' + t.name);
+  });
+
+  /* Dates are counted from today, so the demo can never go stale — and the span
+     has to stay long enough that Clean up old data and the 6/9/12-month window
+     options all have something to act on. */
+  const anchor = win.TDCleanup.historyAnchor(demo);
+  const daysBack = (d) => Math.round((Date.now() - d.getTime()) / 86400000);
+  ok(daysBack(anchor) <= 7, 'the newest item is within the last week, whenever this runs',
+     daysBack(anchor) + ' days ago');
+  const oldest = demo.flatMap(t => t.rows).map(r => r.started || r.completed)
+    .reduce((a, b) => (a && a < b ? a : b));
+  ok(daysBack(oldest) >= 250, 'and the history runs back about nine months',
+     daysBack(oldest) + ' days');
+  const goes = (keep) => demo.map(t => t.rows.filter(r =>
+    win.TDCleanup.outsideWindow(r, win.TDCleanup.windowCutoff(demo, keep), false)).length);
+  ok(goes('3').every(n => n > 0), 'a 3-month cleanup would remove items from every team',
+     JSON.stringify(goes('3')));
+  is(goes('12'), [0, 0, 0], 'and a 12-month one would remove none, so both answers are visible');
+
+  /* Same numbers on every device and in every run, or the demo cannot be pinned
+     here and cannot be talked through twice. */
+  plant({ teams: [], settings: {} });
+  const again = loadDemo();
+  is(again.map(t => t.rows.length), demo.map(t => t.rows.length),
+     'the seeded generator produces an identical dataset every time');
+  is(settle(demoOf(again, 'Team Heron').rows).summary.p85CycleTime,
+     heron.summary.p85CycleTime, 'down to the figures on the tiles');
+
+  /* `view` is a module binding rather than a window one, so the landing team is
+     read where saveView() put it — which is also the copy that survives a
+     reload, and therefore the one that actually decides what you see. */
+  const savedView = JSON.parse(win.localStorage.getItem('td-view') || '{}');
+  is(savedView.activeTeamId, demoOf(again, 'Team Heron').id,
+     'and it lands on Heron, the team whose numbers have the most to say');
+
+  /* Both empty surfaces offer it, because either can be the first one seen: boot
+     opens on Your Data when there are no rows, and #dashEmpty is what pressing
+     Dashboard before pasting gives you. Offering it on the dashboard alone put it
+     on the one tab a first run never lands on. */
+  ['btnSample', 'btnSampleData'].forEach(id =>
+    ok(win.document.getElementById(id), 'the demo is offered on both empty surfaces — ' + id));
+  ok(APP_SRC.includes("selectTab('dashboard')")
+     && APP_SRC.indexOf("selectTab('dashboard')", APP_SRC.indexOf('function loadSample')) > -1,
+     'and loading it switches to the dashboard, not the paste box you pressed it from');
+  ok(APP_SRC.includes("$('btnSampleData').hidden = state.teams.some(t => t.rows.length)"),
+     'the offer goes once anything holds data — it is a first-run affordance, not a button');
 
   /* ────────────────────────────────────────────────────────── */
   const sum = document.getElementById('summary');
