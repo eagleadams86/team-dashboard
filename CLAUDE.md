@@ -35,6 +35,32 @@ file records what is specific to this repo and what must never regress.
   A stray key on a hand-edited backup or cloud document must never ride along
   into the saved/synced copies. **A new stored field must be added to the right
   whitelist or it will be deliberately stripped** — tests.html pins this.
+- **`SCHEMA` is what makes those whitelists safe against OLDER code, and it is
+  now read as well as written.** Stripping an unknown key is right for a hostile
+  payload and wrong for a copy written by a NEWER build — and it bites harder
+  here than at the sibling app, because `loadState()` writes the hydrated copy
+  straight back: an older tab opening a newer document loses the unknown fields
+  **on load alone**, no edit needed, and the next save pushes that loss to every
+  other device. So four boundaries compare `schema` now:
+  - **Boot** — a top-level check under `const SCHEMA`, before any listener is
+    attached, calling `haltForNewerData()`: a card over the page, no render, and
+    a `throw` that skips the rest of the script block. Skipped in a shared view,
+    which reads and writes nothing of this device's own.
+  - **`tdAdopt()`** — the live path, for a document arriving mid-session. It
+    stores the newer copy **verbatim** first (it is the newest there is, and the
+    fresh build reads localStorage next load), then halts.
+  - **Restore** — refuses the file with a toast and does NOT halt, because
+    nothing has arrived yet and what's on screen is still good. It must stay
+    ahead of the `tdAdopt()` call, which would otherwise halt on it.
+  - **Share links** carry `SHARE_PAYLOAD_V`, deliberately separate from `SCHEMA`
+    (a viewer needs no data schema). It lives on `window.TDShare`, not
+    `TDState` — `TDState` is assembled a thousand lines earlier, and reading the
+    `const` before its declaration is a TDZ error that takes the app down.
+  The halt reuses `viewOnly` (hence `let viewOnly`, not `const`) rather than
+  inventing a second flag, so every existing write path is already guarded.
+  **Bump `SCHEMA` in the same commit that adds a stored field, and widen the
+  whitelist in that same commit.** All of it is pinned in tests.html, the boot
+  path by booting a second copy of the app against a planted future document.
 - `loadState()` writes a repaired copy back with **`persist()`, deliberately NOT
   `save()`** — a shape repair must not stamp this device's copy newest and race a
   genuinely newer cloud document. (`save()` = persist + timestamp + cloud push;

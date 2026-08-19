@@ -2,7 +2,14 @@
 <html lang="en" data-theme="midnight">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src https://api.github.com; frame-src 'self'; base-uri 'none'; form-action 'none'">
+<!-- Every page on the shared origin ships a CSP (the family security rule) —
+     this one is published on GitHub Pages beside the app, so it is as much a
+     page on the origin as index.html is. connect-src 'self' is for reading
+     index.html as text (the paths that halt the app can't all be run live),
+     api.github.com for the CI-scorecard line, and frame-src 'self' for the
+     harness iframe — whose content is then governed by index.html's own CSP,
+     not this one. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://api.github.com; frame-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Flow Metrics — Tests</title>
 <link rel="stylesheet" href="theme.css">
@@ -1744,6 +1751,100 @@ async function run(TD, win) {
   f2.remove();
   if (savedState != null) localStorage.setItem('td-state', savedState);
   else localStorage.removeItem('td-state');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a copy from a newer build is refused, not quietly stripped');
+
+  /* The braces to the service worker's belt. hydrateState() keeps only the keys
+     it knows, so an older build handed a newer document would strip the rest —
+     and loadState() writes the hydrated copy straight back, so the loss lands
+     before any edit. The app refuses to open instead.
+
+     Booted for real, the way the migrate group above does it: plant a document
+     from the future, load a second hidden copy of the app, and look at what it
+     did. The halt THROWS, so the giveaway is that the hooks at the foot of the
+     script never got assigned. */
+  const savedFuture = localStorage.getItem('td-state');
+  const FUTURE = { schema: win.TDState.SCHEMA + 1, teams: [{ id: 't1', name: 'Kestrel', rows: [] }],
+                   settings: {}, fieldFromTheFuture: 'must survive' };
+  localStorage.setItem('td-state', JSON.stringify(FUTURE));
+  const f3 = document.createElement('iframe');
+  f3.setAttribute('data-td-tests', '');
+  f3.setAttribute('aria-hidden', 'true');
+  f3.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
+  await new Promise((resolve) => { f3.onload = resolve; f3.src = 'index.html'; document.body.appendChild(f3); });
+  const w3 = f3.contentWindow;
+
+  ok(w3.tdGet === undefined,
+     'the script aborts on a newer document — nothing after the halt initialises');
+  ok(w3.tdViewOnly === true,
+     'the halt sets tdViewOnly, so no write path and no sync session can start');
+  const card = w3.document.querySelector('div[style*="z-index:99999"]');
+  ok(!!card, 'a card is drawn over the app rather than a blank page');
+  ok(!!card && /Newer Version/.test(card.textContent), 'and it says why: ' + (card ? card.textContent.slice(0, 40) : ''));
+  ok(!!card && card.querySelector('button'), 'with a Reload button on it');
+  const after = JSON.parse(localStorage.getItem('td-state'));
+  is(after.fieldFromTheFuture, 'must survive',
+     'the newer document is untouched — the whole point of stopping');
+  is(after.schema, win.TDState.SCHEMA + 1, 'including its version marker');
+  f3.remove();
+  if (savedFuture != null) localStorage.setItem('td-state', savedFuture);
+  else localStorage.removeItem('td-state');
+
+  /* Why it has to halt at all, stated as a test: this is what would happen to
+     that document if it were allowed through the ordinary boundary. */
+  const stripped = win.TDState.hydrateState(FUTURE);
+  ok(!('fieldFromTheFuture' in stripped),
+     'hydrateState drops what it does not know — which is why the guard exists');
+
+  /* The two paths that cannot be run live — one halts inside a sync callback,
+     the other is FileReader UI — are pinned as source instead. */
+  const APP_SRC = await (await fetch('index.html')).text();
+  const adoptAt = APP_SRC.indexOf('window.tdAdopt =');
+  const adopt = APP_SRC.slice(adoptAt, adoptAt + 2000);
+  const guard = adopt.search(/\(\(data && data\.schema\) \|\| 1\) > SCHEMA/);
+  const store = adopt.indexOf('JSON.stringify(data)');
+  const halt = adopt.indexOf('haltForNewerData(data.schema)');
+  const hydrate = adopt.indexOf('hydrateState(data)');
+  ok(guard > -1, 'tdAdopt must refuse a document newer than this build');
+  ok(store > guard && halt > store,
+     'the newer document must be stored VERBATIM before the halt — hydrating would lose its fields');
+  ok(hydrate > -1 && halt < hydrate, 'the halt must fire before hydrateState ever sees it');
+
+  const impAt = APP_SRC.indexOf("window.toast('That file isn’t a Flow Metrics backup')");
+  const imp = APP_SRC.slice(impAt, impAt + 2500);   // far enough to reach the tdAdopt call
+  ok(/Number\(parsed\.schema \|\| 1\) > SCHEMA/.test(imp),
+     'restoring a backup from a newer build must be refused');
+  const refuse = imp.search(/Number\(parsed\.schema \|\| 1\) > SCHEMA/);
+  const adoptCall = imp.indexOf('window.tdAdopt(parsed)');
+  ok(adoptCall > -1 && refuse < adoptCall, 'and refused BEFORE tdAdopt, which would halt on it');
+  ok(!/haltForNewerData/.test(imp), 'a refused file must not stop the app the user is using');
+
+  ok(/let viewOnly = !!shareToken;/.test(APP_SRC),
+     'viewOnly must stay assignable — the halt reuses it as the no-write flag');
+  ok(/!window\.tdViewOnly && !inTestHarness/.test(APP_SRC),
+     'the sync module must still refuse to start under tdViewOnly');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a share link from a newer build');
+
+  const futureLink = await win.TDShare.encodeShare(
+    { v: win.TDShare.SHARE_PAYLOAD_V + 1, sharedAt: 1755000000000, label: 'Kestrel',
+      teams: [{ id: 't1', name: 'Kestrel', rows: [] }], settings: {} });
+  let linkErr = null;
+  try { await win.TDShare.decodeShare(futureLink); } catch (e) { linkErr = e; }
+  ok(!!linkErr, 'a payload version this build does not know is refused');
+  ok(!!linkErr && linkErr.newerVersion === true,
+     'and marked, so the card can say the link is fine and this copy is behind');
+
+  const okLink = await win.TDShare.encodeShare(
+    { v: win.TDShare.SHARE_PAYLOAD_V, sharedAt: 1755000000000, label: 'Kestrel',
+      teams: [{ id: 't1', name: 'Kestrel', rows: [] }], settings: {} });
+  const opened = await win.TDShare.decodeShare(okLink);
+  is(opened.teams[0].name, 'Kestrel', 'a link of the current version still opens');
+  is(win.TDShare.buildSharePayload(win.tdGet().teams.map(t => t.id)).v,
+     win.TDShare.SHARE_PAYLOAD_V,
+     'and the builder stamps the version the decoder checks for');
 
   /* ────────────────────────────────────────────────────────── */
   const sum = document.getElementById('summary');

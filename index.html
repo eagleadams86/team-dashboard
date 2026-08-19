@@ -1095,7 +1095,11 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 const SHARE_PREFIX = '#share=';
 const shareToken = location.hash.startsWith(SHARE_PREFIX)
   ? location.hash.slice(SHARE_PREFIX.length) : null;
-const viewOnly = !!shareToken;
+/* `let`, not `const`: haltForNewerData() sets it. Reusing this flag rather than
+   inventing a second one is deliberate — it is already the tested chokepoint in
+   front of persist(), save() and saveView(), and a second flag would have to be
+   remembered by every write path added from here on. */
+let viewOnly = !!shareToken;
 let shareMeta = null;   // { sharedAt, label } once a link has been decoded
 window.tdViewOnly = viewOnly;
 
@@ -2154,6 +2158,77 @@ const LS = {
   oldRows: 'td-rows', oldSettings: 'td-settings'
 };
 
+/* Stop the app dead, with the saved copy untouched, and say why.
+   Called only for data written by a newer build: from the boot check below (it
+   sits under SCHEMA's declaration, which this is deliberately hoisted above)
+   and from tdAdopt() when sync hands one over mid-session. It sets viewOnly (the
+   existing no-write chokepoint, which the sync module also reads as
+   window.tdViewOnly), draws the message with textContent because the number
+   came out of storage, and THROWS so nothing further initialises. */
+function haltForNewerData(found) {
+  viewOnly = true;
+  window.tdViewOnly = true;
+  const wrap = document.createElement('div');
+  wrap.setAttribute('style', 'position:fixed;inset:0;z-index:99999;display:flex;'
+    + 'align-items:center;justify-content:center;padding:24px;'
+    + 'background:var(--bg,#0a0e1a);color:var(--text-primary,#e7eaf6);'
+    + 'font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif');
+  const card = document.createElement('div');
+  card.setAttribute('style', 'max-width:34em;border:1px solid var(--border,#262f4a);'
+    + 'border-radius:12px;padding:24px 26px;background:var(--surface,#121829)');
+  const h = document.createElement('h1');
+  h.setAttribute('style', 'margin:0 0 12px;font-size:20px');
+  h.textContent = 'This Data Was Saved by a Newer Version';
+  const p1 = document.createElement('p');
+  p1.setAttribute('style', 'margin:0 0 12px');
+  p1.textContent = 'Your saved data uses format ' + String(found)
+    + ', and the copy of the app running here only understands ' + String(SCHEMA)
+    + '. Opening it with this older code would quietly drop the parts it doesn\u2019t '
+    + 'know about, so it has stopped instead.';
+  const p2 = document.createElement('p');
+  p2.setAttribute('style', 'margin:0 0 12px');
+  p2.textContent = 'Nothing has been changed or deleted \u2014 your teams and work items '
+    + 'are exactly as you left them. This usually means another device saved '
+    + 'after an update, and this one is still running the older version from '
+    + 'its offline cache.';
+  const p3 = document.createElement('p');
+  p3.setAttribute('style', 'margin:0 0 18px;color:var(--text-secondary,#aab2d0)');
+  p3.textContent = 'Connect to the internet and reload to get the current version.';
+  const btn = document.createElement('button');
+  btn.setAttribute('style', 'font:inherit;font-weight:600;padding:9px 18px;'
+    + 'border:0;border-radius:8px;cursor:pointer;'
+    + 'background:var(--btn-bg,#e7eaf6);color:var(--btn-text,#0a0e1a)');
+  btn.textContent = 'Reload';
+  /* A plain reload can be answered by the service worker out of the same stale
+     cache that got us here, and location.reload(true) does not help — the
+     force-reload argument is non-standard and ignored. So unregister first,
+     then reload; the page registers a fresh worker on the next successful load.
+     Only `td-shell-` caches are cleared: the origin is shared with the sibling
+     apps, and their caches are not ours to delete. */
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Reloading\u2026';
+    try {
+      if (navigator.serviceWorker) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) await reg.unregister();
+      }
+      if (window.caches) {
+        const keys = await caches.keys();
+        await Promise.all(keys.filter((k) => k.startsWith('td-shell-'))
+          .map((k) => caches.delete(k)));
+      }
+    } catch (e) { /* nothing to clear, or storage refused — reload anyway */ }
+    location.reload();
+  });
+  card.append(h, p1, p2, p3, btn);
+  wrap.appendChild(card);
+  const attach = () => document.body.appendChild(wrap);
+  if (document.body) attach();
+  else document.addEventListener('DOMContentLoaded', attach, { once: true });
+  throw new Error('td: saved data schema ' + found + ' is newer than this build (' + SCHEMA + ')');
+}
+
 /* state.teams[] each hold their own rows; settings are shared by all of them.
    Everything in `state` syncs; everything in `view` stays on this device. */
 let state  = { teams: [], settings: Object.assign({}, DEFAULT_SETTINGS) };
@@ -2284,6 +2359,32 @@ function normalizeSettings(raw) {
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
 const SCHEMA = 3;
+
+/* ── The copy-from-the-future check ─────────────────────────────────────────
+   hydrateState() keeps only the keys it knows, which is right for a hostile
+   payload and wrong for a copy written by a NEWER build. It is worse here than
+   at the sibling app: loadState() writes the hydrated copy STRAIGHT BACK when
+   it differs from what was stored, so an older tab opening a newer document
+   destroys the unknown fields on load alone — no edit required — and the next
+   save pushes the loss to every other device.
+
+   At the TOP LEVEL rather than inside loadState(), because the halt works by
+   throwing: everything after it in this script block is skipped, and the first
+   listener is ~1000 lines below, so an app halted here has no handler attached
+   to it at all. It cannot sit any earlier either — SCHEMA is the `const` just
+   above, and reading it sooner is a temporal-dead-zone error.
+
+   Skipped in a shared view: nothing there reads or writes this device's own
+   saved copy, and someone should still be able to open a colleague's link on a
+   device whose own data has moved ahead. */
+if (!viewOnly) {
+  let peek = null;
+  try { peek = JSON.parse(localStorage.getItem(LS.state) || 'null'); }
+  catch (e) { peek = null; }   // unparseable is loadState()'s problem, not this one
+  if (peek && typeof peek === 'object' && Number(peek.schema || 1) > SCHEMA)
+    haltForNewerData(peek.schema);
+}
+
 function serializeState() {
   return {
     schema: SCHEMA,
@@ -2442,6 +2543,23 @@ window.tdCounts = (d) => ({
    own. The caller needs to know: the sync module records which cloud version it
    holds, and it must not record one it declined. */
 window.tdAdopt = (data, updatedAt) => {
+  /* The copy-from-the-future check, live edition. The boot check above only
+     guards the load, but onSnapshot can hand a page running yesterday's cached
+     code a document today's build wrote on another device, mid-session — the
+     case the offline cache makes likely rather than theoretical.
+
+     Stored VERBATIM first, before hydrateState() can drop what makes it newer:
+     it is the newest copy there is, and the fresh build reads localStorage on
+     its next load. Then the same halt, which THROWS, so nothing below adopts.
+     The restore-from-file path refuses a newer backup before it ever gets here,
+     so this only ever fires for the cloud. */
+  if (Number((data && data.schema) || 1) > SCHEMA) {
+    try {
+      localStorage.setItem(LS.state, JSON.stringify(data));
+      localStorage.setItem(LS.updated, String(updatedAt || Date.now()));
+    } catch (e) { console.warn('localStorage save failed', e); }
+    haltForNewerData(data.schema);
+  }
   /* Before the swap, because the comparison is against what this device holds
      now. Created dates going from "some" to "none" is the same class of event
      as another device clearing everything: it can be deliberate, so it asks
@@ -3749,6 +3867,15 @@ $('importFile').addEventListener('change', (e) => {
       e.target.value = '';
       return;
     }
+    /* Written by a newer build. Refused rather than halted: unlike the boot and
+       sync paths nothing has arrived yet, and the data on screen is still good
+       — so the file is turned away and the app carries on. It must come before
+       tdAdopt(), which would otherwise halt on it. */
+    if (Number(parsed.schema || 1) > SCHEMA) {
+      window.toast('This backup was saved by a newer version of the app — reload to update, then restore it');
+      e.target.value = '';
+      return;
+    }
     const now = window.tdCounts(serializeState());
     const inc = window.tdCounts(parsed);
     const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
@@ -3890,6 +4017,15 @@ function outsideWindow(row, cutoff, wip) {
 
 const SHARE_FORMAT = 1;
 
+/* The PAYLOAD version, and a different thing from SHARE_FORMAT above: that
+   marker says how the bytes are packed, this says what shape is inside them.
+   Deliberately separate from SCHEMA — a viewer needs no data schema, and the
+   payload's keys are fixed and pinned by a test — but a link from a newer build
+   should still say so rather than render as a view quietly missing whatever
+   that build added. Nothing is stored and nothing halts: a link is a borrowed
+   read. */
+const SHARE_PAYLOAD_V = 1;
+
 const b64urlEncode = (bytes) => {
   let s = '';
   for (const b of bytes) s += String.fromCharCode(b);
@@ -3922,7 +4058,7 @@ function buildSharePayload(teamIds, win) {
       : t.rows)
   }));
   const payload = {
-    v: 1,
+    v: SHARE_PAYLOAD_V,
     sharedAt: Date.now(),
     label: teams.map(t => t.name).join(', '),
     teams,
@@ -3955,12 +4091,23 @@ async function decodeShare(token) {
   }
   const p = JSON.parse(json);
   if (!p || !Array.isArray(p.teams) || !p.teams.length) throw new Error('not a share payload');
+  /* Made by a newer build than this one. Marked, so the error card can say the
+     link is fine and this copy is behind — "it looks incomplete" would send the
+     reader chasing a link that arrived perfectly intact. */
+  if (Number(p.v || 1) > SHARE_PAYLOAD_V) {
+    const err = new Error('share payload v' + p.v + ' is newer than this build');
+    err.newerVersion = true;
+    throw err;
+  }
   return p;
 }
 
 /* The codec is its own little trust boundary (a link is the least trusted
    input the app has), so tests.html pins the round trip. */
-window.TDShare = { encodeShare, decodeShare, buildSharePayload };
+/* SHARE_PAYLOAD_V rides here rather than on TDState beside SCHEMA, and has to:
+   TDState is built a thousand lines above this, and a `const` read before its
+   declaration is a temporal-dead-zone error that takes the whole app down. */
+window.TDShare = { encodeShare, decodeShare, buildSharePayload, SHARE_PAYLOAD_V };
 
 /* ── Opening a shared link ──────────────────────────────────────────────── */
 
@@ -3982,15 +4129,25 @@ async function openSharedView() {
     renderAll();
   } catch (e) {
     console.warn('share link could not be read', e);
-    renderShareError();
+    renderShareError(e && e.newerVersion ? 'newer' : 'broken');
   }
 }
 
-function renderShareError() {
+/* `reason` is 'broken' (the usual case: a link cut in half by a mail client) or
+   'newer' (the link is intact, this copy of the app is behind). The advice is
+   opposite in each case, so telling them apart is worth the branch. */
+function renderShareError(reason) {
   document.querySelector('.tabs').hidden = true;
   $('teamSel').hidden = true;
-  $('panel-dashboard').innerHTML =
-    '<div class="card empty">' +
+  $('panel-dashboard').innerHTML = reason === 'newer'
+    ? '<div class="card empty">' +
+      '<h2>This Link Was Made by a Newer Version</h2>' +
+      '<p>The link is fine — this copy of the app is behind, so it can’t read everything ' +
+      'in it. Reload the page to pick up the current version, then open the link again.</p>' +
+      '<div class="row" style="justify-content:center;margin-top:18px">' +
+      '<a class="btn primary" href="' + escapeHtml(location.pathname) + '">Open my own data</a>' +
+      '</div></div>'
+    : '<div class="card empty">' +
     '<h2>This Shared Link Couldn’t Be Opened</h2>' +
     '<p>It looks incomplete — links are long, and mail apps sometimes cut them in half or ' +
     'wrap them across two lines. Ask whoever sent it for a fresh copy, and paste the ' +

@@ -495,6 +495,14 @@ forgiving and will turn `{}` into a valid empty dashboard, which is right for a 
 copy and catastrophic for the wrong file picked out of a Downloads folder. Choosing a file that
 isn't a backup is refused outright and leaves your data alone.
 
+**If one device is behind** — every saved copy carries the data format the app that wrote it
+understood. A copy written by a *newer* version than the one you're running won't be opened:
+you get a card saying so, nothing is changed or deleted, and reloading picks up the current
+version. That matters most on a device that's been offline for a while, where the browser can
+still be running an older cached copy of the app while another device has moved on. A backup
+file from a newer version is refused the same way — without stopping the app you're using —
+and a share link from one tells the reader the link is fine and their copy is behind.
+
 **Two things are deliberately not in the file:** your theme, and which team you were looking
 at. Both are positions on this device rather than data — the same reason they don't sync.
 
