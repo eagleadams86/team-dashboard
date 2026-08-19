@@ -61,6 +61,19 @@ file records what is specific to this repo and what must never regress.
   **Bump `SCHEMA` in the same commit that adds a stored field, and widen the
   whitelist in that same commit.** All of it is pinned in tests.html, the boot
   path by booting a second copy of the app against a planted future document.
+- **Working days (2026-08-19) is ONE setting driving THREE durations** — cycle
+  time, lead time and the ageing threshold — and the wording on every chart,
+  tile, axis and column that states one. Don't let them diverge: a screen mixing
+  the two measures is unreadable. `spanDays()` is the only place the choice is
+  made, and `derive()` returns `workingDays`/`dayNoun` alongside the numbers so a
+  label can never disagree with the figure above it. **Holidays are deliberately
+  absent** — per-country, per-year, and free text in an app that stores none —
+  and the setting's own hint says so rather than half-implementing it. It took
+  `SCHEMA` 3 → 4. A share link carries `settings` whole, so the setting travels;
+  a viewer still on an older cached build strips it and reads calendar days,
+  which is accepted rather than bumping `SHARE_PAYLOAD_V` — that would make every
+  link from this build unreadable to that one, including for the majority who
+  never turn the setting on.
 - `loadState()` writes a repaired copy back with **`persist()`, deliberately NOT
   `save()`** — a shape repair must not stamp this device's copy newest and race a
   genuinely newer cloud document. (`save()` = persist + timestamp + cloud push;
@@ -185,6 +198,10 @@ file records what is specific to this repo and what must never regress.
     **no created dates**, which is the only way the lead-time chart's own
     explanation is reachable; the span stays around nine months so Clean up old
     data and the 6/9/12-month windows all have answers.
+  - **The dates cover the WHOLE WEEK, weekends included**, which is the only
+    thing that makes the working-days setting reachable from the demo: generate
+    completions on weekdays only and the toggle changes nothing on the one
+    dataset anybody is ever shown.
   - Dates are counted from `Date.now()`, so the demo is live whenever it is
     opened. The generator is **seeded** (`seededRandom`) — never swap it for
     `Math.random()`, or the dataset reshuffles on every device and no test can

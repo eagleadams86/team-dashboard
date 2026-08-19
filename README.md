@@ -158,9 +158,11 @@ that has a tail.
 | **Wagtail** | A newer team: four months of history and **no created dates at all**, so the lead-time chart's "add a Created column" face is reachable, and the date window has a team it visibly runs past. Also proves each team's data stands on its own. |
 
 Every team carries all four work types, so the **work type filter** does something whichever
-team you're on. The span is long enough that **Clean up old data** has real answers — a
-3-month cutoff would drop items from all three teams, a 12-month one from none — and that
-the 6, 9 and 12-month **date windows** each change the picture.
+team you're on. The dates cover the **whole week**, not just weekdays, which is what makes the
+**working days** setting reachable from the demo: turning it on visibly shortens Heron's tail
+and drops two items out of its aged count. The span is long enough that **Clean up old data**
+has real answers — a 3-month cutoff would drop items from all three teams, a 12-month one from
+none — and that the 6, 9 and 12-month **date windows** each change the picture.
 
 **The dates are counted from the day you load it**, so the demo is live whenever it's opened
 rather than stale from the day it was written, and the work in progress is genuinely in
@@ -302,6 +304,14 @@ Everything the charts depend on, shared by all your teams:
   (`Bug` by default). Anything blank, or not matching, counts as ordinary planned work.
 - **Aged after (days)** — how long an item can sit in progress before the Aged work chart
   counts it (`14` by default; worth keeping under a month).
+- **Count working days only (Monday to Friday)** — off by default. On, cycle time, lead time
+  and the ageing threshold skip weekends: an item started on a Friday and finished on the
+  Monday takes one day, not three. It is one switch for all three, because a screen mixing the
+  two measures would be unreadable, and every chart and column that states a duration re-labels
+  itself to say which days it means. **Public holidays are not known to the app** and still
+  count as working days — a holiday list would be per-country and per-year, and this app
+  deliberately stores no text of that kind. Throughput, net flow, work in progress and the
+  defect rate are counts rather than durations, so they don't move.
 - **Same-day cycle time** — what an item that starts and finishes on one day is worth
   (`1` day: it still occupied someone for that day)
 - **Word for defects on charts** (`Defect` by default — singular, because it reads as
@@ -361,7 +371,7 @@ re-entered:
 ### Created Dates and Older Versions of the App
 
 Rows gained an optional created date (`k` on the wire, backup `version: 3`, `schema: 3` in the
-saved and synced state). A row without one is left exactly as it was — no `k` key is written —
+saved and synced state; the working-days setting later took both markers to `4`). A row without one is left exactly as it was — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before.
 
 **Created dates are never dropped silently.** If a synced copy arrives with none and this
@@ -432,6 +442,15 @@ worth knowing:
   configured value. **Lead time** is `completed − created` by exactly the same rules — the
   whole wait, including the time an item sat in the backlog before anyone picked it up. Lead
   time is therefore always the longer of the two, and the gap between them is queue.
+- **Days are calendar days unless you turn working days on.** Flow metrics measure the wait the
+  customer actually had, and the customer's weekend isn't free — so calendar days are the
+  default and Monday-to-Friday is the deliberate choice. Working days are counted with a weekday
+  ordinal rather than by walking a span a day at a time, so a two-year lead time costs the same
+  as a two-day cycle time; the ordinal steps by one on each weekday and stands still over a
+  weekend, so the difference between two of them *is* the working days between the dates. A span
+  that falls entirely inside a weekend is zero working days and takes the same-day value, which
+  is the same statement that setting always makes. The ageing threshold moves with it: 14
+  working days is nearly three calendar weeks, so items age later and the Aged work count drops.
 - **The 85th percentile is the number to forecast with**, which is why it, rather than the
   average, is the cycle time figure in the headline row. 85% of the items completed finished
   within it, so it is a promise you can make about the next one. An average is not: on a

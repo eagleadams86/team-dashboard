@@ -545,6 +545,44 @@ async function run(TD, win) {
   is(TD.cycleTimeOf({ completed: D(2015, 1, 21), started: null }, 0.5), null, 'no start date, no cycle time');
 
   /* ────────────────────────────────────────────────────────── */
+  group('working days — Monday to Friday, no holidays');
+
+  /* 8 Feb 2015 is a Sunday (pinned in the date group above), so 9 Feb is a
+     Monday, 13 Feb a Friday and 14/15 Feb the weekend. */
+  is(TD.workDaysBetween(D(2015, 2, 13), D(2015, 2, 9)), 4, 'Monday to Friday is four working days');
+  is(TD.workDaysBetween(D(2015, 2, 16), D(2015, 2, 13)), 1,
+     'Friday to Monday is ONE working day — the whole point of the setting');
+  is(TD.workDaysBetween(D(2015, 2, 15), D(2015, 2, 14)), 0, 'Saturday to Sunday is none');
+  is(TD.workDaysBetween(D(2015, 2, 23), D(2015, 2, 9)), 10, 'two calendar weeks are ten working days');
+  is(TD.workDaysBetween(D(2015, 3, 2), D(2015, 2, 9)), 15, 'three of them are fifteen');
+  is(TD.workDaysBetween(D(2015, 2, 13), D(2015, 2, 16)), -1,
+     'and it signs the same way as diffDays, so a backwards row still floors at 0');
+  /* Spans that cross a year boundary, and the negative side of the epoch — the
+     ordinal is floor-based so both directions have to be checked, not assumed. */
+  is(TD.workDaysBetween(D(2016, 1, 4), D(2015, 12, 28)), 5, 'a week across New Year is five');
+  is(TD.workDaysBetween(D(1969, 12, 15), D(1969, 12, 8)), 5, 'and so is one before the epoch');
+
+  is(TD.cycleTimeOf({ completed: D(2015, 2, 16), started: D(2015, 2, 13) }, 0.5, true), 1,
+     'a Friday-to-Monday item costs one working day, not three');
+  is(TD.cycleTimeOf({ completed: D(2015, 2, 16), started: D(2015, 2, 13) }, 0.5), 3,
+     'and still costs three without the setting — off is the default');
+  is(TD.cycleTimeOf({ completed: D(2015, 2, 15), started: D(2015, 2, 14) }, 0.5, true), 0.5,
+     'a span entirely inside a weekend takes the same-day value, like any zero span');
+  is(TD.cycleTimeOf({ completed: D(2015, 2, 13), started: D(2015, 2, 16) }, 0.5, true), 0,
+     'a backwards row still floors at 0');
+  is(TD.leadTimeOf({ completed: D(2015, 3, 2), created: D(2015, 2, 9) }, 0.5, true), 15,
+     'lead time counts the same way — the two are always read side by side');
+
+  /* The ageing threshold moves with the measure too: five working days is a
+     week of calendar time, so the item ages later. */
+  const ageWork = [{ started: D(2015, 2, 13), completed: null, type: 'Story' }];
+  is(TD.agedCounts(ageWork, [D(2015, 2, 20)], 5, [1], true), [0],
+     'exactly five working days old is not yet aged — the same exclusive rule');
+  is(TD.agedCounts(ageWork, [D(2015, 2, 23)], 5, [1], true), [1], 'at six it is');
+  is(TD.agedCounts(ageWork, [D(2015, 2, 19)], 5, [1]), [1],
+     'where calendar days would have called it aged four days earlier');
+
+  /* ────────────────────────────────────────────────────────── */
   group('Linear trend');
 
   is(TD.linearTrend([1, 2, 3, 4]), [1, 2, 3, 4], 'a straight line is recovered exactly');
@@ -629,7 +667,7 @@ async function run(TD, win) {
   is('smuggled' in strayS, false, 'a stray settings key is dropped at the boundary');
   is(strayS.agedDays, 21, 'while every known key still comes through');
   is(Object.keys(strayS).sort().join(','),
-     'agedDays,cycleTimeLabel,filters,sameDayValue,unplannedLabel,unplannedType',
+     'agedDays,cycleTimeLabel,filters,sameDayValue,unplannedLabel,unplannedType,workingDays',
      'and the surviving keys are exactly the known set');
   is(d.names.wip, 'Work in progress', 'the rest are the standard metric names');
   is(d.titles.cycleTime, 'Cycle Time per Week — Average and 85th Percentile',
@@ -710,6 +748,27 @@ async function run(TD, win) {
     Object.assign({}, SAMPLE_SETTINGS, { sameDayValue: 2 }),
     { filterValue: '', months: 'all' });
   is(dSameDay.avgCycleTime[0], 2, 'the same-day cycle time setting feeds through to the average');
+
+  /* One flag, three durations and the words for them — the whole feature seen
+     from the outside, on the same pinned sample every other number here uses. */
+  const dCal  = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+  const dWork = TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { workingDays: true }),
+    { filterValue: '', months: 'all' });
+  ok(dWork.summary.avgCycleTime < dCal.summary.avgCycleTime,
+     'working days shorten cycle time — weekends stop being counted',
+     dWork.summary.avgCycleTime + ' vs ' + dCal.summary.avgCycleTime);
+  ok(dWork.summary.p85CycleTime < dCal.summary.p85CycleTime,
+     'and the percentile with it, so the forecast figure follows the measure',
+     dWork.summary.p85CycleTime + ' vs ' + dCal.summary.p85CycleTime);
+  is(dWork.throughput, dCal.throughput,
+     'while throughput is untouched — a count of completions is not a duration');
+  is([dCal.dayNoun, dWork.dayNoun], ['days', 'working days'],
+     'the word travels with the numbers, so no chart can label the wrong measure');
+  ok(/\(working days\)$/.test(dWork.axisTitles.cycleTime)
+     && /\(days\)$/.test(dCal.axisTitles.cycleTime),
+     'the cycle time axis says which days it means', dWork.axisTitles.cycleTime);
+  ok(/Working Days$/.test(dWork.titles.agedWork),
+     'and so does the aged work title', dWork.titles.agedWork);
 
   const dOtherType = TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { unplannedType: 'Unplanned' }),
     { filterValue: '', months: 3 });
@@ -1306,7 +1365,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 3, 'the schema marker is 3 — the version that added the created date');
+  is(St.SCHEMA, 4, 'the schema marker is 4 — the version that added the working-days setting');
 
   /* ────────────────────────────────────────────────────────── */
   group('Work in progress — started but not finished');
@@ -1459,6 +1518,8 @@ async function run(TD, win) {
   is(def.unplannedLabel, 'Defect', 'and are called a Defect on charts — singular, it reads as a rate');
   is(def.agedDays, 14, 'work ages after two weeks out of the box');
   is(def.cycleTimeLabel, 'Cycle Time', 'and cycle time is called cycle time');
+  is(def.workingDays, false,
+     'and days are calendar days out of the box — the measure every saved board was taken in');
   is(def.filters.map(f => f.display + '→' + f.value),
      ['All→All', 'Defects→Bug', 'Spikes→Spike', 'Stories→Story', 'Tasks→Task'],
      'the filter list covers the four types a Jira board actually produces');
@@ -1485,6 +1546,15 @@ async function run(TD, win) {
      'so does a negative one');
   is(S.normalizeSettings({ unplannedType: 42 }).unplannedType, 'Bug',
      'a non-string label setting falls back to its default');
+  /* A checkbox that decides how every duration is measured: only the boolean
+     true turns it on, and it is a real boolean either way — localStorage drops
+     an undefined and Firestore refuses a whole document over one. */
+  is(S.normalizeSettings({ workingDays: true }).workingDays, true, 'working days can be turned on');
+  is(S.normalizeSettings({ workingDays: 'yes' }).workingDays, false,
+     'but a hand-edited truthy value does not turn it on');
+  is(S.normalizeSettings({ workingDays: 1 }).workingDays, false, 'nor does a 1');
+  is(typeof S.normalizeSettings({}).workingDays, 'boolean',
+     'and it is never undefined, which would break a sync write');
 
   /* ────────────────────────────────────────────────────────── */
   group('hasData — an empty copy must never beat a copy with data');
@@ -1725,6 +1795,17 @@ async function run(TD, win) {
   const prevSameDay = typeInto(sameDayInput, '-3');
   is(win.tdGet().settings.sameDayValue, 0, 'a typed negative number is clamped to 0');
   typeInto(sameDayInput, prevSameDay);
+
+  /* The one settings control that is neither text nor a number. It writes the
+     boolean the metrics read, not the string an input would give. */
+  const workBox = doc.getElementById('setWorkingDays');
+  const prevWork = workBox.checked;
+  workBox.checked = true;
+  workBox.dispatchEvent(new win.Event('change', { bubbles: true }));
+  is(win.tdGet().settings.workingDays, true, 'the working-days box writes a real boolean');
+  workBox.checked = prevWork;
+  workBox.dispatchEvent(new win.Event('change', { bubbles: true }));
+  is(win.tdGet().settings.workingDays, false, 'and turns back off the same way');
 
   const teamInput = doc.querySelector('#teamRows input[data-team]');
   const prevName = typeInto(teamInput, overlong);
@@ -2004,6 +2085,20 @@ async function run(TD, win) {
   ok(heron.summary.unplannedShare >= king.summary.unplannedShare * 2,
      'Heron\u2019s defect rate is at least double Kingfisher\u2019s',
      heron.summary.unplannedShare + ' vs ' + king.summary.unplannedShare);
+
+  /* Working days is a setting rather than a team, so the demo can only reach it
+     by covering weekends. Were the generator ever changed to land completions on
+     weekdays only, the toggle would be a control that does nothing on the one
+     dataset anybody is shown. */
+  const heronWork = TD.derive(demoOf(demo, 'Team Heron').rows,
+    win.TDState.normalizeSettings({ workingDays: true }),
+    { filterValue: null, months: 'all', bucket: 'week' });
+  ok(heronWork.summary.p85CycleTime < heron.summary.p85CycleTime,
+     'the demo spans weekends, so working days visibly shortens its cycle times',
+     heronWork.summary.p85CycleTime + ' vs ' + heron.summary.p85CycleTime);
+  ok(heronWork.summary.agedNow < heron.summary.agedNow,
+     'and drops an item out of Heron\u2019s aged count, so the ageing rule follows too',
+     heronWork.summary.agedNow + ' vs ' + heron.summary.agedNow);
 
   /* Lead time is the one chart that can be genuinely unavailable, and the app
      says so on its face rather than hiding. That face needs a team without

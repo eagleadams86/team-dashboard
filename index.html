@@ -669,9 +669,21 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
           <input type="text" id="setUnplannedLabel" maxlength="120" placeholder="Defect">
         </div>
         <div>
-          <label for="setAgedDays">Count an in-progress item as aged after (days)</label>
+          <label for="setAgedDays" id="setAgedDaysLabel">Count an in-progress item as aged after (days)</label>
           <input type="number" id="setAgedDays" step="1" min="1" placeholder="14">
         </div>
+      </div>
+      <!-- A measure rather than a label, so it gets its own line under the grid
+           with room for the caveat: the holidays this app cannot know about. -->
+      <div style="margin-top:var(--sp-6)">
+        <label class="checkline" for="setWorkingDays">
+          <input type="checkbox" id="setWorkingDays"><span>Count working days only (Monday to Friday)</span>
+        </label>
+        <p class="hint" style="margin-top:var(--sp-3)">
+          Cycle time, lead time and the ageing threshold skip weekends — an item started on a
+          Friday and finished on the Monday takes one day, not three. <strong>Public holidays are
+          not known to this app</strong> and still count as working days, wherever you are.
+        </p>
       </div>
       <div class="note info" style="margin-top:var(--sp-6)">
         Anything whose Type is blank, or doesn't match the defect text above, counts as
@@ -1134,6 +1146,48 @@ function diffDays(a, b)   { return Math.round((a.getTime() - b.getTime()) / DAY_
 
 /* Sunday = 1 … Saturday = 7. */
 function weekdayNum(d) { return d.getUTCDay() + 1; }
+
+/* ── Working days ───────────────────────────────────────────────────────────
+   Monday to Friday only, for the app's three durations — cycle time, lead time
+   and the ageing threshold — when the Settings toggle is on. Weekends are not
+   counted; PUBLIC HOLIDAYS ARE NOT KNOWN TO THIS APP and still count as working
+   days. That is stated on the setting itself rather than half-implemented: a
+   holiday list would be per-country, per-year, and free text in an app that
+   deliberately stores none.
+
+   Built on an ordinal rather than by walking a span day by day, so a two-year
+   lead time costs the same as a two-day cycle time. weekdayOrdinal(d) counts
+   the Mon–Fri days from a fixed anchor Monday up to and including d: it steps
+   by exactly one on each weekday and stands still across a weekend, so the
+   difference between two of them IS the working days between the dates. */
+const WEEKDAY_EPOCH = 4;          /* Monday 5 Jan 1970, in days since the epoch */
+
+function weekdayOrdinal(d) {
+  const m = Math.floor(d.getTime() / DAY_MS) - WEEKDAY_EPOCH;
+  const weeks = Math.floor(m / 7);        /* floor, not trunc — m goes negative */
+  return weeks * 5 + Math.min(m - weeks * 7 + 1, 5);
+}
+
+/* Working days between two dates, in diffDays' argument order (later, earlier)
+   so the two are interchangeable at every call site. Counts the weekdays after
+   `b` up to and including `a`: Friday to Monday is 1 working day, and Saturday
+   to Sunday is 0 — which the same-day value then covers, exactly as it covers
+   an item that starts and finishes on one day. */
+function workDaysBetween(a, b) { return weekdayOrdinal(a) - weekdayOrdinal(b); }
+
+/* Whichever measure the setting asks for. Every duration in the app goes
+   through this, so the two can never disagree about what a day is. */
+function spanDays(a, b, workingDays) {
+  return workingDays ? workDaysBetween(a, b) : diffDays(a, b);
+}
+
+/* The earliest instant whose weekday ordinal is `k` — weekdayOrdinal inverted.
+   It exists for the aged-work scan, which needs "n working days before this
+   point" as a single cutoff date rather than as a per-item subtraction. */
+function startOfWeekdayOrdinal(k) {
+  const weeks = Math.floor((k - 1) / 5);
+  return (weeks * 7 + (k - 1 - weeks * 5) + WEEKDAY_EPOCH) * DAY_MS;
+}
 
 /* The Sunday on or before d — the start of the week every metric buckets into. */
 function priorSunday(d) { return addDays(d, -(weekdayNum(d) - 1)); }
@@ -1653,12 +1707,15 @@ function parsePastedRows(text, order) {
    computes and why.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Cycle time in days. An item with only one of the two dates has no cycle time
-   at all (null, not zero), and one that starts and finishes the same day takes
-   the configured same-day value rather than a misleading 0. */
-function cycleTimeOf(row, sameDayValue) {
+/* Cycle time in days — calendar days, or Mon–Fri working days when the setting
+   asks for them. An item with only one of the two dates has no cycle time at
+   all (null, not zero), and one that starts and finishes the same day takes the
+   configured same-day value rather than a misleading 0. A span that falls
+   entirely across a weekend is 0 working days and takes that same value: it is
+   the same statement — the item occupied nobody for a measurable stretch. */
+function cycleTimeOf(row, sameDayValue, workingDays) {
   if (!row.completed || !row.started) return null;
-  const days = diffDays(row.completed, row.started);
+  const days = spanDays(row.completed, row.started, workingDays);
   return Math.max(0, days === 0 ? sameDayValue : days);
 }
 
@@ -1666,9 +1723,9 @@ function cycleTimeOf(row, sameDayValue) {
    delivered. Structurally identical to cycleTimeOf on purpose: the two are read
    side by side and subtracted from each other, and two different conventions for
    "same day" or "unmeasurable" would show up as a gap nobody could explain. */
-function leadTimeOf(row, sameDayValue) {
+function leadTimeOf(row, sameDayValue, workingDays) {
   if (!row.completed || !row.created) return null;
-  const days = diffDays(row.completed, row.created);
+  const days = spanDays(row.completed, row.created, workingDays);
   return Math.max(0, days === 0 ? sameDayValue : days);
 }
 
@@ -1753,8 +1810,13 @@ function openCounts(items, evalPoints) {
 
    and that subtracted set only ever spans a threshold-wide window of starts, so
    it stays small however long the history is. Takes the open counts rather than
-   recomputing them, so the two series can never disagree. */
-function agedCounts(items, evalPoints, thresholdDays, wip) {
+   recomputing them, so the two series can never disagree.
+
+   The working-days measure changes only where that window begins: the threshold
+   is still one cutoff DATE per evaluation point — the point five weekdays back
+   is simply further back in the calendar than five days is — so the sorted scan
+   below is untouched. */
+function agedCounts(items, evalPoints, thresholdDays, wip, workingDays) {
   const open = items.filter(r => r.started)
     .map(r => ({
       s: r.started.getTime(),
@@ -1763,7 +1825,10 @@ function agedCounts(items, evalPoints, thresholdDays, wip) {
     .sort((a, b) => a.s - b.s);
   let lo = 0, hi = 0;
   return evalPoints.map((p, k) => {
-    const t = p.getTime(), cut = t - thresholdDays * DAY_MS;
+    const t = p.getTime();
+    const cut = workingDays
+      ? startOfWeekdayOrdinal(weekdayOrdinal(p) - thresholdDays)
+      : t - thresholdDays * DAY_MS;
     while (hi < open.length && open[hi].s <= t) hi++;
     /* `<` not `<=`, so an item started exactly `threshold` days ago still counts
        as young: its age equals the threshold, and aged means older *than* it.
@@ -1778,7 +1843,8 @@ function agedCounts(items, evalPoints, thresholdDays, wip) {
 
 /**
  * @param rows      [{completed: Date, started: Date|null, type: string}]
- * @param settings  {sameDayValue, unplannedType, unplannedLabel, cycleTimeLabel}
+ * @param settings  {sameDayValue, unplannedType, unplannedLabel, cycleTimeLabel,
+ *                   workingDays}
  * @param view      {filterValue: string ('' = no filter), months: number|'all',
  *                   bucket: 'week'|'fortnight'|'month' (default 'week')}
  */
@@ -1796,6 +1862,14 @@ function derive(rows, settings, view) {
      aged work existed must still mean the documented 14 days. */
   const agedDays = Number(settings.agedDays) > 0
     ? Number(settings.agedDays) : DEFAULT_SETTINGS.agedDays;
+  /* Calendar days unless this is explicitly on — the same defaulting as above,
+     so a settings object saved before the toggle existed still means calendar
+     days rather than undefined. One flag drives all three durations and the
+     wording on every chart that states one, because a screen mixing the two
+     measures would be unreadable. */
+  const workingDays = settings.workingDays === true;
+  const dayNoun = workingDays ? 'working days' : 'days';
+  const DayNoun = workingDays ? 'Working Days' : 'Days';
 
   /* Rows whose type doesn't match the filter drop out entirely. Note the filter
      is on work type only — the date window below never removes rows. */
@@ -1884,13 +1958,13 @@ function derive(rows, settings, view) {
     if (!byCompletedWeek.has(ck)) byCompletedWeek.set(ck, []);
     byCompletedWeek.get(ck).push(r);
 
-    const ct = cycleTimeOf(r, sameDay);
+    const ct = cycleTimeOf(r, sameDay, workingDays);
     if (ct != null) {
       if (!cycleByWeek.has(ck)) cycleByWeek.set(ck, []);
       cycleByWeek.get(ck).push(ct);
     }
 
-    const lt = leadTimeOf(r, sameDay);
+    const lt = leadTimeOf(r, sameDay, workingDays);
     if (lt != null) {
       if (!leadByWeek.has(ck)) leadByWeek.set(ck, []);
       leadByWeek.get(ck).push(lt);
@@ -1962,7 +2036,7 @@ function derive(rows, settings, view) {
   const evalPoints = weekStarts.map(b =>
     new Date(Math.min(bucketEnd(b, bucket).getTime(), endDate.getTime())));
   const wip = openCounts(items, evalPoints);
-  const agedCount = agedCounts(items, evalPoints, agedDays, wip);
+  const agedCount = agedCounts(items, evalPoints, agedDays, wip, workingDays);
 
   /* The coaching rule this exists to serve compares work in progress against a
      month's throughput, so the denominator is a month however the charts are
@@ -2024,6 +2098,10 @@ function derive(rows, settings, view) {
     avgLeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
     throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
     wip, agedCount, agedDays,
+    /* The measure, and the word for it, travel with the numbers: every tile and
+       column that states a duration reads them from here rather than reaching
+       back into settings, so the label can never disagree with the figure. */
+    workingDays, dayNoun,
     hasCreated, createdCoverage: items.length ? withCreated / items.length : 0,
     /* Window-wide figures for the summary tiles. avgCycleTime here is the mean
        over the pooled cycle times (per item), not over the per-bucket means —
@@ -2096,18 +2174,18 @@ function derive(rows, settings, view) {
       netFlow: 'Net Flow per ' + Noun + ' (Items Completed − Items Started)',
       leadTime: 'Average Lead Time per ' + Noun + ' (Raised to Delivered)',
       wip: 'Work in Progress at the End of Each ' + Noun,
-      agedWork: 'Items in Progress Longer Than ' + agedDays + ' Days'
+      agedWork: 'Items in Progress Longer Than ' + agedDays + ' ' + DayNoun
     },
     axisTitles: {
       /* Deliberately short: a rotated axis title gets truncated on a narrow
          screen, and the chart title above already says the rest. */
       defectRate: 'Defect rate',
-      cycleTime: cycleLabel + ' (days)',
+      cycleTime: cycleLabel + ' (' + dayNoun + ')',
       throughput: 'Count of closed items during ' + noun,
       netFlow: 'Items completed − items started',
-      leadTime: 'Lead time (days)',
+      leadTime: 'Lead time (' + dayNoun + ')',
       wip: 'Items open at period end',
-      agedWork: 'Items older than ' + agedDays + ' days',
+      agedWork: 'Items older than ' + agedDays + ' ' + dayNoun,
       x: bucket === 'month' ? 'Month'
         : bucket === 'fortnight' ? 'Year-Fortnight (week numbers)'
         : 'Year-Week Number'
@@ -2117,7 +2195,7 @@ function derive(rows, settings, view) {
 
 /* Exposed for tests.html, which drives the real app in a hidden iframe. */
 window.TD = {
-  weekdayNum, priorSunday, weekNumber, weekKey, edate,
+  weekdayNum, priorSunday, weekNumber, weekKey, edate, workDaysBetween,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
   cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, utcDate
@@ -2147,6 +2225,13 @@ const DEFAULT_SETTINGS = {
   /* Two weeks. The usual coaching starting point, and short enough that a board
      with a real ageing problem shows it. */
   agedDays: 14,
+  /* Calendar days, off. Flow metrics measure the wait the customer actually
+     had, and the customer's weekend is not free — so calendar days are the
+     right default and working days are the deliberate choice. It is also the
+     measure every number this app has ever shown was taken in, and a default
+     that quietly re-measured a saved board would be worse than a missing
+     setting. */
+  workingDays: false,
   cycleTimeLabel: 'Cycle Time',
   /* The four types a Jira board actually produces, so the dashboard filter is
      useful on the first paste instead of after a trip to Settings. Spikes
@@ -2353,6 +2438,11 @@ function normalizeSettings(raw) {
      negative one is meaningless. */
   const a = Number(s.agedDays);
   s.agedDays = Number.isFinite(a) && a > 0 ? a : DEFAULT_SETTINGS.agedDays;
+  /* A checkbox, so only the boolean true means on. A hand-edited backup saying
+     "yes" or 1 must not switch the measure every figure is taken in — and it
+     must be a real boolean either way, because localStorage drops an undefined
+     while Firestore rejects the whole document over one. */
+  s.workingDays = s.workingDays === true;
   /* Only the keys this app knows leave this function — the same whitelist rule
      rows and teams already live by (hydrateRows and sanitizeTeams both build
      fresh objects). Without this, any stray key on a hand-edited backup or
@@ -2365,8 +2455,9 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and to the cloud. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 3 added the per-row created date. The marker rides into localStorage
-   and the synced document, but deliberately NOT into a share link — a share
+/* SCHEMA 4 added the working-days setting; 3 added the per-row created date.
+   The marker rides into localStorage and the synced document, but deliberately
+   NOT into a share link — a share
    payload's keys are fixed and pinned by a test, and a viewer needs no schema.
 
    It exists to catch one thing: a browser still running an older build will
@@ -2374,7 +2465,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 3;
+const SCHEMA = 4;
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
    hydrateState() keeps only the keys it knows, which is right for a hostile
@@ -3070,7 +3161,9 @@ const METRIC_HELP = {
   cycleTime: { title: 'Cycle Time',
     body: 'How long does an item take once work has actually started? The average of the '
       + 'items completed in each period, in days. Steady and falling is the good direction — '
-      + 'and steady matters more than fast, because it is what makes a forecast possible.' },
+      + 'and steady matters more than fast, because it is what makes a forecast possible. '
+      + 'Days here means calendar days, weekends included, unless you switch Settings to '
+      + 'working days only — every duration in the app follows that one setting together.' },
   throughput: { title: 'Throughput',
     body: 'What pace do we deliver at? The count of items completed in each period. Read the '
       + 'trend line rather than any single point — throughput is naturally lumpy. The average '
@@ -3122,7 +3215,8 @@ const METRIC_HELP = {
       + 'means shorter cycle times, for the same reason a shorter queue moves faster.' },
   agedWork: { title: 'Aged Work',
     body: 'How many open items have been open too long? Anything still in progress beyond the '
-      + 'threshold in Settings — two weeks by default, and worth keeping under a month. Read '
+      + 'threshold in Settings — two weeks by default, and worth keeping under a month, '
+      + 'counted in whichever days the working-days setting says. Read '
       + 'as of the newest date in your data rather than today, so a paste of last quarter’s '
       + 'export reports that quarter. One caveat: the clean-up tool’s option to also remove '
       + 'unfinished items deletes long-running work in progress, which is exactly what this '
@@ -3279,7 +3373,7 @@ function renderDashboard() {
     tile('Work in progress', String(s.currentWip),
       'open items as of ' + prettyDate(s.asOf), 'wip') +
     tile('Aged work', String(s.agedNow),
-      'in progress over ' + d.agedDays + ' days', 'agedWork');
+      'in progress over ' + d.agedDays + ' ' + d.dayNoun, 'agedWork');
 
   /* Both lines hold user-chosen label text, so both are escaped. The ⓘ goes on
      the name, which is what it explains. */
@@ -3299,9 +3393,9 @@ function renderDashboard() {
   $('tilesFlow').innerHTML =
     tile('Avg ' + (state.settings.cycleTimeLabel || 'cycle time'),
       s.avgCycleTime == null ? '—' : num1(s.avgCycleTime),
-      'days from start to finish', 'cycleTime') +
+      d.dayNoun + ' from start to finish', 'cycleTime') +
     tile('Avg lead time', s.avgLeadTime == null ? '—' : num1(s.avgLeadTime),
-      'days from raised to delivered', 'leadTime');
+      d.dayNoun + ' from raised to delivered', 'leadTime');
 
   /* The Delivery group's own tiles. None restates a headline tile: the band
      answers "is it steady", which the average up there cannot; net flow says
@@ -3360,7 +3454,8 @@ function renderDataTable() {
   const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
   const bucketHead = bucket.charAt(0).toUpperCase() + bucket.slice(1);
   const body = sorted.map(r => {
-    const ct = cycleTimeOf(r, Number(state.settings.sameDayValue));
+    const ct = cycleTimeOf(r, Number(state.settings.sameDayValue),
+      state.settings.workingDays === true);
     return '<tr>' +
       '<td>' + (r.completed ? isoOf(r.completed) : '<span class="hint">in progress</span>') + '</td>' +
       '<td>' + (r.started ? isoOf(r.started) : '<span class="hint">—</span>') + '</td>' +
@@ -3375,7 +3470,8 @@ function renderDataTable() {
   $('dataTable').innerHTML =
     '<div class="table-cap"><div class="table-scroll"><table class="data">' +
     '<thead><tr><th>Completed</th><th>Started</th><th>Created</th><th>Type</th>' +
-    '<th>' + escapeHtml(state.settings.cycleTimeLabel) + ' (days)</th>' +
+    '<th>' + escapeHtml(state.settings.cycleTimeLabel) +
+      (state.settings.workingDays === true ? ' (working days)' : ' (days)') + '</th>' +
     '<th>' + bucketHead + '</th></tr></thead>' +
     '<tbody>' + body + '</tbody></table></div></div>';
 }
@@ -3414,6 +3510,12 @@ function renderSettingsForm() {
   $('setSameDay').value        = state.settings.sameDayValue;
   $('setAgedDays').value       = state.settings.agedDays;
   $('setUnplannedLabel').value = state.settings.unplannedLabel;
+  $('setWorkingDays').checked  = state.settings.workingDays === true;
+  /* The ageing threshold is counted in whichever days the toggle says, so its
+     label has to follow — a box reading "(days)" beside a working-days chart is
+     the one place the two measures could be read as coexisting. */
+  $('setAgedDaysLabel').textContent = 'Count an in-progress item as aged after ('
+    + (state.settings.workingDays === true ? 'working days' : 'days') + ')';
   renderFilterRows();
 }
 
@@ -3798,6 +3900,18 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
     clearTimeout(settingsRedrawTimer);
     settingsRedrawTimer = setTimeout(() => { renderDataTable(); renderDashboard(); }, 150);
   });
+});
+
+/* The one settings control that isn't text or a number: it reads .checked, and
+   changing it re-labels the ageing box beside it, so it renders the form again
+   rather than joining the loop above. No debounce — it can only be pressed as
+   fast as a mouse. */
+$('setWorkingDays').addEventListener('change', e => {
+  state.settings.workingDays = !!e.target.checked;
+  save();
+  renderSettingsForm();
+  renderDataTable();
+  renderDashboard();
 });
 
 $('filterRows').addEventListener('input', e => {
@@ -4546,6 +4660,12 @@ window.TDCleanup = { historyAnchor, outsideWindow, windowCutoff };
                  so the lead-time chart's "this needs a created column" face is
                  reachable, and so the date window has a team it visibly runs
                  past. Also proves each team's data stands alone.
+
+   WORKING DAYS is a setting rather than a team, so what makes it reachable here
+   is that the dates cover the WHOLE WEEK: completions land on any day, so
+   turning the setting on visibly shortens Heron's tail and drops an item out of
+   its aged count. Generating to weekdays only would leave the toggle changing
+   nothing on the one dataset anybody is ever shown.
 
    Two things this deliberately does NOT demo: bad rows and the parse report.
    Those are responses to input rather than properties of a dataset — you see
