@@ -719,9 +719,10 @@ python3 -m http.server 8013
 ```
 
 `index.html` no longer stands alone: the palette is linked as `theme.css` rather than
-inlined, so opening the file off disk without `theme.css` beside it gives an unstyled page.
-Copying both files to a folder and opening `index.html` over `file://` still works; a server
-is simplest, and the tests need one anyway.
+inlined, and the charts need the vendored `chart.min.js` — without it the page's script
+stops at startup. Copying all three files (`index.html`, `theme.css`, `chart.min.js`) to a
+folder and opening `index.html` over `file://` still works; a server is simplest, and the
+tests need one anyway.
 
 Your data lives in `localStorage`, and leaves the browser only if you sign in.
 [`privacy.html`](privacy.html) is the privacy policy — keep it and its effective date current

@@ -44,7 +44,6 @@
   Single page, no build step, no account required. localStorage is the source
   of truth; signing in with Google (optional) mirrors it to Firestore so other
   devices see the same teams — see the sync module at the foot of the page.
-  The Recent-changes box fetches commit subjects from GitHub's API when opened.
   The only local dependency is the vendored chart.min.js sitting next to this.
 
   Every number comes out of derive() below — one function, one place the maths
@@ -3767,9 +3766,11 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
     /* The same caps normalizeSettings applies on the way back in, because
        save() serialises this live object straight to localStorage and the
        cloud: maxlength stops ordinary typing past 120, but not a paste, and
-       the number inputs' min attributes don't stop a typed minus sign. */
+       the number inputs' min attributes don't stop a typed minus sign. Aged
+       days floors at 1 to match derive(), which treats 0 as "use the default"
+       — without the floor the box could say 0 while the charts say 14. */
     state.settings[key] = NUMERIC_SETTINGS.has(key)
-      ? Math.max(0, parseFloat(e.target.value) || 0)
+      ? Math.max(key === 'agedDays' ? 1 : 0, parseFloat(e.target.value) || 0)
       : e.target.value.slice(0, 120);
     save();
     clearTimeout(settingsRedrawTimer);
@@ -3831,7 +3832,7 @@ function todayLocalISO() {
    safety net — one deletion away is exactly when a backup is worth taking. */
 function downloadBackup() {
   const payload = Object.assign(
-    { app: 'team-dashboard', version: 3, exported: new Date().toISOString() },
+    { app: 'team-dashboard', version: SCHEMA, exported: new Date().toISOString() },
     serializeState()
   );
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
