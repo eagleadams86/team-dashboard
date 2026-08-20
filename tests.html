@@ -654,7 +654,8 @@ async function run(TD, win) {
      it plots — and every name must have a help entry behind it, since the ⓘ
      that opens one sits on the name. */
   is(Object.keys(d.names).sort(),
-     ['agedWork', 'cycleTime', 'defectRate', 'leadTime', 'netFlow', 'throughput', 'wip'],
+     ['agedWork', 'cycleTime', 'defectRate', 'forecastHowMany', 'forecastWhen', 'leadTime',
+      'netFlow', 'throughput', 'wip'],
      'every chart has a name of its own');
   ok(Object.keys(d.names).every(k => d.titles[k]),
      'and a sentence under it saying what it plots');
@@ -2051,7 +2052,161 @@ async function run(TD, win) {
      'and the builder stamps the version the decoder checks for');
 
   /* ────────────────────────────────────────────────────────── */
-  group('the demo — every feature has to be reachable from Load sample data');
+  group('Monte Carlo forecast — the sampler');
+
+  /* A team that finishes exactly five every period, so every trial must agree
+     and the arithmetic is checkable by hand. Ten of them is two periods flat;
+     seven is one period plus two fifths of the next, which is the whole reason
+     the crossing period is interpolated into rather than counted whole. */
+  const steady = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5];
+  const T = 500;
+  const flat10 = TD.forecastPeriodsFor(steady, 10, T);
+  is([...new Set(flat10)], [2], 'a steady 5 a period finishes 10 items in exactly 2 periods');
+  const flat7 = TD.forecastPeriodsFor(steady, 7, T);
+  ok(flat7.every(v => Math.abs(v - 1.4) < 1e-9),
+     'and 7 items in 1.4 — the crossing period is interpolated into, not counted whole',
+     JSON.stringify([...new Set(flat7)]));
+  near([...new Set(TD.forecastPeriodsFor(steady, 1, T))][0], 0.2,
+       'one item is a fifth of a period, not a whole one');
+
+  /* Below the floor there is nothing worth resampling, and the app says so
+     rather than drawing a chart off four observations. */
+  is(TD.forecastPeriodsFor(steady.slice(0, TD.FORECAST_MIN_PERIODS - 1), 10, T), null,
+     'fewer than ' + TD.FORECAST_MIN_PERIODS + ' periods refuses outright');
+  is(TD.forecastPeriodsFor(steady.slice(0, TD.FORECAST_MIN_PERIODS), 10, T).length, T,
+     'exactly ' + TD.FORECAST_MIN_PERIODS + ' is enough');
+  is(TD.forecastPeriodsFor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 10, T), null,
+     'a team that completed nothing has no pace to project — null, not a walk to the cap');
+  is(TD.forecastPeriodsFor(steady, 0, T), null, 'and no items asked for is no question');
+
+  /* The forecast must not move under the reader. Same data, same question, same
+     answer — on every render, every device and every reload. */
+  is(TD.forecastPeriodsFor([1, 9, 2, 8, 3, 7, 4, 6, 5, 5], 20, 200),
+     TD.forecastPeriodsFor([1, 9, 2, 8, 3, 7, 4, 6, 5, 5], 20, 200),
+     'the seed is fixed, so two runs of the same question agree exactly');
+
+  is([...new Set(TD.forecastItemsIn(steady, 3, T))], [15],
+     'the other question: 3 periods of a steady 5 is 15 items');
+  is([...new Set(TD.forecastItemsIn(steady, 2.5, T))], [12],
+     'and half a period counts for half, floored — 12.5 items is 12 delivered');
+  is(TD.forecastItemsIn(steady, 0, T), null, 'a horizon of nothing has no answer');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('Monte Carlo forecast — confidence runs opposite ways');
+
+  /* The one thing in this feature that is easy to get backwards, so it is
+     pinned from both ends. A LATER date is the safer promise; a SMALLER count
+     is. Read the two the same way round and the app would tell a team it was
+     95% sure of its most optimistic outcome. */
+  const spread = [0, 2, 3, 4, 5, 6, 7, 8, 9, 20];
+  const days = TD.forecastPeriodsFor(spread, 30, 4000).map(p => Math.ceil(p * 7));
+  const d50 = TD.daysAtConfidence(days, 50), d85 = TD.daysAtConfidence(days, 85),
+        d95 = TD.daysAtConfidence(days, 95);
+  ok(d50 <= d85 && d85 <= d95, 'a date gets LATER as the confidence rises',
+     [d50, d85, d95].join(' / '));
+  ok(d50 < d95, 'and visibly so on a team with a spread', d50 + ' vs ' + d95);
+
+  const counts = TD.forecastItemsIn(spread, 10, 4000);
+  const c50 = TD.countAtConfidence(counts, 50), c85 = TD.countAtConfidence(counts, 85),
+        c95 = TD.countAtConfidence(counts, 95);
+  ok(c50 >= c85 && c85 >= c95, 'a count gets SMALLER as the confidence rises',
+     [c50, c85, c95].join(' / '));
+  ok(c95 < c50, 'and visibly so on the same team', c95 + ' vs ' + c50);
+
+  /* What the confidences actually claim, checked against the trials themselves
+     rather than against the percentile function that produced them. */
+  const atOrBefore = days.filter(v => v <= d85).length / days.length;
+  ok(atOrBefore >= 0.85, '85% of runs really did finish by the 85% date',
+     (atOrBefore * 100).toFixed(1) + '%');
+  const atLeast = counts.filter(v => v >= c85).length / counts.length;
+  ok(atLeast >= 0.85, 'and 85% really did complete at least the 85% count',
+     (atLeast * 100).toFixed(1) + '%');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('Monte Carlo forecast — periods, days and the histogram');
+
+  const jan1 = D(2015, 1, 1);
+  near(TD.periodsBetween(jan1, D(2015, 1, 15), 'week'), 2, 'a fortnight is 2 weeks');
+  near(TD.periodsBetween(jan1, D(2015, 1, 15), 'fortnight'), 1, 'and 1 fortnight');
+  near(TD.periodsBetween(jan1, D(2015, 4, 1), 'month'), 3, 'three calendar months is 3');
+  near(TD.periodsBetween(jan1, D(2015, 2, 15), 'month'), 1 + 14 / 28,
+       'and half way into February is a fraction of the month it is in, not of 30 days');
+  is(TD.periodsBetween(jan1, jan1, 'week'), 0, 'no distance is no periods');
+  is(TD.periodsBetween(jan1, D(2014, 12, 1), 'week'), 0, 'and a target in the past is not negative');
+
+  is(TD.periodsToDays(jan1, 2, 'week'), 14, '2 weeks is 14 days');
+  is(TD.periodsToDays(jan1, 1.5, 'week'), 11, 'and 1.5 weeks rounds UP to 11 — a promise never rounds down');
+  is(TD.periodsToDays(jan1, 1, 'month'), 31, 'a month from 1 January is 31 days, not an average one');
+  is(TD.periodsToDays(jan1, 2, 'month'), 59, 'and two is 59 — February is stepped, not approximated');
+
+  /* The bars, and the confidence each carries. Ten trials so the shares are
+     exact tenths and can be read off by hand. */
+  const hWhen = TD.forecastHistogram([1, 1, 2, 2, 2, 3, 3, 4, 4, 5], true);
+  is(hWhen.labels, ['1', '2', '3', '4', '5'], 'one bar per outcome when the range is small');
+  is(hWhen.counts, [2, 3, 2, 2, 1], 'and the trials land in them');
+  near(hWhen.confidence[0], 0.2, 'a date: confidence accumulates from the EARLY end');
+  near(hWhen.confidence[4], 1, 'and reaches certainty at the latest outcome');
+  const hMany = TD.forecastHistogram([1, 1, 2, 2, 2, 3, 3, 4, 4, 5], false);
+  near(hMany.confidence[0], 1, 'a count: it accumulates the other way — the lowest is certain');
+  near(hMany.confidence[4], 0.1, 'and the highest is the least likely to be reached');
+  const wide = TD.forecastHistogram(Array.from({ length: 200 }, (_, i) => i), true);
+  ok(wide.labels.length <= 24, 'a hundred-value spread is binned rather than drawn as 200 bars',
+     wide.labels.length + ' bars of ' + wide.binWidth);
+  is(wide.counts.reduce((a, b) => a + b, 0), 200, 'and every trial still lands in exactly one bin');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('Monte Carlo forecast — what derive() hands the dashboard');
+
+  const fc = d.forecast;
+  is(fc.reason, null, 'the reference sample forecasts');
+  is(fc.samples, d.summary.wholePeriods,
+     'and deals from exactly the whole periods the throughput tiles read — not the part one');
+  is(fc.items, 10, 'ten items by default');
+  is(iso(fc.targetDate), '2015-08-13', 'and a target three months past the end of the data');
+  ok(fc.when && fc.when.rows.length === 3, 'three confidences for the date');
+  ok(fc.howMany && fc.howMany.rows.length === 3, 'and three for the count');
+  is(fc.when.rows.map(r => r.confidence), [50, 85, 95], 'labelled by confidence, never by percentile');
+  ok(fc.when.rows[0].date <= fc.when.rows[2].date, 'the dates run later as the confidence rises');
+  ok(fc.howMany.rows[0].count >= fc.howMany.rows[2].count, 'and the counts run smaller');
+  ok(fc.when.rows.every(r => r.date > d.endDate), 'every forecast date is after the data ends');
+  is(fc.when.rows.map(r => TD.utcDate(r.date.getUTCFullYear(), r.date.getUTCMonth() + 1, r.date.getUTCDate())
+       .getTime() - d.endDate.getTime()).map(ms => ms / 86400000),
+     fc.when.rows.map(r => r.days), 'and sits exactly its own day count past it');
+
+  /* The two inputs come off localStorage, where a hand-edited copy can say
+     anything, so they are pinned in derive() rather than trusted. */
+  const fcOf = (extra) => TD.derive(p.rows, SAMPLE_SETTINGS,
+    Object.assign({ filterValue: '', months: 3 }, extra)).forecast;
+  is(fcOf({ forecastItems: 0 }).items, 10, 'a zero item count falls back to the default');
+  is(fcOf({ forecastItems: -40 }).items, 10, 'so does a negative one');
+  is(fcOf({ forecastItems: 'DAE-1023' }).items, 10, 'and so does text');
+  is(fcOf({ forecastItems: 7.6 }).items, 8, 'a fraction is rounded to a whole item');
+  is(fcOf({ forecastItems: 999999 }).items, TD.FORECAST_MAX_ITEMS, 'and a runaway number is capped');
+  is(iso(fcOf({ forecastDate: '2015-06-30' }).targetDate), '2015-06-30', 'a stored target date is used');
+  is(iso(fcOf({ forecastDate: '2015-01-01' }).targetDate), '2015-08-13',
+     'one the data has already run past is replaced — a date in the past is not a forecast');
+  is(iso(fcOf({ forecastDate: 'tomorrow' }).targetDate), '2015-08-13', 'and so is anything unparseable');
+
+  /* Grouping by month over a three-month window leaves three observations, and
+     the app refuses rather than reporting a confidence it has not earned. */
+  const fcMonthly = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 3, bucket: 'month' }).forecast;
+  is(fcMonthly.reason, 'few-periods', 'three whole months is below the floor');
+  is(fcMonthly.when, null, 'so there is nothing to draw');
+  is(fcMonthly.howMany, null, 'on either card');
+  /* The message offers two ways out. Grouping shorter is the one that always
+     works — a five-month sample has five months in it however wide the window
+     is opened, and twenty-odd weeks either way. */
+  is(TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 3, bucket: 'week' })
+       .forecast.reason, null,
+     'while the same window grouped by week clears the floor, which is what the message says to try');
+
+  /* The forecast reads the same filtered rows every other figure does. */
+  const fcBugs = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: 'Bug', months: 'all' }).forecast;
+  ok(fcBugs.samples > 0 && fcBugs.items === 10,
+     'the work type filter reaches the forecast like everything else');
+
+  /* ────────────────────────────────────────────────────────── */
+    group('the demo — every feature has to be reachable from Load sample data');
 
   /* The sample data is this app's demo: what someone sent a share link explores,
      and what the app is shown with. So each finding below is a feature that is
@@ -2116,6 +2271,32 @@ async function run(TD, win) {
   ok(heronWork.summary.agedNow < heron.summary.agedNow,
      'and drops an item out of Heron\u2019s aged count, so the ageing rule follows too',
      heronWork.summary.agedNow + ' vs ' + heron.summary.agedNow);
+
+  /* The forecast is only reachable if the demo's default view clears the
+     floor — three months of weekly data on every team. Wagtail is the short
+     one at four months of history, so it is the one that decides this. */
+  const fcDemo = t => TD.derive(demoOf(demo, t).rows, win.TDState.normalizeSettings({}),
+    { filterValue: null, months: '3', bucket: 'week' }).forecast;
+  ['Team Kingfisher', 'Team Heron', 'Team Wagtail'].forEach(t => {
+    const f = fcDemo(t);
+    ok(f.reason === null && f.when && f.howMany,
+       t + ' forecasts on the default 3-month window', 'reason: ' + f.reason);
+  });
+  /* Three answers a coach can actually tell apart. A demo whose 50% and 95%
+     dates were the same day would show the feature working and teach nothing
+     about why anyone would read a distribution rather than a single date. */
+  const fcHeron = fcDemo('Team Heron');
+  ok(fcHeron.when.rows[2].days > fcHeron.when.rows[0].days,
+     'and its 95% date really is later than its 50% one, so the spread is visible',
+     fcHeron.when.rows.map(r => r.days).join(' / '));
+  ok(fcHeron.howMany.rows[0].count > fcHeron.howMany.rows[2].count,
+     'with the counts running the other way, which is the trap the labels exist to avoid',
+     fcHeron.howMany.rows.map(r => r.count).join(' / '));
+  /* Grouping the demo by month over the same window drops below the floor, so
+     the refusal has a face reachable from the demo too. */
+  is(TD.derive(demoOf(demo, 'Team Heron').rows, win.TDState.normalizeSettings({}),
+     { filterValue: null, months: '3', bucket: 'month' }).forecast.reason, 'few-periods',
+     'and grouping by month over 3 months reaches the "not enough history" card');
 
   /* Lead time is the one chart that can be genuinely unavailable, and the app
      says so on its face rather than hiding. That face needs a team without
