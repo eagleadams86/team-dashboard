@@ -2066,6 +2066,9 @@ async function run(TD, win) {
   is(ag.median, d.summary.medianCycleTime, 'the lower line is the median the headline tile states');
   is(ag.p85, d.summary.p85CycleTime, 'the upper line is the same percentile, not a second opinion');
   is(ag.threshold, d.agedDays, 'and the third is the threshold from Settings');
+  is(ag.lines.map(l => l.key), ['median', 'p85', 'threshold'], 'three lines, named for what they are');
+  is(ag.lines.map(l => l.value), [ag.median, ag.p85, ag.threshold],
+     'each carrying the figure it is drawn at, so the words and the line cannot drift apart');
   is(ag.oldest, ag.points.length ? Math.max.apply(null, ag.points.map(p => p.y)) : null,
      'the oldest tile is the highest dot on the chart, or null when there is none');
 
@@ -2096,6 +2099,27 @@ async function run(TD, win) {
      wrong and the chart reports an item aged a day before the tile does. */
   is(a1.points.filter(p => p.aged).map(p => p.y).sort((x, y) => x - y), [15, 30],
      'aged means older THAN the threshold — 14 days against a 14-day threshold is not aged');
+
+  /* The wording beside each line is built where the figures are, and carries no
+     trailing ".0": a chart label is covered by an opaque chip, so every
+     character costs a character of chart, and a percentile is a duration some
+     real item actually took — almost always a whole number. */
+  /* The one completed row above ran 20 April to 1 May, so both percentiles are
+     that same 11 days — which is exactly the point being pinned here: 11, not
+     "11.0". */
+  is(a1.lines.map(l => l.text),
+     ['half took under 11', '85% took under 11', 'aged after 14'],
+     'the line labels state their figure as a whole number, not as "11.0"');
+  /* A fraction can only come from the same-day setting, so the fixture needs an
+     item that started and finished on one day for the decimal to be reachable. */
+  const halfDay = TD.derive(
+    ageRows.concat([{ completed: D(2015, 4, 22), started: D(2015, 4, 22), created: null, type: 'Story' }]),
+    win.TDState.normalizeSettings({ sameDayValue: 0.5 }),
+    { filterValue: '', months: 'all', bucket: 'week' }).ageing;
+  is(halfDay.median, 0.5, 'a same-day item at half a day is the median of the two finished');
+  ok(halfDay.lines.some(l => /\.\d/.test(l.text)),
+     'and a genuinely fractional figure keeps its decimal rather than being rounded away',
+     JSON.stringify(halfDay.lines.map(l => l.text)));
 
   /* One setting, three durations: cycle time, lead time and the ageing
      threshold. An age drawn in calendar days against a working-day threshold

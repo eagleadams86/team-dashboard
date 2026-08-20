@@ -2619,6 +2619,26 @@ function derive(rows, settings, view) {
      third is the ageing threshold, which is the line the tile beside this one
      counts against. Null percentiles when nothing finished has a measurable
      cycle time: the threshold still draws, and the card is still worth having. */
+  const ageMedian = percentileOf(windowCycles, 50);
+  const ageP85 = percentileOf(windowCycles, CYCLE_PERCENTILE);
+
+  /* The words beside each line live here rather than in the chart layer, with
+     the rest of the app's wording: derive() is the one place a figure is worked
+     out, and these are figures in a sentence. The chart layer adds the colour
+     and the dash, which are the only part of a line that is a drawing decision.
+
+     No trailing ".0". num1 is right for a tile, where a column of figures should
+     line up on the decimal point; here every character is a character of chart
+     the label's chip covers, and a percentile is a duration some real item
+     actually took, so it is usually a whole number anyway. */
+  const ageShort = (v) => Number.isInteger(v) ? String(v) : num1(v);
+  const ageLines = [];
+  if (ageMedian != null) ageLines.push({ key: 'median', value: ageMedian,
+    text: 'half took under ' + ageShort(ageMedian) });
+  if (ageP85 != null) ageLines.push({ key: 'p85', value: ageP85,
+    text: CYCLE_PERCENTILE + '% took under ' + ageShort(ageP85) });
+  ageLines.push({ key: 'threshold', value: agedDays, text: 'aged after ' + agedDays });
+
   const ageing = {
     points: agePoints,
     columns: ageColumns.map(c => c.label),
@@ -2626,9 +2646,10 @@ function derive(rows, settings, view) {
     count: inFlight.length,
     agedCount: inFlight.filter(r => r.age > agedDays).length,
     oldest: inFlight.length ? Math.max.apply(null, inFlight.map(r => r.age)) : null,
-    median: percentileOf(windowCycles, 50),
-    p85: percentileOf(windowCycles, CYCLE_PERCENTILE),
-    threshold: agedDays
+    median: ageMedian,
+    p85: ageP85,
+    threshold: agedDays,
+    lines: ageLines
   };
 
   /* ── The forecast ──────────────────────────────────────────────────────────
@@ -3514,27 +3535,58 @@ Chart.register(valueLabels);
    them, so the rightmost is always the emptiest — the one corner of this chart
    that is reliably free.
 
+   ── Each label sits in an opaque chip, and that is not decoration ────────────
+   The first version drew bare text sitting just above its line, which read
+   perfectly on the demo and badly on a real board. Two things went wrong at
+   once, and both were reported from real data:
+
+   • The dashes ran straight THROUGH the words. Nothing separated a label from
+     the line it names, so "85% took under 13.0" had a dotted line crossing it
+     at mid-height.
+   • Where two lines land a day apart — an ageing threshold of 14 against an
+     85th percentile of 13 is an ordinary board — the nudge below stacked the
+     two labels into one six-line-tall smudge of text and dashes.
+
+   The chip fixes both: it is painted in the card's own surface colour, so it
+   interrupts the line it sits on and separates one label from the next. It is
+   centred ON its line rather than floated above it, which is what makes the
+   interruption read as "this line is called this" instead of as a gap.
+
+   The cost is that a chip can cover a dot. It is drawn as narrow as the text
+   allows and pinned to the right-hand edge, which the column ordering keeps as
+   the emptiest part of the chart; the tooltip and the Your Data tab both still
+   reach any item hidden that way.
+
    Drawn top down, and a label that would land on the one above it is pushed
-   clear rather than dropped: three lines a day apart is a real board, and
-   silently losing one is worse than nudging it. */
+   clear rather than dropped: silently losing one is worse than moving it, and
+   the chip's colour still says which line it belongs to. */
 const refLabels = {
   id: 'refLabels',
   afterDatasetsDraw(chart, args, opts) {
     const lines = opts && opts.lines;
     if (!lines || !lines.length) return;
     const ctx = chart.ctx, area = chart.chartArea, y = chart.scales.y;
+    const PAD = 5, CHIP = 15, GAP = 2;
     ctx.save();
     ctx.font = '600 10px ' + token('--font-sans');
     ctx.textAlign = 'right';
-    ctx.textBaseline = 'bottom';
+    ctx.textBaseline = 'middle';
+    const surface = token('--surface');
     let last = -Infinity;
     lines.slice().sort((a, b) => b.value - a.value).forEach((l) => {
-      let py = y.getPixelForValue(l.value) - 3;
-      if (py < last + 12) py = last + 12;
-      if (py < area.top + 9 || py > area.bottom) return;
+      let mid = y.getPixelForValue(l.value);
+      if (mid - CHIP / 2 < last + GAP) mid = last + GAP + CHIP / 2;
+      /* Clamped rather than skipped: the line datasets extend the axis to
+         include their own values, so a line is always in range and a label that
+         has been nudged to the floor should still be read. */
+      mid = Math.min(area.bottom - CHIP / 2, Math.max(area.top + CHIP / 2, mid));
+      const w = ctx.measureText(l.text).width;
+      const left = Math.max(area.left, area.right - w - PAD * 2);
+      ctx.fillStyle = surface;
+      ctx.fillRect(left, mid - CHIP / 2, area.right - left, CHIP);
       ctx.fillStyle = l.colour;
-      ctx.fillText(l.text, area.right - 4, py);
-      last = py;
+      ctx.fillText(l.text, area.right - PAD, mid);
+      last = mid + CHIP / 2;
     });
     ctx.restore();
   }
@@ -3901,18 +3953,21 @@ function drawCharts(d) {
          items it exists to be read against. */
       pointStyle: 'line'
     });
-    /* `text` is what the plugin writes beside the line; `label` is what a
-       tooltip would say. Neither reaches the legend — the filter below keeps
-       the lines out of it. */
-    const refs = [], refTexts = [];
-    const addRef = (text, value, colour, dash) => {
-      refs.push(refLine(text, value, colour, dash));
-      refTexts.push({ text, value, colour });
+    /* Which line is drawn how. The words and the values come from derive(); all
+       that is decided here is the pair of things that are drawing and nothing
+       else — a colour and a dash. Told apart by BOTH, so the three are still
+       distinguishable printed, or to someone who reads one of them as grey. */
+    const REF_STYLE = {
+      median:    { colour: token('--text-muted'),     dash: [6, 4] },
+      p85:       { colour: token('--text-secondary'), dash: [2, 3] },
+      threshold: { colour: serious,                   dash: [10, 3] }
     };
-    const muted = token('--text-muted'), secondary = token('--text-secondary');
-    if (a.median != null) addRef('half took under ' + num1(a.median), a.median, muted, [6, 4]);
-    if (a.p85 != null) addRef(d.cyclePercentile + '% took under ' + num1(a.p85), a.p85, secondary, [2, 3]);
-    addRef('aged after ' + a.threshold, a.threshold, serious, [10, 3]);
+    const refs = [], refTexts = [];
+    a.lines.forEach((l) => {
+      const style = REF_STYLE[l.key];
+      refs.push(refLine(l.text, l.value, style.colour, style.dash));
+      refTexts.push({ text: l.text, value: l.value, colour: style.colour });
+    });
 
     const dot = (aged) => ({
       label: aged ? 'Past ' + a.threshold + ' ' + d.dayNoun : 'In progress',

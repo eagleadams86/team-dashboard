@@ -104,8 +104,24 @@ type. What must not regress:
   in a legend.** Five legend entries wrapped to two rows and took a sixth of a 300px card, and
   they cost a lookup as well as the space. Only the two dot styles keep legend entries — a shape
   does need a key. The labels are right-aligned because columns are ordered busiest-first, which
-  makes the right-hand edge the reliably quiet corner; the plugin nudges a label clear of the one
-  above rather than dropping it, because three lines a day apart is a real board.
+  makes the right-hand edge the reliably quiet corner.
+- **Each label sits in an OPAQUE CHIP, and that is load-bearing, not decoration.** The first
+  version drew bare text floated above its line. It read perfectly on the demo and badly on
+  Charles's real board, reported the same day, in two ways at once: the dashes ran straight
+  through the words, and where two lines land a day apart — an ageing threshold of 14 against an
+  85th percentile of 13 is an ordinary board — the nudge stacked both labels into one smudge of
+  text and dashes. The chip is painted in `--surface`, so it interrupts its own line and
+  separates one label from the next, and it is centred ON the line rather than floated above it,
+  which is what makes the interruption read as a name rather than as a gap. Its cost is that it
+  can cover a dot; that is why it is as narrow as the text allows, and why the right-hand edge is
+  kept quiet. Don't go back to bare text.
+- The plugin nudges a label clear of the one above rather than dropping it — silently losing one
+  is worse than moving it, and the chip's colour still says which line it belongs to.
+- **The wording beside each line is built in `derive()`** (`ageing.lines`), with the rest of the
+  app's figures-in-a-sentence; the chart layer adds only the colour and the dash, which are the
+  one part of a line that is a drawing decision. Those labels drop a trailing `.0` where `num1`
+  would keep it: a tile wants figures lining up on the decimal point, a chart label wants every
+  character it can give back to the chart under the chip.
 - **Columns are work types, and that is a compromise the README states.** The canonical chart puts
   workflow STAGE on the x axis, which needs the status-history export blocked time and flow
   efficiency are both waiting on. `AGE_UNTYPED` and `AGE_OTHER` are pushed to the right-hand end

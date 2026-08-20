@@ -573,6 +573,11 @@ vertical space out of a 300px card, and it costs a lookup — matching a dash pa
 the card to a line in the middle of it. Only the two dot shapes get a legend, because a shape does
 need a key.
 
+Each label sits in a small opaque panel, centred on its own line. That is what keeps the dashes
+from running through the words, and what separates two labels when the lines are close together —
+an ageing threshold of 14 against an 85th percentile of 13 is an ordinary board, and without the
+panels those two labels landed on top of each other.
+
 ### Columns Are Work Types
 
 The canonical version of this chart puts *workflow stage* on the horizontal axis. That needs a
