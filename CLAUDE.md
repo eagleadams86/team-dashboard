@@ -136,6 +136,34 @@ the two are read side by side; the divergences below are deliberate.
   suite silently stopped running. Hostile-id fixtures use `'"><script>'`, the form the existing
   team-id tests already use.
 
+## Both Tables Sort, in Three States (2026-08-20)
+
+The Loaded Data list sorts the way All Teams does. `dataColumns()` mirrors `teamColumns()`:
+`get` returns the value a sort COMPARES — the underlying date or number, never the rendered text,
+so "in progress" and "—" sort as the absences they are rather than alphabetically among real
+values.
+
+- **`nextSort()` is shared by both tables, and it is THREE states**: the column its own way, then
+  reversed, then off. Both tables have a default order that was chosen and is worth getting back
+  to — All Teams opens in the picker's order, Loaded Data with the items still in play at the top
+  — and with a two-state toggle those were reachable exactly once, on the first render, with a
+  reload the only way back. Don't reduce it to two.
+- **Nulls sort LAST in both directions**, the same rule as All Teams: an item in progress has no
+  completion date and no cycle time, and letting it win the top of "shortest cycle time" is the
+  one result nobody could read past.
+- **The period column sorts by the completion date behind it**, never by its own label: "Aug 2026"
+  and "Sep 2026" sort backwards as text, and a week key only happens to sort right because it is
+  written year-first.
+- Sort state lives in `view` (`dataSort`, `dataSortDir`) — per device, no schema — and the export
+  reads the rendered page, so **the sort travels into a CSV**. The arrow on a sorted heading is a
+  CSS `::after`, so it does NOT: pinned, because a stray ↓ in a header cell is exactly the kind of
+  thing that would reach a spreadsheet unnoticed.
+- **A test-isolation lesson worth keeping.** These DOM groups share this origin's saved `view`
+  with whatever was last pressed in the app, so a table can arrive already sorted and an assertion
+  about the default order passes or fails on luck. Both groups now cycle any live column back to
+  off before asserting — which is only possible BECAUSE of the third press. The All Teams group
+  had the same latent fragility and had simply been getting away with it.
+
 ## Copy and CSV on Every Table of Figures (2026-08-20)
 
 Ported from the sibling, which grew it first; the two apps are read side by side and a table
