@@ -82,6 +82,49 @@ file records what is specific to this repo and what must never regress.
   keys, titles or names of people — `privacy.html` promises this, keep it true
   and update its effective date in the same commit as any storage change.
 
+## The Work Item Age Chart (2026-08-20)
+
+The fourth card in Health, and the only chart in the app whose points are ITEMS rather than
+periods: every item still in flight, plotted at the age it has reached, in a column for its work
+type. What must not regress:
+
+- **It must never contradict the two tiles it sits beside.** `ageing.count` is the same set the
+  work in progress tile counts and `ageing.agedCount` the same set the aged work tile counts,
+  from the same dates and the same threshold; `ageing.median` and `ageing.p85` are the *same
+  figures* the headline cycle time tile states, not a second calculation of them. All six are
+  pinned in tests.html against `summary`, because a dashboard telling a stand-up two different
+  things about one board would be wrong in the place nobody checks.
+- **Aged means older THAN the threshold, never equal to it** (`r.age > agedDays`), matching the
+  `<` in `agedCounts`. Get it wrong and the chart reports an item aged a day before the tile does.
+- **Ages go through `spanDays`**, so the working-days setting reaches them exactly as it reaches
+  the threshold they are drawn against — a chart whose dots and whose line disagreed about what a
+  day is would be unreadable. And they are read as of `endDate`, like work in progress and aged
+  work, never from `Date.now()`.
+- **The three reference lines are labelled where they are drawn, by the `refLabels` plugin, not
+  in a legend.** Five legend entries wrapped to two rows and took a sixth of a 300px card, and
+  they cost a lookup as well as the space. Only the two dot styles keep legend entries — a shape
+  does need a key. The labels are right-aligned because columns are ordered busiest-first, which
+  makes the right-hand edge the reliably quiet corner; the plugin nudges a label clear of the one
+  above rather than dropping it, because three lines a day apart is a real board.
+- **Columns are work types, and that is a compromise the README states.** The canonical chart puts
+  workflow STAGE on the x axis, which needs the status-history export blocked time and flow
+  efficiency are both waiting on. `AGE_UNTYPED` and `AGE_OTHER` are pushed to the right-hand end
+  regardless of count — neither is a work type, and keeping both there is what preserves the quiet
+  corner above. `AGE_MAX_COLUMNS` counts REAL types only, so an untyped item can never push a real
+  one off the chart.
+- **Dot positions are computed in `derive()`, not improvised by the renderer**, so the spread is a
+  pinned property of the data. Sorted by age within a column, spread across `±AGE_SPREAD`, and a
+  column of one sits dead centre on its own tick.
+- **The dots carry no ticket key and never will** — this app stores none. The tooltip gives the
+  work type and the start date instead, which is what finds the item again in the export. Any
+  future change here must not smuggle identifying text onto the chart; the storage rule at the
+  top of this file is the reason.
+- Aged dots are told apart by SHAPE as well as colour (a `--serious` triangle against accent
+  circles), the same rule the defect and cycle time charts follow, and the same non-RAG pair.
+  Nothing is coloured "bad": the threshold is one the reader set.
+- Health went from three charts to four, so the defect rate card lost its `solo` class. The class
+  and its CSS stay — the next odd group would otherwise rediscover the problem.
+
 ## The Monte Carlo Forecast (2026-08-20)
 
 The fourth chart group, and the only one that looks forward. It resamples this team's own

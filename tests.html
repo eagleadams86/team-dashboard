@@ -654,8 +654,8 @@ async function run(TD, win) {
      it plots — and every name must have a help entry behind it, since the ⓘ
      that opens one sits on the name. */
   is(Object.keys(d.names).sort(),
-     ['agedWork', 'cycleTime', 'defectRate', 'forecastHowMany', 'forecastWhen', 'leadTime',
-      'netFlow', 'throughput', 'wip'],
+     ['agedWork', 'cycleTime', 'defectRate', 'forecastHowMany', 'forecastWhen', 'itemAge',
+      'leadTime', 'netFlow', 'throughput', 'wip'],
      'every chart has a name of its own');
   ok(Object.keys(d.names).every(k => d.titles[k]),
      'and a sentence under it saying what it plots');
@@ -2052,7 +2052,105 @@ async function run(TD, win) {
      'and the builder stamps the version the decoder checks for');
 
   /* ────────────────────────────────────────────────────────── */
-  group('Monte Carlo forecast — the sampler');
+  group('work item age — the chart must never contradict the tiles');
+
+  /* This chart plots the same items the work in progress and aged work tiles
+     COUNT, from the same dates and the same threshold. If the two ever disagree
+     the dashboard is telling a stand-up two different things about one board,
+     and the chart is the one nobody would check. So the agreement is pinned
+     rather than assumed. */
+  const ag = d.ageing;
+  is(ag.count, d.summary.currentWip, 'one dot per item the work in progress tile counts');
+  is(ag.points.length, ag.count, 'and every one of them is plotted');
+  is(ag.agedCount, d.summary.agedNow, 'and the aged ones match the aged work tile exactly');
+  is(ag.median, d.summary.medianCycleTime, 'the lower line is the median the headline tile states');
+  is(ag.p85, d.summary.p85CycleTime, 'the upper line is the same percentile, not a second opinion');
+  is(ag.threshold, d.agedDays, 'and the third is the threshold from Settings');
+  is(ag.oldest, ag.points.length ? Math.max.apply(null, ag.points.map(p => p.y)) : null,
+     'the oldest tile is the highest dot on the chart, or null when there is none');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('work item age — ages, columns and dots');
+
+  /* Ages are read as of the newest date in the data, like work in progress and
+     aged work — not from today, so a paste of last quarter's export reports
+     that quarter rather than ageing every item by the months since. */
+  const ageRows = [
+    { completed: D(2015, 5, 1), started: D(2015, 4, 20), created: null, type: 'Story' },
+    { completed: null, started: D(2015, 4, 28), created: null, type: 'Story' },   /* 3 days */
+    { completed: null, started: D(2015, 4, 17), created: null, type: 'Bug' },     /* 14 days */
+    { completed: null, started: D(2015, 4, 16), created: null, type: 'Bug' },     /* 15 days */
+    { completed: null, started: D(2015, 4, 1),  created: null, type: '' }         /* 30, untyped */
+  ];
+  const agOf = (settings, view) => TD.derive(ageRows,
+    win.TDState.normalizeSettings(settings || {}),
+    Object.assign({ filterValue: '', months: 'all', bucket: 'week' }, view)).ageing;
+  const a1 = agOf();
+  is(a1.count, 4, 'four items have a start and no completion');
+  is(a1.points.map(p => p.y).sort((x, y) => x - y), [3, 14, 15, 30],
+     'each is aged from its start date to the end of the data');
+  is(a1.oldest, 30, 'and the oldest is the one started first');
+
+  /* The same `>` the aged-work scan uses: an item whose age EQUALS the
+     threshold is not yet aged, because aged means older *than* it. Get this
+     wrong and the chart reports an item aged a day before the tile does. */
+  is(a1.points.filter(p => p.aged).map(p => p.y).sort((x, y) => x - y), [15, 30],
+     'aged means older THAN the threshold — 14 days against a 14-day threshold is not aged');
+
+  /* One setting, three durations: cycle time, lead time and the ageing
+     threshold. An age drawn in calendar days against a working-day threshold
+     would be a chart whose dots and whose line disagreed about what a day is. */
+  const a2 = agOf({ workingDays: true });
+  ok(Math.max.apply(null, a2.points.map(p => p.y)) < a1.oldest,
+     'working days shortens every age, so the dots follow the setting the line does',
+     JSON.stringify(a2.points.map(p => p.y)));
+
+  /* Columns are work types, busiest first, with the name as the tie-break so
+     the order never depends on the order rows happened to arrive in. */
+  is(a1.columns, ['Bug', 'Story', TD.AGE_UNTYPED],
+     'busiest real type first, then alphabetical, with "no type" pushed to the end');
+  is(a1.points.filter(p => p.column === TD.AGE_UNTYPED).length, 1,
+     'an item with no work type gets a column of its own rather than vanishing');
+
+  /* A column of one sits dead centre; a column of several spreads evenly across
+     its slot, sorted by age, so two items the same age never share a pixel. */
+  const solo = a1.points.filter(p => p.column === TD.AGE_UNTYPED);
+  is(solo[0].x, 2, 'a lone item sits on its column’s own tick, not at the edge of the slot');
+  const bugs = a1.points.filter(p => p.column === 'Bug').sort((p, q) => p.x - q.x);
+  is(bugs.map(p => p.x), [-TD.AGE_SPREAD, TD.AGE_SPREAD],
+     'two in a column spread to either edge of the spread');
+  is(bugs.map(p => p.y), [14, 15], 'and are ordered by age, youngest to the left');
+
+  /* A board with more issue types than columns folds its tail into one, rather
+     than drawing a dozen columns two dots wide on a 300px card. */
+  const manyTypes = [{ completed: D(2015, 5, 1), started: D(2015, 4, 20), created: null, type: 'Story' }];
+  for (let i = 0; i < TD.AGE_MAX_COLUMNS + 3; i++)
+    manyTypes.push({ completed: null, started: D(2015, 4, 10), created: null, type: 'Type' + i });
+  const aMany = TD.derive(manyTypes, win.TDState.normalizeSettings({}),
+    { filterValue: '', months: 'all', bucket: 'week' }).ageing;
+  is(aMany.columns.length, TD.AGE_MAX_COLUMNS + 1,
+     'at most ' + TD.AGE_MAX_COLUMNS + ' type columns, plus one for the tail');
+  /* The cap counts real types, so an untyped item can never push one off the
+     chart — it takes a column beside the fold rather than a place among them. */
+  const withUntyped = manyTypes.concat([{ completed: null, started: D(2015, 4, 10), created: null, type: '' }]);
+  const aUn = TD.derive(withUntyped, win.TDState.normalizeSettings({}),
+    { filterValue: '', months: 'all', bucket: 'week' }).ageing;
+  is(aUn.columns.filter(c => c !== TD.AGE_UNTYPED && c !== TD.AGE_OTHER).length, TD.AGE_MAX_COLUMNS,
+     'the same number of real type columns survive when an untyped item joins them');
+  is(aUn.columns[aUn.columns.length - 2], TD.AGE_UNTYPED, 'with "no type" sitting just before the tail');
+  is(aMany.columns[aMany.columns.length - 1], TD.AGE_OTHER, 'and the tail is named, not dropped');
+  is(aMany.foldedTypes, 3, 'with the count of what went into it stated');
+  is(aMany.points.length, aMany.count, 'every folded item is still plotted');
+
+  /* A team with nothing in flight is an ordinary state, not a missing chart. */
+  const aNone = TD.derive([{ completed: D(2015, 5, 1), started: D(2015, 4, 20), created: null, type: 'Story' }],
+    win.TDState.normalizeSettings({}), { filterValue: '', months: 'all', bucket: 'week' }).ageing;
+  is([aNone.count, aNone.points.length, aNone.columns.length], [0, 0, 0], 'nothing in flight, nothing plotted');
+  is(aNone.oldest, null, 'and no oldest item to name — null, not 0');
+  ok(aNone.threshold > 0, 'while the threshold is still known, so the card can still explain itself');
+
+  /* ────────────────────────────────────────────────────────── */
+    group('Monte Carlo forecast — the sampler');
 
   /* A team that finishes exactly five every period, so every trial must agree
      and the arithmetic is checkable by hand. Ten of them is two periods flat;
@@ -2271,6 +2369,21 @@ async function run(TD, win) {
   ok(heronWork.summary.agedNow < heron.summary.agedNow,
      'and drops an item out of Heron\u2019s aged count, so the ageing rule follows too',
      heronWork.summary.agedNow + ' vs ' + heron.summary.agedNow);
+
+  /* The work item age chart's argument is that a dot above the 85% line has
+     outlasted almost everything the team has delivered. Heron is the only team
+     that demonstrates it, and only while its tail survives. */
+  ok(heron.ageing.oldest > heron.ageing.p85 * 1.5,
+     'Heron has an item well past the 85% line, which is what the chart exists to show',
+     heron.ageing.oldest + ' vs ' + heron.ageing.p85);
+  ok(king.ageing.oldest < king.ageing.threshold,
+     'and Kingfisher has none past the threshold, so the chart has both faces',
+     king.ageing.oldest + ' vs ' + king.ageing.threshold);
+  ok(heron.ageing.columns.length >= 3,
+     'with enough work types in flight for the columns to mean something',
+     heron.ageing.columns.join(', '));
+  ok([king, heron].every(t => t.ageing.count === t.summary.currentWip),
+     'and every demo team’s dots still match its work in progress tile');
 
   /* The forecast is only reachable if the demo's default view clears the
      floor — three months of weekly data on every team. Wagtail is the short
