@@ -43,8 +43,14 @@ jobs:
           const PROVOKED = /^Error: td: saved data schema \d+ is newer than this build \(\d+\)$/;
           page.on('pageerror', (e) => { if (!PROVOKED.test(String(e))) errors.push(String(e)); });
           await page.goto('http://localhost:8013/tests.html');
+          /* Wait for the summary to stop saying "Loading…", the same condition every
+             sibling workflow uses. It used to wait for the literal word "passed",
+             which quietly made the suite's exact wording part of the CI contract:
+             renaming the summary to "All N tests pass" — the phrasing the other six
+             suites already used — hung this job for the full 60s and failed a green
+             run (2026-08-20). Match on the state, not on a word. */
           await page.waitForFunction(
-            () => /passed|failed/.test(document.getElementById('summary').textContent),
+            () => !/^Loading/.test(document.getElementById('summary').textContent),
             null, { timeout: 60000 });
           const summary = await page.evaluate(() => document.getElementById('summary').textContent);
           const failedNames = await page.evaluate(() =>
@@ -81,6 +87,6 @@ jobs:
           for (const f of failedNames) console.log('FAIL:', f);
           for (const e of errors) console.log('PAGE ERROR:', e);
           await browser.close();
-          if (failedNames.length || errors.length || !/^All \d+ tests passed$/.test(summary)) process.exit(1);
+          if (failedNames.length || errors.length || !/^All \d+ tests pass/.test(summary)) process.exit(1);
           EOF
           node ci-run-tests.mjs
