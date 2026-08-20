@@ -230,18 +230,35 @@ const SAMPLE_SETTINGS = {
 let passed = 0, failed = 0;
 const out = document.getElementById('out');
 
+/* Cells are filled with textContent, never innerHTML — the same rule the app
+   itself follows, applied to its own harness. It used to concatenate the test
+   name and the failure message straight into markup, which was harmless only
+   while every test name was a literal in this file. It stopped being harmless
+   the moment this suite gained a test that feeds `<img src=x onerror=…>`
+   through escapeHtml: a FAILING assertion puts the payload into `msg`, and the
+   report page would have run it. Reported by CodeQL as js/xss-through-dom on
+   2026-08-20, which is exactly the case it is for. The sibling suites build
+   their rows with createElement + textContent; this one was the odd one out. */
+function cell(text, cls, colspan) {
+  const td = document.createElement('td');
+  if (cls) td.className = cls;
+  if (colspan) td.colSpan = colspan;
+  td.textContent = text;
+  return td;
+}
 function group(name) {
   const tr = document.createElement('tr');
   tr.className = 'group';
-  tr.innerHTML = '<td colspan="3">' + name + '</td>';
+  tr.appendChild(cell(name, null, 3));
   out.appendChild(tr);
 }
 function record(ok, name, msg) {
   ok ? passed++ : failed++;
   const tr = document.createElement('tr');
   tr.className = ok ? 'pass' : 'fail';
-  tr.innerHTML = '<td class="st">' + (ok ? '✓' : '✕') + '</td><td>' + name +
-                 '</td><td class="msg">' + (ok ? '' : (msg || '')) + '</td>';
+  tr.appendChild(cell(ok ? '✓' : '✕', 'st'));
+  tr.appendChild(cell(name));
+  tr.appendChild(cell(ok ? '' : (msg || ''), 'msg'));
   out.appendChild(tr);
 }
 function is(actual, expected, name) {
