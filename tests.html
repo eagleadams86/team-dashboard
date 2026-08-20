@@ -654,8 +654,8 @@ async function run(TD, win) {
      it plots — and every name must have a help entry behind it, since the ⓘ
      that opens one sits on the name. */
   is(Object.keys(d.names).sort(),
-     ['agedWork', 'cycleTime', 'defectRate', 'forecastHowMany', 'forecastWhen', 'itemAge',
-      'leadTime', 'netFlow', 'throughput', 'wip'],
+     ['agedWork', 'cycleScatter', 'cycleTime', 'defectRate', 'forecastHowMany', 'forecastWhen',
+      'itemAge', 'leadTime', 'netFlow', 'throughput', 'wip'],
      'every chart has a name of its own');
   ok(Object.keys(d.names).every(k => d.titles[k]),
      'and a sentence under it saying what it plots');
@@ -2363,6 +2363,59 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(iso(stalled.dataEnd), '2015-04-08', 'and its export date is still known');
 
   /* ────────────────────────────────────────────────────────── */
+  group('the cycle time scatter — one dot per finished item');
+
+  /* It plots the SAME items the throughput series counts and the same measure
+     the cycle time line averages. If those ever diverge, one card is the summary
+     of a different set from the one beside it. */
+  const sc = d.cycleScatter;
+  is(sc.points.length, d.throughput.reduce((a, b) => a + b, 0),
+     'a dot for every item the window counts as completed');
+  is(sc.median, d.summary.medianCycleTime, 'the lower line is the median the tile states');
+  is(sc.p85, d.summary.p85CycleTime, 'and the upper one the percentile the headline tile states');
+  is(sc.lines.map(l => l.key), ['median', 'p85'],
+     'two lines and no threshold — that is a rule about work in PROGRESS, and nothing here is');
+
+  /* x is a day index from the first bucket, not a date: Chart.js needs a time
+     adapter for a date axis and this app vendors none. The ticks are pushed back
+     onto the bucket starts so the axis reads identically to the line chart's. */
+  is(sc.tickAt.length, d.buckets.length, 'one tick per bucket, matching the chart beside it');
+  is(sc.tickAt[0], 0, 'measured from the first bucket');
+  ok(sc.tickAt.every((v, i) => i === 0 || v > sc.tickAt[i - 1]), 'and ascending');
+  ok(sc.points.every(p => p.x >= 0 && p.x <= sc.lastDay),
+     'every dot lands inside the window it was drawn for');
+
+  /* The y value is the cycle time, so every setting that moves a cycle time
+     moves the dots with it — or the chart and the tile above it disagree. */
+  const scRows = [
+    { completed: D(2015, 5, 11), started: D(2015, 5, 1), created: null, type: 'Story' },
+    { completed: D(2015, 5, 4),  started: D(2015, 5, 4), created: null, type: 'Bug' },
+    { completed: D(2015, 5, 6),  started: null,          created: null, type: 'Story' }
+  ];
+  const scOf = (settings) => TD.derive(scRows, win.TDState.normalizeSettings(settings || {}),
+    { filterValue: '', months: 'all', bucket: 'week' }).cycleScatter;
+  is(scOf().points.length, 2,
+     'an item finished with no start date has no cycle time, so it gets no dot rather than one at zero');
+  is(scOf().points.map(p => p.y).sort((a, b) => a - b), [1, 10],
+     'a same-day item takes the same-day value, and the rest their real span');
+  is(scOf({ sameDayValue: 0.5 }).points.map(p => p.y).sort((a, b) => a - b), [0.5, 10],
+     'so changing that setting moves the dot');
+  /* 1 to 11 May 2015 is Friday to Monday: the weekdays after the Friday up to and
+     including the Monday are 4–8 May and 11 May, which is 6 rather than the 10
+     calendar days above. */
+  is(scOf({ workingDays: true }).points.map(p => p.y).sort((a, b) => a - b), [1, 6],
+     'and working days shortens the span exactly as it does on the tile');
+
+  /* Nothing with a start date at all: the card says so rather than drawing an
+     empty grid, and the app still plots everything else. */
+  const noStarts = TD.derive(
+    [{ completed: D(2015, 5, 1), started: null, created: null, type: 'Story' }],
+    SAMPLE_SETTINGS, { filterValue: '', months: 'all', bucket: 'week' });
+  is(noStarts.empty, false, 'the rest of the dashboard still has something to say');
+  is(noStarts.cycleScatter.points.length, 0, 'while the scatter has nothing to plot');
+  is(noStarts.cycleScatter.lines.length, 0, 'and no percentile lines to draw either');
+
+  /* ────────────────────────────────────────────────────────── */
     group('work item age — the chart must never contradict the tiles');
 
   /* This chart plots the same items the work in progress and aged work tiles
@@ -2755,6 +2808,20 @@ group('ARTs — the grouping, and the boundary it crosses');
   ok(trainOnly.train.summary.completedTotal < everyone.train.summary.completedTotal,
      'and scoping to it visibly changes what the train row says',
      trainOnly.train.summary.completedTotal + ' vs ' + everyone.train.summary.completedTotal);
+
+  /* The scatter is where Heron's tail stops being a statistic and becomes a
+     picture. If it is ever tidied away, the app's central argument is no longer
+     visible on the one dataset anybody is shown. */
+  const heronDots = heron.cycleScatter.points.map(p => p.y);
+  const kingDots = king.cycleScatter.points.map(p => p.y);
+  ok(Math.max.apply(null, heronDots) > heron.cycleScatter.p85 * 1.8,
+     'Heron has dots far above its own 85% line — the tail, drawn',
+     Math.max.apply(null, heronDots) + ' vs ' + heron.cycleScatter.p85);
+  ok(Math.max.apply(null, kingDots) < king.cycleScatter.p85 * 3,
+     'Kingfisher does not, so the two boards read differently on this chart too',
+     Math.max.apply(null, kingDots) + ' vs ' + king.cycleScatter.p85);
+  ok(heronDots.length > 40, 'and there are enough dots for a distribution to be visible',
+     String(heronDots.length));
 
   /* The work item age chart's argument is that a dot above the 85% line has
      outlasted almost everything the team has delivered. Heron is the only team
