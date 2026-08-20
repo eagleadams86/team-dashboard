@@ -1124,10 +1124,26 @@ main:focus { outline: none; }
           <div class="chart-wrap"><canvas id="chartCycleTime"></canvas></div>
         </div>
 
+        <!-- Beside the line chart above rather than anywhere else, because the two
+             are the SAME measure at two resolutions: the line is the summary of
+             these dots, and putting them side by side is what makes that
+             visible. Every item, not a per-period average — this is the one
+             chart in the app where a single outlier is a thing you can point at. -->
+        <div class="chart-card" id="cardCycleScatter">
+          <div class="chart-name" id="nameCycleScatter"></div>
+          <div class="chart-title" id="titleCycleScatter"></div>
+          <div class="chart-wrap"><canvas id="chartCycleScatter"></canvas></div>
+          <div class="note info" id="cycleScatterNone" hidden></div>
+        </div>
+
         <!-- Both of these need a created date, which an older paste won't have.
              They hold a card either way rather than vanishing, so the answer to
-             "where is lead time?" is on screen instead of missing. -->
-        <div class="chart-card" id="cardLeadTime">
+             "where is lead time?" is on screen instead of missing.
+
+             `solo` because Flow now holds three charts: the odd one out keeps a
+             single column's width and sits centred rather than stretching across
+             the row, which would read as the more important chart. -->
+        <div class="chart-card solo" id="cardLeadTime">
           <div class="chart-name" id="nameLeadTime"></div>
           <div class="chart-title" id="titleLeadTime"></div>
           <div class="chart-wrap"><canvas id="chartLeadTime"></canvas></div>
@@ -2781,6 +2797,72 @@ function derive(rows, settings, view) {
      turn into null rather than 0 — the same stance percentileOf takes. */
   const wholeThroughput = partial ? throughput.slice(0, -1) : throughput.slice();
 
+  /* The window's pooled cycle time percentiles, worked out ONCE and read by
+     three things: the two summary tiles, the scatter below, and the work item
+     age chart. They are the same figures in all three by construction, which is
+     the point — a dot above the 85% line on one chart and the tile stating that
+     percentile must never be able to disagree.
+
+     No trailing ".0" on the wording. num1 is right for a tile, where a column of
+     figures lines up on the decimal point; on a chart every character is a
+     character the label's chip covers, and a percentile is a duration some real
+     item actually took, so it is usually a whole number anyway. */
+  const ageMedian = percentileOf(windowCycles, 50);
+  const ageP85 = percentileOf(windowCycles, CYCLE_PERCENTILE);
+  const ageShort = (v) => Number.isInteger(v) ? String(v) : num1(v);
+
+  /* ── Every item that finished, at the time it took ─────────────────────────
+     The counterpart of the work item age chart, and the other half of the same
+     picture: that one plots what is still open, this plots what has closed. It
+     is also the same measure the cycle time LINE above it plots, at a different
+     resolution — the line is the per-period summary of exactly these dots, which
+     is why the two sit side by side.
+
+     Built from the buckets rather than from `items`, so the scatter and the line
+     describe the same set by construction: an item completed outside the plotted
+     window is in neither. `x` is a DAY INDEX from the first bucket rather than a
+     date, because Chart.js needs a time adapter for a date axis and this app
+     vendors none — the ticks are forced back onto the bucket boundaries below,
+     so the scatter's x axis reads identically to the line chart's beside it. */
+  const scatterPoints = [];
+  weekStarts.forEach((ws) => {
+    const key = bucketKey(ws, bucket);
+    (byCompletedWeek.get(key) || []).forEach((r) => {
+      const ct = cycleTimeOf(r, sameDay, workingDays);
+      /* No start date, no cycle time — the item is finished work with an unknown
+         beginning, and a dot at zero would be a claim rather than a gap. */
+      if (ct == null) return;
+      scatterPoints.push({
+        x: diffDays(r.completed, weekStarts[0]),
+        y: ct,
+        completed: r.completed,
+        type: r.type
+      });
+    });
+  });
+
+  /* The same two lines the work item age chart draws, from the same pooled cycle
+     times and in the same words, so the pair can be read against each other: one
+     shows where finished work landed, the other where open work has got to. The
+     ageing threshold is deliberately NOT here — it is a rule about work in
+     progress, and nothing on this chart is still in progress. */
+  const scatterLines = [];
+  if (ageMedian != null) scatterLines.push({ key: 'median', value: ageMedian,
+    text: 'half took under ' + ageShort(ageMedian) });
+  if (ageP85 != null) scatterLines.push({ key: 'p85', value: ageP85,
+    text: CYCLE_PERCENTILE + '% took under ' + ageShort(ageP85) });
+
+  const cycleScatter = {
+    points: scatterPoints,
+    lines: scatterLines,
+    median: ageMedian,
+    p85: ageP85,
+    /* Where each bucket starts, in the same day-index units as the points, so
+       the axis can carry the bucket labels the rest of the app uses. */
+    tickAt: weekStarts.map(ws => diffDays(ws, weekStarts[0])),
+    lastDay: diffDays(endDate, weekStarts[0])
+  };
+
   /* ── Every item still in flight, by age ────────────────────────────────────
      The counterpart to the aged-work chart above it. That one says HOW MANY
      were stale at the end of each period; this says WHICH ONES are stale now
@@ -2871,25 +2953,11 @@ function derive(rows, settings, view) {
      third is the ageing threshold, which is the line the tile beside this one
      counts against. Null percentiles when nothing finished has a measurable
      cycle time: the threshold still draws, and the card is still worth having. */
-  const ageMedian = percentileOf(windowCycles, 50);
-  const ageP85 = percentileOf(windowCycles, CYCLE_PERCENTILE);
-
-  /* The words beside each line live here rather than in the chart layer, with
-     the rest of the app's wording: derive() is the one place a figure is worked
-     out, and these are figures in a sentence. The chart layer adds the colour
-     and the dash, which are the only part of a line that is a drawing decision.
-
-     No trailing ".0". num1 is right for a tile, where a column of figures should
-     line up on the decimal point; here every character is a character of chart
-     the label's chip covers, and a percentile is a duration some real item
-     actually took, so it is usually a whole number anyway. */
-  const ageShort = (v) => Number.isInteger(v) ? String(v) : num1(v);
-  const ageLines = [];
-  if (ageMedian != null) ageLines.push({ key: 'median', value: ageMedian,
-    text: 'half took under ' + ageShort(ageMedian) });
-  if (ageP85 != null) ageLines.push({ key: 'p85', value: ageP85,
-    text: CYCLE_PERCENTILE + '% took under ' + ageShort(ageP85) });
-  ageLines.push({ key: 'threshold', value: agedDays, text: 'aged after ' + agedDays });
+  /* The threshold joins the two lines both charts share. It belongs to this one
+     alone: it is a rule about work in progress, and nothing on the scatter is
+     still in progress. */
+  const ageLines = cycleScatter.lines.concat(
+    [{ key: 'threshold', value: agedDays, text: 'aged after ' + agedDays }]);
 
   const ageing = {
     points: agePoints,
@@ -3008,7 +3076,7 @@ function derive(rows, settings, view) {
     throughput, unplannedRate, avgCycleTime, netFlow, started,
     avgLeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
     throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
-    wip, agedCount, agedDays, ageing, forecast,
+    wip, agedCount, agedDays, ageing, cycleScatter, forecast,
     /* `endDate` is what every figure was read as of; `dataEnd` is what this
        team's own export runs to. Equal unless a caller imposed a shared date. */
     dataEnd,
@@ -3073,6 +3141,9 @@ function derive(rows, settings, view) {
       /* Named for what a dot IS rather than for the chart type — nobody at a
          stand-up asks for the scatter plot. */
       itemAge: 'Work item age',
+      /* Named for what a dot is, not for the chart type — the same rule the age
+         chart follows: nobody at a stand-up asks for the scatter plot. */
+      cycleScatter: 'Every finished item',
       /* The two forecast cards. Named for the question each answers rather than
          for the method: nobody walks up to a board asking for a Monte Carlo. */
       forecastWhen: 'Time to finish',
@@ -3098,6 +3169,7 @@ function derive(rows, settings, view) {
       agedWork: 'Items in Progress Longer Than ' + agedDays + ' ' + DayNoun,
       itemAge: 'Age of Every Item Still in Progress on ' + prettyDate(endDate)
         + ', by Work Type',
+      cycleScatter: cycleLabel + ' of Each Item, on the ' + Noun + ' It Finished',
       /* Both name the question's own input, so a card read on its own — in a
          screenshot, over someone's shoulder — still says what was asked. */
       forecastWhen: 'How Many Days to Finish ' + fcItems + ' Item'
@@ -3118,6 +3190,7 @@ function derive(rows, settings, view) {
       agedWork: 'Items older than ' + agedDays + ' ' + dayNoun,
       itemAge: 'Age so far (' + dayNoun + ')',
       itemAgeX: 'Work type',
+      cycleScatter: cycleLabel + ' (' + dayNoun + ')',
       /* Both forecast charts count RUNS up the y axis — the x axis is the
          outcome, which is the other way round from every chart above, where x
          is time. Each says outright what it is counting, because a bar chart
@@ -4316,6 +4389,107 @@ function drawCharts(d) {
     options: agedOpts
   });
 
+  /* ── Every finished item, at the time it took ──
+     The canonical Kanban chart, and the one view here where a single item is a
+     thing you can point at. The line chart beside it averages within a period,
+     which is exactly what hides the item that took five months.
+
+     One colour, and no shape for "slow". The work item age chart marks items
+     past the ageing THRESHOLD, which is a line the reader drew; there is no
+     equivalent here — 15% of items sit above the 85th percentile by definition,
+     not by failing, and colouring them as though they had would be the app
+     judging a figure rather than stating it. The two reference lines do the
+     work, and they are the same two the age chart draws, in the same words, so
+     the pair reads together: one shows where finished work landed, the other
+     where open work has got to.
+
+     Fill is the accent at partial ALPHA rather than a tint, and that is the
+     overplotting fix: a busy board finishes several things on one day at the
+     same cycle time, and opaque dots would stack into one. Overlapping
+     translucent ones darken, so density is legible without jittering a date —
+     which would be a lie about when something finished. */
+  const scat = d.cycleScatter;
+  const scatCard = $('cardCycleScatter');
+  const scatNone = $('cycleScatterNone');
+  const hasScatter = scat.points.length > 0;
+  scatCard.querySelector('.chart-wrap').hidden = !hasScatter;
+  scatCard.classList.toggle('no-chart', !hasScatter);
+  scatNone.hidden = hasScatter;
+  scatNone.textContent = hasScatter ? ''
+    : 'Nothing completed in this window has a start date, so no item has a '
+      + (state.settings.cycleTimeLabel || 'cycle time').toLowerCase()
+      + ' to plot. Add a start column to your paste and every finished item appears here.';
+
+  if (!hasScatter) {
+    if (charts.chartCycleScatter) { charts.chartCycleScatter.destroy(); delete charts.chartCycleScatter; }
+  } else {
+    const [ar, ag, ab] = hexToRgb(accent);
+    const scatOpts = baseOptions(d.axisTitles.cycleScatter, num1, null, d.axisTitles.x, null);
+    scatOpts.scales.y.beginAtZero = true;
+    scatOpts.scales.x.type = 'linear';
+    scatOpts.scales.x.min = 0;
+    /* A margin past the last day, so the reference-line labels have somewhere to
+       sit that is not on top of the data. The work item age chart can pin its
+       labels to the right-hand edge because its columns are ordered
+       busiest-first and the last one is reliably the emptiest; a time axis
+       offers no such corner — the most recent week is as busy as any other, and
+       the median line runs straight through the densest band of dots. Ten per
+       cent is enough for a chip and little enough that the data is not visibly
+       pushed left. The forced ticks are unaffected: they sit on bucket starts,
+       and this only adds empty space beyond the last of them. */
+    scatOpts.scales.x.max = scat.lastDay + Math.max(1, Math.round(scat.lastDay * 0.1));
+    /* Ticks forced back onto the bucket boundaries and labelled with the same
+       words the line chart uses, so the two x axes read identically — which is
+       what lets a reader match a spike on one to the dots that caused it. */
+    scatOpts.scales.x.afterBuildTicks = (axis) => {
+      axis.ticks = scat.tickAt.map(v => ({ value: v }));
+    };
+    scatOpts.scales.x.ticks.callback = (v) => {
+      const i = scat.tickAt.indexOf(v);
+      return i >= 0 ? d.bucketLabels[i] : '';
+    };
+    /* Nearest-point: index mode on a scatter picks every dot sharing an x, which
+       here is every item that finished on one day. */
+    scatOpts.interaction = { mode: 'nearest', intersect: true };
+    scatOpts.plugins.refLabels = { lines: scat.lines.map(l => ({
+      text: l.text, value: l.value,
+      colour: l.key === 'median' ? token('--text-muted') : token('--text-secondary')
+    })) };
+    /* The same privacy stance as the age chart: the dot cannot carry a ticket
+       key because this app stores none, so it carries what finds the item again
+       in the export it came from. */
+    scatOpts.plugins.tooltip.callbacks = {
+      title: (its) => (its[0].raw.type || AGE_UNTYPED) + ' \u00b7 finished '
+        + prettyDate(its[0].raw.completed),
+      label: (c) => num1(c.raw.y) + ' ' + d.dayNoun + ' from start to finish'
+    };
+
+    const refLine = (value, colour, dash) => ({
+      label: '', type: 'line', data: [{ x: 0, y: value }, { x: scat.lastDay, y: value }],
+      borderColor: colour, borderWidth: 1.5, borderDash: dash,
+      pointRadius: 0, pointHitRadius: 0, fill: false, tension: 0, order: 3
+    });
+
+    renderChart('chartCycleScatter', {
+      type: 'scatter',
+      data: {
+        datasets: [{
+          label: 'Finished items',
+          data: scat.points,
+          backgroundColor: 'rgba(' + ar + ',' + ag + ',' + ab + ',0.55)',
+          borderColor: accent,
+          borderWidth: 1,
+          pointRadius: 3.5,
+          pointHoverRadius: 7,
+          order: 1
+        }].concat(scat.lines.map(l => refLine(l.value,
+          l.key === 'median' ? token('--text-muted') : token('--text-secondary'),
+          l.key === 'median' ? [6, 4] : [2, 3])))
+      },
+      options: scatOpts
+    });
+  }
+
   /* ── Every item in flight, by age ──
      A scatter, and the only chart here whose points are ITEMS rather than
      periods. Columns are work types; within a column the dots are spread by
@@ -4508,6 +4682,7 @@ function drawCharts(d) {
   ['defectRate', 'cycleTime', 'throughput', 'netFlow', 'wip', 'agedWork']
     .forEach(k => describe('chart' + k.charAt(0).toUpperCase() + k.slice(1), label(k)));
   if (d.hasCreated) describe('chartLeadTime', label('leadTime'));
+  if (d.cycleScatter.points.length) describe('chartCycleScatter', label('cycleScatter'));
   if (d.ageing.count) describe('chartItemAge', label('itemAge'));
   if (d.forecast.when) describe('chartForecastWhen', label('forecastWhen'));
   if (d.forecast.howMany) describe('chartForecastHowMany', label('forecastHowMany'));
@@ -4643,6 +4818,20 @@ const METRIC_HELP = {
       + 'throughput dragging its rate down and three weeks of extra ageing on everything it '
       + 'has open, and none of that shows in the numbers themselves. Paste a fresh export for '
       + 'that team before drawing any conclusion about it.' },
+  cycleScatter: { title: 'Every Finished Item',
+    body: 'How long did each item actually take? One dot per item, at the time it took, on '
+      + 'the day it finished — where the chart beside it averages '
+      + 'within each period, which is exactly what hides the one item that took five months. '
+      + 'This is the only view here where a single item is a thing you can point at: a dot far '
+      + 'above the rest is a conversation, and the week it sits over tells you which one. The '
+      + 'two lines are this team\u2019s own finished work — half of it came in under the lower '
+      + 'one, ' + CYCLE_PERCENTILE + '% under the upper one — and they are the SAME two lines '
+      + 'the work item age chart draws, so the pair reads together: this shows where finished '
+      + 'work landed, that shows where open work has got to. What you are looking for is the '
+      + 'SPREAD rather than the average. A tight band means the next item is predictable; a '
+      + 'long tail means it is a lottery however good the typical case looks, and that is what '
+      + 'makes a forecast wide. Dots are translucent, so several items finishing on one day at '
+      + 'the same speed show as a darker mark rather than as one.' },
   itemAge: { title: 'Work Item Age',
     body: 'What do I do today? Every item still in progress, plotted at the age it has '
       + 'reached so far \u2014 not how long it took, because none of these has finished. '
@@ -5663,7 +5852,7 @@ TABS.forEach(t => {
    to which group is listed here rather than read from the DOM, because the
    resize on reveal has to know before the panel is measurable. */
 const CHART_GROUPS = {
-  flow:     ['chartCycleTime', 'chartLeadTime'],
+  flow:     ['chartCycleTime', 'chartCycleScatter', 'chartLeadTime'],
   delivery: ['chartThroughput', 'chartNetFlow'],
   health:   ['chartWip', 'chartAgedWork', 'chartItemAge', 'chartDefectRate'],
   /* Forecast is last because it is the only group that says anything about the

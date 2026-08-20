@@ -19,7 +19,7 @@ measures that move together are read together:
 
 | Group | Question it answers | What's plotted |
 |---|---|---|
-| **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); lead time |
+| **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); **every finished item, as a dot**; lead time |
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started) |
 | **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **work item age**; defect rate — defects resolved and defects raised |
 | **Forecast** — what that implies | When will this batch be done, and how much by a date? | Two distributions from ten thousand simulated runs, one per question |
@@ -686,6 +686,34 @@ worth knowing:
 Net-flow bars use the theme's accent for positive and `--serious` for negative — deliberately
 not the red/green pair, because the coaching goal is "keep around zero", so neither sign is
 good or bad.
+
+## Every Finished Item: the Spread, Not the Average
+
+Beside the cycle time chart sits the same measure at a different resolution: **one dot per
+finished item**, at the time it took, over the week it finished. The line chart averages within
+each period — which is exactly what hides the one item that took five months.
+
+This is the only view in the app where a **single item is a thing you can point at**. A dot far
+above the rest is a conversation, and the week it sits over tells you which one to have.
+
+The two lines across it are this team's own finished work: half of it came in under the lower one,
+85% under the upper one. They are the **same two lines the [work item age](#work-item-age-what-to-do-this-morning)
+chart draws**, in the same words, so the pair reads together — this shows where finished work
+landed, that shows where open work has got to.
+
+**What you are looking for is the spread, not the average.** A tight band means the next item is
+predictable. A long tail means it is a lottery however good the typical case looks — and it is
+exactly what makes the [forecast](#forecasting-what-the-pace-youve-had-implies) wide. On the demo,
+Kingfisher's dots sit in a band under 14 days while Heron's run to 48: the same argument the 85th
+percentile tile makes, in a picture.
+
+Dots are drawn translucent, so several items finishing on one day at the same speed show as a
+darker mark rather than as one. The alternative — nudging dots sideways to separate them — would
+be a lie about when something finished.
+
+An item that finished with **no start date** has no cycle time, so it gets no dot rather than one
+at zero. If nothing in the window has a start date the card says so instead of drawing an empty
+grid.
 
 ## Work Item Age: What to Do This Morning
 

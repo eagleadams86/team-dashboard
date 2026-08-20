@@ -296,6 +296,40 @@ Rules it must keep:
   from under somebody looking at a perfectly healthy roll-up. Pinned by a test that selects an
   empty team while standing on All Teams.
 
+## The Cycle Time Scatter (2026-08-20)
+
+One dot per finished item, beside the cycle time line — the same measure at two resolutions, and
+they sit side by side so that is visible.
+
+- **Built from the BUCKETS, not from `items`**, so the scatter and the line describe the same set
+  by construction: an item completed outside the plotted window is in neither. Pinned against the
+  throughput total.
+- **`x` is a DAY INDEX from the first bucket, not a date.** Chart.js needs a time adapter for a
+  date axis and this app vendors none. The ticks are forced back onto the bucket starts and
+  labelled with the same words the line chart uses, so the two x axes read identically — which is
+  what lets a reader match a spike on one to the dots that caused it. Same forced-tick trick as
+  the work item age chart.
+- **The x axis is padded 10% past the last day**, and that is not cosmetic. The age chart can pin
+  its labels to the right-hand edge because its columns are ordered busiest-first and the last is
+  reliably emptiest; a TIME axis offers no such corner, and the median line runs straight through
+  the densest band of dots. The margin gives the label chips somewhere to sit that is not on top
+  of the data.
+- **One colour, and no shape for "slow".** The age chart marks items past the ageing THRESHOLD,
+  which is a line the reader drew. There is no equivalent here: 15% of items sit above the 85th
+  percentile by definition, not by failing, and colouring them would be the app judging a figure
+  rather than stating it.
+- **Fill is the accent at ALPHA, not a `tint()`.** That is the overplotting fix — `tint()` returns
+  an opaque colour, so stacked dots would hide each other, where translucent ones darken. Jittering
+  a date to separate them would be a lie about when something finished.
+- **The two reference lines are the same two the age chart draws**, from the same pooled
+  percentiles, in the same words, drawn by the same `refLabels` plugin. The ageing threshold is
+  deliberately absent: it is a rule about work in progress, and nothing on this chart is.
+  `ageMedian` / `ageP85` / `ageShort` were hoisted above both blocks so the two cannot drift — and
+  because reading them from the age section below was a temporal-dead-zone error.
+- Flow went to three charts, so **lead time took the `solo` class** — the odd card keeps a single
+  column's width and sits centred. That class had been carried unused since Health went to four;
+  this is the group its comment predicted.
+
 ## The Work Item Age Chart (2026-08-20)
 
 The fourth card in Health, and the only chart in the app whose points are ITEMS rather than
