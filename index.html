@@ -126,7 +126,10 @@ header { position: sticky; top: 0; z-index: 20; background: var(--surface);
   border-bottom: 1px solid var(--border); padding: 10px 0; margin-bottom: 20px; }
 .headbar { max-width: 1500px; margin: 0 auto; padding: 0 16px;
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.brand { font-size: 17px; font-weight: 700; letter-spacing: -.01em; margin: 0; }
+/* The auto right margin is what pushes the control cluster to the right edge; it
+   moved back onto .brand on 2026-08-20, when the .applink left the header for the
+   footer. Mirrored in Sprint Predictability. */
+.brand { font-size: 17px; font-weight: 700; letter-spacing: -.01em; margin: 0 auto 0 0; }
 .brand span { color: var(--text-muted); font-weight: 500; }
 /* The mark from the browser tab, worn in the header too. Width and height are on
    the element, not just in CSS, so the row is laid out at its final size before the
@@ -137,12 +140,12 @@ header { position: sticky; top: 0; z-index: 20; background: var(--surface);
    wraps inside a narrow one beside the title rather than running on below it.
    Mirrored in Sprint Predictability. */
 .brand img { width: 22px; height: 22px; vertical-align: middle; margin-right: 9px; }
-/* The link to the sibling app sits with the title, so it — not .brand — carries the
-   auto margin that pushes the control cluster to the right edge. An <a> is inline, and
-   .btn.small pins its height with min-height, which inline boxes ignore: hence
-   inline-flex. Mirrored in Sprint Predictability. */
-.applink { display: inline-flex; align-items: center; text-decoration: none;
-  margin-right: auto; }
+/* The link to the sibling app. It sat in the header beside the title until
+   2026-08-20; it now lives in the footer, where the plain-text cross-link used to be
+   (see the footer rules further down). An <a> is inline, and .btn.small pins its
+   height with min-height, which inline boxes ignore: hence inline-flex. Mirrored in
+   Sprint Predictability. */
+.applink { display: inline-flex; align-items: center; text-decoration: none; }
 
 /* buttons */
 .btn { background: var(--surface-alt); color: var(--text-primary);
@@ -425,6 +428,14 @@ table.filters th.act, table.filters td.act { text-align: right; }
 .privacy-links { margin-top: 6px; }
 .privacy-links a { color: var(--text-muted); }
 .privacy-links a:hover { color: var(--text-secondary); }
+/* The footer is a flex row so the link to the sibling app can sit at the right edge,
+   bottom-aligned with the last note. Its 19px right margin mirrors the notes' 19px
+   indent, so it lines up with the text inside the last card at both ends. Too narrow
+   to hold both, and it wraps onto a line of its own — still right-aligned, which is
+   what margin-left: auto is for. Mirrored in Sprint Predictability. */
+footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.footnotes { flex: 1 1 320px; min-width: 0; }
+footer .applink { margin: 0 19px 0 auto; }
 
 /* share dialog furniture — the sibling app's, unchanged */
 fieldset.formpanel { border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -598,12 +609,6 @@ main:focus { outline: none; }
          time. Bump it on both references whenever make_favicon.py is re-run. -->
     <h1 class="brand"><img src="favicon.ico?v=1" width="22" height="22" alt=""
       >Flow&nbsp;Metrics <span>· Charlie’s Epic Flow Clinic</span></h1>
-    <!-- A real <a>, not a button that navigates: ⌘-click, middle-click and "open in
-         new tab" all keep working, and it needs no script. It stays visible in a
-         shared view — it's navigation, not an edit control. The sibling app carries
-         the mirror image of this link. -->
-    <a class="btn small applink" href="https://eagleadams86.github.io/sprint-velocity/"
-      title="Sprint Predictability — the sibling app: commitment completion, break-in, carryover and velocity">↗ Sprint&nbsp;Predictability</a>
     <label class="sr-only" for="teamSel">Team</label>
     <select id="teamSel" title="Which team you're looking at"><option>—</option></select>
     <button class="btn small" id="manageBtn" type="button" title="Add or rename teams">Teams</button>
@@ -947,14 +952,14 @@ main:focus { outline: none; }
        page. These paragraphs already sat here loose. Purely semantic —
        .privacy keeps every rule that styles them. Mirrored in the sibling app. -->
   <footer>
+  <div class="footnotes">
   <!-- Live region: the sync module rewrites its text as the state changes, so it
        must stay in the tree rather than being toggled hidden. -->
   <p class="privacy" id="privacyNote" role="status">🔒 Private — your data is stored in this browser only.</p>
   <!-- Its own element, not part of #privacyNote: the sync code rewrites that
        note's textContent, which would silently delete links nested inside it. -->
   <p class="privacy privacy-links"><a href="privacy.html">Privacy policy</a> &middot;
-    <a href="https://github.com/eagleadams86/team-dashboard" target="_blank" rel="noopener noreferrer">How it works</a> &middot;
-    <a href="https://eagleadams86.github.io/sprint-velocity/">Sprint Predictability — the sibling app</a></p>
+    <a href="https://github.com/eagleadams86/team-dashboard" target="_blank" rel="noopener noreferrer">How it works</a></p>
 
   <!-- Authorship line. Its own element, deliberately not part of #privacyNote:
        the sync code rewrites that note's textContent, which would silently delete
@@ -969,6 +974,18 @@ main:focus { outline: none; }
        target="_blank" rel="noopener noreferrer">independent personal project</a>,
     <a href="https://github.com/eagleadams86/team-dashboard/blob/main/LICENSE"
        target="_blank" rel="noopener noreferrer">MIT licensed</a>.</p>
+  </div>
+
+  <!-- A real <a>, not a button that navigates: ⌘-click, middle-click and "open in
+       new tab" all keep working, and it needs no script. It stays visible in a
+       shared view — it's navigation, not an edit control. Last in the footer so it
+       is the last thing in the tab order, and so it falls below the notes rather
+       than above them when the row wraps; the CSS still pins it to the right edge,
+       bottom-aligned with the last note. It replaces the plain-text cross-link that
+       used to sit on the links line — one crossing per page, not two. The sibling
+       app carries the mirror image of this link. -->
+  <a class="btn small applink" href="https://eagleadams86.github.io/sprint-velocity/"
+    title="Sprint Predictability — the sibling app: commitment completion, break-in, carryover and velocity">↗ Sprint&nbsp;Predictability</a>
   </footer>
 
 </div>

@@ -112,10 +112,9 @@ and which direction is good.
 This app shares its look and behaviour with
 [Sprint Predictability](https://eagleadams86.github.io/sprint-velocity/), its sibling: the same
 sticky header, button tabs (with arrow-key navigation), summary tiles, ⓘ help dialogs,
-read-only share links, theme picker and footer. **Each app's header carries a link to the
-other**, next to the title — one click either way, from anywhere on the page — and both
-still cross-link at the foot of the page, where a **How it works** link to that app's README
-also sits. If a chrome rule changes in one app, it should change in the other too — with one
+read-only share links, theme picker and footer. **Each app's footer carries a button link to
+the other**, at the right-hand end of the row that holds the **Privacy policy** and **How it
+works** links. If a chrome rule changes in one app, it should change in the other too — with one
 noted exception: how many tile columns there are. This app's headline row always has exactly
 four tiles and so states its column counts outright, while the sibling's tile groups vary in
 size and are still laid out by `auto-fit` — as this app's own per-group tile rows are.

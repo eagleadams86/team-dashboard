@@ -167,7 +167,14 @@ file records what is specific to this repo and what must never regress.
   (`.github/workflows/tests.yml`) runs it headless on every push on port 8013.
   When a rule in this file changes, change the matching test in the same commit.
 - The header/chrome is shared with Sprint Velocity — a chrome change in one repo
-  is mirrored in the other, including the cross-`applink`.
+  is mirrored in the other, including the cross-`applink`. That link lives in the
+  **footer** since 2026-08-20 (it sat in the header beside the title before), where
+  it replaced the plain-text cross-link on the `.privacy-links` line — one crossing
+  per page, not two. The footer is a flex row: the notes wrapped in `.footnotes`,
+  the link after them with `margin: 0 19px 0 auto` so it sits at the right edge
+  bottom-aligned with the last note (the 19px mirrors the notes' indent) and wraps
+  onto its own line, still right-aligned, on a narrow window. `.brand` carries the
+  `margin-right: auto` that pushes the header controls right.
 - Theme: `theme.css` is a copy from `~/claude-theme-pack` (the source of truth
   for ALL apps) — never diverge it locally; palette changes go through the
   pack's `tokens.json` + contrast gate. **All three pages LINK it.** Until
