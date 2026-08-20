@@ -216,7 +216,13 @@ html[data-first-run] #teamSel { display: none; }
 /* controls */
 label { display: block; font-size: 13px; color: var(--text-secondary);
   font-weight: 600; margin-bottom: 4px; }
-input[type="text"], input[type="number"], select, textarea {
+/* input[type="date"] was added when the forecast gained a target date: without
+   it the box kept the UA's own 2px border and zero padding and sat 10px shorter
+   than the number box beside it. Golf Handicap's rule already listed it, which
+   is why this only surfaced here. The pack owns the two date-specific rules
+   (the 16px touch floor and turning the native appearance off); the box itself
+   is each app's own, so this is not theme drift. */
+input[type="text"], input[type="number"], input[type="date"], select, textarea {
   background: var(--surface); color: var(--text-primary);
   border: 1px solid var(--input-border); border-radius: var(--radius-sm);
   padding: 7px 9px; width: 100%;
@@ -259,6 +265,40 @@ select { cursor: pointer; }
 @media (min-width: 941px) {
   .chart-card.solo { width: calc(50% - 9px); margin-inline: auto; }
 }
+
+/* ── The Forecast group's own furniture ──────────────────────────────────────
+   The two questions sit above the charts, spanning both columns like the tile
+   row does. Laid out like the dashboard's own control strip so the pair reads
+   as controls rather than as a form to fill in — same flex row, same
+   bottom-alignment, same field width — but without the surface and border,
+   because it is already inside the panel rather than heading it. */
+/* A GRID, not the wrapping flex row the control strip above uses, and for the
+   reason the rest of the app states outright: a field must never sit in dead
+   space. A flex basis wide enough to keep the two boxes apart on a laptop is
+   too wide to fill a phone's column, so each box wrapped onto its own row and
+   stopped 80px short of the edge — a control with a gap beside it, which is
+   exactly what the orphaned-field rule forbids. Explicit columns give the two
+   boxes a sensible cap on a wide window and one full-width column on a narrow
+   one, with nothing left over either way. */
+.forecast-ask { grid-column: 1 / -1; display: grid; gap: 12px 16px; align-items: end;
+  grid-template-columns: minmax(0, 200px) minmax(0, 200px) minmax(200px, 1fr); }
+@media (max-width: 720px) { .forecast-ask { grid-template-columns: minmax(0, 1fr); } }
+/* The caveat takes what is left of the row beside the boxes, and its own row
+   under them once the columns collapse. */
+.forecast-ask .hint { margin: 0 0 4px; }
+
+/* The three answers, under the chart that shows their working. A definition
+   list rather than a table: each row is one confidence and one answer, and the
+   swatch ties it to the shading on the chart above — which is what saves that
+   shading from needing a legend of its own. Bottom-aligned to the card so both
+   cards' rows line up across the pair even when one chart is a pixel taller. */
+.forecast-rows { margin-top: 12px; display: grid; gap: 6px; }
+.forecast-row { display: flex; align-items: baseline; gap: 9px; font-size: var(--fs-sm); }
+.forecast-row .swatch { flex: none; width: 10px; height: 10px; border-radius: 2px;
+  border: 1px solid var(--border-strong); align-self: center; }
+.forecast-row .conf { flex: none; color: var(--text-secondary); min-width: 8.5em; }
+.forecast-row .answer { color: var(--text-primary); font-weight: var(--fw-semibold); }
+.forecast-row .aside { color: var(--text-secondary); font-weight: 400; }
 
 /* dashboard controls strip */
 .controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;
@@ -835,8 +875,8 @@ main:focus { outline: none; }
     <div id="dashEmpty" class="card empty" hidden>
       <h2>No Data Yet</h2>
       <p>Head to the <strong>Your Data</strong> tab and paste your work items — a completed
-      date, a start date and a type. Add a created date too and you get lead time and flow
-      efficiency as well:</p>
+      date, a start date and a type. Add a created date too and you get lead time as
+      well:</p>
       <pre>Created      Start Date   Completed    Type
 2015-01-02   2015-01-14   2015-01-21   Story
 2015-01-09   2015-01-14   2015-01-26   Bug
@@ -879,6 +919,8 @@ main:focus { outline: none; }
         aria-selected="false" tabindex="-1">Delivery</button>
       <button class="subtab" role="tab" id="stab-health" aria-controls="spanel-health"
         aria-selected="false" tabindex="-1">Health</button>
+      <button class="subtab" role="tab" id="stab-forecast" aria-controls="spanel-forecast"
+        aria-selected="false" tabindex="-1">Forecast</button>
     </div>
 
     <div id="dashCharts">
@@ -939,6 +981,49 @@ main:focus { outline: none; }
           <div class="chart-name" id="nameDefectRate"></div>
           <div class="chart-title" id="titleDefectRate"></div>
           <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
+        </div>
+      </div>
+
+      <!-- The only group that looks forward, and the only one with inputs of its
+           own — which is why they sit inside the panel rather than in the strip
+           at the top of the dashboard. That strip's three controls change what
+           EVERY chart shows; these two change nothing outside this group, and
+           putting them up there would have every other tab carrying a pair of
+           boxes that did nothing to it. They still read from the strip: team,
+           work type, window and grouping all feed the sample this deals from. -->
+      <div class="grid charts" id="spanel-forecast" role="tabpanel" aria-labelledby="stab-forecast" hidden>
+        <div class="forecast-ask">
+          <div class="field">
+            <label for="fcItems">Number of items to finish</label>
+            <input type="number" id="fcItems" min="1" max="2000" step="1" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="fcDate">Count what is done by</label>
+            <input type="date" id="fcDate">
+          </div>
+          <p class="hint" id="fcHint"></p>
+        </div>
+
+        <div class="tiles group" id="tilesForecast"></div>
+
+        <!-- Each card holds a chart AND the three answers under it, because the
+             answers are the output and the chart is the working. The rows carry
+             the same colour their part of the distribution is drawn in, so the
+             shading needs no legend of its own. -->
+        <div class="chart-card" id="cardForecastWhen">
+          <div class="chart-name" id="nameForecastWhen"></div>
+          <div class="chart-title" id="titleForecastWhen"></div>
+          <div class="chart-wrap"><canvas id="chartForecastWhen"></canvas></div>
+          <div class="forecast-rows" id="rowsForecastWhen"></div>
+          <div class="note info forecast-none" hidden></div>
+        </div>
+
+        <div class="chart-card" id="cardForecastHowMany">
+          <div class="chart-name" id="nameForecastHowMany"></div>
+          <div class="chart-title" id="titleForecastHowMany"></div>
+          <div class="chart-wrap"><canvas id="chartForecastHowMany"></canvas></div>
+          <div class="forecast-rows" id="rowsForecastHowMany"></div>
+          <div class="note info forecast-none" hidden></div>
         </div>
       </div>
     </div>
@@ -1877,6 +1962,239 @@ const CYCLE_PERCENTILE = 85;
 const THROUGHPUT_HIGH_PERCENTILE = CYCLE_PERCENTILE;
 const THROUGHPUT_LOW_PERCENTILE  = 100 - CYCLE_PERCENTILE;
 
+/* mulberry32 — small, fast, and good enough for both the things this app deals
+   at random: shaping the demo dataset, and the Monte Carlo forecast below.
+   Seeded, and both callers pass a constant, so the numbers are identical on
+   every run and on every device. Never swap this for Math.random(): the demo
+   would reshuffle itself out of reach of any test, and the forecast would move
+   under the reader every time the page re-rendered. */
+function seededRandom(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ── Monte Carlo forecasting ─────────────────────────────────────────────────
+   Every other figure in this app describes what already happened. This is the
+   only one that says anything about the future, and it does it without asking
+   for a single estimate: it takes the throughput this team actually recorded,
+   deals those periods out again at random ten thousand times, and reports how
+   often each outcome came up.
+
+   The sample it deals from is `wholeThroughput` — the same whole periods the
+   "completed per period" and "steady delivery" tiles read. That is not a
+   convenience: a period that has not finished happening is an incomplete
+   observation, and dealing one into a forecast is dealing a slow week that
+   never occurred. Reusing the existing set also means the forecast and those
+   two tiles can never disagree about which periods they are describing.
+
+   WHOLE PERIODS, not individual days. Resampling days would give a smoother
+   answer and a narrower one, because it quietly assumes each day is
+   independent of the days around it — and they are not: a release freeze, an
+   incident, a holiday week move a whole period together. Dealing whole periods
+   keeps that shared variation, so the spread reported here is the spread the
+   team actually showed rather than a flattering one.
+
+   It assumes one thing, and says so on its face: that the future looks like the
+   window on screen. Changing the window changes the assumption, which is the
+   point — narrowing to the last 3 months is exactly how to ask "what if we
+   carry on at our recent pace?". */
+
+/* Ten thousand deals. Enough that the answers stop moving at the resolution
+   they are reported in — whole items, whole periods — and cheap enough (a
+   couple of milliseconds for both questions) to run on every render alongside
+   everything else, so the forecast is never a stale figure from a moment ago. */
+const FORECAST_TRIALS = 10000;
+
+/* Below this many whole periods there is nothing worth resampling: with four
+   observations the shape of the answer is a fact about which four periods you
+   happen to hold rather than about the team, and it would state a confidence it
+   has no right to. The forecast refuses and says what to change — group by
+   week, or widen the window — rather than drawing a chart nobody should read. */
+const FORECAST_MIN_PERIODS = 8;
+
+/* The three answers each question states, least to most cautious. */
+const FORECAST_CONFIDENCE = [50, 85, 95];
+
+/* Runaway guards: a backlog nobody would type, and a walk that cannot spin for
+   ever when the samples are mostly zeros. */
+const FORECAST_MAX_ITEMS = 2000;
+const FORECAST_MAX_PERIODS = 520;
+const DEFAULT_FORECAST_ITEMS = 10;
+
+/* SEEDED, and deliberately with a constant. A forecast that moved a day every
+   time the page re-rendered — switch the filter and switch it back — would read
+   as the app being unsure of itself rather than as sampling error, and nobody
+   trusts a number that will not sit still. A fixed seed makes the same data and
+   the same question give the same answer on every device and every reload, so
+   it can be pinned by a test and talked through twice, exactly as the demo's
+   own randomness can. It is not a claim that the future is settled: the spread
+   on the chart is where the uncertainty is stated, and that is where it should
+   be. */
+const FORECAST_SEED = 0x5EED1;
+
+/* Min and max without apply(): the trial arrays are ten thousand long, and
+   spreading one across a call's arguments is a stack the engine need not have. */
+function minOf(a) { let m = a[0]; for (const v of a) if (v < m) m = v; return m; }
+function maxOf(a) { let m = a[0]; for (const v of a) if (v > m) m = v; return m; }
+
+/* How long until `items` are finished, one trial per element: deal periods of
+   throughput until enough have been completed, and record how long it took —
+   as a FRACTIONAL number of periods.
+
+   The fraction is the whole point. Counting whole periods, a team finishing
+   five a week needs "2 weeks" for ten items and "2 weeks" for seven and "3
+   weeks" for eleven: three of the four answers on screen would read the same
+   and the chart would be four bars wide. So the period that crosses the line
+   is interpolated into — reaching the tenth item three items into a period
+   that delivered five counts as three fifths of it. That assumes completions
+   are spread evenly through a period, which is the same assumption the
+   fractional horizon in forecastItemsIn already makes, and it is what lets
+   both questions answer to the day.
+
+   Null when there is nothing to deal from — too few periods, or a sample set
+   that is all zeros, where the walk would never arrive. */
+function forecastPeriodsFor(samples, items, trials) {
+  if (!Array.isArray(samples) || samples.length < FORECAST_MIN_PERIODS) return null;
+  if (!(items > 0)) return null;
+  if (!samples.some(v => v > 0)) return null;
+  const rnd = seededRandom(FORECAST_SEED);
+  const n = samples.length, out = new Array(trials);
+  for (let t = 0; t < trials; t++) {
+    let done = 0, periods = 0;
+    while (done < items && periods < FORECAST_MAX_PERIODS) {
+      const dealt = samples[(rnd() * n) | 0];
+      done += dealt;
+      periods++;
+      /* Step back by however much of that period was not needed. `dealt > 0`
+         is not defensive: a period that delivered nothing cannot be the one
+         that crossed the line, so the branch is unreachable with a zero — but
+         a divide by it would be silent, and this runs ten thousand times. */
+      if (done >= items && dealt > 0) { periods -= (done - items) / dealt; break; }
+    }
+    out[t] = periods;
+  }
+  return out;
+}
+
+/* How many items get finished in `periods` periods, one trial per element.
+
+   `periods` is usually fractional — a target date lands mid-week far more often
+   than on a period boundary — so each trial deals the whole periods and then a
+   part of one more, scaled by what is left. Scaling a count is an approximation
+   and the honest one: half a week of a team that delivers six a week is about
+   three, where rounding the horizon down to whole periods would throw away up
+   to six days and make the answer jump as the date crossed a boundary. The
+   trial's total is floored, because two thirds of an item is not an item
+   anybody receives. */
+function forecastItemsIn(samples, periods, trials) {
+  if (!Array.isArray(samples) || samples.length < FORECAST_MIN_PERIODS) return null;
+  if (!(periods > 0)) return null;
+  const rnd = seededRandom(FORECAST_SEED);
+  const n = samples.length, out = new Array(trials);
+  const capped = Math.min(periods, FORECAST_MAX_PERIODS);
+  const full = Math.floor(capped), frac = capped - full;
+  for (let t = 0; t < trials; t++) {
+    let total = 0;
+    for (let p = 0; p < full; p++) total += samples[(rnd() * n) | 0];
+    if (frac > 0) total += samples[(rnd() * n) | 0] * frac;
+    out[t] = Math.floor(total);
+  }
+  return out;
+}
+
+/* ── Reading a confidence off a set of trials ────────────────────────────────
+   The two questions take their percentiles from OPPOSITE ENDS, and getting that
+   backwards is the easiest mistake in the whole feature — so no caller passes a
+   percentile. Both ask for a confidence, and these two say what that means:
+
+   - A DATE is safer the LATER it is. "95% confident of finishing by then" is
+     the day 95% of trials finished on or before — the 95th percentile.
+   - A COUNT is safer the LOWER it is. "95% confident of at least this many" is
+     the count 95% of trials reached or beat — the 5th percentile.
+
+   Everything on screen is labelled by confidence rather than by percentile for
+   the same reason: no reader should have to hold that flip in their head. */
+const daysAtConfidence  = (trials, conf) => percentileOf(trials, conf);
+const countAtConfidence = (trials, conf) => percentileOf(trials, 100 - conf);
+
+/* How many periods lie between two dates, fractionally. Weeks and fortnights
+   are a fixed number of days; months are stepped, because they are not. */
+function periodsBetween(from, to, bucket) {
+  if (!from || !to || to <= from) return 0;
+  if (bucket !== 'month') {
+    const len = bucket === 'fortnight' ? 14 : 7;
+    return (to.getTime() - from.getTime()) / (len * DAY_MS);
+  }
+  let k = 0;
+  while (k < FORECAST_MAX_PERIODS && edate(from, k + 1) <= to) k++;
+  const spanStart = edate(from, k), spanEnd = edate(from, k + 1);
+  return k + (to.getTime() - spanStart.getTime()) / (spanEnd.getTime() - spanStart.getTime());
+}
+
+/* A fractional number of periods, in whole days — the step that turns a trial
+   into a date, and the unit the "time to finish" chart is drawn in.
+
+   DAYS rather than periods, everywhere the answer is stated. The sample is
+   dealt in whole periods and always will be, but the answer to "when" is a
+   date, and a date is a day: reporting "3 weeks" would throw away the
+   resolution the interpolation above exists to produce, and would make the
+   answer jump a whole week at a time as the item count moved by one. It also
+   means the chart reads the same whichever grouping is chosen, where a
+   period-counted x axis would silently change units under the reader.
+
+   Rounded UP: an item finishing part-way through a day has not finished until
+   that day is over, and a forecast that rounds a promise down is the wrong
+   kind of wrong. Months are stepped rather than approximated, because they
+   are not a fixed number of days. */
+function periodsToDays(from, n, bucket) {
+  if (bucket !== 'month') return Math.ceil(n * (bucket === 'fortnight' ? 14 : 7));
+  const whole = Math.floor(n), frac = n - whole;
+  const a = edate(from, whole);
+  return Math.ceil(diffDays(a, from) + frac * diffDays(edate(from, whole + 1), a));
+}
+
+/* A histogram of the trials, and — per bar — the confidence that committing to
+   it would carry.
+
+   `safeHigh` is true for a period count, whose safe end is the late one, and
+   false for an item count, whose safe end is the low one: the same flip the two
+   readers above make, in the one other place it matters. Confidence accumulates
+   FROM the safe end, so on both charts it rises toward the end of the axis a
+   promise should be made at, and darker always means safer whichever way the
+   distribution faces.
+
+   Bar width is chosen so neither chart carries more than about two dozen bars:
+   item counts can span a hundred values where period counts span six, and the
+   same code draws both. */
+function forecastHistogram(trials, safeHigh) {
+  const lo = minOf(trials), hi = maxOf(trials);
+  const width = Math.max(1, Math.ceil((hi - lo + 1) / 24));
+  const bins = [];
+  for (let start = lo; start <= hi; start += width) {
+    bins.push({ start, end: Math.min(start + width - 1, hi), count: 0 });
+  }
+  for (const v of trials) {
+    bins[Math.min(bins.length - 1, Math.floor((v - lo) / width))].count++;
+  }
+  let running = 0;
+  for (let i = 0; i < bins.length; i++) {
+    const b = bins[safeHigh ? i : bins.length - 1 - i];
+    running += b.count;
+    b.confidence = running / trials.length;
+  }
+  return {
+    labels: bins.map(b => (b.start === b.end ? String(b.start) : b.start + '–' + b.end)),
+    counts: bins.map(b => b.count),
+    confidence: bins.map(b => b.confidence),
+    binWidth: width
+  };
+}
+
 /* How many items were open at each point in time — started by then, and either
    never finished or finished after it. Reconstructed from the same two dates
    every other metric uses, so work in progress is a history rather than just
@@ -2184,6 +2502,91 @@ function derive(rows, settings, view) {
      turn into null rather than 0 — the same stance percentileOf takes. */
   const wholeThroughput = partial ? throughput.slice(0, -1) : throughput.slice();
 
+  /* ── The forecast ──────────────────────────────────────────────────────────
+     Two questions off one sample set: how long until N items are finished, and
+     how many are finished by a date. Both deal from `wholeThroughput` above —
+     see the note on forecastPeriodsFor for why whole periods and why not days.
+
+     The two inputs are defaulted HERE rather than trusted from the caller, the
+     same way bucket and agedDays are: `view` comes back off localStorage, where
+     a hand-edited copy can say anything, and a test fixture written before this
+     existed still has to mean something sensible. A count is pinned to a whole
+     number in range; a date has to parse AND be later than the data ends, since
+     a target already in the past is not a forecast — it is a date the reader
+     set weeks ago and the data has since caught up with. */
+  /* Anything that is not a positive number falls back to the default rather
+     than being clamped up to 1: a negative or a cleared box is nonsense input,
+     not a small request, and quietly forecasting one item would answer a
+     question nobody asked. Only a genuine over-range number is clamped. */
+  const fcAsked = Math.round(Number(view.forecastItems));
+  const fcItems = (isFinite(fcAsked) && fcAsked > 0)
+    ? Math.min(FORECAST_MAX_ITEMS, fcAsked) : DEFAULT_FORECAST_ITEMS;
+  const fcStored = /^\d{4}-\d{2}-\d{2}$/.test(String(view.forecastDate || ''))
+    ? new Date(view.forecastDate + 'T00:00:00Z') : null;
+  /* Three months out when nothing valid is stored — about the length of a
+     planning increment, and far enough that a weekly team has a spread worth
+     looking at rather than an answer of "one or two". Counted from the end of
+     the DATA, like every other window here, so a paste of last quarter's export
+     forecasts from where that quarter stopped. */
+  const fcTarget = (fcStored && !isNaN(fcStored) && fcStored > endDate)
+    ? fcStored : edate(endDate, 3);
+  const fcHorizon = periodsBetween(endDate, fcTarget, bucket);
+
+  /* Dealt in whole periods, reported in days — see periodsToDays for why the
+     answer changes unit on the way out. The conversion happens once here rather
+     than inside the sampler, which stays in the units it deals in so a test can
+     hand it a sample set and check the arithmetic without a calendar. */
+  const whenPeriods = forecastPeriodsFor(wholeThroughput, fcItems, FORECAST_TRIALS);
+  const whenTrials = whenPeriods
+    && whenPeriods.map(p => periodsToDays(endDate, p, bucket));
+  const manyTrials = forecastItemsIn(wholeThroughput, fcHorizon, FORECAST_TRIALS);
+
+  /* Why the forecast might have nothing to say, so the cards can name the
+     control that fixes it rather than going blank.
+
+     `few-periods` is the one that happens: group by month over a 3-month window
+     and there are three. `no-throughput` mirrors the sampler's own guard, and is
+     not a shape THIS caller can currently produce — the axis floors at the first
+     completed period, so the first whole period on it always holds a completion.
+     It is stated anyway because forecastPeriodsFor is a public, testable
+     function whose contract allows an all-zero sample set, and a message that
+     exists is better than a blank card if the axis rule ever moves. */
+  const fcReason = wholeThroughput.length < FORECAST_MIN_PERIODS ? 'few-periods'
+    : !wholeThroughput.some(v => v > 0) ? 'no-throughput'
+    : null;
+
+  /* A backlog bigger than this team's recorded pace can clear inside the walk's
+     limit. The trials are all pinned at the cap, so every answer would read the
+     same absurd number — say so instead. */
+  const fcBeyond = !!whenPeriods
+    && percentileOf(whenPeriods, FORECAST_CONFIDENCE[FORECAST_CONFIDENCE.length - 1])
+       >= FORECAST_MAX_PERIODS;
+
+  const forecast = {
+    reason: fcReason,
+    /* Stated on the face wherever an answer is: every other figure in this app
+       names the periods it was counted over, and a forecast has more reason to
+       than most. */
+    samples: wholeThroughput.length,
+    trials: FORECAST_TRIALS,
+    minPeriods: FORECAST_MIN_PERIODS,
+    items: fcItems,
+    targetDate: fcTarget,
+    horizonPeriods: fcHorizon,
+    beyondReach: fcBeyond,
+    when: (whenTrials && !fcBeyond) ? {
+      rows: FORECAST_CONFIDENCE.map(c => {
+        const days = daysAtConfidence(whenTrials, c);
+        return { confidence: c, days, date: addDays(endDate, days) };
+      }),
+      hist: forecastHistogram(whenTrials, true)
+    } : null,
+    howMany: manyTrials ? {
+      rows: FORECAST_CONFIDENCE.map(c => ({ confidence: c, count: countAtConfidence(manyTrials, c) })),
+      hist: forecastHistogram(manyTrials, false)
+    } : null
+  };
+
   /* The window's defect share: pooled — defects completed over everything
      completed — NOT the mean of the per-bucket rates the chart plots. The
      average of a set of ratios is not the ratio of the set: it weighed a quiet
@@ -2203,7 +2606,7 @@ function derive(rows, settings, view) {
     throughput, unplannedRate, avgCycleTime, netFlow, started,
     avgLeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
     throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
-    wip, agedCount, agedDays,
+    wip, agedCount, agedDays, forecast,
     /* The measure, and the word for it, travel with the numbers: every tile and
        column that states a duration reads them from here rather than reaching
        back into settings, so the label can never disagree with the figure. */
@@ -2261,7 +2664,11 @@ function derive(rows, settings, view) {
       netFlow: 'Net flow',
       leadTime: 'Lead time',
       wip: 'Work in progress',
-      agedWork: 'Aged work'
+      agedWork: 'Aged work',
+      /* The two forecast cards. Named for the question each answers rather than
+         for the method: nobody walks up to a board asking for a Monte Carlo. */
+      forecastWhen: 'Time to finish',
+      forecastHowMany: 'Items by a date'
     },
     /* Title Case, matching the dialog headings — minor words stay lowercase
        unless they lead, so it is "per Week" and "Work in Progress". The user's
@@ -2280,7 +2687,14 @@ function derive(rows, settings, view) {
       netFlow: 'Net Flow per ' + Noun + ' (Items Completed − Items Started)',
       leadTime: 'Average Lead Time per ' + Noun + ' (Raised to Delivered)',
       wip: 'Work in Progress at the End of Each ' + Noun,
-      agedWork: 'Items in Progress Longer Than ' + agedDays + ' ' + DayNoun
+      agedWork: 'Items in Progress Longer Than ' + agedDays + ' ' + DayNoun,
+      /* Both name the question's own input, so a card read on its own — in a
+         screenshot, over someone's shoulder — still says what was asked. */
+      forecastWhen: 'How Many Days to Finish ' + fcItems + ' Item'
+        + (fcItems === 1 ? '' : 's') + ', over ' + FORECAST_TRIALS.toLocaleString()
+        + ' Simulated Runs',
+      forecastHowMany: 'How Many Items Finished by ' + prettyDate(fcTarget) + ', over '
+        + FORECAST_TRIALS.toLocaleString() + ' Simulated Runs'
     },
     axisTitles: {
       /* Deliberately short: a rotated axis title gets truncated on a narrow
@@ -2292,6 +2706,15 @@ function derive(rows, settings, view) {
       leadTime: 'Lead time (' + dayNoun + ')',
       wip: 'Items open at period end',
       agedWork: 'Items older than ' + agedDays + ' ' + dayNoun,
+      /* Both forecast charts count RUNS up the y axis — the x axis is the
+         outcome, which is the other way round from every chart above, where x
+         is time. Each says outright what it is counting, because a bar chart
+         whose y axis is "how often" is easy to read as "how many". */
+      forecastRuns: 'Simulated runs',
+      /* Calendar days, always — the working-days setting governs how long work
+         TOOK, and a forecast is a wait somebody is going to sit through. */
+      forecastWhenX: 'Days to finish ' + fcItems + ' item' + (fcItems === 1 ? '' : 's'),
+      forecastHowManyX: 'Items finished by ' + prettyDate(fcTarget),
       x: bucket === 'month' ? 'Month'
         : bucket === 'fortnight' ? 'Year-Fortnight (week numbers)'
         : 'Year-Week Number'
@@ -2304,7 +2727,12 @@ window.TD = {
   weekdayNum, priorSunday, weekNumber, weekKey, edate, workDaysBetween,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
-  cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, utcDate
+  cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, utcDate,
+  /* The forecast's pure pieces, so a test can deal a sample set it wrote itself
+     rather than only reading the answers back off derive(). */
+  seededRandom, forecastPeriodsFor, forecastItemsIn, forecastHistogram,
+  daysAtConfidence, countAtConfidence, periodsBetween, periodsToDays,
+  FORECAST_TRIALS, FORECAST_MIN_PERIODS, FORECAST_CONFIDENCE, FORECAST_MAX_ITEMS
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2355,8 +2783,16 @@ const DEFAULT_SETTINGS = {
 /* activeTeamId lives here, not in the synced payload: which team you happen to
    be looking at is a position on this device, not shared data. Syncing it would
    make switching team on the laptop yank the phone to the same team. */
+/* forecastItems and forecastDate live here for the same reason activeTeamId
+   does: what you are asking the forecast is a question you are asking on THIS
+   device, not shared data. It also keeps them out of `state` entirely, so
+   neither needs a SCHEMA bump, a whitelist entry or a place in a share payload
+   — a link's recipient gets the defaults and asks their own question. Both are
+   validated in derive(), at their point of use, like bucket and filterDisplay.
+   An empty forecastDate means "three months past the end of the data", worked
+   out fresh each render so it can never go stale as the data moves on. */
 const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', activeTeamId: null,
-  chartTab: 'flow', bucket: 'week' };
+  chartTab: 'flow', bucket: 'week', forecastItems: DEFAULT_FORECAST_ITEMS, forecastDate: '' };
 
 const LS = {
   state: 'td-state', view: 'td-view', theme: 'td-theme',
@@ -2979,6 +3415,36 @@ function baseOptions(yTitle, tipFormat, tickFormat, xTitle, partial) {
   };
 }
 
+/* ── The forecast's confidence shading ───────────────────────────────────────
+   ONE hue in four steps: full strength at the safest end, faded away toward the
+   optimistic one. Strength rather than darkness, because tint() mixes toward
+   each theme's own SURFACE — so the faded end is nearly black on Midnight and
+   nearly white on Light, while the solid end is the accent in both. "Darker is
+   safer" would be true in two themes and backwards in the other two.
+
+   Not a red-amber-green ramp,
+   for two reasons: the app states figures rather than judging them — a 50%
+   answer is not "bad", it is a coin toss, and someone may well want one — and a
+   ramp along the red/green axis is unreadable to the people most likely to be
+   handed a forecast in a room. A single-hue ramp carries the same ordering to
+   everyone, and stays legible in all four themes because it is mixed toward
+   each theme's own surface.
+
+   The same four steps paint the bars and the swatches on the answer rows below
+   them, which is what saves the shading from needing a legend of its own. */
+const FORECAST_BANDS = [
+  { min: 0.95, tint: 0.14 },
+  { min: 0.85, tint: 0.40 },
+  { min: 0.50, tint: 0.64 },
+  { min: 0,    tint: 0.86 }
+];
+/* `confidence` is a fraction, never a percentage — the answer rows divide their
+   50/85/95 by 100 before asking, so one scale reaches this. */
+function forecastFill(confidence) {
+  const band = FORECAST_BANDS.find(b => confidence >= b.min) || FORECAST_BANDS[FORECAST_BANDS.length - 1];
+  return tint(token('--accent'), band.tint);
+}
+
 function trendDataset(values) {
   return {
     label: 'Trend',
@@ -3211,6 +3677,66 @@ function drawCharts(d) {
     options: agedOpts
   });
 
+  /* ── The two forecasts ──
+     Both plot the same thing in the same way: how often each outcome came up
+     across ten thousand simulated runs, with every bar shaded by the confidence
+     that committing to it would carry. Bars, and the y axis counts RUNS — the
+     one pair of charts here whose x axis is an outcome rather than time.
+
+     The two face opposite ways, and that is the honest picture rather than an
+     inconsistency: a later date is a safer promise, so the solid end of the
+     "time to finish" chart is on the right, while a SMALLER number of items is
+     the safer promise, so the solid end of "items by a date" is on the left.
+     The colour means the same thing on both — the stronger it is, the safer the
+     promise — which is what lets one reading serve both, and the rows under
+     each chart repeat it in words for anyone who would rather not read colour
+     at all.
+
+     A card with nothing to draw has had its canvas hidden by renderForecast and
+     carries the reason instead; its chart is destroyed rather than left holding
+     a stale series. */
+  const forecastChart = (id, block, xTitle, tipNoun) => {
+    if (!block) {
+      if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+      return;
+    }
+    const opts = baseOptions(d.axisTitles.forecastRuns, int0, null, xTitle, null);
+    opts.scales.y.beginAtZero = true;
+    opts.scales.y.ticks.precision = 0;
+    /* One bar per outcome, so the index mode every other chart uses would light
+       up a neighbour that has nothing to do with the one under the pointer. */
+    opts.interaction = { mode: 'nearest', intersect: true };
+    /* The tooltip is where the shading is spelled out: a reader who wants to
+       know what a bar's colour means points at it. */
+    opts.plugins.tooltip.callbacks = {
+      title: items => items[0].label + ' ' + tipNoun,
+      label: c => int0(c.parsed.y) + ' of ' + FORECAST_TRIALS.toLocaleString() + ' runs',
+      afterLabel: c => Math.round(block.hist.confidence[c.dataIndex] * 100)
+        + '% confident at this point'
+    };
+    renderChart(id, {
+      type: 'bar',
+      data: {
+        labels: block.hist.labels,
+        datasets: [{
+          label: 'Simulated runs',
+          data: block.hist.counts,
+          backgroundColor: block.hist.confidence.map(forecastFill),
+          borderColor: accent,
+          borderWidth: 1,
+          /* Bars butt together: this is one distribution, not a set of separate
+             categories, and gaps between them read as the latter. */
+          categoryPercentage: 1, barPercentage: 1,
+          order: 1
+        }]
+      },
+      options: opts
+    });
+  };
+  forecastChart('chartForecastWhen', d.forecast.when, d.axisTitles.forecastWhenX, 'days');
+  forecastChart('chartForecastHowMany', d.forecast.howMany, d.axisTitles.forecastHowManyX,
+    'items');
+
   /* A canvas is a bitmap to a screen reader — give each chart its title as a
      text alternative. The full series stays reachable as text in the Your Data
      tab's table, which the label points at. */
@@ -3227,6 +3753,8 @@ function drawCharts(d) {
   ['defectRate', 'cycleTime', 'throughput', 'netFlow', 'wip', 'agedWork']
     .forEach(k => describe('chart' + k.charAt(0).toUpperCase() + k.slice(1), label(k)));
   if (d.hasCreated) describe('chartLeadTime', label('leadTime'));
+  if (d.forecast.when) describe('chartForecastWhen', label('forecastWhen'));
+  if (d.forecast.howMany) describe('chartForecastHowMany', label('forecastHowMany'));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3329,7 +3857,36 @@ const METRIC_HELP = {
       + 'as of the newest date in your data rather than today, so a paste of last quarter’s '
       + 'export reports that quarter. One caveat: the clean-up tool’s option to also remove '
       + 'unfinished items deletes long-running work in progress, which is exactly what this '
-      + 'chart counts, so history before a clean-up like that will read low.' }
+      + 'chart counts, so history before a clean-up like that will read low.' },
+  forecastWhen: { title: 'Time to Finish',
+    body: 'When will a batch of work be done? It deals this team\u2019s own completed '
+      + 'periods out again at random ' + FORECAST_TRIALS.toLocaleString() + ' times, and '
+      + 'reports how often each answer came up \u2014 so it forecasts from the pace you '
+      + 'actually worked at rather than from anybody\u2019s estimate. Nothing is sized and '
+      + 'no story points are involved; it only counts how many things finished. Read the '
+      + 'answer you can live with being wrong about: 50% is a coin toss, 85% is the one '
+      + 'worth promising, 95% is what you say when being late is expensive. The spread on '
+      + 'the chart is the real output \u2014 a wide one means the date is a guess whichever '
+      + 'row you pick, and the fix for that is steadier delivery, not a later date.' },
+  forecastHowMany: { title: 'Items by a Date',
+    body: 'How much will be finished by a date you have been given? The same '
+      + FORECAST_TRIALS.toLocaleString() + ' runs, asked the other way round. Note the '
+      + 'answers count DOWN as you get more confident, where the dates above count up: '
+      + 'a smaller number is the safer promise, so 95% confidence buys you a lower figure, '
+      + 'not a higher one. Every row says \u201cat least\u201d for that reason. It counts '
+      + 'items, not points or value, so it is only as good as your items being roughly '
+      + 'comparable in size \u2014 which, on a board whose cycle times cluster, they '
+      + 'usually are.' },
+  forecastSamples: { title: 'Whole Periods Behind the Forecast',
+    body: 'How many completed periods the forecast had to deal from. It is the same set '
+      + 'the completed-per-period and steady delivery tiles read: whole periods only, '
+      + 'because a period that has not finished happening is an incomplete observation '
+      + 'rather than a slow one, and dealing one into a forecast deals a bad week that '
+      + 'never occurred. Below ' + FORECAST_MIN_PERIODS + ' the forecast refuses to draw '
+      + 'anything at all \u2014 with a handful of observations the answer describes which '
+      + 'periods you happen to hold rather than the team. More history is steadier, but '
+      + 'not always better: a window stretching back past a reorganisation forecasts a '
+      + 'team that no longer exists.' }
 };
 
 function helpBtn(key, label) {
@@ -3402,8 +3959,12 @@ function renderDashboard() {
   renderTitle();
 
   const rows = activeRows();
+  /* The forecast's two questions ride in with the rest of the view: derive() is
+     the one place any figure is worked out, and validating them there is what
+     lets renderForecast write the accepted values back into the boxes. */
   const d = derive(rows, state.settings,
-    { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket });
+    { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket,
+      forecastItems: view.forecastItems, forecastDate: view.forecastDate });
   const plottable = !d.empty && d.weeks.length > 0;
 
   /* Three states, three surfaces: the charts when something plots; the paste
@@ -3539,11 +4100,116 @@ function renderDashboard() {
       s.unplannedShare == null ? '—' : pct1(s.unplannedShare),
       'share of completed work', 'defectRate');
 
+  renderForecast(d);
+
   drawCharts(d);
   /* The panels' hidden state lives in the markup, so re-apply the chosen group
      after every render — and this is what resizes the canvases that were 0×0
      while their panel was hidden. */
   selectChartTab(view.chartTab);
+}
+
+/* ── The Forecast group ──────────────────────────────────────────────────────
+   The two boxes are written back from what derive() actually used, never from
+   what was typed: a count is pinned to a whole number in range there and a
+   target date already in the past is replaced, so writing the derived values
+   back is what stops the boxes from disagreeing with the charts under them.
+
+   Everything below reads only `d.forecast` — the figures are worked out in
+   derive() with the rest, so this function states them and nothing more. */
+function renderForecast(d) {
+  const f = d.forecast;
+  const periodNoun = n => (n === 1 ? d.bucketNoun : d.bucketNounPlural);
+
+  /* The boxes. `min` on the date keeps the picker from offering a day the
+     forecast would only reject — the first day it can say anything about is the
+     one after the data ends. */
+  $('fcItems').value = String(f.items);
+  $('fcDate').value = isoOf(f.targetDate);
+  $('fcDate').min = isoOf(addDays(d.endDate, 1));
+
+  /* The one assumption, said plainly and every time — not folded into the ⓘ,
+     where someone reading the number off a shared screen would never meet it. */
+  $('fcHint').textContent = 'Both answers assume the next few ' + d.bucketNounPlural
+    + ' look like the ' + f.samples + ' whole ' + periodNoun(f.samples)
+    + ' on screen. Change the window or the work type filter and the forecast '
+    + 'follows. Counted from ' + prettyDate(d.endDate) + ', where your data ends.';
+
+  const conf85 = 85;
+  const whenRow = f.when && f.when.rows.find(r => r.confidence === conf85);
+  const manyRow = f.howMany && f.howMany.rows.find(r => r.confidence === conf85);
+
+  /* Three tiles: one answer per question at the confidence a team can actually
+     promise on, and the sample size that both rest on. 85 is the headline for
+     the same reason the cycle time tile reads the 85th percentile — high enough
+     to be a promise worth making, low enough that one freak run does not set
+     it — and the 50 and 95 answers are on the rows under each chart. */
+  $('tilesForecast').innerHTML =
+    tile(f.items + ' item' + (f.items === 1 ? '' : 's') + ' finished by',
+      whenRow ? escapeHtml(prettyDate(whenRow.date)) : '&mdash;',
+      whenRow ? '85% of runs were done within ' + whenRow.days
+        + (whenRow.days === 1 ? ' day' : ' days') : 'not enough history to forecast',
+      'forecastWhen') +
+    tile('Items by ' + prettyDate(f.targetDate),
+      manyRow ? 'at least ' + manyRow.count : '&mdash;',
+      manyRow ? '85% of runs completed this many or more' : 'not enough history to forecast',
+      'forecastHowMany') +
+    tile('Drawn from', String(f.samples),
+      'whole ' + periodNoun(f.samples) + ' of throughput in this window',
+      'forecastSamples');
+
+  /* An answer row: the confidence, the answer, and the swatch tying it to its
+     part of the chart above. Everything user-typed is escaped as usual; the
+     dates and counts are ours. */
+  const row = (conf, answer, aside) =>
+    '<div class="forecast-row">' +
+      '<span class="swatch" style="background:' + forecastFill(conf / 100) + '"></span>' +
+      '<span class="conf">' + conf + '% confident</span>' +
+      '<span class="answer">' + answer +
+        (aside ? ' <span class="aside">' + aside + '</span>' : '') + '</span>' +
+    '</div>';
+
+  /* Why each card might have nothing to draw, in the words of the control that
+     fixes it. `few-periods` is the common one and the only one the reader can
+     act on from the strip in front of them. */
+  const excuse = () => {
+    if (f.reason === 'few-periods')
+      return 'A forecast needs at least ' + f.minPeriods + ' whole ' + d.bucketNounPlural
+        + ' of history to resample, and this window holds ' + f.samples + '. '
+        + 'Group by a shorter period, or widen the date window, and it will fill in.';
+    if (f.reason === 'no-throughput')
+      return 'Nothing was completed in any whole ' + d.bucketNoun + ' of this window, '
+        + 'so there is no pace to project forward.';
+    if (f.beyondReach)
+      return 'That is more items than this team\u2019s recorded pace clears in any '
+        + 'reasonable time. Try a smaller number.';
+    return '';
+  };
+
+  /* Same shape as the lead-time card: the card stays and explains itself rather
+     than vanishing, so the answer to "where did the forecast go?" is on screen.
+     The chart is hidden rather than left holding a stale series — the next
+     render may be a different team entirely. */
+  const face = (cardId, rowsId, block, html) => {
+    const card = $(cardId);
+    const has = !!block;
+    card.querySelector('.chart-wrap').hidden = !has;
+    card.classList.toggle('no-chart', !has);
+    const none = card.querySelector('.forecast-none');
+    none.hidden = has;
+    /* Written every time, not only when it shows: a note left holding the last
+       render's reason is a stale sentence one class change away from being
+       read out. */
+    none.textContent = has ? '' : excuse();
+    $(rowsId).innerHTML = has ? html : '';
+  };
+
+  face('cardForecastWhen', 'rowsForecastWhen', f.when, f.when && f.when.rows.map(r =>
+    row(r.confidence, escapeHtml(prettyDate(r.date)),
+        '(' + r.days + (r.days === 1 ? ' day' : ' days') + ')')).join(''));
+
+  face('cardForecastHowMany', 'rowsForecastHowMany', f.howMany, f.howMany && f.howMany.rows.map(r =>
+    row(r.confidence, 'at least ' + r.count + ' item' + (r.count === 1 ? '' : 's'), '')).join(''));
 }
 
 function renderDataTable() {
@@ -3704,7 +4370,11 @@ TABS.forEach(t => {
 const CHART_GROUPS = {
   flow:     ['chartCycleTime', 'chartLeadTime'],
   delivery: ['chartThroughput', 'chartNetFlow'],
-  health:   ['chartWip', 'chartAgedWork', 'chartDefectRate']
+  health:   ['chartWip', 'chartAgedWork', 'chartDefectRate'],
+  /* Forecast is last because it is the only group that says anything about the
+     future: the three before it are what happened, and this is what that
+     implies. It is also the only one with inputs of its own. */
+  forecast: ['chartForecastWhen', 'chartForecastHowMany']
 };
 const CHART_TABS = Object.keys(CHART_GROUPS);
 
@@ -3722,6 +4392,21 @@ function selectChartTab(name) {
      resize once it is on screen gives it its real size. */
   CHART_GROUPS[name].forEach(id => { if (charts[id]) charts[id].resize(); });
 }
+
+/* The forecast's two questions. 'change' rather than 'input': a Monte Carlo on
+   every keystroke would run the whole thing against 1, then 12, then 120 on the
+   way to typing 1200, and both a number box's spinner and a date picker fire
+   change on their own. renderAll() re-derives, which is where both values are
+   validated \u2014 so a cleared box or a date already in the past comes straight
+   back as the default rather than being policed a second time here. */
+['fcItems', 'fcDate'].forEach(id => {
+  $(id).addEventListener('change', () => {
+    view.forecastItems = Number($('fcItems').value) || DEFAULT_FORECAST_ITEMS;
+    view.forecastDate = $('fcDate').value;
+    saveView();
+    renderAll();
+  });
+});
 
 CHART_TABS.forEach(t => {
   const tab = $('stab-' + t);
@@ -4896,17 +5581,11 @@ window.TDCleanup = { historyAnchor, outsideWindow, windowCutoff };
    SEEDED — same numbers every time, on every device — because a demo that
    reshuffles itself cannot be pinned by a test or talked through twice. */
 
-/* mulberry32 — small, fast, and good enough for shaping a demo. Seeded so the
-   dataset is identical on every run; never swap this for Math.random(). */
-function seededRandom(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6D2B79F5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+/* seededRandom() used to live here, and now sits with the maths in section 4:
+   the Monte Carlo forecast is its second caller, so it is a shared utility
+   rather than demo furniture. Both callers need the same thing from it — the
+   same numbers on every device, so a dataset can be pinned by a test and an
+   answer can be talked through twice. Never swap either for Math.random(). */
 
 /* The teams, as profiles rather than as thousands of literal rows. `weeks` of
    history at `perWeek` completions each; `cycle` days from start to finish, with

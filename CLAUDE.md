@@ -82,6 +82,60 @@ file records what is specific to this repo and what must never regress.
   keys, titles or names of people — `privacy.html` promises this, keep it true
   and update its effective date in the same commit as any storage change.
 
+## The Monte Carlo Forecast (2026-08-20)
+
+The fourth chart group, and the only one that looks forward. It resamples this team's own
+recorded throughput ten thousand times and reports how often each outcome came up. What must
+not regress:
+
+- **It deals from `wholeThroughput`, and nothing else.** That is the same set the
+  completed-per-period and steady delivery tiles read, so the three can never disagree about
+  which periods they describe. Dealing the part period in would deal a bad week that never
+  happened; dealing individual DAYS instead would quietly assume each day is independent of the
+  ones around it and report a narrower spread than the team ever showed. Whole periods keep the
+  shared variation — a freeze, an incident, a holiday week — that is the honest part of the
+  answer.
+- **The two confidences run OPPOSITE WAYS, and this is the easiest thing in the app to break.**
+  A date is safer the later it is (85% confidence → the 85th percentile); a count is safer the
+  lower it is (85% confidence → the *15th*). `daysAtConfidence` and `countAtConfidence` exist so
+  that no caller ever passes a percentile, and everything on screen is labelled by confidence
+  for the same reason. Pinned from both ends in tests.html — including against the trials
+  themselves, not just against the percentile function that produced them.
+- **Seeded with a constant (`FORECAST_SEED`), never `Math.random()`.** A forecast that moved a
+  day between renders would read as the app being unsure of itself, could not be pinned by a
+  test, and could not be talked through twice. The uncertainty is stated by the spread on the
+  chart. `seededRandom` was lifted out of the demo section into the maths section when this
+  landed — it now has two callers and both pass a constant.
+- **`forecastItems` and `forecastDate` live in `view`, NOT in `state`.** What you are asking the
+  forecast is a position on this device, like `activeTeamId`. That keeps them out of the synced
+  document entirely: **no SCHEMA bump, no whitelist entry, no place in a share payload** — a
+  link's recipient gets the defaults and asks their own question, which was verified against a
+  real share link (the visitor can change the question and localStorage stays empty). Both are
+  validated in `derive()` at their point of use, like `bucket` and `filterDisplay`; a value that
+  is not a positive number falls back to the default rather than being clamped up to 1, because
+  a cleared or negative box is nonsense input rather than a small request.
+- **The eight-whole-period floor is a refusal, not a warning.** Below it both cards hide their
+  chart and name the control that fixes it. With four observations the shape of the answer is a
+  fact about which four periods you hold. Reachable from the demo by grouping it by month over
+  the default 3-month window, which is why that case has a test.
+- **Answers are stated in DAYS though the sample is dealt in periods.** The period that crosses
+  the finish line is interpolated into — ten items reached three items into a week that
+  delivered five is three fifths of that week. Without it a weekly team answers "2 weeks" to
+  nearly every question and the chart is four bars wide; the first build did exactly that, and
+  its 50% and 85% answers were the same date. `periodsToDays` rounds UP, because a promise that
+  rounds down is the wrong kind of wrong.
+- **The shading is one hue in four steps, by STRENGTH and not by darkness.** `tint()` mixes
+  toward each theme's own surface, so the faded end is near-black on Midnight and near-white on
+  Light — "darker is safer" would be backwards in half the themes. Never RAG: the app states
+  figures rather than judging them, a 50% answer is not "bad", and a red/green ramp is
+  unreadable to the person most likely to be handed a forecast in a room. The answer rows carry
+  the same four fills as swatches, which is what saves the shading from needing a legend.
+- Adding the target date meant adding `input[type="date"]` to the app's own base input rule —
+  without it the box kept the UA's 2px border and zero padding and sat 10px shorter than the
+  number box beside it. Golf Handicap's rule already listed it. **Not theme drift**: the pack
+  owns the two date-specific rules (the 16px touch floor and turning the native appearance off),
+  the control's box is each app's own.
+
 ## Security (shared origin)
 
 - All of `eagleadams86.github.io` is ONE browser origin: any page on any of the

@@ -10,7 +10,7 @@ The app is called **Flow Metrics** on screen. The repo, the Pages path, the Fire
 say *team-dashboard* — renaming any of those would break existing links, backups and sync,
 so the rename is deliberately a display-only one.
 
-Paste your work items and the charts are grouped into three tabs — **by what the data means**,
+Paste your work items and the charts are grouped into four tabs — **by what the data means**,
 so the measures that move together are read together:
 
 | Group | Question it answers | What's plotted |
@@ -18,6 +18,11 @@ so the measures that move together are read together:
 | **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); lead time |
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started) |
 | **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; defect rate — defects resolved and defects raised |
+| **Forecast** — what that implies | When will this batch be done, and how much by a date? | Two distributions from ten thousand simulated runs, one per question |
+
+The first three describe what already happened. **Forecast** is the only one that looks
+forward, and it is the reason for collecting any of the rest — see
+[Forecasting](#forecasting-what-the-pace-youve-had-implies) below.
 
 Charts sit two to a row at any window wide enough for the pair. A group with an odd number of
 them — Health, with three — leaves the last chart alone on its row: it keeps a single column's
@@ -56,6 +61,8 @@ Each group then adds a small tile row of its own, stating what its charts can't:
   percentile of the per-period counts); total **net flow**; and **started vs completed**, the two
   counts net flow is the difference of.
 - **Health** — the ratio of work in progress to a month's throughput, and the defect rate.
+- **Forecast** — the 85%-confident answer to each of its two questions, and the number of whole
+  periods both were dealt from.
 
 Net flow and the defect rate sit with their charts rather than in the headline row because both
 are readings on the period just gone, and neither says what to pick up this morning. Net flow in
@@ -96,6 +103,12 @@ the ⓘ on each says so.
   about a typical period.
 - **Work in progress and aged work** are read at a point in time, and that point is already
   clamped to the end of your data (see below).
+
+**The forecast skips it too**, and for the strongest version of the same reason: it deals whole
+periods out again at random, and a period that has not finished happening is a bad week that
+never occurred. Dealing one in would teach the model a slump the team never had. It uses exactly
+the set the completed-per-period tile does, so the two can never disagree about which periods
+they describe.
 
 The line is drawn at "is this a count per period?", not at "is this important". It does mean two
 tiles in the same row can be counted over different sets of periods — steady delivery over whole
@@ -155,6 +168,13 @@ that has a tail.
 | **Kingfisher** | The healthy board. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. The baseline the other two read against. |
 | **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold**, and a defect rate about two and a half times Kingfisher's. |
 | **Wagtail** | A newer team: four months of history and **no created dates at all**, so the lead-time chart's "add a Created column" face is reachable, and the date window has a team it visibly runs past. Also proves each team's data stands on its own. |
+
+All three teams have enough weekly history to **forecast** on the default 3-month window —
+Wagtail, at four months, is the one that decides that — and Heron's spread is wide enough that
+its 50%, 85% and 95% answers are days apart rather than all the same date, which is the whole
+argument for reading a distribution instead of a single number. Switching **Group by** to Month
+on that same window drops below the eight-period floor, so the forecast's "not enough history"
+card is reachable from the demo too.
 
 Every team carries all four work types, so the **work type filter** does something whichever
 team you're on. The dates cover the **whole week**, not just weekdays, which is what makes the
@@ -348,6 +368,14 @@ same problem. Half a metric that always reads 95% is worse than no metric at all
 all — business outcomes, and how often a story was rewritten after being picked up. Neither is
 derivable from dates.
 
+**A forecast weighted by item size**, and one that starts from what is already in progress.
+Both are real refinements and both are deliberately out for now. Sizing would need a field this
+app doesn't store and would reintroduce the estimating the forecast exists to avoid; crediting
+work already under way would need a rule for how far along an in-progress item is, which is the
+same status-history problem blocked time has. Counting whole items from a standing start is the
+conservative reading of both, and a wide spread is the honest signal that items on this board
+are not comparable.
+
 ### Settings You've Already Saved Keep Winning
 
 Defaults only fill in what isn't saved. A browser that has used the app before keeps whatever
@@ -506,6 +534,95 @@ worth knowing:
 Net-flow bars use the theme's accent for positive and `--serious` for negative — deliberately
 not the red/green pair, because the coaching goal is "keep around zero", so neither sign is
 good or bad.
+
+## Forecasting: What the Pace You've Had Implies
+
+Every other figure here describes what already happened. The **Forecast** tab is the one that
+looks forward, and it does it without asking you to estimate anything at all.
+
+It takes the throughput this team actually recorded — the completions in each whole period —
+deals those periods out again at random **ten thousand times**, and reports how often each
+outcome came up. That is a Monte Carlo forecast, and the only input it needs is the thing you
+have already pasted: dates. No story points, no sizing, no velocity, nothing anybody has to
+guess at in a room.
+
+It answers two questions, from the same set of deals:
+
+| Question | You type | You get |
+|---|---|---|
+| **Time to finish** | a number of items | the date that many will be done by, at 50%, 85% and 95% confidence |
+| **Items by a date** | a target date | how many will be finished by then, at the same three confidences |
+
+Both boxes sit inside the tab rather than in the control strip at the top of the dashboard,
+because they change nothing outside this group. Everything in the strip *does* reach them: the
+team, the work type filter, the date window and the grouping all decide which periods get dealt.
+
+### Read the Confidence, Not the Percentile
+
+The two questions take their answers from **opposite ends of the distribution**, which is the
+one thing about this feature that is easy to get backwards:
+
+- A **date** is a safer promise the **later** it is. 95% confidence buys you a later date.
+- A **count** is a safer promise the **lower** it is. 95% confidence buys you a smaller number.
+
+So being more careful moves one answer up and the other down. Nothing on screen is labelled by
+percentile for that reason — every row says "85% confident", and every count says "at least",
+so you never have to hold the flip in your head. A team asked for twelve items might see *85%
+confident: 8 October* and, on the card beside it, *85% confident: at least 47 items by 15
+December*. Both are the cautious reading.
+
+Which row to use is a judgement about consequences, not about statistics. 50% is a coin toss —
+fine for a private guess at what a sprint might hold. 85% is the one worth saying out loud, and
+the same 85 the cycle time tile reads, for the same reason: high enough to be a promise worth
+making, low enough that one freak run doesn't set it. 95% is what you quote when being late is
+expensive.
+
+### The Spread Is the Real Output
+
+The chart under each answer is the distribution the three rows are read off, shaded by
+confidence — the stronger the colour, the safer a promise at that point. It is worth more than
+any single row. A narrow, tall distribution means the team's pace is steady and the date is
+close to a fact. A wide, flat one means the date is a guess whichever row you pick, and the fix
+for that is steadier delivery rather than a later promise. Two teams with the same median can
+have completely different pictures here, which is exactly the conversation the tab exists to
+start.
+
+The shading runs one way on one chart and the other way on the other, because the safe end of
+each is at a different edge — but the colour means the same thing on both, and the rows repeat
+it in words for anyone who would rather not read colour at all.
+
+### What It Assumes, and When It Refuses
+
+**It assumes the next few periods look like the ones on screen.** That is stated on the tab
+itself, every time, rather than hidden in a help note — and it is why the date window is part
+of the forecast rather than just part of the charts. Narrowing to 3 months is how you ask "what
+if we carry on at our recent pace?"; opening it to 12 asks the same question of a longer, and
+possibly less relevant, history. A window stretching back past a reorganisation forecasts a team
+that no longer exists.
+
+**Below eight whole periods it refuses outright.** Both cards say so and name the control that
+fixes it — group by a shorter period, or widen the window. With a handful of observations the
+shape of the answer is a fact about which four periods you happen to hold rather than about the
+team, and reporting a confidence there would be inventing one. Grouping by month over a 3-month
+window is the usual way to meet this, and grouping by week is the usual way out of it.
+
+**The same data and the same question always give the same answer.** The random number generator
+is seeded with a constant, so a forecast never moves a day between renders — switch the filter
+and switch it back and the figure is where you left it. The uncertainty is stated by the spread
+on the chart, which is where it belongs; a number that also jittered would read as the app being
+unsure of itself.
+
+### Two Details Worth Knowing
+
+**Answers are given to the day**, even though the sample is dealt in whole periods. When a run
+crosses the finish line part-way through a period, that period is counted as the fraction of it
+that was needed — reaching the tenth item three items into a week that delivered five counts as
+three fifths of a week. Without that, a weekly team would answer "2 weeks" to almost every
+question anyone asked, and the chart would be four bars wide.
+
+**It counts items, not points or value.** So it is only as good as your items being roughly
+comparable in size — which, on a board whose cycle times cluster, they usually are, and if they
+are not, that shows up as a wide spread rather than as a wrong answer quietly given.
 
 ## Cleaning Up Old Data
 
