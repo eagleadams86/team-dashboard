@@ -137,6 +137,33 @@ noted exception: how many tile columns there are. This app's headline row always
 four tiles and so states its column counts outright, while the sibling's tile groups vary in
 size and are still laid out by `auto-fit` — as this app's own per-group tile rows are.
 
+## Grouping Teams into ARTs
+
+If you support teams across more than one Agile Release Train, you can group them. The
+**Teams** dialog has an **Agile Release Trains** section: add one, then set each team's ART from
+the picker in its own row of the table above. A team can be on one train or on none — being on
+none is perfectly normal, and nothing forces you to use the feature at all.
+
+**An ART is a label, never a level of maths.** Every figure in this app is worked out per team
+and the All Teams view adds them up; grouping changes what you are looking at and never a single
+number. What it does change:
+
+- **All Teams gains a train picker** — *All trains*, each train by name, and *No ART* if any team
+  is un-grouped. Everything below it follows: the four tiles, every row, and the summary row at
+  the foot of the table, which reads **All teams on Payments ART** when you scope to one.
+- The picker **says how many teams it is hiding**, the same way every other exclusion in this app
+  says what it left out. A figure should never move for a reason that isn't on the page.
+- With no filter, the table **groups by train** so a train's teams sit together, and each team
+  carries its ART under its name. **The header team picker groups the same way**, so a list you
+  know by eye reads the same in both places.
+
+Deleting an ART is the cheapest delete in the app: it takes no team and no work item with it —
+the teams that were on it simply go back to having none. The confirmation says so.
+
+**Share links carry only the trains their own teams are actually on**, so sharing one team never
+publishes the names of every train you support. Share a team that is on no train and the link
+has no ART names in it at all.
+
 ## All Teams: Which One Needs You
 
 The dashboard answers *how is this team doing?*. **All Teams** answers *which of my teams needs
@@ -164,6 +191,10 @@ in the train.
 **Press a team's name to open its dashboard.** That is the move the whole view sets up — the
 table says who needs looking at, and this is looking at them. The team you currently have
 selected is marked in the table, so you can always find your way back to where you were.
+
+If your teams are [grouped into ARTs](#grouping-teams-into-arts), a **train picker** appears
+above the tiles and everything on the page follows it — including the summary row, which becomes
+that train's own figures rather than the whole estate's with some rows hidden.
 
 The tab appears once you have a **second team**, the same rule the team picker follows: with one
 team there is no comparison to make.
@@ -212,7 +243,8 @@ with no work items at all shows dashes throughout.
 ## Teams
 
 Each team keeps its own list of work items; the picker in the header chooses which one the
-dashboard is showing. Add, rename and delete teams from the **Teams** button beside that
+dashboard is showing. Teams can be [grouped into ARTs](#grouping-teams-into-arts), in which case
+the picker groups them the same way. Add, rename and delete teams from the **Teams** button beside that
 picker — a dialog, the same shape as the sibling app's Teams & PIs. Settings are shared by
 every team — one place to say what a "defect" is.
 
@@ -245,6 +277,12 @@ that has a tail.
 | **Kingfisher** | The healthy board. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. The baseline the other two read against. |
 | **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Kingfisher's. |
 | **Wagtail** | A newer team: four months of history and **no created dates at all**, so the lead-time chart's "add a Created column" face is reachable, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
+
+The demo also puts **Kingfisher and Heron on one train (Estuary ART) and leaves Wagtail on
+none** — the smallest arrangement where every part of [ARTs](#grouping-teams-into-arts) does
+something. The picker gets *All trains*, *Estuary ART* and *No ART*; both groups have somebody in
+them; and scoping to the train visibly changes the figures at the foot of the table. A train per
+team would make grouping look pointless, and putting all three on one would leave *No ART* absent.
 
 On **All Teams** the three read as a train with one obvious problem: Heron's 85th percentile is
 three or four times the other two, it holds most of the aged work, and its defect rate is the
@@ -486,7 +524,8 @@ re-entered:
 ### Created Dates and Older Versions of the App
 
 Rows gained an optional created date (`k` on the wire, backup `version: 3`, `schema: 3` in the
-saved and synced state; the working-days setting later took both markers to `4`). A row without one is left exactly as it was — no `k` key is written —
+saved and synced state; the working-days setting later took both markers to `4`, and ARTs to
+`5`). A row without one is left exactly as it was — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before.
 
 **Created dates are never dropped silently.** If a synced copy arrives with none and this

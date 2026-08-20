@@ -290,6 +290,18 @@ select { cursor: pointer; }
    under them once the columns collapse. */
 .forecast-ask .hint { margin: 0 0 4px; }
 
+/* The ART scope row: the picker, and beside it the sentence saying what it is
+   leaving out. Same grid reasoning as the forecast's own row — an explicit
+   column so the picker never sits in dead space on a phone. */
+.artscope-row { display: grid; gap: 10px 16px; align-items: end;
+  grid-template-columns: minmax(0, 240px) minmax(200px, 1fr); }
+@media (max-width: 720px) { .artscope-row { grid-template-columns: minmax(0, 1fr); } }
+.artscope-row .hint { margin: 0 0 4px; }
+/* A team's train, under its name in the table. Only drawn when the table is
+   showing more than one, which is the only time it says anything. */
+.team-art { display: block; font-size: 12px; color: var(--text-secondary);
+  font-weight: 400; margin-top: 2px; }
+
 /* The three answers, under the chart that shows their working. A definition
    list rather than a table: each row is one confidence and one answer, and the
    swatch ties it to the shading on the chart above — which is what saves that
@@ -500,6 +512,20 @@ table.filters th { text-align: left; padding: 0 12px 6px 0;
   text-transform: uppercase; color: var(--text-secondary); }
 table.filters td:last-child, table.filters th:last-child { padding-right: 0; }
 table.filters td.act { width: 1%; }
+/* The ART picker is not an action column: `width: 1%` squeezed a select holding
+   a train's name down to its chevron. It gets a real, capped column of its own —
+   wide enough to read a name in, narrow enough that the team-name box beside it
+   keeps most of the row. */
+table.filters th.art, table.filters td.art { width: 30%; min-width: 130px; text-align: left; }
+table.filters td.art select { width: 100%; }
+/* A floor under the name column, or the ART picker beside it squeezes the box on
+   a phone until "Team Kingfisher" reads as "Team Ki" — a truncated control,
+   which is the thing the no-orphaned-fields rule exists to stop. With the floor
+   the row simply outgrows the dialog and the table scrolls inside its own box,
+   which is what .table-scroll is for and what the Your Data table already does.
+   On the wider dialog, and whenever there are no ARTs, nothing changes: the
+   columns already have more than this between them. */
+table.filters td:first-child, table.filters th:first-child { min-width: 150px; }
 /* A count belongs under its heading, not hard against the box to its left, and
    these columns are only as wide as their widest cell. */
 table.filters th.act, table.filters td.act { text-align: right; }
@@ -787,10 +813,25 @@ main:focus { outline: none; }
        before. Every figure in it comes out of the same derive() the dashboard
        reads, so a row here and that team's dashboard cannot disagree. -->
   <section class="panel" id="panel-allteams" role="tabpanel" aria-labelledby="tab-allteams" hidden>
+    <!-- The ART scope. Above the tiles because it governs them too — every figure
+         on this page follows it, including the train row at the foot of the
+         table. Absent entirely until an ART exists: a picker with one option is
+         a control that cannot do anything. -->
+    <div class="card" id="artScope" hidden style="margin-bottom:18px">
+      <div class="artscope-row">
+        <div class="field">
+          <label for="artFilterSel">Agile Release Train</label>
+          <select id="artFilterSel" title="Show only the teams on one train"></select>
+        </div>
+        <!-- A figure must never move for a reason that is not on the page. -->
+        <p class="hint" id="artScopeNote"></p>
+      </div>
+    </div>
+
     <div id="allTeamsTiles" class="tiles"></div>
 
     <div class="card">
-      <h2>Every Team, Side by Side <span class="hint" id="allTeamsCount"></span></h2>
+      <h2 id="allTeamsHeading">Every Team, Side by Side <span class="hint" id="allTeamsCount"></span></h2>
       <p class="hint">
         Press a column heading to sort by it. Press a team's name to open its dashboard.
         Every row is read over the same window and as of the same date, whatever each team's
@@ -1184,12 +1225,38 @@ main:focus { outline: none; }
   </p>
   <div class="table-scroll">
     <table class="filters" id="teamTable">
-      <thead><tr><th>Team name</th><th class="act">Items</th><th class="act"></th></tr></thead>
+      <thead><tr><th>Team name</th><th class="art" id="artColHead" hidden>ART</th><th class="act">Items</th><th class="act"></th></tr></thead>
       <tbody id="teamRows"></tbody>
     </table>
   </div>
   <div class="row spread" style="margin-top:14px">
     <button class="btn" id="btnAddTeam" type="button">+ Add a team</button>
+  </div>
+
+  <!-- Agile Release Trains. A <details> because most people support one train
+       and should not have to read past a feature they will never use — the same
+       fold "Start again" sits behind in the Back up dialog. It opens itself once
+       an ART exists, so anyone who has used it never has to find it twice. -->
+  <details id="artSection" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
+    <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary)">Agile Release Trains</summary>
+    <p class="hint" style="margin-top:10px">
+      Support more than one train? Add them here, then set each team's ART in the table above.
+      A team can be on one or on none. Grouping is a <strong>label only</strong> — it changes
+      what <strong>All Teams</strong> shows you and never a single figure.
+    </p>
+    <div class="table-scroll" style="margin-top:10px">
+      <table class="filters" id="artTable">
+        <thead><tr><th>ART name</th><th class="act">Teams</th><th class="act"></th></tr></thead>
+        <tbody id="artRows"></tbody>
+      </table>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="btnAddArt" type="button">+ Add an ART</button>
+    </div>
+  </details>
+
+  <div class="row spread" style="margin-top:18px">
+    <span></span>
     <button class="btn primary" id="manageCloseBtn" type="button">Done</button>
   </div>
 </dialog>
@@ -3053,6 +3120,43 @@ function deriveTeams(teams, settings, view) {
   };
 }
 
+/* ── Agile Release Trains ────────────────────────────────────────────────────
+   A team can be on one ART or on none, and being on none is ordinary — nothing
+   forces the feature on anyone who supports a single train.
+
+   An ART is a LABEL, never a level of maths. Every figure in this app is worked
+   out per team by derive() and the All Teams view adds them up; grouping changes
+   what you are looking at and never a single number. Keep it that way: the
+   moment an ART carries a figure of its own, there are two places a team's
+   throughput can be computed and they can disagree.
+
+   Modelled as a list of {id, name} with an `artId` on each team, rather than as
+   a name written on every team: renaming a train then happens in one place, and
+   a team structurally cannot be on two. The same shape as the sibling app, down
+   to the field names, because the two apps are read side by side. */
+const ART_NONE = '~none';
+
+/* Both are pure — they take the list rather than reading `state` — so a share
+   payload can be grouped before it is ever adopted, and tests can pin them. */
+function teamsInArt(teams, artId) {
+  const list = Array.isArray(teams) ? teams : [];
+  if (!artId) return list.slice();                    /* no filter: every team */
+  if (artId === ART_NONE) return list.filter(t => !t.artId);
+  return list.filter(t => t.artId === artId);
+}
+
+/* Teams ordered so a train's teams sit together: ARTs in the order they are
+   listed in the Teams dialog, un-grouped teams last. Within a group the teams
+   keep the order they were added in — the same order the picker uses — so
+   grouping never silently reshuffles a list somebody knows by eye. */
+function groupTeamsByArt(teams, arts) {
+  const order = new Map((arts || []).map((a, i) => [a.id, i]));
+  const rank = (t) => (t.artId && order.has(t.artId) ? order.get(t.artId) : Infinity);
+  return (teams || []).map((t, i) => ({ t, i }))
+    .sort((a, b) => (rank(a.t) - rank(b.t)) || (a.i - b.i))
+    .map(x => x.t);
+}
+
 /* Exposed for tests.html, which drives the real app in a hidden iframe. */
 window.TD = {
   weekdayNum, priorSunday, weekNumber, weekKey, edate, workDaysBetween,
@@ -3066,7 +3170,10 @@ window.TD = {
   FORECAST_TRIALS, FORECAST_MIN_PERIODS, FORECAST_CONFIDENCE, FORECAST_MAX_ITEMS,
   /* The work item age chart's shaping constants, so its tests state the rule
      rather than restating the number and going stale beside it. */
-  AGE_SPREAD, AGE_MAX_COLUMNS, AGE_UNTYPED, AGE_OTHER
+  AGE_SPREAD, AGE_MAX_COLUMNS, AGE_UNTYPED, AGE_OTHER,
+  /* The ART grouping is pure — it takes the team list rather than reading
+     state — so tests can pin both without booting a dialog. */
+  teamsInArt, groupTeamsByArt, ART_NONE
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3131,7 +3238,14 @@ const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', act
      where a reader expects to find a team before they have asked for anything
      else. Validated at its point of use like every other view field — an
      unknown key just means no sort. */
-  teamSort: null, teamSortDir: 'desc' };
+  teamSort: null, teamSortDir: 'desc',
+  /* Which train All Teams is scoped to: '' is every team, an ART's id is that
+     train, and ART_NONE is the teams on none. In `view` rather than in `state`
+     — like activeTeamId, and unlike the sibling app, which keeps it in settings.
+     Which train you are looking at is a position on this device: scoping the
+     laptop to Payments should not yank the phone to it. Validated at its point
+     of use, where an id pointing at a deleted ART falls back to every team. */
+  artFilter: '' };
 
 const LS = {
   state: 'td-state', view: 'td-view', theme: 'td-theme',
@@ -3213,7 +3327,7 @@ function haltForNewerData(found) {
 
 /* state.teams[] each hold their own rows; settings are shared by all of them.
    Everything in `state` syncs; everything in `view` stays on this device. */
-let state  = { teams: [], settings: Object.assign({}, DEFAULT_SETTINGS) };
+let state  = { teams: [], arts: [], settings: Object.assign({}, DEFAULT_SETTINGS) };
 let view   = Object.assign({}, DEFAULT_VIEW);
 let charts = {};
 /* Which top-level view is on screen. Not in `view` and not saved: which tab you
@@ -3228,6 +3342,23 @@ const newId = () => 't' + Date.now().toString(36) + Math.random().toString(36).s
    outside this device — the cloud, a hand-edited localStorage — is replaced
    unless it is plainly safe. Same boundary check as the sibling app. */
 const ID_OK = /^[A-Za-z0-9_-]{1,64}$/;
+
+/* sanitizeArts is the ARTs' boundary; the grouping helpers themselves live with
+   the rest of the pure domain code in section 4, above the window.TD export
+   that hands them to the tests. */
+
+/* The same boundary teams cross. Names are capped like every other label here,
+   ids are replaced unless they are plainly safe, and duplicates get a fresh id
+   rather than two ARTs answering to one name. */
+function sanitizeArts(arts) {
+  const seen = new Set();
+  return (Array.isArray(arts) ? arts : []).map(a => {
+    let id = (a && typeof a.id === 'string' && ID_OK.test(a.id) && !seen.has(a.id)) ? a.id : newId();
+    seen.add(id);
+    return { id, name: String((a && a.name) || 'Untitled ART').slice(0, 120) };
+  });
+}
+
 function sanitizeTeams(teams) {
   const seen = new Set();
   return (Array.isArray(teams) ? teams : []).map(t => {
@@ -3236,7 +3367,13 @@ function sanitizeTeams(teams) {
     /* Names are escaped wherever they render, so the cap is about size, not
        markup: nothing legitimate needs more, and a hand-edited copy shouldn't
        be able to smuggle megabytes in as a "name". */
-    return { id, name: String((t && t.name) || 'Untitled team').slice(0, 120), rows: hydrateRows(t && t.rows) };
+    /* An id or nothing. A pointer that fails the id check is dropped rather than
+       replaced with a fresh one — a made-up id would point at no ART anyway, and
+       "on no train" is a real and ordinary answer where an invented id is not.
+       hydrateState prunes pointers at ARTs that do not exist. */
+    const artId = (t && typeof t.artId === 'string' && ID_OK.test(t.artId)) ? t.artId : null;
+    return { id, name: String((t && t.name) || 'Untitled team').slice(0, 120),
+             artId, rows: hydrateRows(t && t.rows) };
   });
 }
 
@@ -3341,7 +3478,8 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and to the cloud. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 4 added the working-days setting; 3 added the per-row created date.
+/* SCHEMA 5 added ARTs — `state.arts` and an `artId` on each team; 4 added the
+   working-days setting; 3 added the per-row created date.
    The marker rides into localStorage and the synced document, but deliberately
    NOT into a share link — a share
    payload's keys are fixed and pinned by a test, and a viewer needs no schema.
@@ -3351,7 +3489,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 4;
+const SCHEMA = 5;
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
    hydrateState() keeps only the keys it knows, which is right for a hostile
@@ -3381,17 +3519,33 @@ if (!viewOnly) {
 function serializeState() {
   return {
     schema: SCHEMA,
-    teams: state.teams.map(t => ({ id: t.id, name: t.name, rows: serializeRows(t.rows) })),
+    /* `artId` is written only when there is one, so a browser that has never
+       used ARTs serialises byte-identically to before and its first save after
+       upgrading doesn't rewrite the whole synced document — the same rule the
+       per-row created date follows. */
+    teams: state.teams.map(t => {
+      const out = { id: t.id, name: t.name, rows: serializeRows(t.rows) };
+      if (t.artId) out.artId = t.artId;
+      return out;
+    }),
+    /* Likewise: no key at all until an ART exists. */
+    arts: state.arts.length ? state.arts.map(a => ({ id: a.id, name: a.name })) : undefined,
     settings: state.settings
   };
 }
 const countCreated = teams =>
   teams.reduce((n, t) => n + t.rows.filter(r => r.created).length, 0);
 function hydrateState(raw) {
-  return {
-    teams: sanitizeTeams(raw && raw.teams),
-    settings: normalizeSettings(raw && raw.settings)
-  };
+  const arts = sanitizeArts(raw && raw.arts);
+  const teams = sanitizeTeams(raw && raw.teams);
+  /* A team pointing at an ART that isn't in the list is on no train, not on a
+     ghost one. It happens for real: an older build drops `arts` while keeping
+     the teams it hydrated, and a hand-edited backup can say anything. Cleared
+     here rather than guarded at every read, so nothing downstream has to know
+     the pointer might dangle. */
+  const ids = new Set(arts.map(a => a.id));
+  teams.forEach(t => { if (t.artId && !ids.has(t.artId)) t.artId = null; });
+  return { teams, arts, settings: normalizeSettings(raw && raw.settings) };
 }
 
 /* v1 stored a single team's rows under td-rows with the name in td-settings.
@@ -3407,6 +3561,7 @@ function migrate() {
   try { rows = JSON.parse(oldRowsRaw); } catch (e) { /* nothing to carry over */ }
   const migrated = {
     teams: [{ id: newId(), name: String(oldSettings.teamName || '').trim() || 'My team', rows }],
+    arts: [],
     settings: oldSettings
   };
   localStorage.removeItem(LS.oldRows);
@@ -3527,7 +3682,7 @@ window.tdRaisesKeyboard = raisesKeyboard;
 /* Pure helpers tests.html pins. Kept beside the sync hooks because they are the
    same boundary: everything here decides what a copy from outside is allowed to
    turn into. */
-window.TDState = { sanitizeTeams, hydrateState, normalizeSettings, hasData, isBackup, ID_OK,
+window.TDState = { sanitizeTeams, sanitizeArts, hydrateState, normalizeSettings, hasData, isBackup, ID_OK,
   serializeRows, hydrateRows, SCHEMA };
 window.tdCounts = (d) => ({
   teams: (d && d.teams) ? d.teams.length : 0,
@@ -4475,12 +4630,30 @@ function renderTeamSelect() {
   const sel = $('teamSel');
   const current = activeTeam();
   sel.innerHTML = '';
-  state.teams.forEach(t => {
+  const option = (t) => {
     const o = document.createElement('option');
     o.value = t.id;
     o.textContent = t.name + (t.rows.length ? '' : ' (empty)');
-    sel.appendChild(o);
-  });
+    return o;
+  };
+  /* Grouped by ART once there are any, so a train's teams sit together in the
+     picker exactly as they do in the All Teams table — a browser draws
+     <optgroup> as an indented, labelled block for free. Un-grouped teams get a
+     group of their own at the end rather than floating above the labelled ones,
+     where they would read as belonging to whichever group came next. */
+  if (state.arts.length) {
+    const group = (label, teams) => {
+      if (!teams.length) return;
+      const g = document.createElement('optgroup');
+      g.label = label;
+      teams.forEach(t => g.appendChild(option(t)));
+      sel.appendChild(g);
+    };
+    state.arts.forEach(a => group(a.name, teamsInArt(state.teams, a.id)));
+    group('No ART', teamsInArt(state.teams, ART_NONE));
+  } else {
+    state.teams.forEach(t => sel.appendChild(option(t)));
+  }
   if (current) { view.activeTeamId = current.id; sel.value = current.id; }
 }
 
@@ -4491,6 +4664,27 @@ function renderTeamSelect() {
    would go stale with every keystroke. */
 function renderTeamRows() {
   const tb = $('teamRows');
+  const anyArts = state.arts.length > 0;
+  /* The column appears only once an ART exists. Before that it would be a
+     picker with one option in it, which is a control that cannot do anything. */
+  $('artColHead').hidden = !anyArts;
+  /* A team has an ART, so assignment reads the way the data does: one picker per
+     team row, rather than a list of teams to tick inside each ART. It also makes
+     it structurally impossible to put a team on two trains. */
+  const artCell = (t, i) => {
+    if (!anyArts) return '';
+    const opt = (v, label, sel) => '<option value="' + escapeHtml(v) + '"' +
+      (sel ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+    /* The label is positional like the name box beside it: typing in this dialog
+       deliberately does not re-render the row, so a label built from the value
+       would go stale with every keystroke. */
+    return '<td class="art"><label class="sr-only" for="art-of-' + escapeHtml(t.id) +
+      '">ART for team in row ' + (i + 1) + '</label>' +
+      '<select id="art-of-' + escapeHtml(t.id) + '" data-art-of="' + escapeHtml(t.id) + '">' +
+      opt('', 'No ART', !t.artId) +
+      state.arts.map(a => opt(a.id, a.name, t.artId === a.id)).join('') +
+      '</select></td>';
+  };
   tb.innerHTML = '';
   state.teams.forEach((t, i) => {
     const tr = document.createElement('tr');
@@ -4498,12 +4692,36 @@ function renderTeamRows() {
     tr.innerHTML =
       '<td><input type="text" data-team="' + t.id + '" maxlength="120" value="' + escapeHtml(t.name) +
         '" aria-label="Name of team, row ' + (i + 1) + '"></td>' +
+      artCell(t, i) +
       '<td class="act num">' + t.rows.length + '</td>' +
       '<td class="act">' + (only ? '' :
         '<button class="icon-btn" data-delteam="' + t.id + '" title="Delete this team" aria-label="Delete ' +
         escapeHtml(t.name) + '">&times;</button>') + '</td>';
     tb.appendChild(tr);
   });
+}
+
+function renderArtRows() {
+  const tb = $('artRows');
+  tb.innerHTML = '';
+  /* Opened once there is something in it, so anyone who has used the feature
+     never has to go looking for it again. */
+  if (state.arts.length) $('artSection').open = true;
+  state.arts.forEach((a, i) => {
+    const n = state.teams.filter(t => t.artId === a.id).length;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><input type="text" data-art="' + escapeHtml(a.id) + '" maxlength="120" value="' +
+        escapeHtml(a.name) + '" aria-label="Name of ART, row ' + (i + 1) + '"></td>' +
+      '<td class="act num">' + n + '</td>' +
+      '<td class="act"><button class="icon-btn" data-delart="' + escapeHtml(a.id) +
+        '" title="Delete this ART" aria-label="Delete ' + escapeHtml(a.name) + '">&times;</button></td>';
+    tb.appendChild(tr);
+  });
+  if (!state.arts.length) {
+    tb.innerHTML = '<tr><td colspan="3" class="hint" style="padding:8px 4px">' +
+      'No trains yet. Add one and every team gets a picker in the table above.</td></tr>';
+  }
 }
 
 function renderFilterSelect() {
@@ -4842,6 +5060,44 @@ function teamColumns(train) {
   ];
 }
 
+/* Which train the All Teams view is scoped to, and the teams that leaves. The
+   stored value is validated HERE rather than trusted: an ART can be deleted on
+   another device, and a filter pointing at one that no longer exists would show
+   an empty table with no explanation. Falling back to every team is the only
+   safe direction — a wrong scope that shows too much is visible, one that shows
+   too little is not. */
+function currentArtScope() {
+  const want = view.artFilter || '';
+  if (!want) return '';
+  if (want === ART_NONE) return state.teams.some(t => !t.artId) ? ART_NONE : '';
+  return state.arts.some(a => a.id === want) ? want : '';
+}
+
+function renderArtScope(scope) {
+  const box = $('artScope');
+  box.hidden = !state.arts.length;
+  if (!state.arts.length) return;
+  const sel = $('artFilterSel');
+  sel.innerHTML = '';
+  const add = (v, label) => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = label;
+    sel.appendChild(o);
+  };
+  add('', 'All trains');
+  state.arts.forEach(a => add(a.id, a.name));
+  /* Offered only when there is somebody in it. */
+  if (state.teams.some(t => !t.artId)) add(ART_NONE, 'No ART');
+  sel.value = scope;
+
+  const shown = teamsInArt(state.teams, scope).length;
+  const hidden = state.teams.length - shown;
+  $('artScopeNote').textContent = hidden
+    ? 'Showing ' + shown + ' of ' + state.teams.length + ' teams — the other ' + hidden
+      + (hidden === 1 ? ' is' : ' are') + ' in none of the figures below.'
+    : 'Showing all ' + shown + ' teams. Every figure below follows this picker.';
+}
+
 function renderAllTeams() {
   /* Only when it is the view on screen. Every row is a full derive(), forecast
      and all, so running this behind a hidden panel would multiply the most
@@ -4849,12 +5105,41 @@ function renderAllTeams() {
      anywhere else. selectTab() re-renders on the way in. */
   if (activeTab !== 'allteams') return;
 
-  const all = deriveTeams(state.teams, state.settings,
+  const scope = currentArtScope();
+  renderArtScope(scope);
+  /* The scope reaches deriveTeams rather than being applied to its output: the
+     train row and the four tiles are DERIVED over the teams in scope, so
+     "All teams on Payments" is a real figure for that train and not the whole
+     estate's total with some rows hidden under it. */
+  const inScope = teamsInArt(state.teams, scope);
+  const all = deriveTeams(inScope, state.settings,
     { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket });
   const train = all.train;
   const table = $('allTeamsTable');
   const none = $('allTeamsNone');
-  $('allTeamsCount').textContent = '(' + state.teams.length + ' teams)';
+  const artName = scope && scope !== ART_NONE
+    ? (state.arts.find(a => a.id === scope) || {}).name : '';
+  /* One phrase, used in the four places the scope has to be said, so they can
+     never drift apart. "No ART" is right on a picker, where it is one option
+     beside the train names; it is wrong in a sentence, where "All teams on No
+     ART" reads as the name of a train somebody called No ART. */
+  const scopePhrase = scope === ART_NONE ? 'not on a train'
+    : scope ? 'on ' + artName : '';
+  /* The heading takes the same phrase in Title Case, because every heading in
+     this app is — minor words stay lowercase unless they lead, so "on" and "a"
+     do and "Not" and "Train" don't. A train's own name is dropped in exactly as
+     typed either way: re-casing one turned "TiP" into "tip" once. */
+  const scopeHeading = scope === ART_NONE ? 'Not on a Train' : scopePhrase;
+  /* Pluralised on the TOTAL when the "of" form is used: "1 of 3 team" is the
+     kind of thing that reads as a bug in everything else on the page. */
+  $('allTeamsCount').textContent = scope
+    ? '(' + inScope.length + ' of ' + state.teams.length + ' teams)'
+    : '(' + inScope.length + ' team' + (inScope.length === 1 ? '' : 's') + ')';
+  /* The heading names the scope, so a screenshot of this table says what it is
+     a table of. */
+  $('allTeamsHeading').firstChild.textContent = scope
+    ? 'Every Team ' + scopeHeading + ', Side by Side '
+    : 'Every Team, Side by Side ';
 
   /* Nothing has finished anywhere, so there is no window and nothing to line the
      teams up inside. The same two honest reasons the dashboard distinguishes. */
@@ -4862,11 +5147,19 @@ function renderAllTeams() {
     table.innerHTML = '';
     table.hidden = true;
     none.hidden = false;
-    none.textContent = state.teams.some(t => t.rows.length)
-      ? 'Nothing completed matches the ' + view.filterDisplay + ' work type filter in any team, '
-        + 'so there is nothing to compare. Pick another type — or All — above.'
-      : 'No team has any work items yet. Paste an export on the Your Data tab and every team '
-        + 'you load will appear here side by side.';
+    const where = scope ? ' ' + scopePhrase : '';
+    /* A train nobody is on yet. It is easy to reach — add one, close the dialog,
+       and it is already in the picker — and neither of the two messages below
+       fits it: there is no filter to blame and nothing to paste, because the
+       train has no teams rather than no data. */
+    none.textContent = (scope && !inScope.length)
+      ? 'No team is on ' + artName + ' yet. Open Teams in the header and set a team\u2019s '
+        + 'ART to put it on this train.'
+      : inScope.some(t => t.rows.length)
+        ? 'Nothing completed matches the ' + view.filterDisplay + ' work type filter in any team'
+          + where + ', so there is nothing to compare. Pick another type — or All — above.'
+        : 'No team' + where + ' has any work items yet. Paste an export on the Your Data tab and '
+          + 'every team you load will appear here side by side.';
     $('windowNote').innerHTML = '';
     $('allTeamsTiles').innerHTML = '';
     return;
@@ -4882,7 +5175,8 @@ function renderAllTeams() {
     : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(train.endDate) + '</strong>';
   $('windowNote').innerHTML = span + '<br>' + 'every team, as of the same date' +
     '<br>' + train.itemCount + ' item' + (train.itemCount === 1 ? '' : 's') + ' across ' +
-    state.teams.length + ' teams';
+    inScope.length + ' team' + (inScope.length === 1 ? '' : 's') +
+    (scope ? ' ' + escapeHtml(scopePhrase) : '');
 
   const s = train.summary;
   /* The train's own four, in the same order and with the same meanings as the
@@ -4907,14 +5201,19 @@ function renderAllTeams() {
   const sortCol = cols.find(c => c.key === view.teamSort);
   const dir = view.teamSortDir === 'asc' ? 1 : -1;
 
-  let rows = all.rows.slice();
+  /* With no sort asked for, a train's teams sit together — the same order the
+     header picker groups them in, so a list somebody knows by eye reads the same
+     in both places. Pressing a column heading is asking for a different order,
+     and gets it: the grouping is a default, not a constraint. */
+  const artOrder = new Map(groupTeamsByArt(inScope, state.arts).map((t, i) => [t.id, i]));
+  let rows = all.rows.slice().sort((a, b) => artOrder.get(a.id) - artOrder.get(b.id));
   if (sortCol) {
     /* Nulls last whichever way the column runs. A team with no data in this
        window has not got the shortest cycle time in the train, and letting it
        win the top of the table would be the one sort result nobody could read
        past. Ties fall back to the picker's order, so the table never reshuffles
        between two renders of the same data. */
-    const order = new Map(all.rows.map((r, i) => [r.id, i]));
+    const order = artOrder;
     const val = (r) => (sortCol.text ? sortCol.get(r) : (r.d.empty ? null : sortCol.get(r.d)));
     rows.sort((a, b) => {
       const x = val(a), y = val(b);
@@ -4939,9 +5238,20 @@ function renderAllTeams() {
   const cell = (c, r) => {
     if (c.text) {
       /* A name goes into a button's text, and it is the one piece of user text
-         in this table — escaped here as everywhere else. */
+         in this table — escaped here as everywhere else. The team's train goes
+         under it, but only while the table is showing more than one: scoped to a
+         single ART, every row would carry the same word for no reason, and the
+         heading above already says which train this is. */
+      const team = state.teams.find(t => t.id === r.id);
+      const art = (!scope && state.arts.length && team && team.artId)
+        ? (state.arts.find(a => a.id === team.artId) || {}).name : '';
+      const loose = (!scope && state.arts.length && team && !team.artId) ? 'No ART' : '';
+      /* "No ART" here and not the sentence form: this is a label in a column of
+         train names, which is the one place it reads as one option among them. */
+      const under = art || loose;
       return '<td><button type="button" class="team-open" data-open="' + escapeHtml(r.id) + '">'
-        + escapeHtml(r.name) + '</button></td>';
+        + escapeHtml(r.name) + '</button>'
+        + (under ? '<span class="team-art">' + escapeHtml(under) + '</span>' : '') + '</td>';
     }
     /* Nothing this team completed falls inside the window, so it has no rate, no
        percentile and no defect share. It may still have work open and it
@@ -4965,7 +5275,8 @@ function renderAllTeams() {
   /* The train, in a tfoot: a summary of the rows above rather than one more of
      them, which is what it is and what a screen reader is told. Its "Data to"
      is the shared date every row was read as of. */
-  const foot = '<tfoot><tr><td>All teams</td>' + cols.slice(1).map(c =>
+  const foot = '<tfoot><tr><td>' + escapeHtml(scope ? 'All teams ' + scopePhrase : 'All teams')
+    + '</td>' + cols.slice(1).map(c =>
     '<td class="figure">' + escapeHtml(c.key === 'dataEnd' ? prettyDate(train.endDate)
       : c.fmt(c.get(train))) + '</td>').join('') + '</tr></tfoot>';
 
@@ -5092,6 +5403,7 @@ function renderEmptyState() {
 function renderAll() {
   renderTeamSelect();
   renderTeamRows();
+  renderArtRows();
   renderFilterSelect();
   renderDataTable();
   renderEmptyState();
@@ -5194,6 +5506,14 @@ function selectChartTab(name) {
    Pressing a team's name selects that team and goes to its dashboard. That is
    the move the whole view exists to set up: the table says which team needs
    looking at, and this is looking at it. */
+/* Scoping the roll-up to one train. Only this view follows it — the dashboard
+   is about the one team in the header picker, which the scope has no bearing on. */
+$('artFilterSel').addEventListener('change', (e) => {
+  view.artFilter = e.target.value;
+  saveView();
+  renderAllTeams();
+});
+
 $('panel-allteams').addEventListener('click', (e) => {
   const target = e.target.closest ? e.target.closest('[data-sort],[data-open]') : null;
   if (!target) return;
@@ -5549,8 +5869,55 @@ $('teamSel').addEventListener('change', e => {
   /* Switching team is navigation, not editing — nothing to save or push. */
 });
 
+/* ── ARTs ─────────────────────────────────────────────────────────────────── */
+$('btnAddArt').addEventListener('click', () => {
+  const art = { id: newId(), name: 'ART ' + (state.arts.length + 1) };
+  state.arts.push(art);
+  save();
+  renderAll();
+  /* Same landing as a new team: the only thing to do next is name it. */
+  const input = $('artRows').querySelector('[data-art="' + art.id + '"]');
+  if (input) { input.focus(); input.select(); }
+});
+
+$('artRows').addEventListener('input', e => {
+  const id = e.target.dataset && e.target.dataset.art;
+  if (!id) return;
+  const art = state.arts.find(a => a.id === id);
+  if (!art) return;
+  art.name = e.target.value.slice(0, 120);   /* sanitizeArts' cap, where it is written */
+  save();
+  /* Not renderArtRows() — that would replace the input being typed in. The team
+     pickers above carry this name, so they are the ones redrawn. */
+  renderTeamRows();
+  renderAllTeams();
+});
+
+$('artRows').addEventListener('click', e => {
+  const id = e.target.dataset && e.target.dataset.delart;
+  if (!id) return;
+  const i = state.arts.findIndex(a => a.id === id);
+  if (i < 0) return;
+  const art = state.arts[i];
+  const on = state.teams.filter(t => t.artId === id);
+  /* The cheapest delete in the app, and the confirm says so: it takes no team
+     and no work item with it. The teams that were on it simply go back to being
+     on none, which is an ordinary state rather than a broken one. */
+  if (!confirm(on.length
+      ? 'Delete ' + art.name + '?\n\nIts ' + on.length + ' team' + (on.length === 1 ? '' : 's')
+        + ' will go back to being on no ART. No work items are affected.'
+      : 'Delete ' + art.name + '?')) return;
+  state.arts.splice(i, 1);
+  state.teams.forEach(t => { if (t.artId === id) t.artId = null; });
+  /* A filter pointing at an ART that no longer exists would hide every team. */
+  if (view.artFilter === id) { view.artFilter = ''; saveView(); }
+  save();
+  renderAll();
+  window.toast('Deleted ' + art.name);
+});
+
 $('btnAddTeam').addEventListener('click', () => {
-  const team = { id: newId(), name: 'Team ' + (state.teams.length + 1), rows: [] };
+  const team = { id: newId(), name: 'Team ' + (state.teams.length + 1), artId: null, rows: [] };
   state.teams.push(team);
   view.activeTeamId = team.id;
   save();
@@ -5574,6 +5941,20 @@ $('teamRows').addEventListener('input', e => {
   /* Not renderTeamRows() — that would replace the input being typed in. */
   renderTeamSelect();
   renderTitle();
+});
+
+/* Which train a team is on. A 'change' on the same delegated listener the name
+   boxes use, and it DOES re-render — a picker keeps its own value across a
+   render, where a text box being typed in would not, and the ART table's team
+   counts and the All Teams grouping both follow immediately. */
+$('teamRows').addEventListener('change', e => {
+  const id = e.target.dataset && e.target.dataset.artOf;
+  if (!id) return;
+  const team = state.teams.find(t => t.id === id);
+  if (!team) return;
+  team.artId = e.target.value || null;
+  save();
+  renderAll();
 });
 
 $('teamRows').addEventListener('click', e => {
@@ -5920,13 +6301,25 @@ async function squeeze(bytes, Stream, format) {
    recipient's banner can say the copy is a window, not the whole story. */
 function buildSharePayload(teamIds, win) {
   const cutoff = win && win.cutoff;
-  const teams = state.teams.filter(t => teamIds.includes(t.id)).map(t => ({
-    id: t.id,
-    name: t.name,
-    rows: serializeRows(cutoff
-      ? t.rows.filter(r => !outsideWindow(r, cutoff, !!(win && win.wip)))
-      : t.rows)
-  }));
+  const teams = state.teams.filter(t => teamIds.includes(t.id)).map(t => {
+    const out = {
+      id: t.id,
+      name: t.name,
+      rows: serializeRows(cutoff
+        ? t.rows.filter(r => !outsideWindow(r, cutoff, !!(win && win.wip)))
+        : t.rows)
+    };
+    if (t.artId) out.artId = t.artId;
+    return out;
+  });
+  /* Only the trains the shared teams are actually on. Sharing one team should
+     not publish the names of every train you support — a link is the one place
+     this app's data leaves the browser, and an ART name is the one field in it
+     that names something outside the team. A team whose ART is left out has its
+     pointer dropped with it, so nothing in the payload points at nothing. */
+  const used = new Set(teams.map(t => t.artId).filter(Boolean));
+  const arts = state.arts.filter(a => used.has(a.id)).map(a => ({ id: a.id, name: a.name }));
+
   const payload = {
     v: SHARE_PAYLOAD_V,
     sharedAt: Date.now(),
@@ -5934,6 +6327,7 @@ function buildSharePayload(teamIds, win) {
     teams,
     settings: state.settings
   };
+  if (arts.length) payload.arts = arts;
   if (cutoff) payload.from = isoOf(cutoff);
   return payload;
 }
@@ -6425,12 +6819,12 @@ window.TDCleanup = { historyAnchor, outsideWindow, windowCutoff };
    cycle time. `wip` lists the ages, in days, of the items still in flight: any
    past the 14-day default is aged work. `types` is a weighted bag. */
 const DEMO_TEAMS = [
-  { name: 'Team Kingfisher', seed: 20260819, dated: true,
+  { name: 'Team Kingfisher', seed: 20260819, dated: true, art: true,
     weeks: 40, perWeek: [4, 7], cycle: [2, 6], tailChance: 0.05, tail: [8, 14],
     wait: [1, 4], wip: [3, 5, 8, 11],
     types: ['Story', 'Story', 'Story', 'Story', 'Story', 'Story',
             'Task', 'Task', 'Bug', 'Spike'] },
-  { name: 'Team Heron', seed: 71104, dated: true,
+  { name: 'Team Heron', seed: 71104, dated: true, art: true,
     weeks: 40, perWeek: [3, 6], cycle: [3, 8], tailChance: 0.18, tail: [22, 48],
     wait: [2, 9], wip: [4, 9, 13, 17, 21, 26, 31, 38, 45],
     /* A twenty-slot bag so the defect share can be tuned finer than tenths — the
@@ -6512,6 +6906,8 @@ function loadSample() {
     + 'Kingfisher is a healthy board. Heron is the one the metrics exist to catch — a long '
     + 'tail on cycle time, and five items aged past the threshold. Wagtail is newer and has '
     + 'no created dates, so you can see what lead time does without them.\n\n'
+    + 'Kingfisher and Heron are grouped onto one Agile Release Train and Wagtail is on '
+    + 'none, so the All Teams view has something to group.\n\n'
     + 'It is added alongside anything you already have, and you can delete it later.')) return;
 
   /* A first run auto-creates an empty "My team" (hydrateState), so loading the
@@ -6522,10 +6918,22 @@ function loadSample() {
   if (state.teams.length === 1 && !state.teams[0].rows.length && state.teams[0].name === 'My team')
     state.teams = [];
 
+  /* One train holding two teams, and one team on none. That is the smallest
+     arrangement where every part of the feature does something: the picker gets
+     All trains / Estuary / No ART, the No ART group is populated, the table's
+     default grouping visibly moves a row, and scoping to the train visibly
+     changes the figures at the foot of it. A train per team would make grouping
+     look pointless, and putting all three on one would leave the No ART option
+     absent. Named for the estuary the birds share, so it reads as a train rather
+     than as a fourth team. */
+  const demoArt = { id: newId(), name: 'Estuary ART' };
+  state.arts.push(demoArt);
+
   let landOn = null;
   DEMO_TEAMS.forEach(profile => {
     const parsed = parsePastedRows(demoPaste(profile), 'auto');
-    const team = { id: newId(), name: profile.name, rows: parsed.rows };
+    const team = { id: newId(), name: profile.name,
+                   artId: profile.art ? demoArt.id : null, rows: parsed.rows };
     state.teams.push(team);
     /* Land on Heron. Kingfisher's board is the prettier one and says less: the
        reason this app reads the 85th percentile rather than the average is only

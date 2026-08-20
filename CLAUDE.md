@@ -82,6 +82,61 @@ file records what is specific to this repo and what must never regress.
   keys, titles or names of people — `privacy.html` promises this, keep it true
   and update its effective date in the same commit as any storage change.
 
+## ARTs (2026-08-20) — the first schema bump since working days
+
+`state.arts` is a list of `{id, name}` and each team carries an `artId` or null. **SCHEMA 4 → 5,
+with `sanitizeArts` and the widened `sanitizeTeams` in the same commit** — the rule at the top of
+this file, honoured. Modelled exactly like the sibling app's, down to the field names, because
+the two are read side by side; the divergences below are deliberate.
+
+- **An ART is a LABEL, never a level of maths.** Every figure is worked out per team by
+  `derive()` and All Teams adds them up. The moment an ART carries a figure of its own there are
+  two places a team's throughput can be computed and they can disagree. Keep it a filter and a
+  sort.
+- **`teamsInArt` and `groupTeamsByArt` are pure** — they take the list rather than reading
+  `state` — so a share payload can be grouped before it is adopted and tests can pin both. They
+  live in section 4 with the rest of the domain code, **not** beside `sanitizeArts`: the
+  `window.TD` export runs at the end of section 4, and `const ART_NONE` declared in section 5 is
+  a temporal-dead-zone error that takes the whole app down. It did, once, during the build.
+- **Grouping is a SORT, not a filter**: `groupTeamsByArt` returns every team. Within a group they
+  keep the order they were added in, so a list somebody knows by eye never silently reshuffles.
+- **A dangling `artId` is cleared in `hydrateState`, not guarded at every read.** It happens for
+  real — an older build drops `arts` while keeping the teams it hydrated. A hostile `artId` is
+  **dropped rather than replaced** with a fresh id: an invented one points at no ART anyway, and
+  "on no train" is a real answer where a made-up id is not.
+- **Nothing is written until there is something to write.** No `arts` key and no `artId` until
+  they exist, so a browser that never uses the feature serialises byte-identically to before and
+  its first save after this build lands doesn't rewrite the whole synced document — the same rule
+  the per-row created date follows. Pinned.
+- **`SHARE_PAYLOAD_V` was NOT bumped.** An older cached build drops `arts` and shows ungrouped
+  teams, which is graceful degradation rather than a wrong number; bumping would make every link
+  from this build unreadable to that one. A link carries **only the trains its own teams are on**
+  — sharing one team must never publish the names of every train Charles supports, and an ART
+  name is the one field in a payload that names something outside the team.
+- **`view.artFilter`, not `state.settings.artFilter`** — the one deliberate divergence from the
+  sibling, which keeps it in settings. TD already moved `activeTeamId` into `view` on the
+  reasoning that scoping the laptop should not yank the phone; the same argument applies, and it
+  keeps the filter off the schema entirely. Validated in `currentArtScope()`, which falls back to
+  every team: a scope that shows too much is visible, one that shows too little is not.
+- **One `scopePhrase`, used in all four places the scope is said** (heading, summary row, window
+  note, empty state), so they cannot drift. "No ART" is right on a picker, where it is one option
+  beside the train names, and wrong in a sentence — "All teams on No ART" reads as a train
+  somebody called No ART. The heading takes a Title Case variant, like every heading here.
+- **A train with no teams yet gets its own empty state.** It is one click to reach (add a train,
+  close the dialog) and neither of the other two messages fits: there is no filter to blame and
+  nothing to paste, because the train has no teams rather than no data.
+- The ART column in the Teams dialog is **not** an `.act` column — `width: 1%` squeezed a select
+  holding a train's name down to its chevron. It has a real capped column, and the team-name
+  column gained a `min-width` so the picker beside it cannot truncate "Team Kingfisher" to
+  "Team Ki" on a phone; the row simply outgrows the dialog and `.table-scroll` does its job.
+- **The demo puts two teams on one train and leaves one on none.** A train per team makes
+  grouping look pointless; all three on one leaves the No ART option absent. Pinned, including
+  that scoping to the train visibly moves a figure — a picker that changes nothing on the one
+  dataset anybody is shown is a feature nobody will find.
+- A fixture with a literal `</script>` in it closed the script block in tests.html and the whole
+  suite silently stopped running. Hostile-id fixtures use `'"><script>'`, the form the existing
+  team-id tests already use.
+
 ## All Teams, and the Shared Control Strip (2026-08-20)
 
 A second top-level view beside the Dashboard: every team as one row, over one shared window.

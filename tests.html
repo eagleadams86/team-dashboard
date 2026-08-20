@@ -1383,7 +1383,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 4, 'the schema marker is 4 — the version that added the working-days setting');
+  is(St.SCHEMA, 5, 'the schema marker is 5 — the version that added ARTs');
 
   /* ────────────────────────────────────────────────────────── */
   group('Work in progress — started but not finished');
@@ -1692,6 +1692,33 @@ async function run(TD, win) {
      'and nothing else goes in — no theme, no sync uid, no view state');
   is(Sh.buildSharePayload([]).teams, [], 'choosing nothing shares nothing');
   is(sp.from, undefined, 'no window means no `from` — the payload is byte-identical to before');
+
+  /* A link carries only the trains its own teams are actually on. Sharing one
+     team should not publish the names of every train someone supports — a link
+     is the one place this app's data leaves the browser, and an ART name is the
+     one field in it that names something outside the team. */
+  plant({
+    arts: [{ id: 'art-x', name: 'Payments' }, { id: 'art-y', name: 'Platform' }],
+    teams: [
+      { id: 'team-a', name: 'Alpha', artId: 'art-x', rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Bug' }] },
+      { id: 'team-b', name: 'Bravo', artId: 'art-y', rows: [{ c: '2015-02-21', s: '2015-02-14', t: '' }] },
+      { id: 'team-c', name: 'Delta', rows: [{ c: '2015-02-21', s: '2015-02-14', t: '' }] }
+    ],
+    settings: {}
+  });
+  const spArt = Sh.buildSharePayload(['team-a']);
+  is(spArt.arts, [{ id: 'art-x', name: 'Payments' }],
+     'one team’s link carries its own train and not the other one’s name');
+  is(spArt.teams[0].artId, 'art-x', 'with the team still pointing at it');
+  is(Sh.buildSharePayload(['team-c']).arts, undefined,
+     'a team on no train publishes no train names at all — no key, not an empty one');
+  is(Object.keys(Sh.buildSharePayload(['team-c'])).sort(),
+     ['label', 'settings', 'sharedAt', 'teams', 'v'],
+     'so its payload has exactly the keys it had before ARTs existed');
+  is(Sh.buildSharePayload(['team-a', 'team-b']).arts.map(a => a.name), ['Payments', 'Platform'],
+     'sharing both teams carries both trains');
+  is(Sh.buildSharePayload(['team-c']).teams[0].artId, undefined,
+     'and a team on no train has no artId on the wire');
 
   /* ────────────────────────────────────────────────────────── */
   group('Share links — how much history rides along');
@@ -2050,6 +2077,73 @@ async function run(TD, win) {
   is(win.TDShare.buildSharePayload(win.tdGet().teams.map(t => t.id)).v,
      win.TDShare.SHARE_PAYLOAD_V,
      'and the builder stamps the version the decoder checks for');
+
+  /* ────────────────────────────────────────────────────────── */
+group('ARTs — the grouping, and the boundary it crosses');
+
+  const artA = { id: 'a1', name: 'Payments' };
+  const artB = { id: 'a2', name: 'Platform' };
+  const grouped = [
+    { id: 'g1', name: 'One',   artId: 'a2', rows: [] },
+    { id: 'g2', name: 'Two',   artId: 'a1', rows: [] },
+    { id: 'g3', name: 'Three', artId: null, rows: [] },
+    { id: 'g4', name: 'Four',  artId: 'a2', rows: [] }
+  ];
+
+  is(TD.teamsInArt(grouped, 'a2').map(t => t.name), ['One', 'Four'], 'a train has its own teams');
+  is(TD.teamsInArt(grouped, TD.ART_NONE).map(t => t.name), ['Three'],
+     'and the teams on none are a group of their own');
+  is(TD.teamsInArt(grouped, '').map(t => t.name), ['One', 'Two', 'Three', 'Four'],
+     'no filter is every team, in the order they were added');
+  is(TD.teamsInArt(grouped, 'gone').map(t => t.name), [],
+     'and a train nobody is on is empty rather than everybody');
+
+  /* Grouping is a SORT, never a filter: every team comes back, in an order that
+     puts a train's teams together. Within a group they keep the order they were
+     added in, so a list somebody knows by eye never silently reshuffles. */
+  is(TD.groupTeamsByArt(grouped, [artA, artB]).map(t => t.name),
+     ['Two', 'One', 'Four', 'Three'],
+     'ARTs in the order they are listed, un-grouped teams last');
+  is(TD.groupTeamsByArt(grouped, [artB, artA]).map(t => t.name),
+     ['One', 'Four', 'Two', 'Three'],
+     'reordering the ARTs reorders the groups, not the teams inside them');
+  is(TD.groupTeamsByArt(grouped, []).map(t => t.name), ['One', 'Two', 'Three', 'Four'],
+     'with no ARTs at all the list is untouched');
+  is(TD.groupTeamsByArt(grouped, [artA, artB]).length, grouped.length,
+     'and every team survives the sort — grouping never hides one');
+
+  /* The boundary. An ART crosses the same door a team does, and a hand-edited
+     backup or a cloud document can say anything. */
+  const artsIn = win.TDState.sanitizeArts([
+    { id: 'a1', name: 'Payments' },
+    { id: '<script>', name: 'Hostile id' },
+    { id: 'a1', name: 'Duplicate id' },
+    { name: 'No id at all' },
+    'not an object'
+  ]);
+  is(artsIn.length, 5, 'every entry comes through as an ART of some kind');
+  is(artsIn[0].id, 'a1', 'a safe id is kept');
+  ok(win.TDState.ID_OK.test(artsIn[1].id), 'a hostile one is replaced with a fresh id');
+  ok(artsIn[2].id !== 'a1', 'and a duplicate gets its own rather than answering to another’s');
+  is(artsIn[4].name, 'Untitled ART', 'an entry that is not an object still gets a name');
+  is(win.TDState.sanitizeArts([{ id: 'a', name: 'x'.repeat(400) }])[0].name.length, 120,
+     'names are capped like every other label in the app');
+  is(Object.keys(artsIn[0]).sort(), ['id', 'name'],
+     'and an ART is exactly two fields — nothing else rides along');
+
+  /* A pointer at an ART that does not exist means "on no train", not "on a
+     ghost one". It happens for real: an older build drops `arts` while keeping
+     the teams it hydrated. */
+  is(win.TDState.hydrateState({ teams: [{ id: 'x', name: 'X', artId: 'nope', rows: [] }], arts: [] })
+       .teams[0].artId, null, 'a dangling pointer is cleared on the way in');
+  is(win.TDState.hydrateState({ teams: [{ id: 'x', name: 'X', artId: 'a1', rows: [] }], arts: [artA] })
+       .teams[0].artId, 'a1', 'while a real one survives');
+  /* Dropped rather than replaced: an invented id would point at no ART anyway,
+     and "on no train" is a real answer where a made-up id is not. */
+  is(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', artId: '"><script>', rows: [] }])[0].artId,
+     null, 'a hostile pointer is dropped, not swapped for a fresh id');
+  is(Object.keys(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', rows: [] }])[0]).sort(),
+     ['artId', 'id', 'name', 'rows'], 'and every team carries the field, set or not');
 
   /* ────────────────────────────────────────────────────────── */
   group('deriveTeams — one window, one date, every team');
@@ -2526,6 +2620,29 @@ async function run(TD, win) {
   ok(wagAlone.summary.agedNow === 1,
      'while its own dashboard is exactly as it was before the shift',
      String(wagAlone.summary.agedNow));
+
+  /* The demo groups Kingfisher and Heron onto one train and leaves Wagtail on
+     none. That is the smallest arrangement where every part of ARTs does
+     something: the picker gets All trains / the train / No ART, the No ART
+     group is populated, and scoping to the train visibly changes the figures at
+     the foot of the All Teams table. A train per team would make grouping look
+     pointless; all three on one would leave the No ART option absent. */
+  const demoArts = win.tdGet().arts || [];
+  is(demoArts.length, 1, 'the demo has exactly one train');
+  const onArt = demo.filter(t => t.artId);
+  const offArt = demo.filter(t => !t.artId);
+  is(onArt.map(t => t.name), ['Team Kingfisher', 'Team Heron'], 'two teams on it');
+  is(offArt.map(t => t.name), ['Team Wagtail'], 'and one on none, so both groups do something');
+  ok(onArt.every(t => t.artId === demoArts[0].id), 'both point at the train that exists');
+  /* Scoping has to change a figure, or the picker is a control that appears to
+     do nothing on the one dataset anybody is shown. */
+  const trainOnly = TD.deriveTeams(TD.teamsInArt(demo, demoArts[0].id),
+    win.TDState.normalizeSettings({}), { filterValue: null, months: '3', bucket: 'week' });
+  const everyone = TD.deriveTeams(demo, win.TDState.normalizeSettings({}),
+    { filterValue: null, months: '3', bucket: 'week' });
+  ok(trainOnly.train.summary.completedTotal < everyone.train.summary.completedTotal,
+     'and scoping to it visibly changes what the train row says',
+     trainOnly.train.summary.completedTotal + ' vs ' + everyone.train.summary.completedTotal);
 
   /* The work item age chart's argument is that a dot above the 85% line has
      outlasted almost everything the team has delivered. Heron is the only team
