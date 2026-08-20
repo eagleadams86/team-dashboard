@@ -333,7 +333,30 @@ select { cursor: pointer; }
 .chart-wrap { position: relative; height: 300px; }
 
 /* data table */
-.table-scroll { overflow-x: auto; }
+/* ── A scroll box has to be POSITIONED, or iOS lets the page scroll instead ──
+   `overflow-x: auto` is the whole design here: a table too wide for a phone
+   scrolls INSIDE its card and the page stays the width of the screen. On iOS
+   that only half worked. WebKit clipped the table on screen but still counted
+   its full width in the DOCUMENT's scrollable area, so the page itself became
+   horizontally scrollable — and everything past the viewport was empty, because
+   the thing making it scrollable was drawn clipped. Pinch out to see where the
+   page ends and you get the app on the left and a wide band of nothing on the
+   right. Measured on iOS 27 at a 402px viewport: `documentElement.scrollWidth`
+   906 with a 402px body.
+
+   `position: relative` is what fixes it, and nothing weaker does: a stacking
+   context alone (`isolation: isolate`) leaves it at 906, and so does spelling
+   out `overflow-y`. `contain: paint` works but takes the containing block for
+   fixed descendants with it, which is a bigger promise than this needs. All
+   four measured side by side in Safari before choosing.
+
+   No visual change and no new containing block worth having: the only absolutely positioned thing inside one is
+   `.sr-only`, which is a 1px box nobody sees.
+
+   Chrome and Firefox were always right here, which is why this went unnoticed —
+   it is only ever visible on the phone. Mirrored in Sprint Predictability, Money Map and
+   Golf Handicap. */
+.table-scroll { overflow-x: auto; position: relative; }
 /* A focus ring is drawn *outside* the box it belongs to (2px wide, 2px offset),
    and an overflow container clips anything that leaves it — so the team-name
    box, flush against the left edge of this scroller, lost the left side of its
@@ -2701,6 +2724,9 @@ function isBackup(raw) {
 
 window.tdGet = serializeState;
 window.tdHasData = hasData;
+/* Pinned by tests.html — see the openModal comment above for why the list of
+   keyboard-raising types is a decision worth writing down. */
+window.tdRaisesKeyboard = raisesKeyboard;
 /* Pure helpers tests.html pins. Kept beside the sync hooks because they are the
    same boundary: everything here decides what a copy from outside is allowed to
    turn into. */
@@ -3706,13 +3732,67 @@ document.addEventListener('click', e => {
   if (!h) return;
   $('helpTitle').textContent = h.title;
   $('helpBody').textContent = h.body;
-  $('helpDialog').showModal();
+  openModal($('helpDialog'));
 });
 $('helpCloseBtn').addEventListener('click', () => $('helpDialog').close());
-$('dataBtn').addEventListener('click', () => $('dataDialog').showModal());
+$('dataBtn').addEventListener('click', () => openModal($('dataDialog')));
 $('dataCloseBtn').addEventListener('click', () => $('dataDialog').close());
-$('manageBtn').addEventListener('click', () => $('manageDialog').showModal());
+$('manageBtn').addEventListener('click', () => openModal($('manageDialog')));
 $('manageCloseBtn').addEventListener('click', () => $('manageDialog').close());
+
+/* ── Opening a dialog on a touch screen ─────────────────────────────────────
+   `showModal()` runs the spec's dialog focusing steps: focus the `autofocus`
+   element, or failing that the FIRST FOCUSABLE ONE, whatever it happens to
+   be. Nothing here asks for that — there is no `autofocus` anywhere in the
+   file — so which dialogs summoned a phone's keyboard was decided entirely by
+   which happened to open with a text box rather than a button. Teams & boards
+   did, because its markup opens on a team-name box; Back up, Share, Tidy up
+   and Help did not. On a phone the keyboard then covers half the dialog
+   before you have read it.
+
+   So on a COARSE pointer the focus is moved off the field and onto the dialog
+   itself. Focus still goes INTO the dialog, and that part is not optional:
+   leave it on the button behind and a keyboard or screen-reader user is
+   stranded outside a thing covering the page. Landing on the CONTAINER is the
+   arrangement the ARIA practices offer for exactly this case — every dialog
+   here carries `aria-labelledby`, so it announces itself, and Tab from there
+   reaches the first field. `tabIndex` is set at open rather than in the
+   markup: a dialog is a focus target only for the moment it opens.
+
+   `(pointer: coarse)` and NOT the width breakpoint the chrome uses: the
+   keyboard is a fact about touch, not about width. A desktop window dragged
+   narrow keeps its click-and-type, and a wide tablet is still spared.
+
+   It runs only when the browser actually landed on a text-entry field, so it
+   is a no-op for the dialogs that open on a button and stays right for one
+   that later gains a field at the top. And it deliberately does nothing to a
+   caller that focuses something itself AFTERWARDS, which is how a window
+   whose whole point is typing can still ask for the keyboard.
+
+   Ported from Money Map, where it was found and worked out, and mirrored
+   here, in Sprint Predictability, Golf Handicap and PAPTrack on the same
+   afternoon. */
+const KEYBOARD_TYPES = new Set(['text', 'number', 'search', 'tel', 'url', 'email',
+  'password', 'date', 'month']);
+/* Which elements a phone answers with a keyboard — pure over {tagName, type},
+   so the list is pinned by tests rather than rediscovered the next time a
+   dialog opens on a field nobody thought about. A checkbox, a button and a
+   select all raise nothing, which is why the dialogs that open on one are left
+   exactly as they were. */
+function raisesKeyboard(el) {
+  if (!el) return false;
+  return el.tagName === 'TEXTAREA'
+    || (el.tagName === 'INPUT' && KEYBOARD_TYPES.has(el.type));
+}
+function openModal(dlg) {
+  dlg.showModal();
+  if (!window.matchMedia('(pointer: coarse)').matches) return;
+  const el = document.activeElement;
+  if (!el || !dlg.contains(el)) return;
+  if (!raisesKeyboard(el)) return;
+  dlg.tabIndex = -1;
+  dlg.focus();
+}
 
 /* A modal <dialog> ignores backdrop clicks by default, which reads as the app
    being stuck. Clicking outside now closes, same as the button and Escape —
@@ -4132,7 +4212,7 @@ $('clearBtn').addEventListener('click', () => {
   $('clearSyncWarn').textContent = signedIn
     ? 'You are signed in, so this also clears the copy in your Google account. Your other devices will ask before clearing themselves.'
     : '';
-  clearDialog.showModal();
+  openModal(clearDialog);
 });
 
 $('clearBackupBtn').addEventListener('click', downloadBackup);
@@ -4398,7 +4478,7 @@ function openShare() {
   });
   syncSelectAll();
   refreshShareLink();
-  $('shareDialog').showModal();
+  openModal($('shareDialog'));
   $('shareDialog').scrollTop = 0;
 }
 
@@ -4642,7 +4722,7 @@ function openCleanup() {
   if (!$('cleanupTeams').querySelector('input:checked'))
     $('cleanupTeams').querySelectorAll('input:not([disabled])').forEach(i => { i.checked = true; });
   refreshCleanupPreview();
-  $('cleanupDialog').showModal();
+  openModal($('cleanupDialog'));
   /* showModal() focuses the first control and scrolls it into view, which on a
      short screen lands past the heading. Start at the top. */
   $('cleanupDialog').scrollTop = 0;
@@ -5263,7 +5343,7 @@ function chooseSyncSource(local, remote, remoteUpdatedAt) {
     deviceBtn.addEventListener('click', onDevice);
     googleBtn.addEventListener('click', onGoogle);
     dlg.addEventListener('cancel', preventCancel);
-    dlg.showModal();
+    openModal(dlg);
   });
 }
 

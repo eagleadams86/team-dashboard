@@ -224,3 +224,40 @@ file records what is specific to this repo and what must never regress.
 - After changes: browser-test locally (preview server, port 8013), run
   tests.html, commit, push, verify the Pages deploy and CI, spot-check live —
   then stop the preview server.
+
+## Dialogs and Scroll Boxes on a Phone (2026-08-20)
+
+- **Every modal opens through `openModal(dlg)`, never `showModal()` directly.**
+  `showModal()` runs the spec's dialog focusing steps — the `autofocus` element, or failing
+  that the FIRST FOCUSABLE one — and there is no `autofocus` anywhere in the file, so which
+  dialogs raised a phone's keyboard was decided entirely by which happened to open with a
+  text box — Teams & boards did, because its markup opens on a
+  team-name box; Back up, Share, Tidy up and Help did not. The keyboard then covers half the dialog before it has been read. On a
+  COARSE pointer `openModal` moves focus off the field and onto the dialog itself.
+  - **Focus still goes INTO the dialog** — that part is not optional, or a keyboard or
+    screen-reader user is stranded outside a thing covering the page. The CONTAINER is what
+    the ARIA practices offer for this case: every dialog here carries `aria-labelledby`, so
+    it announces itself, and Tab reaches the first field. `tabIndex` is set at open rather
+    than in the markup — a dialog is a focus target only for that moment.
+  - **`(pointer: coarse)`, NOT a width breakpoint.** The keyboard is a fact about touch, not
+    width: a desktop window dragged narrow keeps its click-and-type, a wide tablet is spared.
+  - **`raisesKeyboard(el)` is pure and pinned** over `{tagName, type}`, so the type list is a
+    test rather than a rediscovery. It is a no-op when the browser landed on a button, a
+    picker or a disclosure, which is what leaves those dialogs exactly as they were.
+  - A dialog that genuinely wants the keyboard needs no special case: call `openModal` and
+    then focus the field yourself afterwards, which simply wins.
+  Ported from Money Map, and mirrored across the app family the same afternoon.
+- **A horizontal scroll box must carry `position: relative`.** `overflow-x: auto` is the
+  whole design for `.table-scroll` — content too wide for a phone scrolls inside its card and the
+  page stays the width of the screen. On iOS that only half worked: WebKit clipped it on
+  screen but still counted its full width in the DOCUMENT's scrollable area, so the page
+  itself became horizontally scrollable into a band of nothing. Measured on iOS 27 at a
+  402px viewport: `documentElement.scrollWidth` 906 against a 402px body. `position:
+  relative` is what fixes it and nothing weaker does — a stacking context alone
+  (`isolation: isolate`) leaves it at 906, and so does spelling out `overflow-y`;
+  `contain: paint` works but takes the containing block for fixed descendants with it.
+  Chrome and Firefox were always right here, so it is only ever visible on a phone.
+- **Date fields are `appearance: none`, and that lives in `theme.css`, not here.** WebKit
+  ignores an author `box-sizing` on a natively drawn control, so `width: 100%` on a date
+  input meant the column PLUS its padding and border and the box hung over its neighbour.
+  See rule 11 in the theme pack's CLAUDE.md; don't re-fix it locally.
