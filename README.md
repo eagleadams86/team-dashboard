@@ -10,8 +10,12 @@ The app is called **Flow Metrics** on screen. The repo, the Pages path, the Fire
 say *team-dashboard* — renaming any of those would break existing links, backups and sync,
 so the rename is deliberately a display-only one.
 
-Paste your work items and the charts are grouped into four tabs — **by what the data means**,
-so the measures that move together are read together:
+There are two ways to read the numbers: the **Dashboard**, which is one team in detail, and
+**[All Teams](#all-teams-which-one-needs-you)**, which is every team side by side over one shared
+window. Both are driven by the same work type filter, date window and grouping.
+
+On the Dashboard the charts are grouped into four tabs — **by what the data means**, so the
+measures that move together are read together:
 
 | Group | Question it answers | What's plotted |
 |---|---|---|
@@ -133,6 +137,78 @@ noted exception: how many tile columns there are. This app's headline row always
 four tiles and so states its column counts outright, while the sibling's tile groups vary in
 size and are still laid out by `auto-fit` — as this app's own per-group tile rows are.
 
+## All Teams: Which One Needs You
+
+The dashboard answers *how is this team doing?*. **All Teams** answers *which of my teams needs
+me?* — which, before it existed, meant visiting eight teams in the picker and holding their
+numbers in your head.
+
+One row per team, one column per question people actually scan for:
+
+| Column | The question |
+|---|---|
+| **Completed** / **Per week** | Who is delivering, and at what pace? |
+| **85th cycle time** | Who is slow, and who is unpredictable? |
+| **In progress** / **WIP vs month** | Who is overloaded? |
+| **Aged** | Who has work going stale? |
+| **Defect rate** | Who has a quality problem? |
+| **Data to** | …and whose figures are worth trusting at all |
+
+**Press a column heading to sort by it.** Every numeric column runs worst-first on the first
+press — most aged, longest cycle time — because the reason anyone presses a heading is to find
+the outlier, not to admire the ordering. *Data to* runs the other way, since the interesting end
+there is the oldest export. Press again to reverse. A team with no figure in a column always
+sorts last, whichever way it is running: a team with no data has not got the shortest cycle time
+in the train.
+
+**Press a team's name to open its dashboard.** That is the move the whole view sets up — the
+table says who needs looking at, and this is looking at them. The team you currently have
+selected is marked in the table, so you can always find your way back to where you were.
+
+The tab appears once you have a **second team**, the same rule the team picker follows: with one
+team there is no comparison to make.
+
+### One Shared Date, and Why It Matters
+
+Every row is read **over the same window and as of the same date** — the newest date any team
+has. Without that, "the last 3 months" would mean a different three months in every row, and a
+team that stopped exporting in June would show a healthy June quarter next to everyone else's
+September one.
+
+That is also why **Data to** earns a column. A team three weeks behind everyone else has three
+weeks of zero throughput dragging its rate down and three weeks of extra ageing on everything it
+has open — and none of that is visible in the numbers themselves. Wagtail in the demo is nine
+days behind for exactly this reason: it reads slower on this page than on its own dashboard, and
+the date column is the only thing that explains why. **Before drawing any conclusion about a
+team, check its export is current.**
+
+Freshness is a property of the export, not of a work type: filter to defects and *Data to* still
+shows when the team last sent anything, not when it last had a bug. A healthy team with no recent
+defects is not a stale team.
+
+### The Bottom Row Is Derived, Not Added Up
+
+The four tiles and the **All teams** row describe the whole train. Totals — items completed, work
+in progress, aged work — really are the sum of the rows above them. The **85th percentile is
+not**: the 85th percentile of eight teams is not the average of their eight percentiles, and a
+summary row built that way would be quietly wrong in its most-read column. It is worked out over
+every item any team completed, exactly as if the teams were one team.
+
+That has a consequence worth knowing. Because it pools *items* rather than *teams*, the train
+figure is weighted by how much each team delivers — so a large fast team holds it down while a
+small team with a long tail sits well above it. On the demo the train reads 7 days while Heron
+reads 23. Both are true. **Read the tile for a promise about work you haven't assigned yet; read
+the column to find who needs help.** The tile cannot tell you a team is struggling, and it isn't
+meant to.
+
+### Teams With Nothing to Say
+
+A team still gets a row when it has no figures — that is a finding, not an omission — but it says
+what it can rather than showing a line of dashes. A team that has **started work and finished
+none** in the window shows its work in progress and its export date, because "this team has
+stopped finishing things" is precisely what someone scanning this table is looking for. A team
+with no work items at all shows dashes throughout.
+
 ## Teams
 
 Each team keeps its own list of work items; the picker in the header chooses which one the
@@ -168,7 +244,12 @@ that has a tail.
 |---|---|
 | **Kingfisher** | The healthy board. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. The baseline the other two read against. |
 | **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Kingfisher's. |
-| **Wagtail** | A newer team: four months of history and **no created dates at all**, so the lead-time chart's "add a Created column" face is reachable, and the date window has a team it visibly runs past. Also proves each team's data stands on its own. |
+| **Wagtail** | A newer team: four months of history and **no created dates at all**, so the lead-time chart's "add a Created column" face is reachable, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
+
+On **All Teams** the three read as a train with one obvious problem: Heron's 85th percentile is
+three or four times the other two, it holds most of the aged work, and its defect rate is the
+highest — while Wagtail's *Data to* column quietly explains why its delivery rate looks worse
+there than on its own page.
 
 The **work item age** chart reads differently on each of the three, which is what makes it worth
 looking at from the demo: Kingfisher has nothing past the threshold and every dot below its own

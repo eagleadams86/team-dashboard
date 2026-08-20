@@ -82,6 +82,61 @@ file records what is specific to this repo and what must never regress.
   keys, titles or names of people — `privacy.html` promises this, keep it true
   and update its effective date in the same commit as any storage change.
 
+## All Teams, and the Shared Control Strip (2026-08-20)
+
+A second top-level view beside the Dashboard: every team as one row, over one shared window.
+Rules it must keep:
+
+- **`deriveTeams()` computes NOTHING.** Every figure in the table comes out of the same
+  `derive()` the dashboard reads, once per team, so a row and that team's own page can never
+  disagree — which matters more here than anywhere, because the table is what gets acted on
+  before anyone looks at the detail.
+- **The train is DERIVED over the concatenated rows, never summed.** Totals could be added up;
+  percentiles cannot. The 85th percentile of eight teams is not the average of their eight
+  percentiles, and a summary row built that way would be quietly wrong in its most-read column.
+  A consequence to keep in the help text: pooling *items* weights the figure by how much each
+  team delivers, so the train can read 7 while a small slow team reads 23. Both true. The tile
+  is for promising unassigned work; the column is for finding who needs help.
+- **`derive()` takes an `asOf` override, and it may only ever move a date LATER.** An earlier one
+  would hide data rather than align it, and no caller should be able to ask for that by accident.
+  `deriveTeams` derives the train first and imposes its `endDate` on every team, because without
+  one shared date "the last 3 months" is a different three months per row.
+- **`dataEnd` is read off the UNFILTERED `rows`, not off `items`.** Freshness is a property of
+  the export; filter to defects and a healthy team's last defect might be a month old, which is a
+  fact about its quality and would send someone chasing a perfectly current export. It is also
+  taken before `asOf` can move anything.
+- **The empty return carries `dataEnd` and `inProgressCount`.** It was moved below the date scan
+  to be able to: a team with five items open and nothing finished is a finding, and a row of
+  dashes claiming it has no work in progress would hide it. Don't move it back above.
+- **The control strip is SHARED between the two views** (`#viewControls`, lifted out of
+  `panel-dashboard` into `<main>`), because all three controls mean the same thing to both and a
+  second copy would be two controls over one piece of state. Two consequences that bit during the
+  build: the three handlers must call `renderViews()`, not `renderDashboard()` — the first
+  version left the strip working on one tab and inert on the other — and `#windowNote` is written
+  only by whichever view `activeTab` says is on screen.
+- **`renderAllTeams()` returns immediately unless it is the view on screen.** Every row is a full
+  `derive()`, forecast and all, so running it behind a hidden panel would multiply the most
+  expensive thing the app does by the number of teams on every keystroke anywhere else.
+  `selectTab` re-renders on the way in.
+- The tab is hidden below two teams, the same threshold as the picker, and `selectTab` refuses to
+  land on a hidden tab — a saved position outlives the team that was deleted, or arrives with a
+  one-team share link. It DOES appear in a shared view, which is the point: an RTE can send a
+  whole train's roll-up as one link.
+- Sort state lives in `view` (`teamSort`, `teamSortDir`) — per device, no schema. Numeric columns
+  run worst-first on the first press; **Data to runs the other way**, because its interesting end
+  is the oldest export. **Nulls sort last in both directions**, or a team with no data wins the
+  top of "shortest cycle time". Which way a column runs on a first press travels on the header
+  button as `data-desc` rather than being re-derived in the handler.
+- **The demo's Wagtail carries `stale: 9`**, shifting its whole history back nine days. Its own
+  dashboard is untouched (every window hangs off the latest date in the data, so the picture moves
+  with it); on All Teams it is the team with nine silent days dragging its rate down. Without a
+  team like it the Data to column is a row of matching dates that looks like it does nothing —
+  which is exactly what the demo rule exists to prevent.
+- **No chart here, and that was a decision.** A line per team needs a categorical palette, and the
+  theme pack has none — only `--accent` and `--serious`, which every chart in the app uses as its
+  two-series pair. Inventing colours locally is precisely the drift the pack exists to stop.
+  If this ever wants a chart, it goes through `tokens.json` and the contrast gate first.
+
 ## The Work Item Age Chart (2026-08-20)
 
 The fourth card in Health, and the only chart in the app whose points are ITEMS rather than
