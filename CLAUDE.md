@@ -225,7 +225,7 @@ file records what is specific to this repo and what must never regress.
   tests.html, commit, push, verify the Pages deploy and CI, spot-check live —
   then stop the preview server.
 
-## Dialogs and Scroll Boxes on a Phone (2026-08-20)
+## Fields, Dialogs and Scroll Boxes (2026-08-20)
 
 - **Every modal opens through `openModal(dlg)`, never `showModal()` directly.**
   `showModal()` runs the spec's dialog focusing steps — the `autofocus` element, or failing
@@ -247,6 +247,32 @@ file records what is specific to this repo and what must never regress.
   - A dialog that genuinely wants the keyboard needs no special case: call `openModal` and
     then focus the field yourself afterwards, which simply wins.
   Ported from Money Map, and mirrored across the app family the same afternoon.
+- **A box you land on has its contents SELECTED**, so typing replaces the value
+  rather than running on to the end of it — one delegated `focusin` listener
+  (`SELECT_ON_FOCUS`), which bubbles where `focus` does not, so it covers every
+  field including the ones built a moment before a dialog is shown, with nothing
+  to remember when adding one. Ported from Money Map 2026-08-20 and now in every
+  app in the family. Four things it must keep doing:
+  - **The type list is a WHITELIST.** A date, a checkbox, a range and a file
+    picker have no text for `select()` to take, and a type nobody has thought
+    about is left alone rather than silently swept in.
+  - **A TEXTAREA is never touched** — the `INPUT` check does it. A box you write
+    several lines into should not be one keystroke from gone, and unlike a
+    mistyped figure there is nothing on screen to retype it from.
+  - **`data-keep-caret` is the by-hand opt-out for a single-line PROSE field**,
+    which the TEXTAREA rule cannot catch. Nothing here carries it — a team name and a
+    work-item label are values, not prose — but it is wired so the next one has it.
+  - **The one-shot `mouseup` guard is load-bearing, and only for a POINTER-driven
+    focus.** A click focuses on mousedown and then places the caret on mouseup,
+    which collapses the selection made a moment earlier: without it the feature
+    works from the keyboard and looks broken with a mouse, which is how everybody
+    would meet it. A `{once:true}` listener left hanging after a Tab would sit
+    there and eat the caret placement of a later, deliberate click — hence
+    `focusFromPointer`, set on a capturing `pointerdown`. Clicking a second time
+    places the caret normally (the field is focused by then, so no focusin
+    fires), and that is the way back in for editing rather than replacing.
+  It does not fight `openModal`: on a touch screen focus goes to the dialog, so
+  nothing is selected until you tap a field.
 - **A horizontal scroll box must carry `position: relative`.** `overflow-x: auto` is the
   whole design for `.table-scroll` — content too wide for a phone scrolls inside its card and the
   page stays the width of the screen. On iOS that only half worked: WebKit clipped it on
