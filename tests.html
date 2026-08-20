@@ -2052,7 +2052,112 @@ async function run(TD, win) {
      'and the builder stamps the version the decoder checks for');
 
   /* ────────────────────────────────────────────────────────── */
-  group('work item age — the chart must never contradict the tiles');
+  group('deriveTeams — one window, one date, every team');
+
+  /* Three teams whose exports stop on different days. Without a shared date,
+     "the last 3 months" is a different three months in every row and the table
+     is comparing quarters, which is the whole reason this function exists. */
+  const tA = { id: 'ta', name: 'Alpha', rows: [
+    { completed: D(2015, 5, 1),  started: D(2015, 4, 20), created: null, type: 'Story' },
+    { completed: D(2015, 5, 10), started: D(2015, 5, 1),  created: null, type: 'Bug' },
+    { completed: null,           started: D(2015, 4, 25), created: null, type: 'Story' }
+  ] };
+  const tB = { id: 'tb', name: 'Bravo', rows: [
+    { completed: D(2015, 4, 2), started: D(2015, 3, 20), created: null, type: 'Story' },
+    { completed: D(2015, 4, 9), started: D(2015, 4, 1),  created: null, type: 'Story' }
+  ] };
+  const tC = { id: 'tc', name: 'Charlie', rows: [] };
+  const teamsFixture = [tA, tB, tC];
+  const rollup = TD.deriveTeams(teamsFixture, SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+
+  is(iso(rollup.asOf), '2015-05-10', 'the shared date is the newest date anybody has');
+  is(rollup.rows.map(r => r.name), ['Alpha', 'Bravo', 'Charlie'],
+     'rows come back in the picker’s order, not sorted by anything');
+  is(rollup.rows.filter(r => !r.d.empty).map(r => iso(r.d.endDate)),
+     ['2015-05-10', '2015-05-10'],
+     'every team is read as of that one date, not as of its own last export');
+  is(rollup.rows.map(r => iso(r.d.dataEnd)), ['2015-05-10', '2015-04-09', null],
+     'while dataEnd stays each team’s own — which is what makes a stale team visible');
+
+  /* Bravo's export stopped a month early, so against the shared date it has a
+     month of zero throughput. That is the point: the roll-up shows it slower
+     than its own dashboard does, and the Data to column says why. */
+  const bravoAlone = TD.derive(tB.rows, SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+  const bravoShared = rollup.rows.find(r => r.name === 'Bravo').d;
+  ok(bravoShared.summary.avgThroughput < bravoAlone.summary.avgThroughput,
+     'a team read against a later shared date delivers at a lower rate than on its own page',
+     bravoShared.summary.avgThroughput + ' vs ' + bravoAlone.summary.avgThroughput);
+  is(bravoShared.summary.completedTotal, bravoAlone.summary.completedTotal,
+     'though it completed exactly the same items — only the periods it is spread over changed');
+
+  /* An empty team is a row, not an omission: "this team has nothing" is a
+     finding, and a table that quietly dropped it would hide a whole team. */
+  const charlie = rollup.rows.find(r => r.name === 'Charlie');
+  is(charlie.d.empty, true, 'a team with no rows still gets a row of its own');
+  is(charlie.d.dataEnd, null, 'with no export date to state');
+
+  /* The train is DERIVED over every row, never summed. Totals could be added
+     up; percentiles cannot, and the percentile is the most-read column. */
+  is(rollup.train.summary.completedTotal,
+     rollup.rows.reduce((n, r) => n + (r.d.empty ? 0 : r.d.summary.completedTotal), 0),
+     'the train’s totals do add up to the teams’');
+  is(rollup.train.summary.currentWip,
+     rollup.rows.reduce((n, r) => n + (r.d.empty ? 0 : r.d.summary.currentWip), 0),
+     'and so does its work in progress');
+  const pooled = TD.derive(tA.rows.concat(tB.rows), SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+  is(rollup.train.summary.p85CycleTime, pooled.summary.p85CycleTime,
+     'its percentile is the one over every item, exactly as if the teams were one team');
+
+  /* Nothing finished anywhere: there is no window to line the teams up inside,
+     so there is nothing to compare and the view says so once. */
+  const noneDone = TD.deriveTeams(
+    [{ id: 'x', name: 'X', rows: [{ completed: null, started: D(2015, 4, 1), created: null, type: 'Story' }] }],
+    SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+  is(noneDone.train.empty, true, 'nothing completed anywhere means no train');
+  is(noneDone.rows, [], 'and no rows to draw');
+  is(noneDone.asOf, null, 'and no shared date to draw them against');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('deriveTeams — the two things a shared date must not do');
+
+  /* It may only ever move a date LATER. An earlier one would hide data rather
+     than line it up, and no caller should be able to ask for that by accident. */
+  const early = TD.derive(tA.rows, SAMPLE_SETTINGS,
+    { filterValue: '', months: 'all', asOf: D(2015, 1, 1) });
+  is(iso(early.endDate), '2015-05-10', 'an asOf before this team’s own last date is ignored');
+  const later = TD.derive(tA.rows, SAMPLE_SETTINGS,
+    { filterValue: '', months: 'all', asOf: D(2015, 6, 1) });
+  is(iso(later.endDate), '2015-06-01', 'a later one is taken');
+  is(iso(later.dataEnd), '2015-05-10', 'and never touches what the team’s own data runs to');
+  ok(later.summary.agedNow >= early.summary.agedNow,
+     'work in progress ages against the shared date, which is what an RTE is asking about',
+     later.summary.agedNow + ' vs ' + early.summary.agedNow);
+  is(TD.derive(tA.rows, SAMPLE_SETTINGS, { filterValue: '', months: 'all', asOf: 'yesterday' })
+       .endDate.getTime(), D(2015, 5, 10).getTime(), 'and anything that is not a date is ignored');
+
+  /* Freshness is a property of the EXPORT, not of a work type. Filter to
+     defects and a healthy team's last defect might be a month old — a fact
+     about its quality, not about its data, and reporting it in a freshness
+     column would send someone chasing an export that is perfectly up to date. */
+  is(iso(TD.derive(tA.rows, SAMPLE_SETTINGS, { filterValue: 'Story', months: 'all' }).dataEnd),
+     '2015-05-10', 'dataEnd reads the whole export, not the filtered slice');
+  is(iso(TD.derive(tA.rows, SAMPLE_SETTINGS, { filterValue: 'Story', months: 'all' }).endDate),
+     '2015-05-01', 'while every figure beside it still honours the filter');
+
+  /* A team with rows but nothing finished has no window — and two true things
+     to say anyway, both of them exactly what someone scanning the table is
+     looking for. Dashes everywhere would hide a team that has stopped
+     finishing work under the absence of the numbers around it. */
+  const stalled = TD.derive(
+    [{ completed: null, started: D(2015, 4, 1), created: null, type: 'Story' },
+     { completed: null, started: D(2015, 4, 8), created: null, type: 'Bug' }],
+    SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+  is(stalled.empty, true, 'no completions, no charts');
+  is(stalled.inProgressCount, 2, 'but the work it has open is still counted');
+  is(iso(stalled.dataEnd), '2015-04-08', 'and its export date is still known');
+
+  /* ────────────────────────────────────────────────────────── */
+    group('work item age — the chart must never contradict the tiles');
 
   /* This chart plots the same items the work in progress and aged work tiles
      COUNT, from the same dates and the same threshold. If the two ever disagree
@@ -2394,6 +2499,34 @@ async function run(TD, win) {
      'and drops an item out of Heron\u2019s aged count, so the ageing rule follows too',
      heronWork.summary.agedNow + ' vs ' + heron.summary.agedNow);
 
+  /* Wagtail's export stops nine days before everybody else's, which is what
+     makes the All teams view's Data to column demonstrable: without a team like
+     it that column is a row of matching dates that looks like it does nothing.
+     Its OWN dashboard has to be untouched by the shift, or the demo would be
+     paying for the column with a team that reads wrong everywhere else. */
+  const wagRoll = TD.deriveTeams(demo, win.TDState.normalizeSettings({}),
+    { filterValue: null, months: '3', bucket: 'week' });
+  const wagRow = wagRoll.rows.find(r => /Wagtail/.test(r.name));
+  const others = wagRoll.rows.filter(r => !/Wagtail/.test(r.name));
+  ok(others.every(r => r.d.dataEnd > wagRow.d.dataEnd),
+     'Wagtail’s export stops before every other team’s, so Data to has something to show',
+     wagRoll.rows.map(r => r.name + '=' + iso(r.d.dataEnd)).join(' '));
+  const wagAlone = settle(demoOf(demo, 'Team Wagtail').rows, '3');
+  /* The shared date moves the whole WINDOW forward, not just the periods inside
+     it, so the roll-up's three months start nine days later than Wagtail's own
+     and a little of its oldest history falls out of the back. That is right —
+     every team is being asked about the same three months — and it is why the
+     count can differ as well as the rate. */
+  ok(wagRow.d.summary.completedTotal <= wagAlone.summary.completedTotal,
+     'the shared window starts later, so it can only ever hold less of Wagtail’s history',
+     wagRow.d.summary.completedTotal + ' vs ' + wagAlone.summary.completedTotal);
+  ok(wagRow.d.summary.avgThroughput < wagAlone.summary.avgThroughput,
+     'and it reads slower in the roll-up, because the shared window holds its silent days',
+     wagRow.d.summary.avgThroughput + ' vs ' + wagAlone.summary.avgThroughput);
+  ok(wagAlone.summary.agedNow === 1,
+     'while its own dashboard is exactly as it was before the shift',
+     String(wagAlone.summary.agedNow));
+
   /* The work item age chart's argument is that a dot above the 85% line has
      outlasted almost everything the team has delivered. Heron is the only team
      that demonstrates it, and only while its tail survives. */
@@ -2498,6 +2631,67 @@ async function run(TD, win) {
      'and loading it switches to the dashboard, not the paste box you pressed it from');
   ok(APP_SRC.includes("$('btnSampleData').hidden = state.teams.some(t => t.rows.length)"),
      'the offer goes once anything holds data — it is a first-run affordance, not a button');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the All teams table on screen');
+
+  /* Driven through the real app rather than through derive(), because the two
+     rules most easily got wrong here are about the TABLE: which way a column
+     sorts on its first press, and whether a team with nothing to say still
+     appears. Both are invisible to a test of the maths. */
+  plant({ teams: [
+    { id: 'p1', name: 'Petrel',  rows: [
+      { c: '2015-05-01', s: '2015-04-28', t: 'Story' },
+      { c: '2015-05-02', s: '2015-04-29', t: 'Story' },
+      { c: null,         s: '2015-01-10', t: 'Story' } ] },
+    { id: 'p2', name: 'Osprey',  rows: [
+      { c: '2015-04-01', s: '2015-03-30', t: 'Story' } ] },
+    { id: 'p3', name: 'Avocet',  rows: [] }
+  ], settings: {} });
+  win.selectTab('allteams');
+
+  const cellsOf = (i) => [...win.document.querySelectorAll('#allTeamsTable tbody tr')]
+    .map(tr => tr.cells[i].innerText.trim());
+  const press = (key) => {
+    win.document.querySelector('[data-sort="' + key + '"]').click();
+    return cellsOf(0);
+  };
+
+  is(win.document.getElementById('tab-allteams').hidden, false,
+     'three teams, so the view is on offer');
+  is(cellsOf(0), ['Petrel', 'Osprey', 'Avocet'],
+     'and opens in the picker’s order, where a reader expects to find a team');
+  is(win.document.querySelectorAll('#allTeamsTable tfoot tr').length, 1,
+     'with the train in a tfoot — a summary of the rows, not one more of them');
+
+  /* Every numeric column runs "worst first" on its first press, because the
+     reason anyone presses a heading is to find the outlier. Aged is the
+     clearest case: nobody has ever pressed it to see who has the least. */
+  is(press('aged'), ['Petrel', 'Osprey', 'Avocet'],
+     'aged sorts most-aged first on the first press — 1, then 0, then the team with no figure');
+  is(press('aged'), ['Osprey', 'Petrel', 'Avocet'],
+     'and reverses on the second, with the team that has no figure still LAST');
+  ok(press('p85').indexOf('Avocet') === 2 && press('rate').indexOf('Avocet') === 2,
+     'nulls sort last in every column and both directions — a team with no data has not '
+     + 'got the shortest cycle time in the train');
+
+  /* Data to runs the OTHER way, and it is the one column that should: the
+     interesting end is the oldest export, which is the earliest date. */
+  is(press('dataEnd')[0], 'Osprey', 'Data to sorts the stalest export first');
+  is(press('name')[0], 'Avocet', 'and the team column sorts A to Z');
+
+  /* An empty team keeps its row and still says the two things it can. */
+  win.document.querySelector('[data-sort="name"]').click();   /* Z to A, so Petrel leads */
+  const petrel = [...win.document.querySelectorAll('#allTeamsTable tbody tr')]
+    .find(tr => /Petrel/.test(tr.cells[0].innerText));
+  is(petrel.cells[4].innerText.trim(), '1', 'Petrel’s one open item is counted');
+
+  plant({ teams: [{ id: 'only', name: 'Only', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] }],
+          settings: {} });
+  is(win.document.getElementById('tab-allteams').hidden, true,
+     'one team is not a comparison, so the view is taken away — like the picker beside it');
+  is(win.document.getElementById('tab-dashboard').getAttribute('aria-selected'), 'true',
+     'and you land back on the dashboard rather than on a panel with no tab');
 
   /* ────────────────────────────────────────────────────────── */
   group('escapeHtml — the free-text boundary (a team name reaching innerHTML)');

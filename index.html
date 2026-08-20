@@ -422,6 +422,49 @@ table.data tbody tr:hover { background: var(--surface-alt); }
 table.data td.num { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
 .table-cap { max-height: 460px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 
+/* ── The All teams table ─────────────────────────────────────────────────────
+   A sortable header is a button, not a th with a click handler: it has to be
+   reachable by keyboard and announce itself as pressable, and `aria-sort` on
+   the th tells a screen reader which way the column is running. The button
+   fills the cell so the whole heading is the target rather than just the word.
+   Numbers are right-aligned, so their headings are too — a heading sitting over
+   the left edge of a column of right-aligned figures reads as belonging to the
+   column before it. */
+table.data th.sortable { padding: 0; }
+table.data th.sortable button { display: block; width: 100%; font: inherit; color: inherit;
+  text-transform: inherit; letter-spacing: inherit; background: none; border: 0;
+  padding: 8px 12px; text-align: inherit; cursor: pointer; }
+table.data th.sortable button:hover { color: var(--text-primary); background: var(--surface-alt); }
+table.data th.num, table.data td.figure { text-align: right; }
+table.data td.figure { font-variant-numeric: tabular-nums; }
+/* The arrow is drawn in the header text, so it needs no width of its own and
+   cannot be lost to a narrow column. */
+table.data th[aria-sort] button::after { content: ' \2193'; }
+table.data th[aria-sort="ascending"] button::after { content: ' \2191'; }
+
+/* The team you have selected in the header picker, so the row you are in the
+   middle of investigating is findable in a table of eight. A left border in the
+   accent, matching the tile treatment — not a background fill, which would
+   fight the hover state and read as a warning about that team. */
+table.data tr.is-current td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+table.data tr.is-current td { background: var(--surface-alt); }
+/* The train's own row. tfoot rather than a last row, so it is announced as a
+   summary and stays put if the rows above are ever made scrollable. */
+table.data tfoot td { border-top: 2px solid var(--border-strong); border-bottom: 0;
+  font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* A team name opens that team's dashboard, so it is a button. Styled as a link
+   rather than as a control: a row of eight buttons would read as eight things
+   to press, where what is wanted is eight names one of which happens to be
+   clickable. */
+button.team-open { font: inherit; font-weight: var(--fw-semibold); color: var(--text-primary);
+  background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
+  text-decoration: underline; text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px; }
+button.team-open:hover { text-decoration-color: var(--accent); color: var(--accent); }
+/* A team with no data in this window still gets a row — it is a finding, not an
+   omission — but its figures are dashes and should read as such. */
+table.data tr.no-data td.figure { color: var(--text-muted); }
+
 /* status notes */
 .note { border: 1px solid var(--border); border-left-width: 3px;
   border-radius: var(--radius-sm); padding: 12px; font-size: 13px; }
@@ -682,6 +725,11 @@ main:focus { outline: none; }
        keys are wired at the foot of the page. Same pattern as the sibling app. -->
   <div class="tabs" role="tablist" aria-label="Views">
     <button class="tab" role="tab" id="tab-dashboard" aria-controls="panel-dashboard" aria-selected="true"  tabindex="0">Dashboard</button>
+    <!-- Next to Dashboard because it is the other way of reading the same
+         numbers, and hidden until there are two teams to compare — the same rule
+         the team picker follows, and the one the sibling app's All teams view
+         follows too. Nothing shows until there is something behind it. -->
+    <button class="tab" role="tab" id="tab-allteams" aria-controls="panel-allteams" aria-selected="false" tabindex="-1" hidden>All Teams</button>
     <button class="tab" role="tab" id="tab-data"      aria-controls="panel-data"      aria-selected="false" tabindex="-1">Your Data</button>
     <button class="tab" role="tab" id="tab-settings"  aria-controls="panel-settings"  aria-selected="false" tabindex="-1">Settings</button>
   </div>
@@ -692,6 +740,68 @@ main:focus { outline: none; }
        app's comment records. tabindex="-1" because a skip link has to be able
        to move focus here, and nothing else may put it in the tab order. -->
   <main id="maincontent" tabindex="-1">
+
+  <!-- ══════════════════ THE VIEW CONTROLS ══════════════════
+       SHARED by the two views that read the numbers — Dashboard and All teams
+       — rather than living inside either. All three of them (work type, window,
+       grouping) mean exactly the same thing to both, and a second copy on the
+       second view would be two controls to keep in step over one piece of
+       state. It sits above the panels so it lands in the same place on screen
+       it always did, and selectTab() takes it away on Your Data and Settings,
+       where none of it applies.
+
+       #windowNote is written by whichever of the two views is on screen: the
+       strip is shared, so the sentence describing what is under it has to be
+       whatever is actually under it. -->
+  <div class="controls" id="viewControls" hidden>
+    <div class="field">
+      <label for="filterSel">Work type filter</label>
+      <select id="filterSel"></select>
+    </div>
+    <div class="field">
+      <label for="monthsSel">Show data for most recent</label>
+      <select id="monthsSel">
+        <option value="1">1 month</option>
+        <option value="3">3 months</option>
+        <option value="6">6 months</option>
+        <option value="9">9 months</option>
+        <option value="12">12 months</option>
+        <option value="all">All</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="bucketSel">Group by</label>
+      <select id="bucketSel">
+        <option value="week">Week</option>
+        <option value="fortnight">2 weeks</option>
+        <option value="month">Month</option>
+      </select>
+    </div>
+    <div class="window" id="windowNote"></div>
+  </div>
+
+  <!-- ══════════════════ ALL TEAMS ══════════════════
+       Every team on one page, against one shared window and one shared date.
+       The dashboard answers "how is this team doing?"; this answers "which of
+       my teams needs me?", which needed eight visits and a memory for numbers
+       before. Every figure in it comes out of the same derive() the dashboard
+       reads, so a row here and that team's dashboard cannot disagree. -->
+  <section class="panel" id="panel-allteams" role="tabpanel" aria-labelledby="tab-allteams" hidden>
+    <div id="allTeamsTiles" class="tiles"></div>
+
+    <div class="card">
+      <h2>Every Team, Side by Side <span class="hint" id="allTeamsCount"></span></h2>
+      <p class="hint">
+        Press a column heading to sort by it. Press a team's name to open its dashboard.
+        Every row is read over the same window and as of the same date, whatever each team's
+        own export runs to — the <strong>Data to</strong> column says which teams are behind.
+      </p>
+      <div class="table-scroll" style="margin-top:var(--sp-5)">
+        <table class="data" id="allTeamsTable"></table>
+      </div>
+      <div class="note info" id="allTeamsNone" hidden></div>
+    </div>
+  </section>
 
   <!-- ══════════════════ YOUR DATA ══════════════════ -->
   <section class="panel" id="panel-data" role="tabpanel" aria-labelledby="tab-data" hidden>
@@ -848,32 +958,6 @@ main:focus { outline: none; }
 
   <!-- ══════════════════ TEAM DASHBOARD ══════════════════ -->
   <section class="panel" id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
-    <div class="controls">
-      <div class="field">
-        <label for="filterSel">Work type filter</label>
-        <select id="filterSel"></select>
-      </div>
-      <div class="field">
-        <label for="monthsSel">Show data for most recent</label>
-        <select id="monthsSel">
-          <option value="1">1 month</option>
-          <option value="3">3 months</option>
-          <option value="6">6 months</option>
-          <option value="9">9 months</option>
-          <option value="12">12 months</option>
-          <option value="all">All</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="bucketSel">Group by</label>
-        <select id="bucketSel">
-          <option value="week">Week</option>
-          <option value="fortnight">2 weeks</option>
-          <option value="month">Month</option>
-        </select>
-      </div>
-      <div class="window" id="windowNote"></div>
-    </div>
 
     <div id="dashEmpty" class="card empty" hidden>
       <h2>No Data Yet</h2>
@@ -2329,13 +2413,29 @@ function derive(rows, settings, view) {
       : rows.slice())
     .filter(r => r.completed || r.started);
 
+  /* When this team's export stops, and so how fresh everything below it is. The
+     All teams table states it in a column of its own, because a team three weeks
+     behind everyone else has three weeks of zero throughput dragging its rate
+     down and three weeks of extra ageing on everything it has open, and none of
+     that is visible in the figures themselves.
+
+     Read off `rows` and NOT off the filtered `items`, which is the difference
+     between "this export has stopped" and "this team has not had a bug lately".
+     Filter to defects and a healthy team's last defect might be a month old;
+     that is a fact about its quality, not about its data, and reporting it in a
+     freshness column would send someone chasing an export that is perfectly up
+     to date. Taken before the shared date below can move anything, too. */
+  let dataEnd = null;
+  for (const r of rows) {
+    if (r.completed && (!dataEnd || r.completed > dataEnd)) dataEnd = r.completed;
+    if (r.started && (!dataEnd || r.started > dataEnd)) dataEnd = r.started;
+  }
+
   /* Items still in progress. They contribute nothing to throughput, quality or
      cycle time — all three key off a completion — but they DO count as work
      started, so they move net flow: the started tally counts start dates with
      no reference to completion at all. */
   const finished = items.filter(r => r.completed);
-
-  if (!finished.length) return { empty: true, weeks: [], startDate: null, endDate: null };
 
   const isUnplanned = r => String(r.type || '').trim().toLowerCase() === unplannedStr;
 
@@ -2346,6 +2446,32 @@ function derive(rows, settings, view) {
     if (r.completed && (!endDate || r.completed > endDate)) endDate = r.completed;
     if (r.started && (!endDate || r.started > endDate)) endDate = r.started;
   }
+
+  /* Every metric here keys off a completion, so with none there is no axis and
+     nothing to plot — but there are still two true things to say about a team
+     in that state, and the All teams table needs both of them. A team with five
+     items open and nothing finished is a finding, and a row of dashes claiming
+     it has no work in progress would hide it; a team whose export stopped in
+     June should say so rather than reading as empty.
+
+     This return moved BELOW the date scan above to be able to carry them. It
+     still runs before anything that needs a bucket axis, which is what it was
+     always guarding. */
+  if (!finished.length) return {
+    empty: true, weeks: [], startDate: null, endDate: null,
+    dataEnd, inProgressCount: items.length
+  };
+
+  /* ── One shared date, for a comparison across teams ─────────────────────────
+     Left alone, every team's window hangs off its own last date, so "the last 3
+     months" would mean a different three months per team and the All teams
+     table would be comparing different quarters in adjacent rows. `asOf` lets a
+     caller impose one date on all of them.
+
+     Only ever LATER than this team's own — a caller passes the newest date
+     across every team, and an earlier one would hide data rather than align it,
+     which is not a thing any caller should be able to ask for by accident. */
+  if (view.asOf instanceof Date && !isNaN(view.asOf) && view.asOf > endDate) endDate = view.asOf;
   /* "All" means no start bound at all. */
   const startDate = view.months === 'all' ? null : edate(endDate, -Number(view.months));
 
@@ -2757,6 +2883,9 @@ function derive(rows, settings, view) {
     avgLeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
     throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
     wip, agedCount, agedDays, ageing, forecast,
+    /* `endDate` is what every figure was read as of; `dataEnd` is what this
+       team's own export runs to. Equal unless a caller imposed a shared date. */
+    dataEnd,
     /* The measure, and the word for it, travel with the numbers: every tile and
        column that states a duration reads them from here rather than reaching
        back into settings, so the label can never disagree with the figure. */
@@ -2879,12 +3008,57 @@ function derive(rows, settings, view) {
   };
 }
 
+/* ── Every team at once ──────────────────────────────────────────────────────
+   The rest of the app answers "how is this team doing?". This answers "which of
+   my teams needs me?", which is a different job and the one nothing here could
+   do before: the header picker shows one team at a time, so comparing eight of
+   them meant eight visits and a memory for numbers.
+
+   It computes nothing itself. Every figure in the All teams table comes out of
+   the same derive() the dashboard reads, once per team, so a row in that table
+   and the dashboard for that team can never disagree — which matters more here
+   than anywhere else, because the table is what someone acts on before they
+   look at the detail.
+
+   TWO THINGS make it a comparison rather than eight readings side by side:
+
+   • ONE SHARED DATE. The train is derived first, over every team's rows at
+     once, and its end date — the newest date anybody has — is imposed on each
+     team through `asOf`. Without that, "the last 3 months" is a different three
+     months in every row, and a team that stopped exporting in June would show a
+     healthy June quarter next to everyone else's September one.
+
+   • THE TRAIN IS DERIVED, NOT SUMMED. Totals could be added up, but percentiles
+     cannot — the 85th percentile of eight teams is not the average of their
+     eight percentiles, and a "total" row built that way would be quietly wrong
+     in its most-read column. Deriving over the concatenated rows gives the
+     train the same treatment a team gets, from the same code. */
+function deriveTeams(teams, settings, view) {
+  const list = Array.isArray(teams) ? teams : [];
+  const everything = [];
+  for (const t of list) everything.push(...(t.rows || []));
+  const train = derive(everything, settings, view);
+  /* Nothing anywhere has finished, so there is no window to compare within and
+     no date to share. The rows would all be empty; say so once instead. */
+  if (train.empty) return { train, rows: [], asOf: null };
+
+  const shared = Object.assign({}, view, { asOf: train.endDate });
+  return {
+    train,
+    asOf: train.endDate,
+    /* In the picker's order, deliberately. Sorting is a thing the reader asks
+       for by pressing a column; until they do, a team should be where they
+       expect to find it rather than wherever its throughput put it today. */
+    rows: list.map(t => ({ id: t.id, name: t.name, d: derive(t.rows || [], settings, shared) }))
+  };
+}
+
 /* Exposed for tests.html, which drives the real app in a hidden iframe. */
 window.TD = {
   weekdayNum, priorSunday, weekNumber, weekKey, edate, workDaysBetween,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
-  cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, utcDate,
+  cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, deriveTeams, utcDate,
   /* The forecast's pure pieces, so a test can deal a sample set it wrote itself
      rather than only reading the answers back off derive(). */
   seededRandom, forecastPeriodsFor, forecastItemsIn, forecastHistogram,
@@ -2952,7 +3126,12 @@ const DEFAULT_SETTINGS = {
    An empty forecastDate means "three months past the end of the data", worked
    out fresh each render so it can never go stale as the data moves on. */
 const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', activeTeamId: null,
-  chartTab: 'flow', bucket: 'week', forecastItems: DEFAULT_FORECAST_ITEMS, forecastDate: '' };
+  chartTab: 'flow', bucket: 'week', forecastItems: DEFAULT_FORECAST_ITEMS, forecastDate: '',
+  /* How the All teams table is sorted. Null is the picker's own order, which is
+     where a reader expects to find a team before they have asked for anything
+     else. Validated at its point of use like every other view field — an
+     unknown key just means no sort. */
+  teamSort: null, teamSortDir: 'desc' };
 
 const LS = {
   state: 'td-state', view: 'td-view', theme: 'td-theme',
@@ -3037,6 +3216,11 @@ function haltForNewerData(found) {
 let state  = { teams: [], settings: Object.assign({}, DEFAULT_SETTINGS) };
 let view   = Object.assign({}, DEFAULT_VIEW);
 let charts = {};
+/* Which top-level view is on screen. Not in `view` and not saved: which tab you
+   left the app on is not a position worth restoring — a reload should open on
+   the dashboard — and two renderers need to know which of them owns the shared
+   window note right now. */
+let activeTab = 'dashboard';
 
 const newId = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
@@ -4206,6 +4390,25 @@ const METRIC_HELP = {
       + 'export reports that quarter. One caveat: the clean-up tool’s option to also remove '
       + 'unfinished items deletes long-running work in progress, which is exactly what this '
       + 'chart counts, so history before a clean-up like that will read low.' },
+  trainPercentile: { title: 'The Whole Train\u2019s ' + CYCLE_PERCENTILE + 'th Percentile',
+    body: 'The figure for every team at once, worked out over every item any of them '
+      + 'completed \u2014 NOT the average of their separate percentiles, which is not a '
+      + 'percentile of anything. Read it as the promise you could make about a piece of work '
+      + 'before you knew which team would pick it up. Because it pools items rather than '
+      + 'teams, it is weighted by how much each team delivers: a large fast team can hold '
+      + 'this figure down while a small team with a long tail sits well above it. That is '
+      + 'not a flaw in the figure \u2014 most work really does go through the fast teams '
+      + '\u2014 but it does mean this tile cannot tell you a team is struggling. The column '
+      + 'in the table below can, which is what it is there for: read the tile for a promise, '
+      + 'read the column to find who needs help.' },
+  teamDataEnd: { title: 'Data To',
+    body: 'The last date this team\u2019s own export runs to. Every other column is read over '
+      + 'the same window and as of the same date \u2014 the newest date any team has \u2014 '
+      + 'so the figures are comparable, and this column is how you know whether they are '
+      + 'worth comparing. A team three weeks behind everyone else has three weeks of zero '
+      + 'throughput dragging its rate down and three weeks of extra ageing on everything it '
+      + 'has open, and none of that shows in the numbers themselves. Paste a fresh export for '
+      + 'that team before drawing any conclusion about it.' },
   itemAge: { title: 'Work Item Age',
     body: 'What do I do today? Every item still in progress, plotted at the age it has '
       + 'reached so far \u2014 not how long it took, because none of these has finished. '
@@ -4354,7 +4557,7 @@ function renderDashboard() {
       $('dashNothingBody').textContent = 'Nothing completed matches the '
         + view.filterDisplay + ' work type filter. Pick another type — or All — above.';
     }
-    $('windowNote').innerHTML = '';
+    if (activeTab === 'dashboard') $('windowNote').innerHTML = '';
     Object.keys(charts).forEach(k => { charts[k].destroy(); delete charts[k]; });
     return;
   }
@@ -4362,7 +4565,9 @@ function renderDashboard() {
   const span = d.startDate
     ? 'Showing <strong>' + prettyDate(d.startDate) + '</strong> to <strong>' + prettyDate(d.endDate) + '</strong>'
     : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(d.endDate) + '</strong>';
-  $('windowNote').innerHTML = span + '<br>' +
+  /* The strip above is shared with All Teams, so the sentence in it belongs to
+     whichever of the two is actually on screen. */
+  if (activeTab === 'dashboard') $('windowNote').innerHTML = span + '<br>' +
     d.buckets.length + ' ' + (d.buckets.length === 1 ? d.bucketNoun : d.bucketNounPlural) +
     ' &middot; ' + d.itemCount + ' item' + (d.itemCount === 1 ? '' : 's') +
     (d.inProgressCount ? ' (' + d.inProgressCount + ' in progress)' : '') +
@@ -4589,6 +4794,191 @@ function renderForecast(d) {
     row(r.confidence, 'at least ' + r.count + ' item' + (r.count === 1 ? '' : 's'), '')).join(''));
 }
 
+/* ── The All teams table ─────────────────────────────────────────────────────
+   One column per question an RTE or a coach actually scans for, in the order
+   they are usually asked: who is delivering, who is slow, who is overloaded,
+   who has stale work, who has a quality problem — and, last and least often
+   asked but most often the real answer, whose data is out of date.
+
+   `get` pulls the figure out of a derive() result and `fmt` states it. Nothing
+   here computes: a column that needed arithmetic of its own would be a figure
+   the dashboard could disagree with. `desc` is which way the column sorts on
+   the first press, and it is always "the end you are looking for" — most aged
+   first, longest cycle time first — because the reason anyone presses a column
+   header is to find the outlier, not to admire the ordering.
+
+   Built as a function of the derived result rather than as a constant, because
+   three of the headings carry words the user chose: the grouping noun, the word
+   for cycle time and the word for defects. */
+function teamColumns(train) {
+  const n = train.bucketNoun;
+  const cycle = (state.settings.cycleTimeLabel || 'Cycle time');
+  const defect = (state.settings.unplannedLabel || 'Unplanned');
+  const dash = '—';
+  const or = (v, f) => (v == null ? dash : f(v));
+  return [
+    { key: 'name', label: 'Team', text: true, desc: false,
+      get: (r) => r.name.toLowerCase() },
+    { key: 'completed', label: 'Completed', desc: true, help: 'throughput',
+      get: (d) => d.summary.completedTotal, fmt: (v) => or(v, String) },
+    { key: 'rate', label: 'Per ' + n, desc: true, help: 'throughput',
+      get: (d) => d.summary.avgThroughput, fmt: (v) => or(v, num1) },
+    { key: 'p85', label: train.cyclePercentile + 'th ' + cycle.toLowerCase(), desc: true,
+      help: 'cycleTimePercentile',
+      get: (d) => d.summary.p85CycleTime, fmt: (v) => or(v, num1) },
+    { key: 'wip', label: 'In progress', desc: true, help: 'wip',
+      get: (d) => d.summary.currentWip, fmt: (v) => or(v, String) },
+    { key: 'ratio', label: 'WIP vs month', desc: true, help: 'wip',
+      get: (d) => d.summary.wipRatio, fmt: (v) => or(v, (x) => num1(x) + '×') },
+    { key: 'aged', label: 'Aged', desc: true, help: 'agedWork',
+      get: (d) => d.summary.agedNow, fmt: (v) => or(v, String) },
+    { key: 'defects', label: defect + ' rate', desc: true, help: 'defectRate',
+      get: (d) => d.summary.unplannedShare, fmt: (v) => or(v, pct1) },
+    /* Ascending on the first press: the interesting end is the OLDEST export,
+       which is the earliest date, which is the opposite of every column beside
+       it. Stated here rather than special-cased in the sort. */
+    { key: 'dataEnd', label: 'Data to', desc: false, help: 'teamDataEnd',
+      get: (d) => d.dataEnd, fmt: (v) => (v == null ? dash : prettyDate(v)) }
+  ];
+}
+
+function renderAllTeams() {
+  /* Only when it is the view on screen. Every row is a full derive(), forecast
+     and all, so running this behind a hidden panel would multiply the most
+     expensive thing the app does by the number of teams on every keystroke
+     anywhere else. selectTab() re-renders on the way in. */
+  if (activeTab !== 'allteams') return;
+
+  const all = deriveTeams(state.teams, state.settings,
+    { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket });
+  const train = all.train;
+  const table = $('allTeamsTable');
+  const none = $('allTeamsNone');
+  $('allTeamsCount').textContent = '(' + state.teams.length + ' teams)';
+
+  /* Nothing has finished anywhere, so there is no window and nothing to line the
+     teams up inside. The same two honest reasons the dashboard distinguishes. */
+  if (train.empty) {
+    table.innerHTML = '';
+    table.hidden = true;
+    none.hidden = false;
+    none.textContent = state.teams.some(t => t.rows.length)
+      ? 'Nothing completed matches the ' + view.filterDisplay + ' work type filter in any team, '
+        + 'so there is nothing to compare. Pick another type — or All — above.'
+      : 'No team has any work items yet. Paste an export on the Your Data tab and every team '
+        + 'you load will appear here side by side.';
+    $('windowNote').innerHTML = '';
+    $('allTeamsTiles').innerHTML = '';
+    return;
+  }
+  table.hidden = false;
+  none.hidden = true;
+
+  /* The same sentence the dashboard writes, about the train instead of a team.
+     The strip is shared, so whichever view is up owns the note under it. */
+  const span = train.startDate
+    ? 'Showing <strong>' + prettyDate(train.startDate) + '</strong> to <strong>'
+      + prettyDate(train.endDate) + '</strong>'
+    : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(train.endDate) + '</strong>';
+  $('windowNote').innerHTML = span + '<br>' + 'every team, as of the same date' +
+    '<br>' + train.itemCount + ' item' + (train.itemCount === 1 ? '' : 's') + ' across ' +
+    state.teams.length + ' teams';
+
+  const s = train.summary;
+  /* The train's own four, in the same order and with the same meanings as the
+     dashboard's headline row — the pace, how predictable it is, how much is in
+     flight, and what has been in flight too long. Deriving the train rather
+     than adding the rows up is what makes the middle one honest: the 85th
+     percentile of eight teams is not the average of their eight percentiles. */
+  $('allTeamsTiles').innerHTML =
+    tile('Completed per ' + train.bucketNoun,
+      s.avgThroughput == null ? '&mdash;' : num1(s.avgThroughput),
+      'across every team, over ' + s.wholePeriods + ' whole '
+        + (s.wholePeriods === 1 ? train.bucketNoun : train.bucketNounPlural), 'throughput') +
+    tile(train.cyclePercentile + 'th percentile ' + (state.settings.cycleTimeLabel || 'cycle time').toLowerCase(),
+      s.p85CycleTime == null ? '&mdash;' : num1(s.p85CycleTime),
+      'over every item any team completed, not an average of theirs', 'trainPercentile') +
+    tile('Work in progress', String(s.currentWip),
+      'open across every team as of ' + prettyDate(s.asOf), 'wip') +
+    tile('Aged work', String(s.agedNow),
+      'in progress over ' + train.agedDays + ' ' + train.dayNoun, 'agedWork');
+
+  const cols = teamColumns(train);
+  const sortCol = cols.find(c => c.key === view.teamSort);
+  const dir = view.teamSortDir === 'asc' ? 1 : -1;
+
+  let rows = all.rows.slice();
+  if (sortCol) {
+    /* Nulls last whichever way the column runs. A team with no data in this
+       window has not got the shortest cycle time in the train, and letting it
+       win the top of the table would be the one sort result nobody could read
+       past. Ties fall back to the picker's order, so the table never reshuffles
+       between two renders of the same data. */
+    const order = new Map(all.rows.map((r, i) => [r.id, i]));
+    const val = (r) => (sortCol.text ? sortCol.get(r) : (r.d.empty ? null : sortCol.get(r.d)));
+    rows.sort((a, b) => {
+      const x = val(a), y = val(b);
+      if (x == null && y == null) return order.get(a.id) - order.get(b.id);
+      if (x == null) return 1;
+      if (y == null) return -1;
+      if (x < y) return -1 * dir;
+      if (x > y) return 1 * dir;
+      return order.get(a.id) - order.get(b.id);
+    });
+  }
+
+  const head = '<thead><tr>' + cols.map(c => {
+    const aria = sortCol === c
+      ? ' aria-sort="' + (view.teamSortDir === 'asc' ? 'ascending' : 'descending') + '"' : '';
+    return '<th scope="col" class="sortable' + (c.text ? '' : ' num') + '"' + aria + '>'
+      + '<button type="button" data-sort="' + c.key + '" data-desc="' + (c.desc ? '1' : '')
+      + '">' + escapeHtml(c.label) + '</button></th>';
+  }).join('') + '</tr></thead>';
+
+  const figure = (html) => '<td class="figure">' + html + '</td>';
+  const cell = (c, r) => {
+    if (c.text) {
+      /* A name goes into a button's text, and it is the one piece of user text
+         in this table — escaped here as everywhere else. */
+      return '<td><button type="button" class="team-open" data-open="' + escapeHtml(r.id) + '">'
+        + escapeHtml(r.name) + '</button></td>';
+    }
+    /* Nothing this team completed falls inside the window, so it has no rate, no
+       percentile and no defect share. It may still have work open and it
+       certainly has a last export date, and both are exactly what someone
+       scanning this table is looking for — a team that has stopped finishing
+       things, or one that has stopped sending them. Dashes everywhere would
+       hide the finding under the absence of the numbers around it. */
+    if (r.d.empty) {
+      if (c.key === 'wip') return figure(String(r.d.inProgressCount || 0));
+      if (c.key === 'dataEnd') return figure(r.d.dataEnd ? escapeHtml(prettyDate(r.d.dataEnd)) : '—');
+      return figure('—');
+    }
+    return figure(escapeHtml(c.fmt(c.get(r.d))));
+  };
+
+  const body = '<tbody>' + rows.map(r =>
+    '<tr class="' + (r.id === view.activeTeamId ? 'is-current' : '')
+      + (r.d.empty ? ' no-data' : '') + '">'
+    + cols.map(c => cell(c, r)).join('') + '</tr>').join('') + '</tbody>';
+
+  /* The train, in a tfoot: a summary of the rows above rather than one more of
+     them, which is what it is and what a screen reader is told. Its "Data to"
+     is the shared date every row was read as of. */
+  const foot = '<tfoot><tr><td>All teams</td>' + cols.slice(1).map(c =>
+    '<td class="figure">' + escapeHtml(c.key === 'dataEnd' ? prettyDate(train.endDate)
+      : c.fmt(c.get(train))) + '</td>').join('') + '</tr></tfoot>';
+
+  table.innerHTML = head + body + foot;
+}
+
+/* The two views the shared control strip drives. A function declaration, not a
+   const: selectTab calls it, and selectTab runs during boot — before anything
+   declared further down the file has been assigned. renderAllTeams returns
+   immediately unless it is the view on screen, so this costs nothing when the
+   dashboard is up. */
+function renderViews() { renderDashboard(); renderAllTeams(); }
+
 function renderDataTable() {
   const rows = activeRows();
   $('rowCount').textContent = rows.length ? '(' + rows.length + ' item' + (rows.length === 1 ? '' : 's') + ')' : '';
@@ -4682,6 +5072,12 @@ function renderSettingsForm() {
 function renderEmptyState() {
   const rows = activeRows().length;
   $('teamSel').hidden    = state.teams.length < 2;
+  /* The same threshold as the picker beside it, for the same reason: with one
+     team there is no comparison to make. If it goes while you are standing on
+     it, selectTab drops you back on the dashboard rather than leaving a panel
+     up with no tab selected. */
+  $('tab-allteams').hidden = state.teams.length < 2;
+  if (activeTab === 'allteams' && $('tab-allteams').hidden) selectTab('dashboard');
   $('btnAppend').hidden  = !rows;
   $('btnClear').hidden   = !rows;
   $('loadedCard').hidden = !rows;
@@ -4700,6 +5096,7 @@ function renderAll() {
   renderDataTable();
   renderEmptyState();
   renderDashboard();
+  renderAllTeams();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -4708,8 +5105,16 @@ function renderAll() {
 
 /* tabs — roving tabindex plus arrow keys, the sibling app's tablist manners:
    one stop in the tab order, ArrowLeft/Right/Home/End move along the row. */
-const TABS = ['dashboard', 'data', 'settings'];
+const TABS = ['dashboard', 'allteams', 'data', 'settings'];
+/* The two views that read the numbers, and so the two that share the control
+   strip above them and take turns owning the sentence inside it. */
+const NUMBER_TABS = ['dashboard', 'allteams'];
 function selectTab(name) {
+  /* A tab that is not on offer must never be landed on. All Teams is taken away
+     below two teams, and a position saved while it was there outlives the team
+     that was deleted — or the share link that arrived with one team in it. */
+  if (!TABS.includes(name) || $('tab-' + name).hidden) name = 'dashboard';
+  activeTab = name;
   TABS.forEach(t => {
     const sel = t === name;
     const tab = $('tab-' + t);
@@ -4717,6 +5122,14 @@ function selectTab(name) {
     tab.tabIndex = sel ? 0 : -1;
     $('panel-' + t).hidden = !sel;
   });
+  /* The strip belongs to the two views it means anything to. */
+  $('viewControls').hidden = !NUMBER_TABS.includes(name);
+  /* All Teams is built only while it is on screen — see renderAllTeams — so
+     arriving is when it gets built, and leaving is when the dashboard takes the
+     shared window note back. Just the two views, not renderAll: switching tabs
+     has no bearing on the team picker, the data table or the empty state, and
+     rebuilding those on every press is work nobody asked for. */
+  if (NUMBER_TABS.includes(name)) renderViews();
   /* Chart.js sizes to a hidden canvas as 0×0, so re-measure on reveal. */
   if (name === 'dashboard') Object.values(charts).forEach(c => c.resize());
 }
@@ -4769,6 +5182,42 @@ function selectChartTab(name) {
      resize once it is on screen gives it its real size. */
   CHART_GROUPS[name].forEach(id => { if (charts[id]) charts[id].resize(); });
 }
+
+/* The All teams table: one delegated listener for both of the things in it that
+   can be pressed, because the table is rebuilt on every render and per-element
+   listeners would have to be re-attached each time.
+
+   Pressing a column heading sorts by it; pressing the same one again reverses.
+   The first press runs the column its own way — most aged first, oldest export
+   first — because the reason anyone presses a heading is to find the outlier.
+
+   Pressing a team's name selects that team and goes to its dashboard. That is
+   the move the whole view exists to set up: the table says which team needs
+   looking at, and this is looking at it. */
+$('panel-allteams').addEventListener('click', (e) => {
+  const target = e.target.closest ? e.target.closest('[data-sort],[data-open]') : null;
+  if (!target) return;
+  if (target.dataset.open) {
+    const team = state.teams.find(t => t.id === target.dataset.open);
+    if (!team) return;
+    view.activeTeamId = team.id;
+    view.chartTab = 'flow';
+    saveView();
+    selectTab('dashboard');
+    selectChartTab('flow');
+    return;
+  }
+  const key = target.dataset.sort;
+  /* Which way this column runs on a first press travels on the button, set when
+     the header was built — rather than rebuilding the whole column list here
+     against a made-up derive result just to read one flag off it. */
+  view.teamSortDir = view.teamSort === key
+    ? (view.teamSortDir === 'asc' ? 'desc' : 'asc')
+    : (target.dataset.desc ? 'desc' : 'asc');
+  view.teamSort = key;
+  saveView();
+  renderAllTeams();
+});
 
 /* The forecast's two questions. 'change' rather than 'input': a Monte Carlo on
    every keystroke would run the whole thing against 1, then 12, then 120 on the
@@ -5144,12 +5593,16 @@ $('teamRows').addEventListener('click', e => {
   window.toast('Deleted ' + team.name);
 });
 
-/* dashboard controls */
-$('filterSel').addEventListener('change', e => { view.filterDisplay = e.target.value; saveView(); renderDashboard(); });
-$('monthsSel').addEventListener('change', e => { view.months = e.target.value; saveView(); renderDashboard(); });
+/* The shared view controls. All three drive BOTH views that read them, so all
+   three redraw both — renderAllTeams returns immediately unless it is the one on
+   screen, so this costs nothing on the dashboard. Before All Teams existed these
+   called renderDashboard alone, which is exactly the bug that left the strip
+   working on one tab and inert on the other. */
+$('filterSel').addEventListener('change', e => { view.filterDisplay = e.target.value; saveView(); renderViews(); });
+$('monthsSel').addEventListener('change', e => { view.months = e.target.value; saveView(); renderViews(); });
 /* The data table's last column follows this too, so it re-renders as well. */
 $('bucketSel').addEventListener('change', e => {
-  view.bucket = e.target.value; saveView(); renderDataTable(); renderDashboard();
+  view.bucket = e.target.value; saveView(); renderDataTable(); renderViews();
 });
 
 /* settings — shared by every team */
@@ -5991,7 +6444,16 @@ const DEMO_TEAMS = [
             'Story', 'Story', 'Story', 'Story', 'Story',
             'Bug', 'Bug', 'Bug', 'Task', 'Task', 'Task', 'Task', 'Task',
             'Spike', 'Spike'] },
-  { name: 'Team Wagtail', seed: 5150, dated: false,
+  /* `stale` shifts every one of this team's dates back by that many days, so its
+     export stops before everybody else's. Its OWN dashboard is unchanged — every
+     window here hangs off the latest date in the data, so the whole picture just
+     moves back with it — but on All Teams, where one shared date is imposed on
+     every row, it is the team with nine days of zero throughput dragging its
+     rate down and nine extra days of ageing on everything it has open. That is
+     the single most common reason a roll-up lies, and the Data to column exists
+     to catch it; without a team like this the column is a row of matching dates
+     that looks like it does nothing. */
+  { name: 'Team Wagtail', seed: 5150, dated: false, stale: 9,
     weeks: 16, perWeek: [2, 4], cycle: [2, 7], tailChance: 0.08, tail: [10, 18],
     wait: [0, 0], wip: [2, 6, 16],
     types: ['Story', 'Story', 'Story', 'Story', 'Story',
@@ -6008,7 +6470,11 @@ function demoPaste(profile) {
   const pick = (list) => list[Math.floor(rnd() * list.length)];
 
   const midnight = Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
-  const iso = (offset) => new Date(midnight + offset * DAY_MS).toISOString().slice(0, 10);
+  /* `stale` moves this team's whole history back together, which is what makes
+     it a stopped export rather than a quiet team: the shape of its own data —
+     and so every figure on its own dashboard — is untouched. */
+  const iso = (offset) => new Date(midnight + (offset - (profile.stale || 0)) * DAY_MS)
+    .toISOString().slice(0, 10);
 
   /* Wagtail's paste has no Created column at all, rather than a column of blanks:
      a team that has never exported one is the case lead time has to handle, and
