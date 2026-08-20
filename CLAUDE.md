@@ -125,10 +125,9 @@ the two are read side by side; the divergences below are deliberate.
 - **A train with no teams yet gets its own empty state.** It is one click to reach (add a train,
   close the dialog) and neither of the other two messages fits: there is no filter to blame and
   nothing to paste, because the train has no teams rather than no data.
-- The ART column in the Teams dialog is **not** an `.act` column — `width: 1%` squeezed a select
-  holding a train's name down to its chevron. It has a real capped column, and the team-name
-  column gained a `min-width` so the picker beside it cannot truncate "Team Kingfisher" to
-  "Team Ki" on a phone; the row simply outgrows the dialog and `.table-scroll` does its job.
+- The team-name column has a `min-width` so the ART picker beside it cannot truncate
+  "Team Kingfisher" to "Team Ki" on a phone; the row simply outgrows the dialog and
+  `.table-scroll` does its job.
 - **The demo puts two teams on one train and leaves one on none.** A train per team makes
   grouping look pointless; all three on one leaves the No ART option absent. Pinned, including
   that scoping to the train visibly moves a figure — a picker that changes nothing on the one
@@ -136,6 +135,35 @@ the two are read side by side; the divergences below are deliberate.
 - A fixture with a literal `</script>` in it closed the script block in tests.html and the whole
   suite silently stopped running. Hostile-id fixtures use `'"><script>'`, the form the existing
   team-id tests already use.
+
+## The Teams Dialog Follows the Sibling's (2026-08-20)
+
+Charles asked for this window to match Sprint Predictability's **Teams, ARTs & PIs**, which is
+the right call: the two apps share their chrome and the sibling is the design lead for it. What
+that means concretely, and what a later edit must not tidy back:
+
+- **`#manageDialog` is 1100px**, matched to the sibling's — which took it from Money Map's own
+  wide dialog, so the three apps' working windows are one width. The app default of 560 is right
+  for Back up and the help sheet, which are a few lines each, and wrong for a table of teams: at
+  560 a row's name box, picker, count and delete were shouldered into each other.
+- **No `thead` on either table.** There is nothing a heading would add — a count says
+  "217 items", a picker shows the train it is set to, and a name box is a name box. Each control
+  keeps its own `aria-label`, which a visible heading was never going to give it.
+- **A section per thing you manage**, headed by its name with its own `+ Add` button at the
+  right-hand end of the header row, a 12px muted note under the heading, then the table. Both
+  Add buttons live in those headers, not under their tables.
+- **The ARTs section is flat, not folded.** It was behind a `<details>` on the reasoning that
+  most people support one train; the sibling shows its three sections flat, the two dialogs are
+  read side by side, and a section somebody has to open is a section they have to find first.
+- **Row padding is the sibling's 10px 12px, but the two outside edges are zeroed.** That
+  difference is content, not taste: its rows hold plain text, where a 12px inset reads as a
+  margin; these hold a bordered input box, and the inset would put that box out of line with the
+  section heading directly above it.
+- The heading stays `h2` at 16px rather than the sibling's `h3` at 17px, because every other
+  dialog in THIS app is `h2` and one odd one out would be worse than a pixel of difference.
+- Pinned in tests.html — the width, the absent theads, the two section headers, both Add buttons
+  being in them, and the counts carrying their nouns. All of it is the kind of thing a later edit
+  tidies back with the best of intentions.
 
 ## All Teams, and the Shared Control Strip (2026-08-20)
 

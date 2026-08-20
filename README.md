@@ -245,8 +245,10 @@ with no work items at all shows dashes throughout.
 Each team keeps its own list of work items; the picker in the header chooses which one the
 dashboard is showing. Teams can be [grouped into ARTs](#grouping-teams-into-arts), in which case
 the picker groups them the same way. Add, rename and delete teams from the **Teams** button beside that
-picker — a dialog, the same shape as the sibling app's Teams & PIs. Settings are shared by
-every team — one place to say what a "defect" is.
+picker. That window also holds your [Agile Release Trains](#grouping-teams-into-arts), and is
+laid out to match the sibling app's **Teams, ARTs & PIs** — same width, a section per thing you
+manage, each with its own *+ Add* button at the right-hand end of its heading. Settings are
+shared by every team — one place to say what a "defect" is.
 
 The picker only appears once there are **two or more** teams: with one team it is not a
 choice. It is part of a wider rule — nothing shows until there is something behind it, so a

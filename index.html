@@ -499,6 +499,38 @@ table.data tr.no-data td.figure { color: var(--text-muted); }
   padding: 12px 16px; font-family: var(--font-mono); font-size: 12px;
   color: var(--text-primary); overflow-x: auto; max-width: 100%; }
 
+/* ── The Teams dialog's tables ───────────────────────────────────────────────
+   The sibling app's treatment, so the two windows read as one design: no header
+   row at all, a rule under each row, and every column right-aligned but the
+   first. There is no thead because there is nothing a heading would add — a
+   count says "217 items", a picker shows the train it is set to, and the name
+   box is a name box. Each control keeps its own accessible name instead, which
+   a heading was never going to give it anyway.
+
+   The name box and the picker are capped: at 1100px a full-width input is a
+   400px box holding "Team Heron", which reads as a mistake rather than as room.
+   The cap is what keeps the four columns spread the way the sibling's are. */
+table.manage { width: 100%; border-collapse: collapse; font-size: 14px;
+  font-variant-numeric: tabular-nums; }
+table.manage td { text-align: right; padding: 10px 12px;
+  border-bottom: 1px solid var(--border); vertical-align: middle; }
+/* The two outside edges are zeroed, which the sibling's cells are not — and the
+   difference is content, not taste. Its rows hold plain text, so a 12px inset on
+   both sides reads as a margin; these hold a bordered input box, and 12px would
+   put that box out of line with the section heading and the note directly above
+   it. The same reasoning already zeroes the last column of the settings table. */
+table.manage td:first-child { text-align: left; padding-left: 0; }
+table.manage td:last-child { padding-right: 0; }
+table.manage td.count { color: var(--text-muted); white-space: nowrap; }
+table.manage input[type="text"] { max-width: 320px; }
+table.manage select { max-width: 220px; }
+/* A row with nothing in it yet — the ARTs table before the first train. */
+table.manage td.empty-row { text-align: left; color: var(--text-secondary);
+  border-bottom: 0; padding-left: 0; }
+/* The section headings inside the dialog, and the note under each one. */
+.manage-head { font-size: 14px; font-weight: var(--fw-semibold); color: var(--text-primary); }
+.manage-note { color: var(--text-secondary); font-size: 12px; margin: 4px 0 0; }
+
 /* settings filter list, and the Teams dialog's table */
 table.filters { width: 100%; border-collapse: collapse; }
 /* 12px between columns, not 4. Every cell in these tables holds a full-width
@@ -512,20 +544,13 @@ table.filters th { text-align: left; padding: 0 12px 6px 0;
   text-transform: uppercase; color: var(--text-secondary); }
 table.filters td:last-child, table.filters th:last-child { padding-right: 0; }
 table.filters td.act { width: 1%; }
-/* The ART picker is not an action column: `width: 1%` squeezed a select holding
-   a train's name down to its chevron. It gets a real, capped column of its own —
-   wide enough to read a name in, narrow enough that the team-name box beside it
-   keeps most of the row. */
-table.filters th.art, table.filters td.art { width: 30%; min-width: 130px; text-align: left; }
-table.filters td.art select { width: 100%; }
 /* A floor under the name column, or the ART picker beside it squeezes the box on
    a phone until "Team Kingfisher" reads as "Team Ki" — a truncated control,
    which is the thing the no-orphaned-fields rule exists to stop. With the floor
    the row simply outgrows the dialog and the table scrolls inside its own box,
-   which is what .table-scroll is for and what the Your Data table already does.
-   On the wider dialog, and whenever there are no ARTs, nothing changes: the
-   columns already have more than this between them. */
-table.filters td:first-child, table.filters th:first-child { min-width: 150px; }
+   which is what .table-scroll is for and what the Your Data table already does. */
+table.manage td:first-child { min-width: 150px; }
+table.manage td.art { min-width: 130px; }
 /* A count belongs under its heading, not hard against the box to its left, and
    these columns are only as wide as their widest cell. */
 table.filters th.act, table.filters td.act { text-align: right; }
@@ -618,6 +643,15 @@ dialog { background: var(--surface); color: var(--text-primary);
 
    Scoped to this dialog. The help dialog is a paragraph of prose, and a wider
    measure makes prose harder to read, not easier. */
+/* 1100px, matched to the sibling app's Teams, ARTs & PIs window — which took it
+   from Money Map's own wide dialog, so the three apps' working windows are one
+   width. The default 560 is right for Back up and the help sheet, which are a
+   few lines each; it is wrong for a table of teams, where every row carries a
+   name box, a picker, a count and a delete and at 560 they were shouldered into
+   each other. Outside the media query below, because `width: calc(100% - 32px)`
+   already shrinks it to fit a phone. */
+#manageDialog { max-width: 1100px; }
+
 @media (min-width: 760px) {
   #shareDialog { max-width: 820px; }
   /* No align-items: start — the two panels stretch to the taller of them, so
@@ -723,7 +757,7 @@ main:focus { outline: none; }
       >Flow&nbsp;Metrics <span>· Charlie’s Epic Flow Clinic</span></h1>
     <label class="sr-only" for="teamSel">Team</label>
     <select id="teamSel" title="Which team you're looking at"><option>—</option></select>
-    <button class="btn small" id="manageBtn" type="button" title="Add or rename teams">Teams</button>
+    <button class="btn small" id="manageBtn" type="button" title="Add or rename teams, and group them into ARTs">Teams</button>
     <label class="sr-only" for="themeSel">Theme</label>
     <!-- The four unified themes, listed alphabetically (matches the sibling app).
          Midnight is pre-selected to match the theme the boot script in <head>
@@ -1217,46 +1251,41 @@ main:focus { outline: none; }
 </div>
 
 <!-- ── Teams — opened from the header, like the sibling app's Teams & PIs ─── -->
+<!-- Laid out to match the sibling app's Teams, ARTs & PIs window, which is the
+     design lead for the chrome the two share: one section per thing you manage,
+     each headed by its name with its own "+ Add" button at the right-hand end, a
+     note under that heading where the thing needs explaining, and a table of
+     rows under that. Same 1100px too — see the CSS.
+
+     The ARTs section is no longer folded behind a <details>. The fold was a
+     reasonable instinct — most people support one train — but the sibling shows
+     its three sections flat, the two dialogs are read side by side, and a
+     section somebody has to open is a section they have to find first. -->
 <dialog id="manageDialog" aria-labelledby="manageDialogTitle">
-  <h2 id="manageDialogTitle">Teams</h2>
-  <p>
-    Each team keeps its own work items. The picker in the header chooses which one the
-    dashboard is showing; Settings are shared by all of them.
-  </p>
+  <h2 id="manageDialogTitle">Teams &amp; ARTs</h2>
+
+  <div class="row spread">
+    <strong class="manage-head">Teams</strong>
+    <button class="btn small" id="btnAddTeam" type="button">+ Add a team</button>
+  </div>
+  <p class="manage-note">Each team keeps its own work items. The picker in the header chooses
+    which one the dashboard is showing; Settings are shared by all of them.</p>
   <div class="table-scroll">
-    <table class="filters" id="teamTable">
-      <thead><tr><th>Team name</th><th class="art" id="artColHead" hidden>ART</th><th class="act">Items</th><th class="act"></th></tr></thead>
-      <tbody id="teamRows"></tbody>
-    </table>
-  </div>
-  <div class="row spread" style="margin-top:14px">
-    <button class="btn" id="btnAddTeam" type="button">+ Add a team</button>
+    <table class="manage" id="teamTable" aria-label="Teams"><tbody id="teamRows"></tbody></table>
   </div>
 
-  <!-- Agile Release Trains. A <details> because most people support one train
-       and should not have to read past a feature they will never use — the same
-       fold "Start again" sits behind in the Back up dialog. It opens itself once
-       an ART exists, so anyone who has used it never has to find it twice. -->
-  <details id="artSection" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
-    <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary)">Agile Release Trains</summary>
-    <p class="hint" style="margin-top:10px">
-      Support more than one train? Add them here, then set each team's ART in the table above.
-      A team can be on one or on none. Grouping is a <strong>label only</strong> — it changes
-      what <strong>All Teams</strong> shows you and never a single figure.
-    </p>
-    <div class="table-scroll" style="margin-top:10px">
-      <table class="filters" id="artTable">
-        <thead><tr><th>ART name</th><th class="act">Teams</th><th class="act"></th></tr></thead>
-        <tbody id="artRows"></tbody>
-      </table>
-    </div>
-    <div class="row" style="margin-top:12px">
-      <button class="btn" id="btnAddArt" type="button">+ Add an ART</button>
-    </div>
-  </details>
+  <div class="row spread" style="margin-top:20px">
+    <strong class="manage-head">Agile Release Trains</strong>
+    <button class="btn small" id="btnAddArt" type="button">+ Add an ART</button>
+  </div>
+  <p class="manage-note">An Agile Release Train groups teams together. It is a
+    <strong>label only</strong> — every figure is still worked out per team — and
+    <strong>All Teams</strong> gains a picker for it. Teams need not be on one.</p>
+  <div class="table-scroll">
+    <table class="manage" id="artTable" aria-label="Agile Release Trains"><tbody id="artRows"></tbody></table>
+  </div>
 
-  <div class="row spread" style="margin-top:18px">
-    <span></span>
+  <div class="row" style="justify-content:flex-end;margin-top:18px">
     <button class="btn primary" id="manageCloseBtn" type="button">Done</button>
   </div>
 </dialog>
@@ -4664,10 +4693,9 @@ function renderTeamSelect() {
    would go stale with every keystroke. */
 function renderTeamRows() {
   const tb = $('teamRows');
+  /* The cell appears only once an ART exists. Before that it would be a picker
+     with one option in it, which is a control that cannot do anything. */
   const anyArts = state.arts.length > 0;
-  /* The column appears only once an ART exists. Before that it would be a
-     picker with one option in it, which is a control that cannot do anything. */
-  $('artColHead').hidden = !anyArts;
   /* A team has an ART, so assignment reads the way the data does: one picker per
      team row, rather than a list of teams to tick inside each ART. It also makes
      it structurally impossible to put a team on two trains. */
@@ -4693,8 +4721,10 @@ function renderTeamRows() {
       '<td><input type="text" data-team="' + t.id + '" maxlength="120" value="' + escapeHtml(t.name) +
         '" aria-label="Name of team, row ' + (i + 1) + '"></td>' +
       artCell(t, i) +
-      '<td class="act num">' + t.rows.length + '</td>' +
-      '<td class="act">' + (only ? '' :
+      /* The count carries its own noun, the way the sibling's rows do. With no
+         header row there is nothing else to say what the number is. */
+      '<td class="count">' + t.rows.length + (t.rows.length === 1 ? ' item' : ' items') + '</td>' +
+      '<td>' + (only ? '' :
         '<button class="icon-btn" data-delteam="' + t.id + '" title="Delete this team" aria-label="Delete ' +
         escapeHtml(t.name) + '">&times;</button>') + '</td>';
     tb.appendChild(tr);
@@ -4704,22 +4734,19 @@ function renderTeamRows() {
 function renderArtRows() {
   const tb = $('artRows');
   tb.innerHTML = '';
-  /* Opened once there is something in it, so anyone who has used the feature
-     never has to go looking for it again. */
-  if (state.arts.length) $('artSection').open = true;
   state.arts.forEach((a, i) => {
     const n = state.teams.filter(t => t.artId === a.id).length;
     const tr = document.createElement('tr');
     tr.innerHTML =
       '<td><input type="text" data-art="' + escapeHtml(a.id) + '" maxlength="120" value="' +
         escapeHtml(a.name) + '" aria-label="Name of ART, row ' + (i + 1) + '"></td>' +
-      '<td class="act num">' + n + '</td>' +
-      '<td class="act"><button class="icon-btn" data-delart="' + escapeHtml(a.id) +
+      '<td class="count">' + n + (n === 1 ? ' team' : ' teams') + '</td>' +
+      '<td><button class="icon-btn" data-delart="' + escapeHtml(a.id) +
         '" title="Delete this ART" aria-label="Delete ' + escapeHtml(a.name) + '">&times;</button></td>';
     tb.appendChild(tr);
   });
   if (!state.arts.length) {
-    tb.innerHTML = '<tr><td colspan="3" class="hint" style="padding:8px 4px">' +
+    tb.innerHTML = '<tr><td colspan="3" class="empty-row">' +
       'No trains yet. Add one and every team gets a picker in the table above.</td></tr>';
   }
 }

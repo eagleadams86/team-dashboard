@@ -2146,6 +2146,49 @@ group('ARTs — the grouping, and the boundary it crosses');
      ['artId', 'id', 'name', 'rows'], 'and every team carries the field, set or not');
 
   /* ────────────────────────────────────────────────────────── */
+  group('the Teams dialog matches the sibling app’s window');
+
+  /* The two apps share their chrome and the sibling is the design lead, so this
+     window's shape is a rule rather than a preference. Pinned because it is
+     exactly the kind of thing a later edit tidies back: a thead "for clarity", a
+     narrower dialog "because 1100 is a lot", an Add button moved under its table. */
+  plant({ arts: [], teams: [{ id: 'z1', name: 'Zephyr', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] }],
+          settings: {} });
+  const dlg = win.document.getElementById('manageDialog');
+  is(win.getComputedStyle(dlg).maxWidth, '1100px',
+     'the same width as the sibling’s Teams, ARTs & PIs window');
+  is(win.document.querySelectorAll('#manageDialog thead').length, 0,
+     'no header row on either table — every cell says what it is instead');
+  is(win.document.querySelectorAll('#manageDialog table.manage').length, 2,
+     'one table per section, both in the shared treatment');
+
+  /* Each section is headed by its name with its own Add button at the right,
+     which is the layout the sibling uses and what makes the two read as one
+     design. Both buttons live OUTSIDE the tables, in those headers. */
+  const heads = [...win.document.querySelectorAll('#manageDialog .manage-head')].map(e => e.textContent);
+  is(heads, ['Teams', 'Agile Release Trains'], 'two sections, each headed by its name');
+  ok(win.document.getElementById('btnAddTeam').closest('.row.spread'),
+     'the team Add button sits in the Teams header row');
+  ok(win.document.getElementById('btnAddArt').closest('.row.spread'),
+     'and the ART Add button in the ARTs header row');
+
+  /* With no header row, a bare number would be a number with no noun. */
+  const teamRow = win.document.querySelector('#teamRows tr');
+  is(teamRow.querySelector('.count').textContent, '1 item',
+     'a count carries its own noun, singular when it should be');
+  is(teamRow.cells.length, 3, 'and there is no ART cell until an ART exists');
+
+  plant({ arts: [{ id: 'ax', name: 'Estuary' }],
+          teams: [{ id: 'z1', name: 'Zephyr', artId: 'ax', rows: [] },
+                  { id: 'z2', name: 'Zither', rows: [] }], settings: {} });
+  is(win.document.querySelector('#teamRows tr').cells.length, 4,
+     'the ART cell appears the moment there is a train to choose');
+  is(win.document.querySelector('#artRows .count').textContent, '1 team',
+     'and an ART states how many teams are on it, in its own words');
+  is(win.document.querySelector('#teamRows .count').textContent, '0 items',
+     'an empty team reads as 0 items rather than as a bare zero');
+
+  /* ────────────────────────────────────────────────────────── */
   group('deriveTeams — one window, one date, every team');
 
   /* Three teams whose exports stop on different days. Without a shared date,
