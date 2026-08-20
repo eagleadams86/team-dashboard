@@ -35,6 +35,18 @@ full width. A chart drawn twice as wide as the ones above it reads as the more i
 which it isn't, and its bars stop being comparable with theirs at a glance. On a narrow window
 every chart is full width, so there is nothing to centre.
 
+**Choose how much history to show** — 1 month, **12 weeks (a PI)**, 3, 6, 9 or 12 months, or All.
+Every option but the PI is a number of calendar months; a planning increment is six two-week
+sprints, so it is 84 days flat rather than three months rounded — a few days out of step with the
+sprints it is made of would defeat the point of having it. It sits between *1 month* and *3
+months* in the list, because that list is ordered by how much history it shows rather than by the
+unit each option is written in.
+
+One thing to expect: a 12-week window drawn as weeks usually carries **13 bars**, not 12. The
+window is exactly 12 weeks of calendar, but its ends fall mid-week, so the first and last bars are
+partial — which is true of every other window here too, and why the note above the charts says how
+much of the last period it covers.
+
 **Group by week, 2 weeks or month.** The control sits beside the date window on the dashboard.
 Weekly is the default and the finest grain; monthly smooths out the lumpiness that makes a
 single week hard to read. The grouping also drives the last column of the Your Data table, so

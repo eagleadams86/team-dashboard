@@ -809,6 +809,48 @@ async function run(TD, win) {
      existed. Every pinned number above is asserted without a bucket, so if
      this holds and those hold, weekly maths has not moved.
      ══════════════════════════════════════════════════════════ */
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the planning-increment window');
+
+  /* Every other option is a number of MONTHS; a PI is a fixed number of weeks —
+     six two-week sprints, the cadence the sibling app is built around. Rounding
+     it through months would land it a few days out of step with the sprints it
+     is made of, so it is 84 days flat. */
+  const piWin = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 'pi' });
+  is(Math.round((piWin.endDate - piWin.startDate) / 86400000) + 1, 84,
+     'a PI window is exactly 12 weeks of calendar, both ends included');
+  is(iso(piWin.endDate), '2015-05-13', 'ending where the data does, like every other window');
+  is(iso(piWin.startDate), '2015-02-19', 'and starting 83 days before it');
+
+  /* The span does not move with the grouping — only how it is cut up does, which
+     is true of the month windows beside it too. A 12-week window is 12 weeks
+     whether it is drawn as weeks, fortnights or months. */
+  ['week', 'fortnight', 'month'].forEach(b => {
+    const w = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 'pi', bucket: b });
+    is(Math.round((w.endDate - w.startDate) / 86400000) + 1, 84, 'still 84 days grouped by ' + b);
+  });
+
+  /* It sits between 1 month and 3 months by span, which is where the picker
+     lists it — that list is ordered by how much history it shows, not by the
+     unit each option is written in. */
+  const oneMonth = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 1 });
+  const threeMonth = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 3 });
+  ok(piWin.startDate > threeMonth.startDate && piWin.startDate < oneMonth.startDate,
+     'its window sits between the 1-month and 3-month ones',
+     [iso(threeMonth.startDate), iso(piWin.startDate), iso(oneMonth.startDate)].join(' < '));
+  ok(piWin.summary.completedTotal < threeMonth.summary.completedTotal,
+     'so it counts fewer items than three months does',
+     piWin.summary.completedTotal + ' vs ' + threeMonth.summary.completedTotal);
+
+  /* It reaches everything the other windows do, including the roll-up, which
+     passes the value straight through to every team. */
+  const piTeams = TD.deriveTeams([{ id: 'w1', name: 'W', rows: p.rows }], SAMPLE_SETTINGS,
+    { filterValue: '', months: 'pi' });
+  is(Math.round((piTeams.train.endDate - piTeams.train.startDate) / 86400000) + 1, 84,
+     'and All Teams reads it the same way');
+
+  /* ────────────────────────────────────────────────────────── */
   group('derive() — grouping');
 
   is(TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 3, bucket: 'week' }),

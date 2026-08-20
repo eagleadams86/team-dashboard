@@ -834,6 +834,11 @@ main:focus { outline: none; }
       <label for="monthsSel">Show data for most recent</label>
       <select id="monthsSel">
         <option value="1">1 month</option>
+        <!-- Between 1 and 3 months because that is where its span falls: the list
+             is ordered by how much history it shows, not by the unit it is
+             written in. Named as well as measured, so it means something to
+             somebody who runs a train and something to somebody who does not. -->
+        <option value="pi">12 weeks (a PI)</option>
         <option value="3">3 months</option>
         <option value="6">6 months</option>
         <option value="9">9 months</option>
@@ -1660,6 +1665,13 @@ function edate(d, months) {
    which fortnight a date falls in is a property of the calendar. Anchoring to
    the window would slide every bar sideways when you switched 3 months to 6,
    and two screenshots of the same team would not line up. */
+/* A planning increment: six two-week sprints, which is the cadence the sibling
+   app is built around (`SPRINTS_PER_PI = 6`, sprints coming round every 14 days)
+   and the period an RTE is asked to report on. Named rather than inlined so the
+   two apps can be read against each other, and so the window note and the option
+   label can never disagree about how long one is. */
+const PI_WEEKS = 12;
+
 const FORTNIGHT_EPOCH = utcDate(1970, 1, 4);
 const BUCKET_NOUNS = { week: 'week', fortnight: 'fortnight', month: 'month' };
 
@@ -2615,7 +2627,16 @@ function derive(rows, settings, view) {
      which is not a thing any caller should be able to ask for by accident. */
   if (view.asOf instanceof Date && !isNaN(view.asOf) && view.asOf > endDate) endDate = view.asOf;
   /* "All" means no start bound at all. */
-  const startDate = view.months === 'all' ? null : edate(endDate, -Number(view.months));
+  /* "All" means no start bound at all; a PI is a fixed number of WEEKS, where
+     every other option is a number of months. It is the one window here that is
+     not a calendar span — a planning increment is six two-week sprints, which is
+     the cadence the sibling app is built around and the period an RTE is asked
+     about. 84 days rather than 12 months / 4.33: a PI is weeks, and rounding it
+     through months would land it a few days out of step with the sprints it is
+     made of. Inclusive of both ends, like the month windows beside it. */
+  const startDate = view.months === 'all' ? null
+    : view.months === 'pi' ? addDays(endDate, -(PI_WEEKS * 7 - 1))
+    : edate(endDate, -Number(view.months));
 
   /* The bucket starts either end of the window. */
   const startPS = startDate ? bucketStart(startDate, bucket) : null;

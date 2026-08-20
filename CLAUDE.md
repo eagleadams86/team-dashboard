@@ -296,6 +296,25 @@ Rules it must keep:
   from under somebody looking at a perfectly healthy roll-up. Pinned by a test that selects an
   empty team while standing on All Teams.
 
+## The Planning-Increment Window (2026-08-20)
+
+`months: 'pi'` is the one window value that is not a number of months. `PI_WEEKS = 12` — six
+two-week sprints, matching the sibling's `SPRINTS_PER_PI = 6` and its 14-day cadence — and the
+span is `addDays(endDate, -(PI_WEEKS * 7 - 1))`, i.e. 84 days flat.
+
+- **Not expressed in months.** Rounding 12 weeks through months would land it a few days out of
+  step with the sprints it is made of, which defeats the point of the option existing.
+- **`Number('pi')` is NaN**, so `derive`'s start-date line has to branch on it before the
+  arithmetic — that branch is the whole feature and the only place the value is special.
+- The option sits between *1 month* and *3 months* because the picker is ordered by SPAN, not by
+  the unit each label happens to use.
+- **A 12-week window drawn as weeks carries 13 bars**, essentially always: the ends fall mid-week
+  and `bucketStart` rounds down. That is how every other window here behaves, and it is why the
+  option's label and the window note use different units — the label is calendar, the note is
+  buckets on the axis. Don't "fix" it by snapping this one window to bucket boundaries; the others
+  would then disagree with it.
+- It reaches All Teams for free, because `deriveTeams` passes the view straight through.
+
 ## The Cycle Time Scatter (2026-08-20)
 
 One dot per finished item, beside the cycle time line — the same measure at two resolutions, and
