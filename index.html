@@ -3396,6 +3396,10 @@ const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', act
      else. Validated at its point of use like every other view field — an
      unknown key just means no sort. */
   teamSort: null, teamSortDir: 'desc',
+  /* How the Loaded Data table is sorted, on the same terms: null is the order it
+     opens in — unfinished first, then newest — which is where a reader expects
+     to find the items still in play before they have asked for anything else. */
+  dataSort: null, dataSortDir: 'desc',
   /* Which train All Teams is scoped to: '' is every team, an ART's id is that
      train, and ART_NONE is the teams on none. In `view` rather than in `state`
      — like activeTeamId, and unlike the sibling app, which keeps it in settings.
@@ -5702,16 +5706,46 @@ function renderDataTable() {
     return;
   }
 
-  /* Unfinished items sort to the top — they're the ones still in play. */
-  const key = r => (r.completed || r.started || new Date(0)).getTime() + (r.completed ? 0 : 1e12);
-  const sorted = rows.slice().sort((a, b) => key(b) - key(a));
   /* The last column follows the dashboard's grouping control, so the table and
      the charts always name the same period. */
   const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
   const bucketHead = bucket.charAt(0).toUpperCase() + bucket.slice(1);
+  const sameDay = Number(state.settings.sameDayValue);
+  const workingDays = state.settings.workingDays === true;
+  const cols = dataColumns(bucket, bucketHead);
+
+  /* Unfinished items sort to the top — they're the ones still in play — and
+     within that, newest first. That is the order the table opens in and returns
+     to, exactly as All Teams opens in the picker's order: pressing a heading is
+     asking for a different order, not replacing the default with whatever was
+     last pressed. */
+  const baseKey = r => (r.completed || r.started || new Date(0)).getTime() + (r.completed ? 0 : 1e12);
+  const base = rows.slice().sort((a, b) => baseKey(b) - baseKey(a));
+
+  const sortCol = cols.find(c => c.key === view.dataSort);
+  let sorted = base;
+  if (sortCol) {
+    /* Nulls last whichever way the column runs, the same rule the All Teams
+       table follows: an item still in progress has no completion date and no
+       cycle time, so it has no place in an ordering by either — and letting it
+       win the top would be the one sort result nobody could read past. Ties fall
+       back to the base order above, so the table never reshuffles between two
+       renders of the same data. */
+    const order = new Map(base.map((r, i) => [r, i]));
+    const dir = view.dataSortDir === 'asc' ? 1 : -1;
+    sorted = base.slice().sort((a, b) => {
+      const x = sortCol.get(a, sameDay, workingDays), y = sortCol.get(b, sameDay, workingDays);
+      if (x == null && y == null) return order.get(a) - order.get(b);
+      if (x == null) return 1;
+      if (y == null) return -1;
+      if (x < y) return -1 * dir;
+      if (x > y) return 1 * dir;
+      return order.get(a) - order.get(b);
+    });
+  }
+
   const body = sorted.map(r => {
-    const ct = cycleTimeOf(r, Number(state.settings.sameDayValue),
-      state.settings.workingDays === true);
+    const ct = cycleTimeOf(r, sameDay, workingDays);
     return '<tr>' +
       '<td>' + (r.completed ? isoOf(r.completed) : '<span class="hint">in progress</span>') + '</td>' +
       '<td>' + (r.started ? isoOf(r.started) : '<span class="hint">—</span>') + '</td>' +
@@ -5723,13 +5757,45 @@ function renderDataTable() {
       '</tr>';
   }).join('');
 
+  const head = '<thead><tr>' + cols.map(c => {
+    const aria = sortCol === c
+      ? ' aria-sort="' + (view.dataSortDir === 'asc' ? 'ascending' : 'descending') + '"' : '';
+    return '<th scope="col" class="sortable' + (c.num ? ' num' : '') + '"' + aria + '>'
+      + '<button type="button" data-datasort="' + c.key + '" data-desc="' + (c.desc ? '1' : '')
+      + '">' + escapeHtml(c.label) + '</button></th>';
+  }).join('') + '</tr></thead>';
+
   $('dataTable').innerHTML =
     '<div class="table-cap"><div class="table-scroll"><table class="data" id="dataItemsTable">' +
-    '<thead><tr><th>Completed</th><th>Started</th><th>Created</th><th>Type</th>' +
-    '<th>' + escapeHtml(state.settings.cycleTimeLabel) +
-      (state.settings.workingDays === true ? ' (working days)' : ' (days)') + '</th>' +
-    '<th>' + bucketHead + '</th></tr></thead>' +
-    '<tbody>' + body + '</tbody></table></div></div>';
+    head + '<tbody>' + body + '</tbody></table></div></div>';
+}
+
+/* The Loaded Data table's columns, in the order they are drawn. `get` pulls the
+   value a sort compares — the underlying date or number, never the rendered
+   text, so "in progress" and "—" sort as the absences they are rather than
+   alphabetically among real values.
+
+   `desc` is which way a column runs on its FIRST press, and it is always the end
+   somebody is looking for: the most recent date, the longest cycle time. The
+   same rule the All Teams table follows, for the same reason — nobody presses a
+   heading to find the least interesting row.
+
+   The period column sorts by the completion date behind it rather than by its
+   own label: "Aug 2026" and "Sep 2026" sort backwards as text, and a week key
+   only happens to sort right because it is written year-first. */
+function dataColumns(bucket, bucketHead) {
+  return [
+    { key: 'completed', label: 'Completed', desc: true, get: r => r.completed && r.completed.getTime() },
+    { key: 'started', label: 'Started', desc: true, get: r => r.started && r.started.getTime() },
+    { key: 'created', label: 'Created', desc: true, get: r => r.created && r.created.getTime() },
+    { key: 'type', label: 'Type', desc: false, get: r => (r.type || '').toLowerCase() || null },
+    { key: 'cycle', num: true, desc: true,
+      label: (state.settings.cycleTimeLabel || 'Cycle Time')
+        + (state.settings.workingDays === true ? ' (working days)' : ' (days)'),
+      get: (r, sameDay, workingDays) => cycleTimeOf(r, sameDay, workingDays) },
+    { key: 'period', label: bucketHead, num: true, desc: true,
+      get: r => r.completed && r.completed.getTime() }
+  ];
 }
 
 function escapeHtml(s) {
@@ -5898,6 +5964,41 @@ function selectChartTab(name) {
   CHART_GROUPS[name].forEach(id => { if (charts[id]) charts[id].resize(); });
 }
 
+/* ── What pressing a column heading does ─────────────────────────────────────
+   THREE states, not two: the column its own way, then reversed, then off.
+
+   Both of these tables have a default order that was chosen and is worth
+   getting back to — All Teams opens in the picker's order so a team is where you
+   expect to find it, and Loaded Data opens with the items still in play at the
+   top. With a two-state toggle those orders were reachable exactly once, on the
+   first render, and a reload was the only way back to them. A third press is
+   cheap, it is a pattern people meet in other tables, and it makes a deliberate
+   default an order you can ask for rather than one you can only lose.
+
+   `defaultDesc` is which way the column runs on its FIRST press, and it is
+   always the end somebody is looking for: the most recent date, the longest
+   cycle time, the most aged. Nobody presses a heading to find the least
+   interesting row. */
+function nextSort(currentKey, currentDir, key, defaultDesc) {
+  const first = defaultDesc ? 'desc' : 'asc';
+  if (currentKey !== key) return { key, dir: first };
+  if (currentDir === first) return { key, dir: defaultDesc ? 'asc' : 'desc' };
+  return { key: null, dir: first };
+}
+
+/* The Loaded Data table's headings. Delegated on the card rather than the table,
+   because the table is rebuilt on every render and per-element listeners would
+   have to be re-attached each time. */
+$('loadedCard').addEventListener('click', (e) => {
+  const btn = e.target.closest ? e.target.closest('[data-datasort]') : null;
+  if (!btn) return;
+  const next = nextSort(view.dataSort, view.dataSortDir, btn.dataset.datasort, !!btn.dataset.desc);
+  view.dataSort = next.key;
+  view.dataSortDir = next.dir;
+  saveView();
+  renderDataTable();
+});
+
 /* The All teams table: one delegated listener for both of the things in it that
    can be pressed, because the table is rebuilt on every render and per-element
    listeners would have to be re-attached each time.
@@ -5930,14 +6031,12 @@ $('panel-allteams').addEventListener('click', (e) => {
     selectChartTab('flow');
     return;
   }
-  const key = target.dataset.sort;
   /* Which way this column runs on a first press travels on the button, set when
      the header was built — rather than rebuilding the whole column list here
      against a made-up derive result just to read one flag off it. */
-  view.teamSortDir = view.teamSort === key
-    ? (view.teamSortDir === 'asc' ? 'desc' : 'asc')
-    : (target.dataset.desc ? 'desc' : 'asc');
-  view.teamSort = key;
+  const next = nextSort(view.teamSort, view.teamSortDir, target.dataset.sort, !!target.dataset.desc);
+  view.teamSort = next.key;
+  view.teamSortDir = next.dir;
   saveView();
   renderAllTeams();
 });

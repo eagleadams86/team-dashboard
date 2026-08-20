@@ -200,9 +200,9 @@ people actually scan for:
 **Press a column heading to sort by it.** Every numeric column runs worst-first on the first
 press — most aged, longest cycle time — because the reason anyone presses a heading is to find
 the outlier, not to admire the ordering. *Data to* runs the other way, since the interesting end
-there is the oldest export. Press again to reverse. A team with no figure in a column always
-sorts last, whichever way it is running: a team with no data has not got the shortest cycle time
-in the train.
+there is the oldest export. Press again to reverse, and **a third time to turn the sort off** and
+get the default order back. A team with no figure in a column always sorts last, whichever way it
+is running: a team with no data has not got the shortest cycle time in the train.
 
 **Press a team's name to open its dashboard.** That is the move the whole view sets up — the
 table says who needs looking at, and this is looking at them. The team you currently have
@@ -932,6 +932,26 @@ and quoting it would break the arithmetic you exported a CSV to do.
 The two tables in **Settings** and the **Teams** window have no export buttons: they are
 configuration — a Display→Value mapping, and a list of names — rather than figures anybody puts
 in a status email.
+
+### Sorting the Loaded Data Table
+
+The item list sorts the same way the [All Teams](#all-teams-which-one-needs-you) table does:
+press a heading to sort by it, press again to reverse, and **a third time to turn it off**.
+
+It opens — and returns to — **items still in play at the top, then newest first**, which is the
+order that answers "what is open right now?" without asking for anything. Pressing a heading asks
+for a different order rather than replacing that default with whatever was last pressed.
+
+Each column runs the useful way on its first press: dates newest-first, cycle time longest-first.
+**Absences always sort last**, whichever direction the column is running — an item still in
+progress has no completion date and no cycle time, so it has no place in an ordering by either,
+and letting it win the top would be the one result nobody could read past.
+
+The period column sorts **chronologically**, by the completion date behind it rather than by its
+own label — "Aug 2026" and "Sep 2026" sort backwards as text.
+
+Because [export](#taking-a-table-off-the-page) reads the rendered page, **the sort travels with
+it**: sort by cycle time, press ⬇ CSV, and the file arrives in that order.
 
 ## Cleaning Up Old Data
 

@@ -2997,6 +2997,17 @@ group('ARTs — the grouping, and the boundary it crosses');
 
   is(win.document.getElementById('tab-allteams').hidden, false,
      'three teams, so the view is on offer');
+
+  /* This suite shares the origin's saved view with the browser, so the table can
+     arrive already sorted from whatever was last pressed in the app. Cycle any
+     live column back to off first — which is what the third press is for — so
+     the assertion below is about the default order rather than about luck. */
+  const sortedTeamCol = () => [...win.document.querySelectorAll('#allTeamsTable th')]
+    .findIndex(th => th.getAttribute('aria-sort'));
+  while (sortedTeamCol() >= 0) {
+    win.document.querySelectorAll('#allTeamsTable th')[sortedTeamCol()].querySelector('button').click();
+  }
+
   is(cellsOf(0), ['Petrel', 'Osprey', 'Avocet'],
      'and opens in the picker’s order, where a reader expects to find a team');
   is(win.document.querySelectorAll('#allTeamsTable tfoot tr').length, 1,
@@ -3017,6 +3028,12 @@ group('ARTs — the grouping, and the boundary it crosses');
      interesting end is the oldest export, which is the earliest date. */
   is(press('dataEnd')[0], 'Osprey', 'Data to sorts the stalest export first');
   is(press('name')[0], 'Avocet', 'and the team column sorts A to Z');
+  /* Three states here too, so the picker's order is an order you can ask for
+     rather than one you can only lose. */
+  press('name');
+  press('name');
+  is(sortedTeamCol(), -1, 'a third press turns the sort off');
+  is(cellsOf(0), ['Petrel', 'Osprey', 'Avocet'], 'and the picker’s order comes back');
 
   /* An empty team keeps its row and still says the two things it can. */
   win.document.querySelector('[data-sort="name"]').click();   /* Z to A, so Petrel leads */
@@ -3098,6 +3115,98 @@ group('ARTs — the grouping, and the boundary it crosses');
   sel.value = 'q2'; sel.dispatchEvent(new win.Event('change'));
   ok(trainChartOf(), 'and survives the selected team having nothing to plot');
   is(trainSeries().reduce((a, b) => a + b, 0), 1, 'still showing the train, not the empty team');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the Loaded Data table sorts like the others');
+
+  /* Driven through the real app, because the rules worth pinning are about the
+     TABLE: which way a column runs on its first press, where the absences go,
+     and that the period column sorts by the date behind it rather than by its
+     own label. None of that is visible to a test of the maths. */
+  plant({ teams: [{ id: 'sd', name: 'Sorted', rows: [
+    /* Deliberately mixed: two finished with different spans, one still in
+       progress, one finished with no start date — the two kinds of absence this
+       table has to place. */
+    { c: '2026-03-10', s: '2026-03-01', t: 'Story' },   /* 9 days  */
+    { c: '2026-01-20', s: '2026-01-18', t: 'Bug' },     /* 2 days  */
+    { c: null,         s: '2026-04-01', t: 'Task' },    /* open    */
+    { c: '2026-02-05', s: null,         t: 'Alpha' }    /* no span */
+  ] }], settings: {} });
+  win.selectTab('data');
+
+  const dCells = (i) => [...win.document.querySelectorAll('#dataItemsTable tbody tr')]
+    .map(tr => tr.cells[i].innerText.trim());
+  const dPress = (k) => win.document.querySelector('[data-datasort="' + k + '"]').click();
+  const sortedCol = () => [...win.document.querySelectorAll('#dataItemsTable th')]
+    .findIndex(th => th.getAttribute('aria-sort'));
+
+  /* This suite shares the origin's saved view with the browser, so the table may
+     arrive already sorted from whatever was last pressed in the app — which is
+     precisely what the third press is for. Cycle any live column back to off,
+     and the group starts from the default order rather than from luck. */
+  while (sortedCol() >= 0) {
+    const th = win.document.querySelectorAll('#dataItemsTable th')[sortedCol()];
+    th.querySelector('button').click();
+  }
+
+  /* The order it opens in, and the one it returns to: still in play first, then
+     newest. Pressing a heading asks for a different order rather than replacing
+     the default with whatever was last pressed. */
+  is(dCells(0), ['in progress', '2026-03-10', '2026-02-05', '2026-01-20'],
+     'unfinished first, then newest — the order the table opens in');
+
+  dPress('cycle');
+  is(dCells(4), ['9.0', '2.0', '—', '—'], 'cycle time runs longest-first on the first press');
+  dPress('cycle');
+  is(dCells(4), ['2.0', '9.0', '—', '—'],
+     'and reverses — but the two with no cycle time stay LAST either way');
+
+  dPress('completed');
+  is(dCells(0), ['2026-03-10', '2026-02-05', '2026-01-20', 'in progress'],
+     'a date column runs newest-first, with the unfinished item last');
+  dPress('completed');
+  is(dCells(0), ['2026-01-20', '2026-02-05', '2026-03-10', 'in progress'],
+     'reversed it runs oldest-first, and the unfinished item is STILL last');
+
+  dPress('type');
+  is(dCells(3), ['Alpha', 'Bug', 'Story', 'Task'], 'the type column runs A to Z on the first press');
+
+  /* THREE states, not two. Both tables have a default order worth getting back
+     to; with a two-state toggle it was reachable exactly once, on the first
+     render, and a reload was the only way back. */
+  dPress('type');
+  is(dCells(3), ['Task', 'Story', 'Bug', 'Alpha'], 'a second press reverses it');
+  dPress('type');
+  is(sortedCol(), -1, 'and a third turns the sort off — no column is marked as sorted');
+  is(dCells(0), ['in progress', '2026-03-10', '2026-02-05', '2026-01-20'],
+     'which puts the table back in the order it opened in');
+
+  /* The period column sorts by the completion date behind it, never by its own
+     label: "Aug 2026" and "Sep 2026" sort backwards as text, and a week key only
+     happens to sort right because it is written year-first. */
+  const bucketSel = win.document.getElementById('bucketSel');
+  bucketSel.value = 'month'; bucketSel.dispatchEvent(new win.Event('change'));
+  win.selectTab('data');
+  dPress('period');
+  is(dCells(5), ['Mar 2026', 'Feb 2026', 'Jan 2026', '—'],
+     'the period column sorts chronologically, not alphabetically');
+  bucketSel.value = 'week'; bucketSel.dispatchEvent(new win.Event('change'));
+  win.selectTab('data');
+
+  /* aria-sort tells a screen reader which column is running and which way, and
+     only ever one column carries it. */
+  dPress('started');
+  const sortedHeads = [...win.document.querySelectorAll('#dataItemsTable th')]
+    .map(th => th.getAttribute('aria-sort'));
+  is(sortedHeads.filter(Boolean), ['descending'], 'exactly one column is marked as sorted');
+  is(sortedHeads[1], 'descending', 'and it is the one that was pressed');
+
+  /* What you export is what you are looking at, so a sort has to travel with it
+     — and the arrow on the heading is CSS, so it must not land in the file. */
+  const exported = TD.tableToRows(win.document.getElementById('dataItemsTable'));
+  is(exported[0].some(h => /[↑↓]/.test(h)), false,
+     'the sort arrow is drawn in CSS and never reaches an export');
+  is(exported.length, 5, 'and every row comes off with the header');
 
   /* ────────────────────────────────────────────────────────── */
   group('CSV export — the formula guard and the quoting');
