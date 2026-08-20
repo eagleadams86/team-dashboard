@@ -2923,6 +2923,95 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and you land back on the dashboard rather than on a panel with no tab');
 
   /* ────────────────────────────────────────────────────────── */
+  group('CSV export — the formula guard and the quoting');
+
+  /* A spreadsheet treats a cell opening with =, + or @ as a FORMULA, so a team
+     name is executable the moment somebody opens the file. This app escapes
+     everything it renders to HTML for the same class of reason; a CSV is simply
+     another place text goes somewhere it can be interpreted, and the one place
+     the escaping is not HTML. It matters beyond this app: a share link is how
+     somebody ELSE's team name reaches this browser. */
+  is(TD.csvCell('=1+1'), "'=1+1", 'a cell that would run as a formula is defused');
+  is(TD.csvCell('+SUM(A1)'), "'+SUM(A1)", 'so is a leading plus');
+  is(TD.csvCell('@import'), "'@import", 'and a leading at-sign');
+  is(TD.csvCell("=cmd|' /c calc'!A1"), "'=cmd|' /c calc'!A1",
+     'the classic DDE payload — apostrophes need no CSV quoting, only the guard');
+  is(TD.csvCell('=A1,B2'), '"\'=A1,B2"', 'guarded first, then quoted because of the comma');
+
+  is(TD.csvCell('-5'), '-5', 'a real negative number is left alone');
+  is(TD.csvCell('-0.5'), '-0.5', 'including a fractional one');
+  is(TD.csvCell('-alpha'), "'-alpha", 'but a dash followed by text is not a number');
+  /* Net flow is negative for half the weeks on a busy board, so quoting a
+     negative would break the arithmetic people export a CSV to do. */
+  is(TD.toCsv([['Net flow'], ['-4']]), 'Net flow\r\n-4', 'and it survives a whole file untouched');
+
+  /* Dates reach the writer as "Aug 19, 2026" straight off the page, so the comma
+     case is the common one here rather than the exotic one. */
+  is(TD.csvCell('Aug 19, 2026'), '"Aug 19, 2026"', 'a date is quoted for its comma');
+  is(TD.toCsv([['a', 'Aug 19, 2026'], ['b', '2']]), 'a,"Aug 19, 2026"\r\nb,2',
+     'or the row silently gains a column');
+  is(TD.csvCell('He said "hi"'), '"He said ""hi"""', 'quotes are doubled');
+  is(TD.csvCell('two\nlines'), '"two\nlines"', 'a newline forces quoting');
+  is(TD.csvCell('Team Heron'), 'Team Heron', 'and plain text is untouched');
+  is(TD.csvCell(null), '', 'as is nothing at all');
+
+  /* Tabs for the clipboard, because that is what a spreadsheet, a Word table and
+     a Google Doc all paste as a grid — a pasted CSV lands as one column of text
+     and has to be run through Text to Columns. */
+  is(TD.toTsv([['Team', 'Done'], ['Heron', '30']]), 'Team\tDone\r\nHeron\t30',
+     'the clipboard flavour is TAB separated');
+  is(TD.toTsv([['=1+1']]), "'=1+1", 'and carries the same formula guard');
+  is(TD.toTsv([['Rocket, Team', '4']]), 'Rocket, Team\t4',
+     'while a comma needs no quoting when the delimiter is a tab');
+
+  /* A train's name reaches a FILENAME, the other place free text lands somewhere
+     it can be interpreted — one with a slash in it would propose a path. */
+  is(TD.slugify('Payments ART'), 'payments-art', 'a train name becomes a safe slug');
+  is(TD.slugify('../../etc/passwd'), 'etc-passwd', 'a path cannot survive it');
+  is(TD.slugify('!!!'), 'art', 'and a name with nothing usable in it still yields something');
+  is(TD.slugify('x'.repeat(90)).length, 40, 'capped, which no real name notices');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('CSV export — reading the table off the page');
+
+  /* Read from the RENDERED table rather than rebuilt from state, so what you
+     export is what you are looking at. Both of these tables are already the
+     product of choices the reader made — filter, window, grouping, ART scope,
+     which column it is sorted by — and a second code path building "the same"
+     rows would drift from the screen the first time one of them changed. */
+  const mkTable = (html) => {
+    const d = win.document.createElement('div');
+    d.innerHTML = '<table>' + html + '</table>';
+    return d.querySelector('table');
+  };
+  is(TD.tableToRows(mkTable('<tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr>')),
+     [['A', 'B'], ['1', '2']], 'header and body rows come off together');
+  is(TD.tableToRows(null), [], 'and no table is no rows rather than a throw');
+
+  /* Anything hidden from assistive technology is DECORATION, and decoration is
+     not data. The ART printed under a team name is the named case: a grouping
+     the screen shows, not a figure in that cell. */
+  const cellOf = (html) => TD.cellText(mkTable('<tr>' + html + '</tr>').rows[0].cells[0]);
+  is(cellOf('<td>Team Heron<span class="team-art">Estuary ART</span></td>'), 'Team Heron',
+     'the ART under a team name is display furniture, not a value');
+  is(cellOf('<td>6<span aria-hidden="true">!</span></td>'), '6',
+     'an aria-hidden marker never turns a count into text');
+  is(cellOf('<td>Aged<span class="sr-only">— needs attention</span></td>'), 'Aged',
+     'nor does screen-reader-only text');
+  is(cellOf('<td>Throughput<button class="tile-help">i</button></td>'), 'Throughput',
+     'and the ⓘ is not part of a column heading');
+  is(cellOf('<td>  spread   over\n  lines </td>'), 'spread over lines',
+     'whitespace is collapsed, which is what makes a tab safe as a delimiter');
+
+  /* Padded to the widest row so the file is a rectangle: an empty state drawn as
+     one cell with a colspan would otherwise emit a one-column row in a
+     nine-column file — valid CSV, and every spreadsheet reads the rest of that
+     row under the wrong headings. */
+  const ragged = TD.tableToRows(mkTable('<tr><th>A</th><th>B</th><th>C</th></tr><tr><td colspan="3">none</td></tr>'));
+  is(ragged.map(r => r.length), [3, 3], 'a colspan row is padded to the full width');
+  is(ragged[1], ['none', '', ''], 'with the value in the first cell and blanks after it');
+
+  /* ────────────────────────────────────────────────────────── */
   group('escapeHtml — the free-text boundary (a team name reaching innerHTML)');
 
   /* `sanitizeTeams` has had a hostile-id test since it was written; this

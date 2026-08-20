@@ -877,7 +877,10 @@ main:focus { outline: none; }
     <div id="allTeamsTiles" class="tiles"></div>
 
     <div class="card">
-      <h2 id="allTeamsHeading">Every Team, Side by Side <span class="hint" id="allTeamsCount"></span></h2>
+      <div class="row spread">
+        <h2 id="allTeamsHeading">Every Team, Side by Side <span class="hint" id="allTeamsCount"></span></h2>
+        <span id="allTeamsExport"></span>
+      </div>
       <p class="hint">
         Press a column heading to sort by it. Press a team's name to open its dashboard.
         Every row is read over the same window and as of the same date, whatever each team's
@@ -942,7 +945,10 @@ main:focus { outline: none; }
          them to act on — see renderEmptyState(). A first run should show the paste
          box and nothing else. -->
     <div class="card" id="loadedCard" hidden>
-      <h2>Loaded Data <span class="hint" id="rowCount"></span></h2>
+      <div class="row spread">
+        <h2>Loaded Data <span class="hint" id="rowCount"></span></h2>
+        <span id="dataExport"></span>
+      </div>
       <p class="hint">Read-only — to correct a row, fix it in your source and paste again.</p>
       <div id="dataTable" style="margin-top:var(--sp-5)"></div>
     </div>
@@ -3214,7 +3220,11 @@ window.TD = {
   AGE_SPREAD, AGE_MAX_COLUMNS, AGE_UNTYPED, AGE_OTHER,
   /* The ART grouping is pure — it takes the team list rather than reading
      state — so tests can pin both without booting a dialog. */
-  teamsInArt, groupTeamsByArt, ART_NONE
+  teamsInArt, groupTeamsByArt, ART_NONE,
+  /* The CSV writer's pure pieces. A CSV is the one place this app's text goes
+     somewhere it can be INTERPRETED rather than displayed, so the guard on it is
+     pinned as tightly as the HTML escaper beside it. */
+  csvCell, toCsv, toTsv, cellText, tableToRows, slugify
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -5230,6 +5240,7 @@ function renderAllTeams() {
     table.innerHTML = '';
     table.hidden = true;
     none.hidden = false;
+    $('allTeamsExport').innerHTML = '';
     const where = scope ? ' ' + scopePhrase : '';
     /* A train nobody is on yet. It is easy to reach — add one, close the dialog,
        and it is already in the picker — and neither of the two messages below
@@ -5249,6 +5260,10 @@ function renderAllTeams() {
   }
   table.hidden = false;
   none.hidden = true;
+  /* The filename says which train it came from, so two exports taken a minute
+     apart from two scopes do not land in Downloads under the same name. */
+  $('allTeamsExport').innerHTML = exportButtons('allTeamsTable',
+    'all-teams' + (scope ? '-' + slugify(artName || 'no-art') : ''));
 
   /* The same sentence the dashboard writes, about the train instead of a team.
      The strip is shared, so whichever view is up owns the note under it. */
@@ -5376,6 +5391,10 @@ function renderViews() { renderDashboard(); renderAllTeams(); }
 function renderDataTable() {
   const rows = activeRows();
   $('rowCount').textContent = rows.length ? '(' + rows.length + ' item' + (rows.length === 1 ? '' : 's') + ')' : '';
+  /* Only while there is a table to take. The card itself is already hidden until
+     rows exist (renderEmptyState), but the buttons are drawn from here, so this
+     is where they have to stop. */
+  $('dataExport').innerHTML = rows.length ? exportButtons('dataItemsTable', 'work-items') : '';
 
   if (!rows.length) {
     $('dataTable').innerHTML = '<div class="note info">Nothing loaded yet.</div>';
@@ -5404,7 +5423,7 @@ function renderDataTable() {
   }).join('');
 
   $('dataTable').innerHTML =
-    '<div class="table-cap"><div class="table-scroll"><table class="data">' +
+    '<div class="table-cap"><div class="table-scroll"><table class="data" id="dataItemsTable">' +
     '<thead><tr><th>Completed</th><th>Started</th><th>Created</th><th>Type</th>' +
     '<th>' + escapeHtml(state.settings.cycleTimeLabel) +
       (state.settings.workingDays === true ? ' (working days)' : ' (days)') + '</th>' +
@@ -6167,6 +6186,203 @@ function todayLocalISO() {
 
 /* Its own function because the cleanup dialog offers the same download as its
    safety net — one deletion away is exactly when a backup is worth taking. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   TAKING A TABLE OFF THE PAGE
+
+   Ported from the sibling app, which grew this first; the two are read side by
+   side and a table should come off either of them the same way. Until now the
+   only ways figures left this app were the whole-dataset JSON backup and a share
+   link — neither of which helps anybody putting the All Teams comparison into a
+   Monday status mail.
+
+   Two verbs, because there are two jobs and each is bad at the other's. COPY
+   puts the table on the clipboard tab-separated, which pastes as a real grid
+   into a mail, a deck or a sheet — the actual reason this was asked for. CSV
+   downloads a file, for keeping or for opening in Excel later. A pasted CSV
+   lands as one column of text and has to be run through Text to Columns; a file
+   has to be a CSV to open as a spreadsheet at all.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Read from the RENDERED table rather than rebuilt from state, and that is the
+   whole design. Both of these tables are already the product of choices the
+   reader made — the work type filter, the date window, the grouping, which ART
+   is in scope, which column the table is sorted by — and a second code path
+   building "the same" rows from state would have to reproduce every one of them
+   and would drift from the screen the first time one changed. What you export is
+   what you are looking at, by construction.
+
+   The cost is that display values arrive with display furniture, which this
+   strips. `[aria-hidden="true"]` and `.sr-only` are the general rule — anything
+   hidden from assistive technology is decoration, and decoration is not data —
+   and the rest are named cases: the ⓘ buttons, and the ART printed under a team
+   name on the All Teams table, which is a grouping the screen shows rather than
+   a figure in that cell (the sibling strips its own `.artname` for the same
+   reason, and scoping to one train removes it from the screen anyway). */
+function cellText(cell) {
+  const copy = cell.cloneNode(true);
+  copy.querySelectorAll('[aria-hidden="true"], .sr-only, .tile-help, .team-art')
+    .forEach(el => el.remove());
+  return copy.textContent.replace(/\s+/g, ' ').trim();
+}
+
+function tableToRows(table) {
+  if (!table) return [];
+  const rows = [...table.rows].map(tr => [...tr.cells].map(cellText));
+  /* Padded to the widest row so the file is a rectangle: an empty state drawn as
+     one cell with a colspan would otherwise emit a one-column row in a
+     nine-column file — valid CSV, and every spreadsheet reads the rest of that
+     row as belonging to the wrong headings. */
+  const width = rows.reduce((a, r) => Math.max(a, r.length), 0);
+  rows.forEach(r => { while (r.length < width) r.push(''); });
+  return rows;
+}
+
+/* ── CSV, and the formula problem ───────────────────────────────────────────
+   A spreadsheet treats a cell opening with =, +, - or @ as a FORMULA, so a team
+   called `=1+1` — or something a good deal less playful — is executable the
+   moment the file is opened. This app escapes everything it renders to HTML for
+   the same class of reason; a CSV is simply another place text goes somewhere it
+   can be interpreted, and the one place the escaping is not HTML. It matters
+   more here than in most apps: a team name is the one free-text field the app
+   stores, and a share link is a way for somebody else's text to reach it.
+
+   A leading apostrophe is the standard defence — Excel, Numbers and Sheets all
+   read it as "this is text", and it is visible enough in a plain file that
+   nobody is misled. It goes only on a cell starting with one of the four
+   characters, so an ordinary figure is untouched, and a NEGATIVE NUMBER is
+   deliberately left alone: `-3` is a number everywhere, and quoting it would
+   break the arithmetic people export a CSV to do. Net flow is negative for half
+   the weeks on a busy board, so this is not hypothetical. */
+const FORMULA_LEAD = /^[=+@]|^-(?![0-9.])/;
+
+function csvCell(v) {
+  let s = String(v == null ? '' : v);
+  if (FORMULA_LEAD.test(s)) s = "'" + s;
+  /* Quoted whenever the delimiter, a quote or a newline is in play. Dates reach
+     here as "Aug 19, 2026" straight off the page, so the comma case is the
+     common one rather than the exotic one. */
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+/* A function DECLARATION, not the arrow const the sibling uses, and the same for
+   toTsv below. Its test hooks sit at the very end of that file where a const has
+   long since initialised; this app's `window.TD` export runs in section 4, a
+   couple of thousand lines above here, and reading a `const` before its
+   declaration is a temporal-dead-zone error that takes the whole app down. It
+   did, once, in exactly this spot. */
+function toCsv(rows) { return rows.map(r => r.map(csvCell).join(',')).join('\r\n'); }
+
+/* Tab-separated for the clipboard, because that is what a spreadsheet, a Word
+   table and a Google Doc all paste as a grid. Same formula guard; no quoting,
+   because a tab cannot appear in any of these cells — cellText collapses every
+   run of whitespace — and quotes-in-clipboard-TSV is not a convention anything
+   agrees on. */
+function toTsv(rows) {
+  return rows.map(r => r.map(v => {
+    const s = String(v == null ? '' : v);
+    return FORMULA_LEAD.test(s) ? "'" + s : s;
+  }).join('\t')).join('\r\n');
+}
+
+/* `data-export` names the table's own id, so the pair is markup plus one
+   delegated listener rather than wiring per render — and both of these tables
+   are rebuilt on nearly every keystroke elsewhere in the app.
+
+   Deliberately NOT hidden in a shared view. Everything else a shared view strips
+   is stripped because it would WRITE; this writes nothing, and it reads the
+   rendered table, so it can only hand back figures already on the recipient's
+   screen. Sending a link is how a colleague gets these numbers — letting them
+   paste the table into their own notes is the point of it, not a leak. */
+/* A train's name reaches a FILENAME, which is the one other place besides HTML
+   and CSV that this app's free text lands somewhere it can be interpreted — a
+   name with a slash in it would otherwise propose a path. Reduced to letters,
+   digits and dashes, and capped, which no legitimate name notices. */
+function slugify(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '').slice(0, 40) || 'art';
+}
+
+function exportButtons(tableId, name) {
+  return '<span class="row" style="gap:6px">' +
+    '<button type="button" class="btn small" data-export="' + escapeHtml(tableId) + '"' +
+    ' data-export-name="' + escapeHtml(name) + '" data-export-how="copy">Copy</button>' +
+    '<button type="button" class="btn small" data-export="' + escapeHtml(tableId) + '"' +
+    ' data-export-name="' + escapeHtml(name) + '" data-export-how="csv">⬇ CSV</button>' +
+    '</span>';
+}
+
+/* Two routes, because the modern one is gated in more places than it looks.
+   `navigator.clipboard` needs a secure context AND, in several browsers, a
+   permission or a trusted gesture — an embedded webview or an older Safari
+   refuses it outright. `execCommand` is deprecated and still the thing that
+   works when the other doesn't, so it gets a turn before the app gives up.
+
+   The textarea is off-screen rather than `display: none`: a hidden element
+   cannot be selected, so the copy would silently take nothing. */
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) {
+    console.warn('clipboard API refused, trying execCommand', e);
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.setAttribute('aria-hidden', 'true');
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch (e) {
+    console.warn('execCommand copy refused too', e);
+    return false;
+  }
+}
+
+async function runExport(btn) {
+  const rows = tableToRows(document.getElementById(btn.dataset.export));
+  if (!rows.length) { window.toast('Nothing to export from that table'); return; }
+  const name = btn.dataset.exportName || 'table';
+
+  if (btn.dataset.exportHow === 'copy') {
+    if (await copyText(toTsv(rows)))
+      window.toast((rows.length - 1) + ' row' + (rows.length === 2 ? '' : 's')
+        + ' copied — paste into a mail or a sheet');
+    else
+      /* Both routes refused. The file still works, so point at it rather than
+         leaving a button that appears to do nothing. */
+      window.toast('This browser wouldn’t let the app copy — use ⬇ CSV instead');
+    return;
+  }
+
+  /* A BOM, spelled as an escape so it cannot be lost to a copy-paste or read as
+     a stray character in a diff. Without it Excel on Windows opens a UTF-8 CSV
+     as Latin-1 and any team name with an accent arrives mangled. */
+  const blob = new Blob(['\uFEFF' + toCsv(rows)], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  /* todayLocalISO() for the same reason downloadBackup() uses it — a raw UTC
+     slice stamps tomorrow's date on an evening export west of Greenwich. */
+  a.download = 'flow-metrics-' + name + '-' + todayLocalISO() + '.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  window.toast('Exported');
+}
+
+/* One listener for every export button there will ever be. Delegated on the
+   document, like the ⓘ help buttons, so a re-render never has to re-wire them. */
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest ? e.target.closest('[data-export]') : null;
+  if (btn) runExport(btn);
+});
+
 function downloadBackup() {
   const payload = Object.assign(
     { app: 'team-dashboard', version: SCHEMA, exported: new Date().toISOString() },
