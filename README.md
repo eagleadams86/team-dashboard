@@ -835,6 +835,46 @@ question anyone asked, and the chart would be four bars wide.
 comparable in size — which, on a board whose cycle times cluster, they usually are, and if they
 are not, that shows up as a wide spread rather than as a wrong answer quietly given.
 
+## Taking a Table off the Page
+
+Both tables of figures — **All Teams** and the **Loaded Data** list on Your Data — carry
+**Copy** and **⬇ CSV** in their heading.
+
+| Button | What it does |
+|---|---|
+| **Copy** | Puts the table on the clipboard tab-separated, which pastes as a real grid into an email, a slide or a spreadsheet |
+| **⬇ CSV** | Downloads a file, for keeping or for opening in Excel |
+
+Two buttons because there are two jobs and each is bad at the other's: a pasted CSV lands as one
+column of text and has to be run through *Text to Columns*, and a file has to be a CSV to open as
+a spreadsheet at all.
+
+**What you export is what you are looking at.** The tables are read off the rendered page rather
+than rebuilt from stored data, so every choice you have already made applies — the work type
+filter, the date window, the grouping, which ART is in scope, which column the table is sorted
+by — and the file cannot quietly disagree with the screen it came from. Display furniture is
+dropped: the ⓘ buttons, screen-reader-only text, and the ART printed under a team's name, none
+of which are values in a cell.
+
+The filename says where it came from and when — `flow-metrics-all-teams-2026-08-20.csv`, or
+`flow-metrics-all-teams-payments-art-2026-08-20.csv` when you have scoped to one train, so two
+exports taken a minute apart don't land in Downloads under the same name.
+
+**The buttons stay on in a shared view**, unlike every other control there. Everything else a
+shared view strips is stripped because it would *write*; this writes nothing and can only hand
+back figures already on the recipient's screen. Sending a link is how a colleague gets these
+numbers — letting them paste the table into their own notes is the point of it.
+
+One detail worth knowing: a spreadsheet treats a cell opening with `=`, `+` or `@` as a
+**formula**, so a team called `=1+1` would be executable the moment the file is opened. Those
+cells get a leading apostrophe, which Excel, Numbers and Sheets all read as "this is text". A
+genuine negative number is left alone — net flow is negative for half the weeks on a busy board,
+and quoting it would break the arithmetic you exported a CSV to do.
+
+The two tables in **Settings** and the **Teams** window have no export buttons: they are
+configuration — a Display→Value mapping, and a list of names — rather than figures anybody puts
+in a status email.
+
 ## Cleaning Up Old Data
 
 Years of history make every paste and backup heavier without telling you anything new.

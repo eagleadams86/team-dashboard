@@ -136,6 +136,49 @@ the two are read side by side; the divergences below are deliberate.
   suite silently stopped running. Hostile-id fixtures use `'"><script>'`, the form the existing
   team-id tests already use.
 
+## Copy and CSV on Every Table of Figures (2026-08-20)
+
+Ported from the sibling, which grew it first; the two apps are read side by side and a table
+should come off either the same way. Until this landed the only ways figures left the app were
+the whole-dataset JSON backup and a share link, neither of which helps anybody putting the All
+Teams comparison into a Monday status mail.
+
+- **Read off the RENDERED table, never rebuilt from state.** Both tables are already the product
+  of choices the reader made — filter, window, grouping, ART scope, sort column — and a second
+  code path building "the same" rows would have to reproduce every one of them and would drift
+  from the screen the first time one changed. What you export is what you are looking at, by
+  construction. Don't "optimise" this into a state-driven builder.
+- **`cellText` strips furniture**: `[aria-hidden="true"]` and `.sr-only` as the general rule,
+  plus `.tile-help` and `.team-art`. The last is the named case — the ART under a team's name is
+  a grouping the screen shows, not a figure in that cell, and the sibling strips its own
+  `.artname` for the same reason.
+- **`tableToRows` pads to the widest row.** A colspan empty state would otherwise emit a
+  one-column row in a nine-column file: valid CSV, and every spreadsheet reads the rest of that
+  row under the wrong headings.
+- **The formula guard is a security boundary, not a formatting nicety.** `=`, `+`, `@` and a
+  dash-not-followed-by-a-digit get a leading apostrophe. A team name is the one free-text field
+  this app stores and a share link is how somebody else's text reaches this browser, so a CSV is
+  simply the one place the escaping is not HTML. A **negative number is deliberately left alone**
+  — net flow is negative half the time and quoting it would break the arithmetic.
+- **Tabs for the clipboard, commas for the file.** A pasted CSV lands as one column and needs
+  Text to Columns; a file must be a CSV to open as a spreadsheet. `cellText` collapses all
+  whitespace, which is what makes a tab safe as a delimiter with no quoting.
+- **The BOM is spelled `'\uFEFF'`, as an escape.** I first wrote it as a literal character and
+  it survived — but it is invisible in an editor and in a diff, which is exactly why the sibling
+  spells it out. Without it Excel on Windows opens a UTF-8 CSV as Latin-1. Note `Blob.text()`
+  strips a leading BOM on decode, so a test asserting on the decoded string will always say it
+  is missing; check `arrayBuffer()` for `EF BB BF`.
+- **`toCsv` and `toTsv` are function DECLARATIONS**, not the sibling's arrow consts. Its test
+  hooks sit at the end of that file; this app's `window.TD` export runs in section 4, thousands
+  of lines above, and reading a `const` before its declaration took the whole app down once here
+  — the same TDZ trap `ART_NONE` sprang.
+- **The buttons stay on in a shared view.** Everything else a shared view strips is stripped
+  because it would WRITE; this writes nothing and can only hand back figures already on the
+  recipient's screen.
+- **`slugify` guards the filename**, the other place free text lands somewhere it can be
+  interpreted — a train name with a slash would propose a path.
+- The Settings and Teams-dialog tables deliberately have no buttons: configuration, not figures.
+
 ## The Teams Dialog Follows the Sibling's (2026-08-20)
 
 Reordering landed the same afternoon, in both apps at once:
