@@ -2189,6 +2189,75 @@ group('ARTs — the grouping, and the boundary it crosses');
      'an empty team reads as 0 items rather than as a bare zero');
 
   /* ────────────────────────────────────────────────────────── */
+  group('reordering teams and ARTs');
+
+  /* Both lists are ORDERED and the order is read: teams appear in this order in
+     the header picker and down the All Teams table, ARTs are the order their
+     groups come in. So reordering permutes an array that was always there — no
+     new field, no schema bump — and both places have to follow it. */
+  const oneRow = [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }];
+  plant({ arts: [{ id: 'ar1', name: 'Alpha' }, { id: 'ar2', name: 'Beta' }],
+          teams: [{ id: 'm1', name: 'One', artId: 'ar1', rows: oneRow },
+                  { id: 'm2', name: 'Two', artId: 'ar1', rows: oneRow },
+                  { id: 'm3', name: 'Three', artId: 'ar2', rows: oneRow }],
+          settings: {} });
+  /* Opened for real, through the button, because a button inside a closed
+     <dialog> is display:none and cannot take focus — which is the whole point of
+     the three assertions below. */
+  win.document.getElementById('manageBtn').click();
+  const dialogNames = (sel) => [...win.document.querySelectorAll(sel + ' input')].map(i => i.value);
+  const pressMove = (kind, id, dir) => {
+    win.document.querySelector('[data-move' + kind + '="' + id + '"][data-dir="' + dir + '"]').click();
+  };
+
+  is(dialogNames('#teamRows'), ['One', 'Two', 'Three'], 'teams start in the order they were added');
+  pressMove('team', 'm3', -1);
+  is(dialogNames('#teamRows'), ['One', 'Three', 'Two'], 'a team moves one place up');
+  pressMove('team', 'm3', 1);
+  is(dialogNames('#teamRows'), ['One', 'Two', 'Three'], 'and one place back down');
+  is(win.tdGet().teams.map(t => t.name), ['One', 'Two', 'Three'],
+     'the new order is what gets saved — the array IS the order');
+
+  /* Ends are disabled rather than hidden: a button that vanishes at the top of
+     the list makes the row jump and moves the delete under the pointer. */
+  const upOf = (kind, id) => win.document.querySelector('[data-move' + kind + '="' + id + '"][data-dir="-1"]');
+  const downOf = (kind, id) => win.document.querySelector('[data-move' + kind + '="' + id + '"][data-dir="1"]');
+  is(upOf('team', 'm1').disabled, true, 'the first row cannot move up');
+  is(downOf('team', 'm3').disabled, true, 'and the last cannot move down');
+  is(downOf('team', 'm1').disabled, false, 'while every other direction is live');
+
+  /* Moving with the keyboard must not lose your place. The row is rebuilt, so
+     the button that was focused no longer exists; the same one in its new
+     position is focused instead, or its opposite number when it lands at an end
+     and goes disabled. */
+  pressMove('team', 'm1', 1);
+  is(win.document.activeElement.getAttribute('aria-label'), 'Move One down',
+     'focus follows the thing you moved');
+  pressMove('team', 'm1', 1);
+  is(win.document.activeElement.getAttribute('aria-label'), 'Move One up',
+     'and falls back to the other arrow when the one you pressed goes disabled');
+  pressMove('team', 'm1', -1); pressMove('team', 'm1', -1);
+
+  /* The picker groups by ART, so a team moves within its own train rather than
+     to the top of the list — which is the same rule the All Teams table follows,
+     and the reason both are read off one ordering. */
+  pressMove('team', 'm2', -1);
+  is([...win.document.getElementById('teamSel').querySelectorAll('optgroup')]
+       .map(g => g.label + ':' + [...g.children].map(o => o.textContent).join('|')),
+     ['Alpha:Two|One', 'Beta:Three'],
+     'reordering inside a train reorders it inside that train’s group in the picker');
+
+  /* ARTs are ordered too, and theirs is the order the groups appear in. */
+  is(dialogNames('#artRows'), ['Alpha', 'Beta'], 'ARTs start in the order they were added');
+  pressMove('art', 'ar2', -1);
+  is(dialogNames('#artRows'), ['Beta', 'Alpha'], 'and reorder the same way');
+  is([...win.document.getElementById('teamSel').querySelectorAll('optgroup')].map(g => g.label),
+     ['Beta', 'Alpha'], 'which moves their whole group, teams and all');
+  is(TD.groupTeamsByArt(win.TDState.sanitizeTeams(win.tdGet().teams), win.tdGet().arts).map(t => t.name),
+     ['Three', 'Two', 'One'], 'and is what groupTeamsByArt reads');
+  win.document.getElementById('manageCloseBtn').click();
+
+  /* ────────────────────────────────────────────────────────── */
   group('deriveTeams — one window, one date, every team');
 
   /* Three teams whose exports stop on different days. Without a shared date,

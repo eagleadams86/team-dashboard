@@ -157,6 +157,9 @@ number. What it does change:
   carries its ART under its name. **The header team picker groups the same way**, so a list you
   know by eye reads the same in both places.
 
+ARTs reorder with **↑** and **↓** like teams do, and that order is the order their groups appear
+in — both in the header picker and down the All Teams table.
+
 Deleting an ART is the cheapest delete in the app: it takes no team and no work item with it —
 the teams that were on it simply go back to having none. The confirmation says so.
 
@@ -244,8 +247,10 @@ with no work items at all shows dashes throughout.
 
 Each team keeps its own list of work items; the picker in the header chooses which one the
 dashboard is showing. Teams can be [grouped into ARTs](#grouping-teams-into-arts), in which case
-the picker groups them the same way. Add, rename and delete teams from the **Teams** button beside that
-picker. That window also holds your [Agile Release Trains](#grouping-teams-into-arts), and is
+the picker groups them the same way. Add, rename, reorder and delete teams from the **Teams**
+button beside that picker — a name is edited in place, **↑** and **↓** move a team up or down,
+and **×** deletes it. The order matters: it is the order teams appear in that picker and down
+the All Teams table. That window also holds your [Agile Release Trains](#grouping-teams-into-arts), and is
 laid out to match the sibling app's **Teams, ARTs & PIs** — same width, a section per thing you
 manage, each with its own *+ Add* button at the right-hand end of its heading. Settings are
 shared by every team — one place to say what a "defect" is.

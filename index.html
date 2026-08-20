@@ -554,10 +554,22 @@ table.manage td.art { min-width: 130px; }
 /* A count belongs under its heading, not hard against the box to its left, and
    these columns are only as wide as their widest cell. */
 table.filters th.act, table.filters td.act { text-align: right; }
+/* A square icon button. The base hover is NEUTRAL and `.danger` is what turns it
+   red — the same split `.btn` / `.btn.danger` already uses, and the reason it
+   changed: this class used to mean "delete", because deleting was the only thing
+   it did. The reorder arrows are not destructive and must not light up as though
+   they were. Disabled dims by opacity rather than by a greyed colour, so nothing
+   here invents a palette value; same rule as `.btn:disabled`. */
 .icon-btn { appearance: none; background: none; border: 1px solid var(--border-strong);
   color: var(--text-muted); border-radius: var(--radius-sm); cursor: pointer;
   width: 30px; height: 30px; font-size: 14px; line-height: 1; }
-.icon-btn:hover { color: var(--err); border-color: var(--err); }
+.icon-btn:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.icon-btn.danger:hover { color: var(--err); border-color: var(--err); }
+.icon-btn:disabled { opacity: .45; cursor: not-allowed; }
+.icon-btn:disabled:hover { color: var(--text-muted); border-color: var(--border-strong); }
+/* The buttons at the end of a row: kept on one line and pushed to the right edge,
+   so the arrows line up down the table however wide the columns end up. */
+.rowacts { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
 
 /* footer notes — the sibling app's .privacy: lined up with the text inside the
    last card (18px of card padding + its 1px border), not with the card edge. */
@@ -4724,11 +4736,56 @@ function renderTeamRows() {
       /* The count carries its own noun, the way the sibling's rows do. With no
          header row there is nothing else to say what the number is. */
       '<td class="count">' + t.rows.length + (t.rows.length === 1 ? ' item' : ' items') + '</td>' +
-      '<td>' + (only ? '' :
-        '<button class="icon-btn" data-delteam="' + t.id + '" title="Delete this team" aria-label="Delete ' +
-        escapeHtml(t.name) + '">&times;</button>') + '</td>';
+      '<td>' + rowActs('team', t.id, t.name, i, state.teams.length, only) + '</td>';
     tb.appendChild(tr);
   });
+}
+
+/* ── The buttons at the end of a row ─────────────────────────────────────────
+   Move up, move down, delete — the same three on a team and on an ART, so they
+   are built once.
+
+   The ORDER of both lists is meaningful, which is why they are reorderable at
+   all rather than fixed to the order things were added in: teams are listed in
+   the header picker and down the All Teams table in this order, and ARTs are the
+   order their groups appear in. Reordering permutes an array that was always
+   there, so it stores and syncs with no new field and no schema bump.
+
+   Ends are disabled rather than hidden — a button that vanishes at the top of
+   the list makes the row jump and moves the delete under the pointer. */
+function rowActs(kind, id, name, i, total, hideDelete) {
+  const arrow = (dir, glyph, word) =>
+    '<button class="icon-btn" data-move' + kind + '="' + escapeHtml(id) + '" data-dir="' + dir +
+    '" title="Move ' + word + '"' + ((dir < 0 ? i === 0 : i === total - 1) ? ' disabled' : '') +
+    ' aria-label="Move ' + escapeHtml(name) + ' ' + word + '">' + glyph + '</button>';
+  return '<span class="rowacts">' +
+    arrow(-1, '\u2191', 'up') + arrow(1, '\u2193', 'down') +
+    (hideDelete ? '' :
+      '<button class="icon-btn danger" data-del' + kind + '="' + escapeHtml(id) +
+      '" title="Delete this ' + kind + '" aria-label="Delete ' + escapeHtml(name) +
+      '">&times;</button>') +
+    '</span>';
+}
+
+/* Swap a team or an ART one place along its list, then put the keyboard back
+   where it was. Without the focus restore, moving something with the keyboard
+   loses your place entirely: the row is rebuilt, so the button that was focused
+   no longer exists. If the button lands disabled — the thing has reached an end
+   — focus goes to its opposite number on the same row, which is the only one
+   still worth pressing. */
+function moveInList(list, kind, id, dir) {
+  const i = list.findIndex(x => x.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  list.splice(j, 0, list.splice(i, 1)[0]);
+  save();
+  renderAll();
+  const pick = (d) => $('manageDialog')
+    .querySelector('[data-move' + kind + '="' + id + '"][data-dir="' + d + '"]');
+  const want = pick(dir);
+  const other = pick(-dir);
+  if (want && !want.disabled) want.focus();
+  else if (other) other.focus();
 }
 
 function renderArtRows() {
@@ -4741,8 +4798,7 @@ function renderArtRows() {
       '<td><input type="text" data-art="' + escapeHtml(a.id) + '" maxlength="120" value="' +
         escapeHtml(a.name) + '" aria-label="Name of ART, row ' + (i + 1) + '"></td>' +
       '<td class="count">' + n + (n === 1 ? ' team' : ' teams') + '</td>' +
-      '<td><button class="icon-btn" data-delart="' + escapeHtml(a.id) +
-        '" title="Delete this ART" aria-label="Delete ' + escapeHtml(a.name) + '">&times;</button></td>';
+      '<td>' + rowActs('art', a.id, a.name, i, state.arts.length, false) + '</td>';
     tb.appendChild(tr);
   });
   if (!state.arts.length) {
@@ -5921,6 +5977,8 @@ $('artRows').addEventListener('input', e => {
 });
 
 $('artRows').addEventListener('click', e => {
+  const btn = e.target.closest ? e.target.closest('[data-moveart]') : null;
+  if (btn) { moveInList(state.arts, 'art', btn.dataset.moveart, Number(btn.dataset.dir)); return; }
   const id = e.target.dataset && e.target.dataset.delart;
   if (!id) return;
   const i = state.arts.findIndex(a => a.id === id);
@@ -5985,6 +6043,8 @@ $('teamRows').addEventListener('change', e => {
 });
 
 $('teamRows').addEventListener('click', e => {
+  const btn = e.target.closest ? e.target.closest('[data-moveteam]') : null;
+  if (btn) { moveInList(state.teams, 'team', btn.dataset.moveteam, Number(btn.dataset.dir)); return; }
   const id = e.target.dataset && e.target.dataset.delteam;
   if (!id) return;
   const i = state.teams.findIndex(t => t.id === id);

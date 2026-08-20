@@ -138,6 +138,28 @@ the two are read side by side; the divergences below are deliberate.
 
 ## The Teams Dialog Follows the Sibling's (2026-08-20)
 
+Reordering landed the same afternoon, in both apps at once:
+
+- **Teams and ARTs reorder with ↑ / ↓.** Both lists are *read* in order — teams down the
+  header picker and the All Teams table, ARTs as the order their groups come in — so the
+  order you added things in is rarely the order you want a year later. Reordering permutes an
+  array that was always there, so **no new field and no schema bump**.
+- **`.icon-btn` split**: the base hover is now NEUTRAL and `.danger` is what turns it red,
+  the same split `.btn` / `.btn.danger` already uses. The class used to mean "delete" because
+  deleting was the only thing it did; the arrows are not destructive and must not light up as
+  though they were. The × buttons carry `.danger` now.
+- **Ends are disabled rather than hidden**: a button that vanishes at the top of a list makes
+  the row jump and moves the delete under the pointer.
+- **`moveInList` restores focus after `renderAll()`**, or moving something with the keyboard
+  loses your place entirely — the row is rebuilt, so the focused button no longer exists. If
+  it lands disabled, focus goes to its opposite number on the same row. The test that pins
+  this **opens the dialog through `manageBtn`**: a button inside a closed `<dialog>` is
+  `display: none` and cannot take focus, so the assertion passes vacuously without it.
+- A team moves within its own ART group in the picker, not to the top of the list, because
+  `groupTeamsByArt` sorts by train first. That is the same rule the All Teams table follows
+  and it is pinned.
+
+
 Charles asked for this window to match Sprint Predictability's **Teams, ARTs & PIs**, which is
 the right call: the two apps share their chrome and the sibling is the design lead for it. What
 that means concretely, and what a later edit must not tidy back:
