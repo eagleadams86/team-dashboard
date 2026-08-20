@@ -280,10 +280,21 @@ Rules it must keep:
   with it); on All Teams it is the team with nine silent days dragging its rate down. Without a
   team like it the Data to column is a row of matching dates that looks like it does nothing —
   which is exactly what the demo rule exists to prevent.
-- **No chart here, and that was a decision.** A line per team needs a categorical palette, and the
-  theme pack has none — only `--accent` and `--serious`, which every chart in the app uses as its
-  two-series pair. Inventing colours locally is precisely the drift the pack exists to stop.
-  If this ever wants a chart, it goes through `tokens.json` and the contrast gate first.
+- **One chart, and the reasoning behind that.** A line PER TEAM would need a categorical palette
+  the theme pack does not have — only `--accent` and `--serious`, which every chart here uses as
+  its two-series pair — and inventing colours locally is the drift the pack exists to stop. That
+  ruled out the expensive version, and for a while it wrongly ruled out the cheap one too: the
+  train's own AGGREGATE line needs exactly one colour, and the accent already is it. So All Teams
+  carries the train's throughput over time and nothing per-team. A per-team chart still goes
+  through `tokens.json` and the contrast gate first.
+- **`drawTrainThroughput` is deliberately identical to the dashboard's throughput chart** — same
+  type, colour, trend line and partial-period tooltip footer. It is the same measure, and a
+  second styling for it would only invite the question of what is different about it.
+- **The chart is held in its own `trainChart`, NOT in the shared `charts` registry.** That object
+  is the dashboard's, and `renderDashboard` destroys every entry in it whenever the SELECTED TEAM
+  has nothing plottable — which has no bearing on the train, and would have wiped this chart out
+  from under somebody looking at a perfectly healthy roll-up. Pinned by a test that selects an
+  empty team while standing on All Teams.
 
 ## The Work Item Age Chart (2026-08-20)
 

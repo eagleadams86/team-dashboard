@@ -2923,6 +2923,74 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and you land back on the dashboard rather than on a panel with no tab');
 
   /* ────────────────────────────────────────────────────────── */
+  group('All Teams — the train’s throughput over time');
+
+  /* The four tiles say where the train IS; this chart says where it has been.
+     It is drawn from the train's own derive() result, so nothing here computes
+     anything — and it must follow every control the rest of the view does. */
+  plant({ arts: [{ id: 'tr1', name: 'Payments' }],
+          teams: [
+            { id: 'q1', name: 'One', artId: 'tr1', rows: [
+              { c: '2015-05-01', s: '2015-04-28', t: 'Story' },
+              { c: '2015-05-02', s: '2015-04-29', t: 'Bug' }] },
+            { id: 'q2', name: 'Two', rows: [
+              { c: '2015-05-01', s: '2015-04-27', t: 'Story' }] }
+          ], settings: {} });
+  win.selectTab('allteams');
+
+  const trainChartOf = () => win.Chart.getChart(win.document.getElementById('chartTrainThroughput'));
+  const trainSeries = () => { const c = trainChartOf(); return c ? c.data.datasets[0].data : null; };
+
+  ok(trainChartOf(), 'the chart is drawn when the train has something to plot');
+  is(win.document.getElementById('cardTrainThroughput').hidden, false, 'and its card is showing');
+
+  /* Plotted straight off derive(), not recomputed — if these ever diverge, the
+     chart and the tiles above it are telling two different stories. */
+  const trainNow = TD.deriveTeams(win.TDState.sanitizeTeams(win.tdGet().teams),
+    win.TDState.normalizeSettings({}), { filterValue: '', months: '3', bucket: 'week' }).train;
+  is(trainSeries(), trainNow.throughput, 'the series IS the train’s throughput, not a second sum of it');
+  is(trainSeries().reduce((a, b) => a + b, 0), 3, 'three items across the two teams');
+
+  /* One series and one colour on purpose: a line per team would need a
+     categorical palette the theme pack does not have. The trend line beside it
+     is the same dashed one every other chart in the app carries. */
+  is(trainChartOf().data.datasets.map(d => d.label), ['Throughput', 'Trend'],
+     'one series plus its trend, and nothing per-team');
+
+  /* It follows the ART scope, like every other figure on the page. */
+  const scope = win.document.getElementById('artFilterSel');
+  scope.value = 'tr1'; scope.dispatchEvent(new win.Event('change'));
+  is(trainSeries().reduce((a, b) => a + b, 0), 2, 'scoped to a train, it plots that train alone');
+  ok(/Payments/.test(win.document.getElementById('titleTrainThroughput').textContent),
+     'and says which train it is', win.document.getElementById('titleTrainThroughput').textContent);
+  scope.value = ''; scope.dispatchEvent(new win.Event('change'));
+  is(trainSeries().reduce((a, b) => a + b, 0), 3, 'and back to every team');
+
+  /* Nothing to plot: the card goes, and the chart is DESTROYED rather than left
+     holding a stale series — the next render may be a different train entirely. */
+  plant({ arts: [], teams: [{ id: 'q1', name: 'One', rows: [] },
+                            { id: 'q2', name: 'Two', rows: [] }], settings: {} });
+  win.selectTab('allteams');
+  is(win.document.getElementById('cardTrainThroughput').hidden, true, 'no train, no card');
+  is(!trainChartOf(), true, 'and no chart left behind');
+
+  /* The reason it is held outside the dashboard's `charts` registry. That object
+     is emptied whenever the SELECTED TEAM has nothing plottable, which has no
+     bearing on the train — and would have wiped this chart out from under
+     somebody looking at a perfectly healthy roll-up. */
+  plant({ arts: [], teams: [
+    { id: 'q1', name: 'Has data', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] },
+    { id: 'q2', name: 'Empty', rows: [] }], settings: {} });
+  win.selectTab('allteams');
+  ok(trainChartOf(), 'the chart is up');
+  /* Select the empty team, which is what sends renderDashboard down its
+     destroy-everything path. */
+  const sel = win.document.getElementById('teamSel');
+  sel.value = 'q2'; sel.dispatchEvent(new win.Event('change'));
+  ok(trainChartOf(), 'and survives the selected team having nothing to plot');
+  is(trainSeries().reduce((a, b) => a + b, 0), 1, 'still showing the train, not the empty team');
+
+  /* ────────────────────────────────────────────────────────── */
   group('CSV export — the formula guard and the quoting');
 
   /* A spreadsheet treats a cell opening with =, + or @ as a FORMULA, so a team

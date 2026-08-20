@@ -173,7 +173,8 @@ The dashboard answers *how is this team doing?*. **All Teams** answers *which of
 me?* — which, before it existed, meant visiting eight teams in the picker and holding their
 numbers in your head.
 
-One row per team, one column per question people actually scan for:
+A chart of the whole train's throughput over time, then one row per team, one column per question
+people actually scan for:
 
 | Column | The question |
 |---|---|
@@ -201,6 +202,23 @@ that train's own figures rather than the whole estate's with some rows hidden.
 
 The tab appears once you have a **second team**, the same rule the team picker follows: with one
 team there is no comparison to make.
+
+### The Train's Throughput Over Time
+
+The four tiles say where the train **is**; the chart under them says where it has **been** — items
+completed per period across every team in scope, with the same dashed trend line every other chart
+carries. It follows the train picker, the work type filter, the date window and the grouping, like
+everything else on the page.
+
+It plots **one series and one colour on purpose**. A line per team would need a palette of
+distinguishable colours that the shared theme pack doesn't have, and inventing one here would put
+this app's charts out of step with its siblings. The aggregate needs only the accent — and it
+answers the question the tiles can't: *is the whole train's delivery steady?* Which team moved is
+the table underneath.
+
+One thing to watch: a dip can be **one team stopping** rather than the train slowing down. Check
+the **Data to** column before concluding anything — a team whose export is stale looks exactly like
+a team that stopped delivering.
 
 ### One Shared Date, and Why It Matters
 

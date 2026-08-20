@@ -876,6 +876,18 @@ main:focus { outline: none; }
 
     <div id="allTeamsTiles" class="tiles"></div>
 
+    <!-- The four tiles above say where the train IS; this says where it has been.
+         One series and one colour on purpose: a line per team would need a
+         categorical palette the theme pack does not have, and inventing one
+         locally is the drift the pack exists to stop. The aggregate needs only
+         the accent, and it answers the question the tiles cannot — is the whole
+         train's delivery steady? Which team moved is the table underneath. -->
+    <div class="chart-card" id="cardTrainThroughput" style="margin-bottom:18px">
+      <div class="chart-name" id="nameTrainThroughput"></div>
+      <div class="chart-title" id="titleTrainThroughput"></div>
+      <div class="chart-wrap"><canvas id="chartTrainThroughput"></canvas></div>
+    </div>
+
     <div class="card">
       <div class="row spread">
         <h2 id="allTeamsHeading">Every Team, Side by Side <span class="hint" id="allTeamsCount"></span></h2>
@@ -3381,6 +3393,12 @@ function haltForNewerData(found) {
 let state  = { teams: [], arts: [], settings: Object.assign({}, DEFAULT_SETTINGS) };
 let view   = Object.assign({}, DEFAULT_VIEW);
 let charts = {};
+/* The All Teams throughput chart is held HERE rather than in `charts` above.
+   That object is the dashboard's, and renderDashboard destroys every entry in it
+   whenever the SELECTED TEAM has nothing plottable — which has no bearing on the
+   train, and would have wiped this chart out from under a reader looking at a
+   perfectly healthy roll-up. */
+let trainChart = null;
 /* Which top-level view is on screen. Not in `view` and not saved: which tab you
    left the app on is not a position worth restoring — a reload should open on
    the dashboard — and two renderers need to know which of them owns the shared
@@ -4596,6 +4614,16 @@ const METRIC_HELP = {
       + 'export reports that quarter. One caveat: the clean-up tool’s option to also remove '
       + 'unfinished items deletes long-running work in progress, which is exactly what this '
       + 'chart counts, so history before a clean-up like that will read low.' },
+  trainThroughput: { title: 'Throughput Across Every Team',
+    body: 'What pace is the whole train delivering at, week by week? The same count the '
+      + 'dashboard plots for one team, added up across every team in scope \u2014 a total is '
+      + 'the one figure here that genuinely is the sum of its parts. Read the trend line '
+      + 'rather than any single point: throughput is lumpy for one team and stays lumpy for '
+      + 'six. The thing to watch for is a dip that is one TEAM stopping rather than the train '
+      + 'slowing down, and the table below is what tells the two apart \u2014 check the Data '
+      + 'to column first, because a team whose export is stale looks exactly like a team that '
+      + 'stopped delivering. It follows the train picker, so scoping to one ART redraws this '
+      + 'for that ART alone.' },
   trainPercentile: { title: 'The Whole Train\u2019s ' + CYCLE_PERCENTILE + 'th Percentile',
     body: 'The figure for every team at once, worked out over every item any of them '
       + 'completed \u2014 NOT the average of their separate percentiles, which is not a '
@@ -5191,6 +5219,66 @@ function renderArtScope(scope) {
     : 'Showing all ' + shown + ' teams. Every figure below follows this picker.';
 }
 
+/* ── The train's throughput over time ────────────────────────────────────────
+   The same chart the dashboard draws for one team, drawn for every team in
+   scope: same type, same colour, same trend line, same partial-period footnote
+   in the tooltip. Deliberately identical, because it is the same measure — a
+   reader who has learnt to read one has learnt to read the other, and a second
+   styling for the same figure would only invite the question of what is
+   different about it.
+
+   `train` is a derive() result over the concatenated rows of the teams in scope,
+   so it already carries the full series; nothing here computes anything. Null
+   means there is nothing to draw. */
+function drawTrainThroughput(train, scopePhrase) {
+  const card = $('cardTrainThroughput');
+  card.hidden = !train;
+  if (!train) {
+    /* Destroyed rather than left holding a stale series — the next render may be
+       a different train entirely, or the same one with a filter on. */
+    if (trainChart) { trainChart.destroy(); trainChart = null; }
+    return;
+  }
+
+  const Noun = train.bucketNoun.charAt(0).toUpperCase() + train.bucketNoun.slice(1);
+  $('nameTrainThroughput').innerHTML = '<span>' + escapeHtml(train.names.throughput) + '</span>'
+    + helpBtn('trainThroughput', train.names.throughput);
+  $('titleTrainThroughput').textContent = 'Items Completed per ' + Noun
+    + ' Across Every Team' + (scopePhrase ? ' ' + scopePhrase : '');
+
+  const accent = token('--accent');
+  const opts = baseOptions(train.axisTitles.throughput, int0, null, train.axisTitles.x, train.partial);
+  opts.scales.y.beginAtZero = true;
+  /* Counts are whole numbers: without this Chart.js picks fractional steps on a
+     short axis and int0 rounds several of them to the same label. */
+  opts.scales.y.ticks.precision = 0;
+
+  if (trainChart) trainChart.destroy();
+  trainChart = new Chart($('chartTrainThroughput').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: train.bucketLabels,
+      datasets: [{
+        label: 'Throughput',
+        data: train.throughput,
+        borderColor: accent,
+        backgroundColor: accent,
+        borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false, order: 1
+      }, trendDataset(train.throughput)]
+    },
+    options: opts
+  });
+
+  /* A canvas is a bitmap to a screen reader, and the table below is where the
+     same window is available as text. */
+  const c = $('chartTrainThroughput');
+  c.setAttribute('role', 'img');
+  c.setAttribute('aria-label', $('titleTrainThroughput').textContent + '. '
+    + train.buckets.length + ' ' + train.bucketNoun + (train.buckets.length === 1 ? '' : 's')
+    + ' ending ' + prettyDate(train.endDate)
+    + '. Each team\u2019s own figures are in the table below.');
+}
+
 function renderAllTeams() {
   /* Only when it is the view on screen. Every row is a full derive(), forecast
      and all, so running this behind a hidden panel would multiply the most
@@ -5256,6 +5344,7 @@ function renderAllTeams() {
           + 'every team you load will appear here side by side.';
     $('windowNote').innerHTML = '';
     $('allTeamsTiles').innerHTML = '';
+    drawTrainThroughput(null);
     return;
   }
   table.hidden = false;
@@ -5294,6 +5383,8 @@ function renderAllTeams() {
       'open across every team as of ' + prettyDate(s.asOf), 'wip') +
     tile('Aged work', String(s.agedNow),
       'in progress over ' + train.agedDays + ' ' + train.dayNoun, 'agedWork');
+
+  drawTrainThroughput(train, scopePhrase);
 
   const cols = teamColumns(train);
   const sortCol = cols.find(c => c.key === view.teamSort);
