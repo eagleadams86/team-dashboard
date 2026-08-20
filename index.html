@@ -251,7 +251,10 @@ select { cursor: pointer; }
    reason to stand as tall as the chart beside it. */
 .chart-card.no-chart { align-self: start; }
 
-/* A group with an odd number of charts leaves the last one alone on its row. It
+/* A group with an odd number of charts leaves the last one alone on its row.
+   No group has one today — Health went to four when the work item age card
+   landed — but the rule and the class stay: the next odd group would otherwise
+   rediscover the problem. It
    keeps a column's width and sits centred, rather than stretching across: a
    chart drawn at twice its siblings' width reads as the more important one,
    which it isn't, and its x-axis stops being comparable with theirs at a glance.
@@ -977,7 +980,20 @@ main:focus { outline: none; }
           <div class="chart-wrap"><canvas id="chartAgedWork"></canvas></div>
         </div>
 
-        <div class="chart-card solo">
+        <!-- The card that explodes the one above it: that plots how MANY were
+             stale at each period end, this plots which ones are stale now.
+             Sits between them and the defect rate deliberately — the two
+             ageing cards belong side by side. Its own empty face, because a
+             team with nothing in flight is a real and unremarkable state, not
+             a missing chart. -->
+        <div class="chart-card" id="cardItemAge">
+          <div class="chart-name" id="nameItemAge"></div>
+          <div class="chart-title" id="titleItemAge"></div>
+          <div class="chart-wrap"><canvas id="chartItemAge"></canvas></div>
+          <div class="note info" id="itemAgeNone" hidden></div>
+        </div>
+
+        <div class="chart-card">
           <div class="chart-name" id="nameDefectRate"></div>
           <div class="chart-title" id="titleDefectRate"></div>
           <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
@@ -2004,6 +2020,17 @@ function seededRandom(seed) {
    point — narrowing to the last 3 months is exactly how to ask "what if we
    carry on at our recent pace?". */
 
+/* ── The work item age chart ─────────────────────────────────────────────────
+   How wide a column's dots are spread, in x-axis slots either side of centre;
+   how many type columns are drawn before the tail is folded into one; and the
+   two labels that are not work types. Named rather than inlined because the
+   spread is pinned by a test, and because a board can produce a type called
+   "Other" — the fold label has to be recognisable as ours when it does. */
+const AGE_SPREAD = 0.3;
+const AGE_MAX_COLUMNS = 6;
+const AGE_UNTYPED = 'No type';
+const AGE_OTHER = 'Other types';
+
 /* Ten thousand deals. Enough that the answers stop moving at the resolution
    they are reported in — whole items, whole periods — and cheap enough (a
    couple of milliseconds for both questions) to run on every render alongside
@@ -2502,6 +2529,108 @@ function derive(rows, settings, view) {
      turn into null rather than 0 — the same stance percentileOf takes. */
   const wholeThroughput = partial ? throughput.slice(0, -1) : throughput.slice();
 
+  /* ── Every item still in flight, by age ────────────────────────────────────
+     The counterpart to the aged-work chart above it. That one says HOW MANY
+     were stale at the end of each period; this says WHICH ONES are stale now
+     and by how much — the only thing on the dashboard a stand-up can act on
+     item by item rather than in aggregate.
+
+     Read as of the newest date in the data, like work in progress and aged work
+     beside it, and measured with spanDays so the working-days setting reaches
+     it exactly as it reaches the ageing threshold it is drawn against.
+
+     The dots carry no ticket key, and cannot: this app stores none, on purpose.
+     What a dot does carry — its work type and its start date — is enough to
+     find the item in the export it came from, which is what the tooltip and the
+     ⓘ both say. */
+  const inFlight = items
+    .filter(r => r.started && !r.completed)
+    .map(r => ({
+      age: Math.max(0, spanDays(endDate, r.started, workingDays)),
+      type: r.type || '',
+      started: r.started
+    }));
+
+  /* Columns are work types, because that is the only categorical column this
+     app holds — the canonical version of this chart puts workflow STAGE on the
+     x axis, which would need the status history that blocked time and flow
+     efficiency are both waiting on. Type still earns the axis: a board whose
+     defects age and whose stories don't is a different problem from one where
+     everything ages, and one glance separates them.
+
+     Ordered by how many are in flight, so the busiest column is leftmost, with
+     the name as a tie-break so the order never depends on row order. */
+  const ageBuckets = new Map();
+  for (const r of inFlight) {
+    const key = r.type || AGE_UNTYPED;
+    if (!ageBuckets.has(key)) ageBuckets.set(key, []);
+    ageBuckets.get(key).push(r);
+  }
+  const ranked = [...ageBuckets.entries()]
+    .sort((a, b) => b[1].length - a[1].length || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  /* "No type" is not a work type, it is the absence of one, so it goes to the
+     end with the fold column rather than sorting into the middle of the real
+     ones on its count. That also keeps both synthetic columns on the right,
+     which is what makes the right-hand edge the reliably quiet corner the
+     reference-line labels are drawn in. */
+  const untyped = ranked.filter(([label]) => label === AGE_UNTYPED);
+  const typed = ranked.filter(([label]) => label !== AGE_UNTYPED);
+  /* A board with a dozen issue types would draw a dozen columns two dots wide
+     on a card this size. The long tail folds into one column, and the count of
+     what went in is stated rather than silently dropped. The cap counts real
+     types only — "No type" must not push a real one out of the chart. */
+  const kept = typed.slice(0, AGE_MAX_COLUMNS);
+  const folded = typed.slice(AGE_MAX_COLUMNS);
+  const ageColumns = kept.concat(untyped).map(([label, rows]) => ({ label, rows }));
+  if (folded.length) {
+    ageColumns.push({
+      label: AGE_OTHER,
+      rows: folded.reduce((all, [, rows]) => all.concat(rows), [])
+    });
+  }
+
+  /* Points, positioned here rather than in the chart layer so the spread is a
+     pinned property of the data rather than something the renderer improvises.
+     Items in a column are spread evenly across it and sorted by age, which
+     stops two items the same age landing on the same pixel and makes each
+     column read as a small distribution of its own. A column of one sits dead
+     centre rather than at the left edge of its slot. */
+  const agePoints = [];
+  ageColumns.forEach((col, i) => {
+    const sorted = col.rows.slice().sort((a, b) => a.age - b.age
+      || a.started.getTime() - b.started.getTime());
+    const n = sorted.length;
+    sorted.forEach((r, j) => {
+      agePoints.push({
+        x: i + (n === 1 ? 0 : -AGE_SPREAD + (2 * AGE_SPREAD * j) / (n - 1)),
+        y: r.age,
+        aged: r.age > agedDays,
+        type: r.type,
+        started: r.started,
+        column: col.label
+      });
+    });
+  });
+
+  /* The lines the dots are read against. Two are this team's own finished work
+     — the same median and percentile the headline tile states, taken from the
+     same pooled cycle times, so a dot above the 85th line really is an item
+     that has already outlasted 85% of everything this team has delivered. The
+     third is the ageing threshold, which is the line the tile beside this one
+     counts against. Null percentiles when nothing finished has a measurable
+     cycle time: the threshold still draws, and the card is still worth having. */
+  const ageing = {
+    points: agePoints,
+    columns: ageColumns.map(c => c.label),
+    foldedTypes: folded.length,
+    count: inFlight.length,
+    agedCount: inFlight.filter(r => r.age > agedDays).length,
+    oldest: inFlight.length ? Math.max.apply(null, inFlight.map(r => r.age)) : null,
+    median: percentileOf(windowCycles, 50),
+    p85: percentileOf(windowCycles, CYCLE_PERCENTILE),
+    threshold: agedDays
+  };
+
   /* ── The forecast ──────────────────────────────────────────────────────────
      Two questions off one sample set: how long until N items are finished, and
      how many are finished by a date. Both deal from `wholeThroughput` above —
@@ -2606,7 +2735,7 @@ function derive(rows, settings, view) {
     throughput, unplannedRate, avgCycleTime, netFlow, started,
     avgLeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
     throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
-    wip, agedCount, agedDays, forecast,
+    wip, agedCount, agedDays, ageing, forecast,
     /* The measure, and the word for it, travel with the numbers: every tile and
        column that states a duration reads them from here rather than reaching
        back into settings, so the label can never disagree with the figure. */
@@ -2665,6 +2794,9 @@ function derive(rows, settings, view) {
       leadTime: 'Lead time',
       wip: 'Work in progress',
       agedWork: 'Aged work',
+      /* Named for what a dot IS rather than for the chart type — nobody at a
+         stand-up asks for the scatter plot. */
+      itemAge: 'Work item age',
       /* The two forecast cards. Named for the question each answers rather than
          for the method: nobody walks up to a board asking for a Monte Carlo. */
       forecastWhen: 'Time to finish',
@@ -2688,6 +2820,8 @@ function derive(rows, settings, view) {
       leadTime: 'Average Lead Time per ' + Noun + ' (Raised to Delivered)',
       wip: 'Work in Progress at the End of Each ' + Noun,
       agedWork: 'Items in Progress Longer Than ' + agedDays + ' ' + DayNoun,
+      itemAge: 'Age of Every Item Still in Progress on ' + prettyDate(endDate)
+        + ', by Work Type',
       /* Both name the question's own input, so a card read on its own — in a
          screenshot, over someone's shoulder — still says what was asked. */
       forecastWhen: 'How Many Days to Finish ' + fcItems + ' Item'
@@ -2706,6 +2840,8 @@ function derive(rows, settings, view) {
       leadTime: 'Lead time (' + dayNoun + ')',
       wip: 'Items open at period end',
       agedWork: 'Items older than ' + agedDays + ' ' + dayNoun,
+      itemAge: 'Age so far (' + dayNoun + ')',
+      itemAgeX: 'Work type',
       /* Both forecast charts count RUNS up the y axis — the x axis is the
          outcome, which is the other way round from every chart above, where x
          is time. Each says outright what it is counting, because a bar chart
@@ -2732,7 +2868,10 @@ window.TD = {
      rather than only reading the answers back off derive(). */
   seededRandom, forecastPeriodsFor, forecastItemsIn, forecastHistogram,
   daysAtConfidence, countAtConfidence, periodsBetween, periodsToDays,
-  FORECAST_TRIALS, FORECAST_MIN_PERIODS, FORECAST_CONFIDENCE, FORECAST_MAX_ITEMS
+  FORECAST_TRIALS, FORECAST_MIN_PERIODS, FORECAST_CONFIDENCE, FORECAST_MAX_ITEMS,
+  /* The work item age chart's shaping constants, so its tests state the rule
+     rather than restating the number and going stale beside it. */
+  AGE_SPREAD, AGE_MAX_COLUMNS, AGE_UNTYPED, AGE_OTHER
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3362,6 +3501,46 @@ const valueLabels = {
 };
 Chart.register(valueLabels);
 
+/* Names the reference lines on the work item age chart where they are drawn,
+   instead of in a legend.
+
+   A legend entry costs vertical space out of a 300px card — five of them wrapped
+   to two rows and took a sixth of the plot — and it costs a lookup: the reader
+   has to match a dash pattern at the top of the card to a line in the middle of
+   it. Labelling in place removes both. The two DOT styles keep their legend
+   entries, because a shape does need a key.
+
+   Right-aligned deliberately. Columns are ordered by how many items are in
+   them, so the rightmost is always the emptiest — the one corner of this chart
+   that is reliably free.
+
+   Drawn top down, and a label that would land on the one above it is pushed
+   clear rather than dropped: three lines a day apart is a real board, and
+   silently losing one is worse than nudging it. */
+const refLabels = {
+  id: 'refLabels',
+  afterDatasetsDraw(chart, args, opts) {
+    const lines = opts && opts.lines;
+    if (!lines || !lines.length) return;
+    const ctx = chart.ctx, area = chart.chartArea, y = chart.scales.y;
+    ctx.save();
+    ctx.font = '600 10px ' + token('--font-sans');
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    let last = -Infinity;
+    lines.slice().sort((a, b) => b.value - a.value).forEach((l) => {
+      let py = y.getPixelForValue(l.value) - 3;
+      if (py < last + 12) py = last + 12;
+      if (py < area.top + 9 || py > area.bottom) return;
+      ctx.fillStyle = l.colour;
+      ctx.fillText(l.text, area.right - 4, py);
+      last = py;
+    });
+    ctx.restore();
+  }
+};
+Chart.register(refLabels);
+
 /* tickFormat defaults to tipFormat — pass it separately when the axis wants
    rounder numbers than the tooltip. xTitle and partial come from derive(), so
    the axis says which grouping is on screen and the tooltip owns up to a final
@@ -3677,6 +3856,119 @@ function drawCharts(d) {
     options: agedOpts
   });
 
+  /* ── Every item in flight, by age ──
+     A scatter, and the only chart here whose points are ITEMS rather than
+     periods. Columns are work types; within a column the dots are spread by
+     derive() so two items the same age don't land on the same pixel.
+
+     Three horizontal lines give the dots a meaning they don't have on their
+     own. Two are this team's own finished work — the median and the 85th
+     percentile, the same figures the headline tile states — so a dot above the
+     upper line is an item that has already outlasted 85% of everything this
+     team has ever delivered, which is a far stronger statement than "it is
+     old". The third is the ageing threshold from Settings, the line the tile
+     beside this one counts against.
+
+     Aged dots are told apart by SHAPE as well as colour — a filled triangle in
+     --serious against accent circles — which is the same rule the defect and
+     cycle time charts follow, and the same non-RAG pair. Nothing here is
+     coloured "bad": the threshold is one the reader set. */
+  const ageCard = $('cardItemAge');
+  const ageEmpty = $('itemAgeNone');
+  const hasFlight = d.ageing.count > 0;
+  ageCard.querySelector('.chart-wrap').hidden = !hasFlight;
+  ageCard.classList.toggle('no-chart', !hasFlight);
+  ageEmpty.hidden = hasFlight;
+  ageEmpty.textContent = hasFlight ? ''
+    : 'Nothing is in progress' + (view.filterDisplay && currentFilterValue()
+        ? ' under the ' + view.filterDisplay + ' filter' : '')
+      + ' as of ' + prettyDate(d.endDate) + ', so there is no work to age. '
+      + 'Items appear here as soon as they have a start date and no completion.';
+
+  if (!hasFlight) {
+    if (charts.chartItemAge) { charts.chartItemAge.destroy(); delete charts.chartItemAge; }
+  } else {
+    const a = d.ageing;
+    const cols = a.columns;
+    const xMin = -0.5, xMax = cols.length - 0.5;
+    /* A reference line on a linear axis is two points at the same height. */
+    const refLine = (label, value, colour, dash) => ({
+      label, type: 'line', data: [{ x: xMin, y: value }, { x: xMax, y: value }],
+      borderColor: colour, borderWidth: 1.5, borderDash: dash,
+      pointRadius: 0, pointHitRadius: 0, fill: false, tension: 0, order: 3,
+      /* The legend below draws point styles, so without this a horizontal
+         reference line is announced by a circle — indistinguishable from the
+         items it exists to be read against. */
+      pointStyle: 'line'
+    });
+    /* `text` is what the plugin writes beside the line; `label` is what a
+       tooltip would say. Neither reaches the legend — the filter below keeps
+       the lines out of it. */
+    const refs = [], refTexts = [];
+    const addRef = (text, value, colour, dash) => {
+      refs.push(refLine(text, value, colour, dash));
+      refTexts.push({ text, value, colour });
+    };
+    const muted = token('--text-muted'), secondary = token('--text-secondary');
+    if (a.median != null) addRef('half took under ' + num1(a.median), a.median, muted, [6, 4]);
+    if (a.p85 != null) addRef(d.cyclePercentile + '% took under ' + num1(a.p85), a.p85, secondary, [2, 3]);
+    addRef('aged after ' + a.threshold, a.threshold, serious, [10, 3]);
+
+    const dot = (aged) => ({
+      label: aged ? 'Past ' + a.threshold + ' ' + d.dayNoun : 'In progress',
+      data: a.points.filter(p => p.aged === aged),
+      backgroundColor: aged ? serious : tint(accent, 0.45),
+      borderColor: aged ? serious : accent,
+      borderWidth: 1.5,
+      pointStyle: aged ? 'triangle' : 'circle',
+      pointRadius: aged ? 6 : 5,
+      pointHoverRadius: aged ? 9 : 8,
+      order: 1
+    });
+
+    const ageOpts = baseOptions(d.axisTitles.itemAge, int0, null, d.axisTitles.itemAgeX, null);
+    ageOpts.scales.y.beginAtZero = true;
+    ageOpts.scales.y.ticks.precision = 0;
+    ageOpts.scales.x.type = 'linear';
+    ageOpts.scales.x.min = xMin;
+    ageOpts.scales.x.max = xMax;
+    /* One tick per column, forced: left to itself a linear axis would step in
+       halves from -0.5 and label the gaps between the columns. */
+    ageOpts.scales.x.afterBuildTicks = (axis) => { axis.ticks = cols.map((_, i) => ({ value: i })); };
+    ageOpts.scales.x.ticks.callback = (v) => cols[v] != null ? cols[v] : '';
+    ageOpts.scales.x.grid.display = false;
+    /* Nearest-point, because index mode on a scatter picks every dot sharing an
+       x — which here is one item, but only by accident of the spread. */
+    ageOpts.interaction = { mode: 'nearest', intersect: true };
+    const dotSets = [dot(true), dot(false)].filter(s => s.data.length);
+    ageOpts.plugins.refLabels = { lines: refTexts };
+    /* Only the dot styles. The lines name themselves on the chart — see
+       refLabels — so a legend entry for each would be the same information
+       twice, in the more expensive place. */
+    ageOpts.plugins.legend = {
+      display: true, position: 'top',
+      labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
+                font: { size: 11 }, filter: item => item.datasetIndex < dotSets.length }
+    };
+    /* The dot cannot be labelled with a ticket key — this app stores none — so
+       the tooltip carries what it does have, which is exactly what finds the
+       item again in the export it came from. */
+    ageOpts.plugins.tooltip.callbacks = {
+      title: (its) => {
+        const p = its[0].raw;
+        return (p.type || AGE_UNTYPED) + ' \u00b7 started ' + prettyDate(p.started);
+      },
+      label: (c) => int0(c.raw.y) + ' ' + d.dayNoun + ' in progress',
+      afterLabel: (c) => c.raw.aged ? 'Past the ' + a.threshold + '-' + d.dayNoun + ' threshold' : ''
+    };
+
+    renderChart('chartItemAge', {
+      type: 'scatter',
+      data: { datasets: dotSets.concat(refs) },
+      options: ageOpts
+    });
+  }
+
   /* ── The two forecasts ──
      Both plot the same thing in the same way: how often each outcome came up
      across ten thousand simulated runs, with every bar shaded by the confidence
@@ -3753,6 +4045,7 @@ function drawCharts(d) {
   ['defectRate', 'cycleTime', 'throughput', 'netFlow', 'wip', 'agedWork']
     .forEach(k => describe('chart' + k.charAt(0).toUpperCase() + k.slice(1), label(k)));
   if (d.hasCreated) describe('chartLeadTime', label('leadTime'));
+  if (d.ageing.count) describe('chartItemAge', label('itemAge'));
   if (d.forecast.when) describe('chartForecastWhen', label('forecastWhen'));
   if (d.forecast.howMany) describe('chartForecastHowMany', label('forecastHowMany'));
 }
@@ -3858,6 +4151,21 @@ const METRIC_HELP = {
       + 'export reports that quarter. One caveat: the clean-up tool’s option to also remove '
       + 'unfinished items deletes long-running work in progress, which is exactly what this '
       + 'chart counts, so history before a clean-up like that will read low.' },
+  itemAge: { title: 'Work Item Age',
+    body: 'What do I do today? Every item still in progress, plotted at the age it has '
+      + 'reached so far \u2014 not how long it took, because none of these has finished. '
+      + 'The aged work chart beside it counts how many were stale at the end of each '
+      + 'period; this one names them. Three lines give the dots their meaning: half of '
+      + 'your finished work took less than the lower one, ' + CYCLE_PERCENTILE + '% took '
+      + 'less than the middle one, and the top one is the ageing threshold you set. An '
+      + 'item above the ' + CYCLE_PERCENTILE + '% line has already outlasted almost '
+      + 'everything this team has ever delivered, which is a much stronger signal than '
+      + '\u201cit looks old\u201d \u2014 it is very unlikely to finish normally now, and it '
+      + 'is the one to talk about first. Columns are work types, because a board where the '
+      + 'defects age and the stories do not is a different problem from one where '
+      + 'everything ages. The dots carry no ticket number: this app never stores one. '
+      + 'Point at a dot and it gives you the work type and the start date, which is what '
+      + 'finds the item again in the export you pasted.' },
   forecastWhen: { title: 'Time to Finish',
     body: 'When will a batch of work be done? It deals this team\u2019s own completed '
       + 'periods out again at random ' + FORECAST_TRIALS.toLocaleString() + ' times, and '
@@ -4093,9 +4401,23 @@ function renderDashboard() {
      progress and aged work — are headline tiles now, so what is left here is
      what each chart needs to be read BY: the coaching ratio that says whether
      the work in progress figure is a lot, and the rate the defect chart plots. */
+  const ag = d.ageing;
   $('tilesHealth').innerHTML =
     tile('WIP vs throughput', s.wipRatio == null ? '—' : num1(s.wipRatio) + '×',
       'against ' + s.monthlyThroughput + ' completed in the last month', 'wip') +
+    /* The one figure on the dashboard that points at a single item. It sits
+       here rather than in the headline row because the aged-work tile up there
+       already answers "is anything stale?"; this answers "how bad is the worst
+       of it?", which is a question you only ask once the answer to the first
+       is yes. Read against the median rather than against the threshold: the
+       threshold is a round number somebody chose, where the median is what
+       this team's finished work actually took. */
+    tile('Oldest in progress', ag.oldest == null ? '—' : String(ag.oldest),
+      ag.oldest == null ? 'nothing is in progress'
+        : ag.median == null ? d.dayNoun + ' so far'
+        : d.dayNoun + ' so far, against a median of ' + num1(ag.median)
+          + ' for finished work',
+      'itemAge') +
     tile((state.settings.unplannedLabel || 'Unplanned') + ' rate',
       s.unplannedShare == null ? '—' : pct1(s.unplannedShare),
       'share of completed work', 'defectRate');
@@ -4370,7 +4692,7 @@ TABS.forEach(t => {
 const CHART_GROUPS = {
   flow:     ['chartCycleTime', 'chartLeadTime'],
   delivery: ['chartThroughput', 'chartNetFlow'],
-  health:   ['chartWip', 'chartAgedWork', 'chartDefectRate'],
+  health:   ['chartWip', 'chartAgedWork', 'chartItemAge', 'chartDefectRate'],
   /* Forecast is last because it is the only group that says anything about the
      future: the three before it are what happened, and this is what that
      implies. It is also the only one with inputs of its own. */

@@ -17,19 +17,19 @@ so the measures that move together are read together:
 |---|---|---|
 | **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); lead time |
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started) |
-| **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; defect rate — defects resolved and defects raised |
+| **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **work item age**; defect rate — defects resolved and defects raised |
 | **Forecast** — what that implies | When will this batch be done, and how much by a date? | Two distributions from ten thousand simulated runs, one per question |
 
 The first three describe what already happened. **Forecast** is the only one that looks
 forward, and it is the reason for collecting any of the rest — see
 [Forecasting](#forecasting-what-the-pace-youve-had-implies) below.
 
-Charts sit two to a row at any window wide enough for the pair. A group with an odd number of
-them — Health, with three — leaves the last chart alone on its row: it keeps a single column's
-width and sits **centred**, rather than stretching the full width. A chart drawn twice as wide as
-the ones above it reads as the more important one, which it isn't, and its bars stop being
-comparable with theirs at a glance. On a narrow window every chart is full width, so there is
-nothing to centre.
+Charts sit two to a row at any window wide enough for the pair. Every group holds an even number
+of them today, so none is left over — but a group with an odd count leaves its last chart alone
+on its row, keeping a single column's width and sitting **centred** rather than stretching the
+full width. A chart drawn twice as wide as the ones above it reads as the more important one,
+which it isn't, and its bars stop being comparable with theirs at a glance. On a narrow window
+every chart is full width, so there is nothing to centre.
 
 **Group by week, 2 weeks or month.** The control sits beside the date window on the dashboard.
 Weekly is the default and the finest grain; monthly smooths out the lumpiness that makes a
@@ -60,7 +60,8 @@ Each group then adds a small tile row of its own, stating what its charts can't:
 - **Delivery** — **steady delivery**, the band most whole periods land in (15th to 85th
   percentile of the per-period counts); total **net flow**; and **started vs completed**, the two
   counts net flow is the difference of.
-- **Health** — the ratio of work in progress to a month's throughput, and the defect rate.
+- **Health** — the ratio of work in progress to a month's throughput, the age of the **oldest
+  item still in progress**, and the defect rate.
 - **Forecast** — the 85%-confident answer to each of its two questions, and the number of whole
   periods both were dealt from.
 
@@ -166,8 +167,14 @@ that has a tail.
 | Team | What it's there to show |
 |---|---|
 | **Kingfisher** | The healthy board. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. The baseline the other two read against. |
-| **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold**, and a defect rate about two and a half times Kingfisher's. |
+| **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Kingfisher's. |
 | **Wagtail** | A newer team: four months of history and **no created dates at all**, so the lead-time chart's "add a Created column" face is reachable, and the date window has a team it visibly runs past. Also proves each team's data stands on its own. |
+
+The **work item age** chart reads differently on each of the three, which is what makes it worth
+looking at from the demo: Kingfisher has nothing past the threshold and every dot below its own
+85% line; Heron's oldest item has been in flight longer than its own 85th percentile by a wide
+margin, which is the whole argument for drawing that line; and all three carry enough work types
+in flight for the columns to say something.
 
 All three teams have enough weekly history to **forecast** on the default 3-month window —
 Wagtail, at four months, is the one that decides that — and Heron's spread is wide enough that
@@ -534,6 +541,78 @@ worth knowing:
 Net-flow bars use the theme's accent for positive and `--serious` for negative — deliberately
 not the red/green pair, because the coaching goal is "keep around zero", so neither sign is
 good or bad.
+
+## Work Item Age: What to Do This Morning
+
+Every other chart on the Health tab is a count. **Work item age** is the one that names things:
+each item still in progress plotted at the age it has reached so far, in a column for its work
+type.
+
+It is the chart to run a stand-up off. The aged work chart beside it says *how many* were stale
+at the end of each period; this one says *which ones are stale now, and by how much*.
+
+### The Three Lines Are the Point
+
+A dot on its own says an item is 23 days old, which means nothing without something to compare
+it against. So three lines cross the chart:
+
+| Line | What it is |
+|---|---|
+| **half took under N** | The median of this team's own finished work |
+| **85% took under N** | The 85th percentile — the same figure the headline tile states |
+| **aged after N** | The ageing threshold from Settings |
+
+The middle one is the one that matters. An item above it has **already taken longer than 85% of
+everything this team has ever delivered** — it is not merely old, it is outside the range of
+work that finishes normally, and it is very unlikely to be the exception. That is a much stronger
+thing to say in a stand-up than "this looks like it's been there a while", and it comes from the
+team's own history rather than from anyone's opinion.
+
+The lines are labelled where they are drawn rather than in a legend: a legend entry costs
+vertical space out of a 300px card, and it costs a lookup — matching a dash pattern at the top of
+the card to a line in the middle of it. Only the two dot shapes get a legend, because a shape does
+need a key.
+
+### Columns Are Work Types
+
+The canonical version of this chart puts *workflow stage* on the horizontal axis. That needs a
+status-history export this app doesn't take — the same thing [blocked time and flow
+efficiency](#what-isnt-here-and-why) are waiting on. Work type still earns the axis: a board
+where the defects age and the stories don't is a completely different problem from one where
+everything ages, and one glance separates them.
+
+Columns are ordered by how many items are in them, busiest first. Items within a column are
+spread across it and sorted by age, so two items the same age never land on the same pixel. A
+board with more issue types than fit folds its tail into one **Other types** column and says how
+many went in; items with no work type at all get a column of their own at the end rather than
+disappearing.
+
+### The Dots Have No Ticket Numbers
+
+They can't. This app stores no ticket key, no summary and no name — that is
+[the storage rule](#getting-your-data-in) working as intended, not an oversight, and it is what
+makes it safe to keep work data in a browser tab at all.
+
+What a dot does carry is enough: point at one and it gives you the **work type and the start
+date**, which finds the item again in the export you pasted in seconds. The Your Data tab lists
+every unfinished item at the top for the same reason.
+
+### Reading It
+
+- **Nothing above the threshold line** — the board is healthy, and the aged work tile reads 0.
+  Kingfisher in the demo looks like this.
+- **A few dots high above everything else** — the usual picture, and the useful one: those are
+  the items to talk about, in that order, starting with the highest.
+- **Everything drifting upward together** — not an ageing problem but a work-in-progress problem.
+  Check the WIP vs throughput tile; the answer is usually to start less, not to push harder.
+- **One column ageing and the others not** — a queue specific to that kind of work. Defects
+  waiting on a reproduction, spikes nobody has time for.
+
+Ages follow the **working days** setting exactly as the ageing threshold does, because a chart
+whose dots and whose line disagreed about what a day is would be unreadable. And like work in
+progress and aged work, ages are read **as of the newest date in your data**, not today — so a
+paste of last quarter's export reports that quarter rather than ageing everything by the months
+since.
 
 ## Forecasting: What the Pace You've Had Implies
 
