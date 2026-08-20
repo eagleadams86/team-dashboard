@@ -2165,6 +2165,41 @@ async function run(TD, win) {
      'the offer goes once anything holds data — it is a first-run affordance, not a button');
 
   /* ────────────────────────────────────────────────────────── */
+  group('escapeHtml — the free-text boundary (a team name reaching innerHTML)');
+
+  /* `sanitizeTeams` has had a hostile-id test since it was written; this
+     boundary had none, here and in three siblings, which an audit found on
+     2026-08-20 — `escapeHtml` was not called once by this suite, and it is the
+     function between a team NAME and the markup of every tile, table and
+     picker. Names are free text and deliberately not sanitized on the way in,
+     because escaping at the sink is the design; so the sink is what gets
+     pinned. They also travel in share links, the one place the text is not
+     something you typed yourself.
+     It matters beyond this app: every GitHub Pages site in this account shares
+     one browser origin, so a hole here is a hole in Sprint Velocity too — and
+     both of these hold figures copied out of a work Jira. */
+  is(win.escapeHtml('<>&"\''), '&lt;&gt;&amp;&quot;&#39;',
+     'every HTML-significant character is replaced');
+
+  const evil = '"><img src=x onerror=alert(1)><script>alert(2)<\/script>';
+  const e = win.escapeHtml(evil);
+  /* Parsed for real rather than string-matched: the question is what a BROWSER
+     builds from this, in an attribute as much as in text — nameFlow() and the
+     filter rows both interpolate into attributes. A regex over the output
+     would pass on markup the parser still accepts. */
+  const probe = document.createElement('div');
+  probe.innerHTML = '<span title="' + e + '">' + e + '</span>';
+  is(probe.querySelectorAll('img, script').length, 0,
+     'a hostile team name creates no element');
+  is(probe.firstElementChild.textContent, evil,
+     'and reads back unchanged as text');
+  is(probe.firstElementChild.getAttribute('title'), evil,
+     'including inside an attribute');
+  is(win.escapeHtml(null), '', 'null is handled, not thrown on');
+  is(win.escapeHtml(undefined), '', 'undefined is handled, not thrown on');
+  is(win.escapeHtml(7), '7', 'a number is stringified');
+
+  /* ────────────────────────────────────────────────────────── */
   const sum = document.getElementById('summary');
   sum.className = failed ? 'bad' : 'ok';
   sum.textContent = failed
