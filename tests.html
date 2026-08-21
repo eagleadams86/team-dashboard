@@ -1027,6 +1027,60 @@ async function run(TD, win) {
      'stages that exist but reach no item in flight leave the type axis alone');
 
   /* ────────────────────────────────────────────────────────── */
+  group('click a dot, copy its issue key');
+
+  const Dots = win.tdDots;
+  /* A chart shaped the way Chart.js hands one over. */
+  const fakeChart = (data) => ({ data: { datasets: [{ data }] }, canvas: { style: {} } });
+  const hit = [{ datasetIndex: 0, index: 1 }];
+
+  is(Dots.dotUnder(fakeChart([{ key: 'A-1' }, { key: 'DAE-9' }]), hit), { key: 'DAE-9' },
+     'the dot under the pointer is the one whose key gets copied');
+  is(Dots.dotUnder(fakeChart([{ key: 'A-1' }]), []), null, 'a click on empty canvas hits nothing');
+  is(Dots.dotUnder(fakeChart([{ key: 'A-1' }]), null), null, 'and neither does a null hit list');
+  is(Dots.dotUnder({ data: { datasets: [{}] }, canvas: { style: {} } }, hit), null,
+     'a dataset with no data — a reference line — yields nothing to copy');
+
+  /* The no-key branch, which is the one that must never copy something else:
+     dotName falls back to the work type for a paste with no Key column, and
+     silently putting "Story" on the clipboard would be worse than doing
+     nothing. Synchronous, so it can be asserted without waiting on a promise. */
+  const said = [];
+  const realToast = win.toast;
+  win.toast = (m) => said.push(m);
+  try {
+    win.tdDots.copyDotKey({ key: '', type: 'Story' });
+  } finally { win.toast = realToast; }
+  is(said.length, 1, 'a dot with no key still says something rather than failing silently');
+  ok(/no issue key/.test(said[0]) && !/Story/.test(said[0]),
+     'and says it has no key rather than copying its work type', said[0]);
+
+  /* The wiring. No pure test can see a renderer that forgot to attach the
+     handler, and "it works on one scatter and not the other" is a bug nobody
+     could describe — so both are pinned, and pinned as the SAME function. */
+  plant({ stages: [], arts: [], settings: {},
+          teams: [{ id: 'z1', name: 'Z', rows: [
+            { c: '2026-08-09', s: '2026-08-02', t: 'Story', i: 'DAE-1' },
+            { s: '2026-08-05', t: 'Bug', i: 'DAE-2' }
+          ] }] });
+  win.renderAll();
+  const liveCharts = win.tdCharts();
+  ok(liveCharts.chartCycleScatter && liveCharts.chartItemAge,
+     'both scatters drew, so there is wiring to check');
+  is(typeof liveCharts.chartCycleScatter.options.onClick, 'function',
+     'the finished-item scatter copies on click');
+  is(typeof liveCharts.chartItemAge.options.onClick, 'function',
+     'and so does the work item age chart');
+  is(liveCharts.chartCycleScatter.options.onClick, liveCharts.chartItemAge.options.onClick,
+     'and it is ONE handler shared by both, so the pair cannot drift apart');
+  is(liveCharts.chartCycleScatter.options.onHover, liveCharts.chartItemAge.options.onHover,
+     'the cursor affordance likewise');
+  /* Charts that are not scatters of items must NOT copy: their points are
+     periods and buckets, and there is nothing to put on a clipboard. */
+  ok(!liveCharts.chartThroughput || !liveCharts.chartThroughput.options.onClick,
+     'a chart whose points are periods carries no copy handler');
+
+  /* ────────────────────────────────────────────────────────── */
   group('workflow stages — the figures');
 
   const stRows = [

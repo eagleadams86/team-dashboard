@@ -994,11 +994,33 @@ strictly more than the work-type axis ever said.
 Items within a column are spread across it and sorted by age, so two items the same age never
 land on the same pixel.
 
+### Click a Dot to Copy Its Key
+
+Point at a dot and the tooltip names it. **Press it and its issue key goes on your clipboard**,
+ready to paste into Jira — which is the next thing anybody does with a name read off this chart.
+A toast confirms which key was copied. The pointer only turns to a hand over a dot that has a
+key, so the affordance never promises something that would do nothing.
+
+A dot with **no** key says so rather than copying something else. Without a Key column the
+tooltip falls back to the work type, which is a useful label and useless on a clipboard — quietly
+copying `Story` would be worse than doing nothing.
+
+It works the same on **both** scatters — this one and [every finished
+item](#every-finished-item-the-spread-not-the-average) — from one piece of code, so the pair
+can never behave differently. It works in a [shared link](#sharing-a-read-only-link) too: it
+writes nothing and reads only what is already drawn on the recipient's screen.
+
+If you are working by keyboard or with a screen reader, the same keys are in the **Loaded data**
+table on the Your Data tab, which has its own **Copy** button — that table is where every
+chart's text description already points.
+
 ### What a Dot Is Called
 
 Point at a dot and it names the item: its **issue key**, if your paste had a Key column. That is
 the whole reason the key is stored — "which of these needs looking at" is unanswerable when
 every dot on the chart is called Story, and a key is something you can paste straight into Jira.
+Or [press the dot](#click-a-dot-to-copy-its-key) and it goes on your clipboard without the
+retyping.
 
 If your export has no key column, a dot falls back to its **work type and start date**, which
 finds the item in the export you pasted in seconds. Both charts name dots the same way, from one
@@ -1476,6 +1498,11 @@ status is reported rather than resolved, and a status nobody has listed is simpl
 so a paste can never add the rule that reads it). The claim underneath the whole design is
 asserted directly: the parsed rows are stringified and checked to contain **no status name at
 all**, on hand-written fixtures and again on the demo's own data.
+
+**Click-to-copy** is pinned on the part that can go quietly wrong: a dot with no key saying so
+rather than copying its work type, a reference line yielding nothing, and — the one no pure test
+can see — both scatters actually carrying the handler, as the *same* function, while a chart
+whose points are periods carries none.
 
 The **current stage** gets its own group, since that is where the untrusted text sits in a cell
 on every row rather than in one heading: the anchored heading against the real Jira columns a
