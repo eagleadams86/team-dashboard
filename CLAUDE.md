@@ -8,7 +8,7 @@ GitHub Pages: https://eagleadams86.github.io/team-dashboard/
 Charles pastes data from his **work Jira** into this app. That fact drives the two
 non-negotiable rule sets below. The sibling app is Sprint Velocity
 (`~/claude-sprint-velocity`) — its CLAUDE.md is the fuller reference for the
-conventions the two apps share (chrome, themes, sync, share links, testing); this
+conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
 ## Only Numbers, Dates and Two Guarded Labels Are Ever Saved (2026-08-12/13, amended 2026-08-20)
@@ -54,8 +54,8 @@ file records what is specific to this repo and what must never regress.
   date-ordering rules (started ≤ completed, created ≤ start) so a hand-edited
   copy can't smuggle a backwards span in as a 0-day cycle time; `normalizeSettings()` returns only
   `Object.keys(DEFAULT_SETTINGS)`; `loadView()` reads only `DEFAULT_VIEW`'s keys.
-  A stray key on a hand-edited backup or cloud document must never ride along
-  into the saved/synced copies. **A new stored field must be added to the right
+  A stray key on a hand-edited backup or share link must never ride along
+  into the saved copy. **A new stored field must be added to the right
   whitelist or it will be deliberately stripped** — tests.html pins this.
 - **`SCHEMA` is what makes those whitelists safe against OLDER code, and it is
   now read as well as written.** Stripping an unknown key is right for a hostile
@@ -98,8 +98,10 @@ file records what is specific to this repo and what must never regress.
   never turn the setting on.
 - `loadState()` writes a repaired copy back with **`persist()`, deliberately NOT
   `save()`** — a shape repair must not stamp this device's copy newest and race a
-  genuinely newer cloud document. (`save()` = persist + timestamp + cloud push;
-  reserve it for real edits.)
+  genuinely newer copy. Sync's removal collapsed what the two DO — `save()` is
+  now `persist()` plus the viewOnly guard — and the distinction is kept anyway:
+  persist() means "write the shape down", save() means "the user changed
+  something", and collapsing them would lose the only marker of which is which.)
 - Settings labels and team names are short and capped (120); rows carry **one
   identifier and no other** — the issue key, shape-checked — and no titles,
   summaries, statuses or names of people. `privacy.html` promises exactly that,
@@ -118,7 +120,7 @@ dot: "which of these needs reviewing" is unanswerable when every dot is called S
   is still a summary. **Never relax this to a length cap**, and never "just trim it to fit".
 - **`i` is omitted when empty**, so a team that has never pasted a key serialises
   byte-identically to before — the rule the created date and `artId` already follow, and what
-  keeps the first save after this build from rewriting the whole synced document.
+  keeps the first save after this build from rewriting the whole stored document.
 - **`SHARE_PAYLOAD_V` was NOT bumped**, matching ARTs. Keys DO travel in a link, deliberately:
   they name the dots, and a link that dropped them would show the recipient a different picture
   from the sender's. An older cached build drops the field and names dots by type — graceful
@@ -163,7 +165,7 @@ the two are read side by side; the divergences below are deliberate.
   "on no train" is a real answer where a made-up id is not.
 - **Nothing is written until there is something to write.** No `arts` key and no `artId` until
   they exist, so a browser that never uses the feature serialises byte-identically to before and
-  its first save after this build lands doesn't rewrite the whole synced document — the same rule
+  its first save after this build lands doesn't rewrite the whole stored document — the same rule
   the per-row created date follows. Pinned.
 - **`SHARE_PAYLOAD_V` was NOT bumped.** An older cached build drops `arts` and shows ungrouped
   teams, which is graceful degradation rather than a wrong number; bumping would make every link
@@ -518,7 +520,7 @@ not regress:
   chart. `seededRandom` was lifted out of the demo section into the maths section when this
   landed — it now has two callers and both pass a constant.
 - **`forecastItems` and `forecastDate` live in `view`, NOT in `state`.** What you are asking the
-  forecast is a position on this device, like `activeTeamId`. That keeps them out of the synced
+  forecast is a position on this device, like `activeTeamId`. That keeps them out of the stored
   document entirely: **no SCHEMA bump, no whitelist entry, no place in a share payload** — a
   link's recipient gets the defaults and asks their own question, which was verified against a
   real share link (the visitor can change the question and localStorage stays empty). Both are
@@ -550,16 +552,50 @@ not regress:
 ## Security (shared origin)
 
 - All of `eagleadams86.github.io` is ONE browser origin: any page on any of the
-  account's Pages sites can touch this app's localStorage and Firebase session.
-  So: **no third-party scripts ever** (`chart.min.js` is vendored — don't
-  hand-edit it), a CSP on every page, and any new external endpoint goes into
-  the CSP's connect-src after asking whether it's needed at all.
-- This app signs in via **Google Identity Services, not Firebase's popup** (the
-  flow was proven here first, then ported to Sprint Velocity) — its CSP differs
-  from its siblings' accordingly; don't "unify" it blindly.
-- Sync: one Firestore doc per user, project `teamdashboard-6723f`; rules confine
-  each account to its own data. `FIREBASE_CONFIG` is public client config, not a
-  secret — GitHub's leak alerts on it are closed won't-fix; never rotate.
+  account's Pages sites can touch this app's localStorage. So: **no third-party
+  scripts ever** (`chart.min.js` is vendored — don't hand-edit it), and a CSP on
+  every page.
+- **This app's CSP now names NO external origin at all** (2026-08-20, with sync).
+  `default-src 'none'` is the real rule rather than a formality, and
+  `connect-src 'none'` is spelled out rather than left to the default because it
+  is the directive that would carry work data off the device. Adding any origin
+  here is a decision about where Jira figures may go — ask whether it is needed
+  at all first, and expect `tests.html` to fail until the pin is changed
+  deliberately.
+
+## Sync Was REMOVED (2026-08-20) — Don't Put It Back Without Asking
+
+Google sign-in + one Firestore doc per user (project `teamdashboard-6723f`) was removed at
+Charles's request, in the same PR that let the app store issue keys. The two go together: the
+app now holds identifiers out of a work system, and the answer to "where does that live" is
+"one browser, and nowhere else".
+
+- **It was removed, not disabled.** The module, `#syncBtn`, the which-copy dialog,
+  `firestore.rules`, `hasData()`, `cloudPush`/`cloudFlush`/`tdSignedIn` and every Google
+  address in the CSP went together. Setting a config to `null` would have left the code, the
+  origins and the CSP in place — which is not the same claim.
+- **The pins are in `tests.html`, group "sync is gone — and cannot come back by accident".**
+  A CSP naming no host, `connect-src 'none'`, no module script, no `import(`, a word-list
+  tripwire over the app's *code* (comments are stripped, because the removal note deliberately
+  names Firebase so a grep lands somewhere useful), and a live boot proving the leftover keys
+  are deleted. If you are reinstating sync, those tests are the specification of what you are
+  undoing — change them deliberately, in the same commit.
+- **`clearSyncLeftovers()` deletes `td-sync-uid` and `td-updated` on every load.**
+  `td-sync-uid` is a Google account id, the only personally identifying thing this app ever
+  wrote down; leaving it after removing the feature would be keeping an identifier for nothing.
+- **`tdAdopt()` survives sync** — restore-from-backup is its caller now, plus the test
+  harness's `plant()`. Two things changed with it: it no longer stores a newer document
+  verbatim before halting (that made sense only when the incoming copy was genuinely the
+  newest in existence), and its "you are about to lose your created dates / issue keys" prompt
+  is worded for a FILE rather than for another device. The restore handler now honours its
+  `false` return — before, a declined adopt still toasted "Backup restored".
+- **What was lost with it, and would have to be rebuilt**: the Google Identity Services
+  workaround for corporate networks that block `<project>.firebaseapp.com` **per hostname**
+  (measured, real, and not something a fresh implementation would think of), the
+  never-guess-by-timestamp reconciliation, the empty-copy-never-wins rule, and the
+  `serverAt` server-clock ordering. It is all in one commit in `git log`.
+- **Data written before the removal still sits in Firestore.** Removing the client does not
+  delete it. `privacy.html` tells anyone who used sync how to ask for deletion.
 
 ## Offline (`sw.js`)
 

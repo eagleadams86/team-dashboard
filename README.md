@@ -5,10 +5,10 @@ completed and started dates. Single page, no build step, nothing to install.
 
 **Live:** https://eagleadams86.github.io/team-dashboard/
 
-The app is called **Flow Metrics** on screen. The repo, the Pages path, the Firebase project
-(`teamdashboard-6723f`) and the `app: 'team-dashboard'` marker inside a backup file all still
-say *team-dashboard* — renaming any of those would break existing links, backups and sync,
-so the rename is deliberately a display-only one.
+The app is called **Flow Metrics** on screen. The repo, the Pages path and the
+`app: 'team-dashboard'` marker inside a backup file all still say *team-dashboard* — renaming
+any of those would break existing links and backups, so the rename is deliberately a
+display-only one.
 
 There are two ways to read the numbers: the **Dashboard**, which is one team in detail, and
 **[All Teams](#all-teams-which-one-needs-you)**, which is every team side by side over one shared
@@ -291,8 +291,8 @@ first run is the paste box and its instructions, and nothing else. The **Loaded 
 the **Clean up old data** card and the **Append to existing** / **Clear this team's data**
 buttons all appear the moment rows exist (`renderEmptyState()`).
 
-Which team you're looking at is a position on *this* device and deliberately isn't synced:
-switching team on the laptop shouldn't yank the phone to the same team.
+Which team you're looking at is a position on *this* device and deliberately isn't part of
+your data: it stays out of backups and share links for the same reason the theme does.
 
 ## The Demo — Trying It Without Pasting Anything
 
@@ -567,43 +567,27 @@ re-entered:
   your data, a share link carries it, and there is no version negotiation on a share link that
   would let an older build understand a renamed key.)
 - A `plannedLabel` setting existed, with an input and a saved value, but nothing on screen ever
-  read it. It is dropped on load rather than left riding along in every backup and synced copy.
+  read it. It is dropped on load rather than left riding along in every backup for ever.
 
 ### Created Dates and Older Versions of the App
 
 Rows gained an optional created date (`k` on the wire, backup `version: 3`, `schema: 3` in the
-saved and synced state; the working-days setting later took both markers to `4`, ARTs to `5`,
+saved state; the working-days setting later took both markers to `4`, ARTs to `5`,
 and the issue key to `6`). A row without one is left exactly as it was — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before. **The issue key
 (`i` on the wire) follows exactly the same rule**: absent unless there is one, so a team whose
 export has no key column saves byte-identically to before that field existed, and the first save
-after upgrading doesn't rewrite the whole synced document.
+after upgrading doesn't rewrite the whole stored document.
 
-**Created dates are never dropped silently.** If a synced copy arrives with none and this
-device has some, the app asks before taking it — the same treatment as another device clearing
-all its data — and cancelling keeps them *and* pushes them back up, so the other device gets
-them too. Two ways that happens:
+**Created dates and issue keys are never dropped silently.** A backup saved by a build older
+than the one that added a field simply has none of it in the file. It restores without
+complaint, and the column is gone — and since [sync was
+removed](#cross-device-sync-was-removed-2026-08-20) there is no second copy anywhere to get it
+back from. So a restore that would lose them **asks first**, in one prompt covering both
+fields, and Cancel means nothing is restored at all rather than "restored, minus a column".
+The boot version check doesn't cover this: that fires on a copy from a *newer* build, and this
+one is older.
 
-- a browser on an **older build**, which hydrates only the fields it knows and pushes the rest
-  back without them (it also drops the `schema` marker, so this case is named in the prompt);
-- a current build that has simply **never been given a Created column** — it pushes a perfectly
-  valid copy that just has no created dates in it.
-
-**Which copy is newer is decided by the Firestore server's clock, not by either device's.**
-The synced document carries a `serverAt` server timestamp, and each device records the
-`serverAt` of the version it currently holds and compares incoming writes against that.
-
-It used to compare two devices' wall clocks — the pushing device wrote its own `Date.now()`
-and the receiver compared that against its own last-edit stamp. Nothing reconciled the two, so
-a laptop and a virtual desktop a few minutes apart could each conclude the other's newer change
-was older; worse, the "loser" then pushed its staler copy over the newer one on its next
-sign-in, so an edit could be lost on *both* devices. `updatedAt` is still written for any build
-that predates this, and a device falls back to it until it has seen one server timestamp —
-one push from each device is enough to leave the fallback behind for good.
-
-The document also carries a `writerId`, so a device can recognise its own write coming back:
-a server timestamp only resolves once the server has it, so your own push returns on the
-listener as something that would otherwise look like news from elsewhere.
 - The first version stored one team's rows under `td-rows`, with the team name in `td-settings`.
   Those fold into a single team the first time a newer version loads, and the old keys go.
 
@@ -1011,16 +995,16 @@ Removing items only removes items. The team itself survives, even if it ends up 
 The **Back up** button in the header opens a dialog (the same shape as the sibling app's)
 that writes one JSON file holding
 every team, their work items and your shared settings — `team-dashboard-YYYY-MM-DD.json`. It's
-a copy you keep, independent of this browser and of any Google account, and it's the only way
-back from a cleared browser if you've never signed in.
+a copy you keep, independent of this browser. It is the only copy of your data that exists
+anywhere else, and the only way back from a cleared browser.
 
 **Restoring replaces everything.** You're shown what the file holds against what's already
 here — *"Restore 2 teams and 3 items from this file? This replaces the 1 team and 0 items in
-this browser"* — and nothing changes until you confirm. If you're signed in, the restored copy
-is stamped as the newest and pushed, so it becomes what your other devices get.
+this browser"* — and nothing changes until you confirm. Restoring on another device is how you
+move your data between devices.
 
-A restored file goes through exactly the same sanitising as a copy arriving from the cloud
-(`hydrateState`), so a hand-edited backup can't introduce anything a synced copy couldn't.
+A restored file goes through exactly the same sanitising as a share link (`hydrateState`), so a
+hand-edited backup can't introduce anything a link couldn't.
 Before that, `isBackup()` checks the file is plainly one of ours: `hydrateState` is deliberately
 forgiving and will turn `{}` into a valid empty dashboard, which is right for a damaged saved
 copy and catastrophic for the wrong file picked out of a Downloads folder. Choosing a file that
@@ -1035,7 +1019,7 @@ file from a newer version is refused the same way — without stopping the app y
 and a share link from one tells the reader the link is fine and their copy is behind.
 
 **Two things are deliberately not in the file:** your theme, and which team you were looking
-at. Both are positions on this device rather than data — the same reason they don't sync.
+at. Both are positions on this device rather than data.
 
 ### Starting Again
 
@@ -1044,8 +1028,9 @@ the whole-board version of Clean up old data. It's behind a fold on purpose: the
 irreversible action in the app shouldn't sit a mis-click away from Download backup.
 
 Pressing it opens a confirmation of its own that says exactly how much is going ("This
-deletes 2 teams and 3 items"), warns you when you're signed in that the copy in your Google
-account goes too, and offers the same JSON download as a last chance to keep any of it.
+deletes 2 teams and 3 items") and offers the same JSON download as a last chance to keep any
+of it. There is no "…and every device you own" line any more: since sync was removed there is
+exactly one copy, and it is the one in this browser.
 
 **Your settings and your theme survive.** Starting fresh isn't asking to lose the type
 labels, filters and ageing threshold you spent time tuning — those are configuration, not
@@ -1056,8 +1041,7 @@ data. What's left is exactly what a brand-new browser gets: one empty team to pa
 The **Share** button in the header builds a link that shows someone the teams you pick,
 read-only — no sign-in, no way to change anything, and (ported from the sibling app) the
 data travels **inside the link itself**: everything after the `#` never leaves the browser,
-so the figures reach the recipient without GitHub Pages, Firebase or anyone else seeing
-them. The payload is a trimmed copy — the chosen teams plus the shared settings, because
+so the figures reach the recipient without GitHub Pages or anyone else seeing them. The payload is a trimmed copy — the chosen teams plus the shared settings, because
 those drive every number on the charts.
 
 It carries the same fields the app stores, **issue keys included**. That is deliberate: the keys
@@ -1088,7 +1072,7 @@ would leave nothing at all says so.
 The recipient sees a standing "Read-only view" bar, the dashboard only (no Your Data or
 Settings tabs), and a link back to their own data. Nothing they do is saved, and nothing
 already in their browser is touched — `save()`, `persist()` and `saveView()` are all
-no-ops in a shared view, and sync never initialises. A link that arrives truncated (mail
+no-ops in a shared view, and no service worker is installed. A link that arrives truncated (mail
 apps do this) shows an error card rather than ever falling through to the viewer's own
 data.
 
@@ -1106,9 +1090,9 @@ be withdrawn — treat it like emailing a spreadsheet.
 
 The app keeps a copy of itself on your device, so it opens with no network at all — on a
 train, on hotel wifi, or when the work VPN is being difficult. Your teams and work items
-were always local, so once the page loads everything works: pasting, the charts, cleanup,
-export. Sync is the one thing that can't — it needs the network by definition, and picks up
-again on its own when you're back.
+were always local, so once the page loads **everything** works: pasting, the charts, cleanup,
+export, share links, backup and restore. There is no longer any part of the app that needs the
+network — sync was the one exception, and it is gone.
 
 What's kept is only the app's own public files — the page, the stylesheet, the chart
 library and the icon, the same files anyone can read on GitHub. **Nothing of yours is ever
@@ -1124,130 +1108,47 @@ described under [Back Up & Restore](#back-up--restore) stops it misreading anyth
 pushing makes every installed copy uninstall itself and go back to being an ordinary
 online-only page.
 
-## Cross-Device Sync (Firebase, Free Tier — Optional)
+## Cross-Device Sync Was Removed (2026-08-20)
 
-Signing in with Google is entirely optional and does one thing: puts the same teams on your
-other devices. Without it the app is fully usable and fully local.
+This app used to offer optional Google sign-in, which mirrored your teams to a Firestore
+database in a Firebase project owned by the author. **It is gone.** Not disabled behind a
+`null` config — removed: the module, the sign-in button, the reconciliation dialog, the
+`firestore.rules` file and every Google address in the Content-Security-Policy went in one
+commit.
 
-Sync is **enabled** in this deployment, backed by the `teamdashboard-6723f` Firebase project.
-`FIREBASE_CONFIG`, at the top of the bottom `<script type="module">` block in `index.html`,
-points at it; setting that constant back to `null` returns the app to local-only mode and
-hides all sync UI.
+**Why.** This app holds figures taken from a work Jira. Sync meant a copy of them sat in a
+personal Firebase project, which is a place work data has no particular business being — and
+the feature was carrying a fair amount of complexity for it: a hostname-blocking workaround, a
+reconciliation dialog, an empty-copy-never-wins rule, a server-clock ordering scheme and a
+whole class of failure ("looks fine, has not pushed for weeks") that had to be surfaced in the
+UI because it could not be prevented. Removing it deleted all of that at once.
 
-To recreate the setup from scratch (e.g. in a fork):
+**What replaces it.** **Back up** downloads a JSON file; **Restore** reads one back. That is
+how you move data between devices now, and it has the property sync never had: you can see
+exactly what moved, and it goes nowhere you did not put it.
 
-1. At [console.firebase.google.com](https://console.firebase.google.com), create a project
-   (Analytics not needed)
-2. **Build → Authentication → Get started → Google** — enable the Google sign-in provider
-3. **Authentication → Settings → Authorized domains** — add `eagleadams86.github.io`
-4. **Build → Firestore Database → Create database** (production mode), then paste the contents
-   of [`firestore.rules`](firestore.rules) into **Rules**
-5. **Project settings → Your apps → Add app → Web** — copy the `firebaseConfig` object and
-   paste it as the value of `FIREBASE_CONFIG`
-6. **[console.cloud.google.com](https://console.cloud.google.com) → APIs & Services →
-   Credentials** — open the OAuth 2.0 Client ID named *Web client (auto created by Google
-   Service)*. Copy its Client ID into `GOOGLE_CLIENT_ID` in `index.html`, and under
-   **Authorized JavaScript origins** add `https://eagleadams86.github.io` (and
-   the exact localhost origin you serve from locally). Without the origin, Google rejects the
-   token request with `origin_mismatch` and sign-in never starts.
+**What the removal is worth checking against.** The claim is not "the Firebase code is gone" —
+it is that the page cannot reach the network at all. The CSP at the top of `index.html` names
+**no external origin**, and spells out `connect-src 'none'` rather than leaving it to the
+default, because that is the directive that would carry work data off the device. `tests.html`
+pins both, plus a word-list tripwire over the app's code so a paste-back of the old module
+fails loudly rather than shipping.
 
-   **Origins match exactly, port included.** `http://localhost` and `http://localhost:5000`
-   are two different origins to Google, and neither covers `http://localhost:8080`. This
-   project has `http://localhost`, `http://localhost:5000` and `https://eagleadams86.github.io`
-   registered — serving locally on any other port means adding it here first.
+**Leftovers are deleted, not merely unread.** `clearSyncLeftovers()` runs on every load and
+removes `td-sync-uid` and `td-updated`. The first of those is a Google account id — the only
+personally identifying thing this app ever wrote down — and keeping it after removing the
+feature that needed it would be keeping an identifier for no reason. Pinned by a test that
+plants both keys, boots the app and checks they are gone.
 
-### Why Sign-In Doesn't Use Firebase's Popup
+**Data written before the removal still exists in Firestore.** Removing the client does not
+delete what the server holds; that has to be done in the Firebase console (or the project
+deleted outright), and `privacy.html` now tells anyone who used sync how to ask for it.
 
-Firebase's `signInWithPopup` opens the popup at `<project>.firebaseapp.com/__/auth/handler` and
-only redirects on to Google from there. A proxy that blocks that first hop kills sign-in
-outright — the popup dies with `ERR_TUNNEL_CONNECTION_FAILED` or the proxy's own block page,
-and nothing in the app ever runs.
-
-**The block is per hostname, not on `firebaseapp.com` as a whole**, which is worth stating
-because the obvious conclusion is wrong. Measured on one corporate network on a single day:
-
-| Hostname | Result |
-|---|---|
-| `teamdashboard-6723f.firebaseapp.com` | blocked |
-| `paptrack-6c817.firebaseapp.com` | blocked |
-| `sprintvelocity-141b7.firebaseapp.com` | **reachable** |
-
-Same sign-in code, same SDK, three projects created within days of each other — and the two
-blocked ones aren't even the newest. Whichever way a filter categorises a given hostname is
-outside our control and can change, so "the other apps are fine" is not evidence that this one
-will be, and a sibling app working today doesn't mean it will work next month.
-
-So sign-in uses **Google Identity Services** instead: a popup straight to `accounts.google.com`
-returns an OAuth access token, which Firebase exchanges for a session via
-`signInWithCredential`. Same Google account, same Firestore data, same rules — only the doorway
-changed, and `accounts.google.com` is a mainstream Google domain that isn't blocked in the same
-way.
-
-This is why `GOOGLE_CLIENT_ID` exists as a separate constant: it is *not* part of
-`firebaseConfig` and can't be derived from it.
-
-**Reachability, if sign-in fails on a restricted network.** The app needs
-`accounts.google.com`, `www.gstatic.com`, `firestore.googleapis.com`,
-`identitytoolkit.googleapis.com` and `securetoken.googleapis.com`. Opening each in a browser is
-the quickest way to find which one a proxy is blocking. Note that an existing session keeps
-refreshing against `securetoken.googleapis.com` alone, so an app can look fine for weeks on a
-network where a *fresh* sign-in would fail — test in a private window.
-
-The config object is not a secret; access is controlled by the rules, which restrict every
-user to their own document. Each person who signs in gets their own private data — sharing
-the app means sharing the URL, not the data. There is deliberately no shared-workspace model.
-
-### About the `apiKey` in This File
-
-GitHub secret scanning flags it as a "Google API Key — public leak". **That alert is expected
-and has been closed as won't-fix** (the same alert exists, and is closed, on every one of these
-Firebase apps).
-
-A Firebase Web API key *identifies* the project; it doesn't *authorise* anything. Every Firebase
-web app ships it in client JavaScript, because the browser has to have it. Rotating it would
-change nothing, because the new one would be just as public.
-
-What actually guards the data, checked on 2026-08-06:
-
-| | |
-|---|---|
-| Firestore | Denies every unauthenticated read, on this app's path and all others |
-| Anonymous sign-up | Disabled — `accounts:signUp` returns `ADMIN_ONLY_OPERATION` |
-| Other Google APIs | None enabled in the project, so the key reaches nothing else |
-
-The one forward-looking risk is that enabling some other API in this project later would widen
-what the key can reach. The rule that follows: if a new Google API is ever turned on here,
-restrict the key at the same time — Google Cloud console → **APIs & Services → Credentials →
-the browser key → Application restrictions → HTTP referrers**, limited to
-`eagleadams86.github.io`.
-
-`firestore.rules` is a checked-in copy for the audit trail; the console is what's live. If the
-rules ever change there, update the file to match.
-
-**How sync behaves:** `localStorage` stays in charge and the cloud only mirrors it. The
-**first** time a given Google account signs in on a browser, if both sides already hold data,
-a dialog asks which copy to keep — deliberately not a timestamp guess, which cost real data in
-the sibling app. Underneath that, **an empty copy never beats a copy with data in it**,
-whichever is newer: without that rule, signing in on a fresh browser would push its emptiness,
-stamped `now`, over the device that actually had the teams. The one empty team a fresh browser
-creates doesn't count as data; teams you named do.
-
-If sync stops working the button says **"⚠️ Not syncing"** and the note at the foot of the page
-gives the cause and the remedy — a silent failure would leave the app claiming to sync while
-nothing had left the browser for weeks. There's no retry button on purpose: Firestore retries
-the transient causes itself, and the next successful save clears the state.
-
-Two rules in the push are load-bearing, both learned from a real outage in the sibling app.
-**The cloud copy goes through JSON, exactly as the local save does** (`forCloud()`): `setDoc()`
-walks the live object and Firestore rejects the *whole document* if it finds a single
-`undefined` anywhere in it, where localStorage would simply drop that key — so a local copy
-can look perfect while nothing reaches the cloud. This file's boundary rebuilds fresh literals
-with concrete defaults and reaches no `undefined` today, and the tests pin that by *key*
-(`x === undefined` passes whether the key exists or not); the round trip is there so the next
-optional field can't quietly change it. And **`invalid-argument` does not mean "too big"** —
-Firestore uses that one code for both an oversized document and a value it can't store, so the
-"delete a team" advice appears only when Firestore's own message mentions size. A remedy that
-destroys data must never be the guess.
+**If it is ever wanted back**, `git log` has the whole module in one commit, including the
+Google Identity Services workaround for corporate networks that block
+`<project>.firebaseapp.com` per hostname — which was real, was measured, and would be needed
+again. Putting it back means putting the CSP origins back too, and the tests above will say
+so.
 
 ## Running It
 
@@ -1263,36 +1164,22 @@ stops at startup. Copying all three files (`index.html`, `theme.css`, `chart.min
 folder and opening `index.html` over `file://` still works; a server is simplest, and the
 tests need one anyway.
 
-Your data lives in `localStorage`, and leaves the browser only if you sign in.
+Your data lives in `localStorage` and does not leave the browser.
 [`privacy.html`](privacy.html) is the privacy policy — keep it and its effective date current
 if what the app stores, or where it sends it, ever changes. The footer links to it, and to
 this README on GitHub as **How it works**, for anyone wanting more than the in-app ⓘ dialogs.
 
-A Content-Security-Policy `<meta>` at the top of `index.html` restricts the page to its own
-scripts plus Firebase's CDN and Google's sign-in client, and network access to the handful of
-endpoints sync uses. It also spells out `worker-src 'self'` for `sw.js` rather than letting
-that resolve through the fallback chain, which would otherwise inherit `script-src`'s
-external hosts. **Any new external endpoint has to be added there too**, or it fails only in
-production.
+A Content-Security-Policy `<meta>` at the top of `index.html` **names no external origin at
+all**. Since sync was removed there is nothing for it to allow: no CDN, no Google, no
+analytics. `default-src 'none'` is therefore the real rule rather than a formality, and each
+directive below it is an exception it has to earn — including `connect-src 'none'`, spelled
+out rather than left to the default because it is the one directive that would carry work data
+off the device, and `worker-src 'self'` for `sw.js`, spelled out rather than resolved through
+the fallback chain.
 
-`accounts.google.com` appears in `script-src`, `connect-src` *and* `frame-src` because sign-in
-goes through Google Identity Services — see [Why Sign-In Doesn't Use Firebase's Popup](#why-sign-in-doesnt-use-firebases-popup) above.
-
-Note for anyone comparing against the sibling apps: this one no longer allows `apis.google.com`
-and no longer produces the `gen_204` telemetry noise those apps document, because the auth
-iframe that fired it is gone.
-
-`apis.google.com` stays out of `script-src` deliberately, and the sync module uses
-`initializeAuth` rather than `getAuth` so the SDK never asks for it. `getAuth()` always wires in
-`browserPopupRedirectResolver`, and on Safari, iOS and mobile browsers the SDK initialises that
-resolver during startup — which loads `apis.google.com/js/api.js` to build the gapi iframe that
-carries `signInWithPopup` and `signInWithRedirect` results back to the page. This app calls
-neither, so nothing consumed it; the visible symptom was a CSP error in the console on phones
-and in Safari, and nothing else. Token refresh, sign-out and the cross-tab session all run
-elsewhere in the SDK and never touch the resolver. Dropping it costs
-`signInWithPopup`/`signInWithRedirect`/phone sign-in, which now raise `auth/argument-error`; if
-one is ever wanted, pass `browserPopupRedirectResolver` to that call rather than reverting to
-`getAuth()`.
+**Adding any origin there is a decision about where work data may go, not a technical
+detail** — and it fails only in production while working fine on localhost, so it will not
+announce itself. `tests.html` fails if the policy names a single host.
 
 ## Tests
 
@@ -1300,8 +1187,9 @@ one is ever wanted, pass `browserPopupRedirectResolver` to that call rather than
 
 `tests.html` pins the pure functions by loading the real `index.html` in a hidden iframe — no
 copies to drift. It must be served over `http://localhost`, not opened as a file. The iframe is
-marked `data-td-tests`, which the sync module checks so no sign-in session ever boots inside
-the harness.
+marked `data-td-tests`; that was how the sync module knew to stay off inside the harness, and
+the attribute is kept — it is the harness's only way to say "this is a test frame", and the
+next thing that must not run in one will want it.
 
 **It only runs on localhost, and enforces that itself.** `file://` is deliberately not treated
 as local: it has no hostname, and the empty string used to sit in that allow-list on the
@@ -1338,8 +1226,10 @@ listed one by one, including a summary, markup and a spreadsheet formula),
 work-in-progress handling — including the net-flow miscount stated as a test, and a WIP row
 whose *empty completed cell comes first*, which a line-trim once shifted into a completed row —
 the week straddling New Year (whose cycle times once vanished from the chart and tile), quoted
-CSV fields, the share-link codec round trip on both wire formats, and the sync
-boundary: `sanitizeTeams()` (ids arriving from the cloud end up in `data-` attributes and
+CSV fields, the share-link codec round trip on both wire formats, that [sync really is
+gone](#cross-device-sync-was-removed-2026-08-20) (a CSP naming no host at all, a word-list
+tripwire over the app's code, and the leftover keys actually being deleted at boot), and the
+outside-copy boundary: `sanitizeTeams()` (ids arriving in a share link end up in `data-` attributes and
 `<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is replaced, names are capped, types
 coerced to strings), `normalizeSettings()`
 (including the `defectType` → `unplannedType` carry-over, and junk filter entries or a junk
@@ -1349,7 +1239,7 @@ file being restored over real data.
 
 Two promises get pinned end to end rather than function by function:
 `buildSharePayload()` — a share link holds **only the chosen teams** plus the shared settings,
-and nothing else (no theme, no sync uid, no view state) — and `migrate()`, the v1 upgrade,
+and nothing else (no theme, no view state) — and `migrate()`, the v1 upgrade,
 exercised the way it really runs: the old `td-rows`/`td-settings` keys are planted, a second
 hidden copy of the app boots, and the suite checks the single team it folds them into.
 
@@ -1380,8 +1270,7 @@ average bug rate in the defect rate chart title. Change the maths and the suite 
 | `sw.js` | Service worker: keeps the app's own public files on your device so it opens offline |
 | `sw-kill.js` | The escape hatch — copy it over `sw.js` and push to uninstall every installed worker |
 | `tests.html` | Pure-function tests |
-| `privacy.html` | Privacy policy — exists because other people may sign in |
-| `firestore.rules` | Checked-in copy of the deployed security rules |
+| `privacy.html` | Privacy policy — what the app stores and where it does (and doesn't) go |
 | `.github/workflows/tests.yml` | Runs `tests.html` headless on every push |
 | `favicon.ico` | Tab icon — the fallback a browser fetches from the site root on its own |
 | `make_favicon.py` | Draws `favicon.ico` to match the inline SVG icon in `index.html` |
@@ -1409,14 +1298,15 @@ independent reimplementation of them in HTML and JavaScript: the formulas, the l
 every chart were built from scratch, and a handful of short field labels read the same only
 because they name the same thing. It has since grown well past the original: any number of teams,
 its own Flow / Delivery / Health grouping, a date window and period picker, read-only share
-links, cross-device sync, four themes and a test suite.
+links, four themes and a test suite. It had cross-device sync too, until that was removed on
+2026-08-20 — see [above](#cross-device-sync-was-removed-2026-08-20).
 
 ## Ownership and Licence
 
 Flow Metrics is an independent personal project by Charles Adams — built on personally owned
-hardware, with a personally paid-for Claude subscription, in a personal GitHub account, and
-syncing (when you turn it on) through a Firebase project he owns. No employer equipment,
-funding or code went into it.
+hardware, with a personally paid-for Claude subscription, in a personal GitHub account. No
+employer equipment, funding or code went into it, and since 2026-08-20 it has no server or
+database behind it either: your data stays in your own browser.
 
 It holds no employer information beyond issue keys, and that is a property of the design
 rather than a promise: there is no free-text field anywhere in the app, and the storage

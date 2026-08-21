@@ -59,8 +59,7 @@ const PREFIX = 'td-shell-';
 
 /* THE ALLOWLIST, and the security boundary of this file. Every entry is a file
    that is already public in the GitHub repo. Nothing else is EVER cached — not
-   the work items, not a Firestore reply, not tests.html, not the repo's own
-   notes. A request that is not on this list is not intercepted at all: it goes
+   the work items, not tests.html, not the repo's own notes. A request that is not on this list is not intercepted at all: it goes
    to the network as if this worker did not exist. Adding a line here is a
    security decision, so justify it in the commit. */
 const SHELL = [
@@ -164,9 +163,11 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   let url;
   try { url = new URL(req.url); } catch (_) { return; }
-  /* Cross-origin is never touched: Firestore, Google sign-in and the Firebase
-     SDK on gstatic all go straight past. Sync is an online-only feature by
-     definition and gets no help — and no interference — from here. */
+  /* Cross-origin is never touched. Since sync was removed (2026-08-20) the page
+     makes no cross-origin request at all — its CSP says connect-src 'none' — so
+     this is now a guard against a request that should never exist rather than
+     one that routinely did. Kept: a worker that intercepted an off-origin
+     request would be a far worse bug than a redundant check. */
   if (url.origin !== self.location.origin) return;
   const key = shellKey(url);
   if (!key) return;
