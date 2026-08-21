@@ -154,7 +154,7 @@ size and are still laid out by `auto-fit` — as this app's own per-group tile r
 ## Grouping Teams into ARTs
 
 If you support teams across more than one Agile Release Train, you can group them. The
-**Teams** dialog has an **Agile Release Trains** section: add one, then set each team's ART from
+**Teams & Stages** dialog has an **Agile Release Trains** section: add one, then set each team's ART from
 the picker in its own row of the table above. A team can be on one train or on none — being on
 none is perfectly normal, and nothing forces you to use the feature at all.
 
@@ -279,7 +279,7 @@ with no work items at all shows dashes throughout.
 
 Each team keeps its own list of work items; the picker in the header chooses which one the
 dashboard is showing. Teams can be [grouped into ARTs](#grouping-teams-into-arts), in which case
-the picker groups them the same way. Add, rename, reorder and delete teams from the **Teams**
+the picker groups them the same way. Add, rename, reorder and delete teams from the **Teams & Stages**
 button beside that picker — a name is edited in place, **↑** and **↓** move a team up or down,
 and **×** deletes it. Each row also holds a **project id** — the letters at the front of that
 team's issue keys, `DAE` for `DAE-1552` — which is what lets [one export covering several
@@ -379,7 +379,7 @@ showing a red note.
 It asks before it loads and adds alongside anything you already have, with one exception:
 the empty `My team` the app creates on a first run is dropped, but only if it's untouched —
 still the only team, still empty, still under that name. To get rid of the demo afterwards,
-use **Teams** to delete the three, or *Start again* in the Back up dialog.
+use **Teams & Stages** to delete the three, or *Start again* in the Back up dialog.
 
 The demo group in `tests.html` pins every finding in that table. **Adding a feature means
 adding the data that demonstrates it, a row in this table, and a test** — a feature the demo
@@ -524,7 +524,7 @@ row to the team it belongs to.
 
 **The routing is the project id at the front of each issue key.** Each team is one Jira project,
 so `DAE-1552` belongs to whichever team is set to `DAE`. You set that id once per team, in the
-**Teams** window — or let the app fill it in for you: when a team with no id yet is given a
+**Teams & Stages** window — or let the app fill it in for you: when a team with no id yet is given a
 single-team paste whose keys are *unanimously* one project, that project becomes its id and the
 paste report says so. Unanimity is the bar, not a majority: a paste that is 90% one project is a
 question, not a fact.
@@ -549,7 +549,7 @@ are three ways a row can fail to land, and they have three different fixes:
 | What the report says | What it means | The fix |
 |---|---|---|
 | *N project ids no team claims* | Rows for a project nothing answers to | One press creates a team for it, named after the id and with the id already set — or give the id to a team you already have |
-| *N project ids are on more than one team* | Two teams share an id, so nothing can decide | Change one of them in **Teams** |
+| *N project ids are on more than one team* | Two teams share an id, so nothing can decide | Change one of them in **Teams & Stages** |
 | *N items had no readable issue key* | Nothing to route by | Add a `Key` column to the export |
 
 When something is still unplaced, the paste **stays in the box** — create the team, press
@@ -821,7 +821,7 @@ says less than the numbers do.
 This is the part worth reading even if you skip the rest.
 
 A **stage** is a part of your workflow you want to measure the wait in — *Build*, *Review*,
-*Test*. You create and name them under **Teams** in the header, and against each one you type
+*Test*. You create and name them under **Teams & Stages** in the header, and against each one you type
 the **Jira statuses that feed it**, separated by commas. Several statuses can feed one stage:
 a workflow with both *Ready for Code Review* and *Code Review* is one Review stage as far as
 the flow is concerned, and their days are added together.
@@ -1090,7 +1090,7 @@ cells get a leading apostrophe, which Excel, Numbers and Sheets all read as "thi
 genuine negative number is left alone — net flow is negative for half the weeks on a busy board,
 and quoting it would break the arithmetic you exported a CSV to do.
 
-The two tables in **Settings** and the **Teams** window have no export buttons: they are
+The two tables in **Settings** and the **Teams & Stages** window have no export buttons: they are
 configuration — a Display→Value mapping, and a list of names — rather than figures anybody puts
 in a status email.
 

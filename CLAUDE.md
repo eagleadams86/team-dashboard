@@ -214,10 +214,17 @@ this file was written to keep out. **Read this whole section before changing any
   to ARTs or the project id. The test is re-typeability: a train's name and a project id are one
   word typed in a dialog, and a per-item column of day counts is not — it comes back only by
   finding the export again. Same test, opposite answer, and that is the line to apply next time.
-- **The manage dialog is now "Teams, ARTs & Stages"** — three sections against the sibling's
-  three (Teams, ARTs & PIs). The two windows share a SHAPE — one section per thing you manage,
-  each headed by its name with its own Add button — not a list of sections; the sibling has no
-  stage times and this app has no PIs. Pinned in tests.html.
+- **The manage dialog is now "Teams, ARTs & Stages" and the header button is "Teams & Stages"**
+  — three sections against the sibling's three (Teams, ARTs & PIs). The two windows share a
+  SHAPE — one section per thing you manage, each headed by its name with its own Add button —
+  not a list of sections; the sibling has no stage times and this app has no PIs.
+  **The button rename (2026-08-21) is the sibling's rule being followed, not a divergence from
+  it**: SV's button has always read "Teams & PIs", naming its own distinctive section rather
+  than hiding it behind the first one, and this app's plain "Teams" was the drift. It was
+  reported the day stages shipped, by Charles, who could not find the feature — a section
+  nobody knows is there is a section nobody opens. Every in-app sentence that points at the
+  window was renamed with it. Pinned, because "Teams" is the tidier-looking label and exactly
+  what a later edit would shorten it back to.
 - **The demo sets the stages up BEFORE it parses**, because a stage column is only ever found
   by an alias that already exists. Kingfisher spends most of its time building, **Heron spends
   more of its time queueing than building** — the finding the whole feature exists to produce,

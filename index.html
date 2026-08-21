@@ -809,7 +809,14 @@ main:focus { outline: none; }
       >Flow&nbsp;Metrics <span>· Charlie’s Epic Flow Clinic</span></h1>
     <label class="sr-only" for="teamSel">Team</label>
     <select id="teamSel" title="Which team you're looking at"><option>—</option></select>
-    <button class="btn small" id="manageBtn" type="button" title="Add or rename teams, and group them into ARTs">Teams</button>
+    <!-- "Teams & Stages", not "Teams", and the sibling app is why: its button has
+         always read "Teams & PIs" — it names its own distinctive section rather
+         than hiding it behind the first one. This app's third section is stages,
+         so following that pattern is what keeps the two headers parallel, and a
+         feature nobody can find behind a button called something else is a
+         feature nobody has. Reported 2026-08-21 by Charles, who could not find
+         it. -->
+    <button class="btn small" id="manageBtn" type="button" title="Add or rename teams, group them into ARTs, and set up workflow stages">Teams &amp; Stages</button>
     <label class="sr-only" for="themeSel">Theme</label>
     <!-- The four unified themes, listed alphabetically (matches the sibling app).
          Midnight is pre-selected to match the theme the boot script in <head>
@@ -1036,7 +1043,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <section class="panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
     <div class="card">
       <h2>Labels &amp; Work Types</h2>
-      <p class="hint">Shared by every team. Team names live behind the <strong>Teams</strong> button in the header.</p>
+      <p class="hint">Shared by every team. Team names live behind the <strong>Teams &amp; Stages</strong> button in the header.</p>
       <div class="grid two" style="margin-top:var(--sp-6)">
         <div>
           <label for="setCycleLabel">Word to use for cycle time on charts</label>
@@ -5592,7 +5599,7 @@ const METRIC_HELP = {
       + 'cycle time, because a status export counts days in statuses that sit outside the '
       + 'started-to-finished span. These days are CALENDAR days as your export counted them: '
       + 'they are worked out by Jira, so the working-days setting does not reach them. '
-      + 'Stages are ones you set up under Teams in the header — this app never stores the '
+      + 'Stages are ones you set up under Teams & Stages in the header — this app never stores the '
       + 'status names out of your export, only the days and the stage name you chose.' },
   cycleTime: { title: 'Cycle Time',
     body: 'How long does an item take once work has actually started? The average of the '
@@ -6231,7 +6238,7 @@ function renderStageTime(d) {
     const team = activeTeam();
     const teamHasStages = !!(team && team.rows.some(r => r.stages));
     none.textContent = !state.stages.length
-      ? 'No workflow stages yet. Open Teams in the header, add the parts of your workflow you '
+      ? 'No workflow stages yet. Open Teams & Stages in the header, add the parts of your workflow you '
         + 'want to measure — Build, Review, Test — and list the Jira statuses that feed each '
         + 'one. Then paste a Time in Status export with a column per status.'
       : teamHasStages
@@ -6583,7 +6590,7 @@ function renderAllTeams() {
        fits it: there is no filter to blame and nothing to paste, because the
        train has no teams rather than no data. */
     none.textContent = (scope && !inScope.length)
-      ? 'No team is on ' + artName + ' yet. Open Teams in the header and set a team\u2019s '
+      ? 'No team is on ' + artName + ' yet. Open Teams & Stages in the header and set a team\u2019s '
         + 'ART to put it on this train.'
       : inScope.some(t => t.rows.length)
         ? 'Nothing completed matches the ' + view.filterDisplay + ' work type filter in any team'
@@ -7472,7 +7479,7 @@ function stagesReadHtml(res) {
       '. Only the day counts are saved — the status names in your headings are not.';
   } else if (state.stages.length) {
     html += '<br>No stage columns in this paste: none of the headings match a status you have '
-      + 'listed against a stage. Open <strong>Teams</strong> in the header and check the '
+      + 'listed against a stage. Open <strong>Teams &amp; Stages</strong> in the header and check the '
       + 'spellings against this export\u2019s own column headings.';
   }
   if (clash.length) {
@@ -7522,7 +7529,7 @@ function showParseNote(res, mode, team, adopted) {
       ? '<br>Every key in this paste starts <strong>' + escapeHtml(adopted) + '</strong>, and this '
         + 'team had no project id — so that is now its project id, and a paste covering several '
         + 'teams will send its ' + escapeHtml(adopted) + ' rows here. Change it under '
-        + '<strong>Teams</strong>.'
+        + '<strong>Teams &amp; Stages</strong>.'
       : '') +
     '</div>';
 }
@@ -7631,7 +7638,7 @@ function showMultiNote(res, route, mode) {
   } else {
     html += '<div class="note caution" style="margin-top:var(--sp-4)">'
       + '<strong>Nothing in this paste belongs to a team yet.</strong> Every row carries a project '
-      + 'id no team answers to — see below, or set one on a team under <strong>Teams</strong>.'
+      + 'id no team answers to — see below, or set one on a team under <strong>Teams &amp; Stages</strong>.'
       + '</div>';
   }
 
@@ -7651,7 +7658,7 @@ function showMultiNote(res, route, mode) {
       + (n > 1 ? '<div style="margin-top:var(--sp-4)"><button class="btn small" type="button" '
           + 'data-create-team="*">Create all ' + n + ' teams</button></div>' : '')
       + '<div style="margin-top:var(--sp-4)">Or give one of these ids to a team you already have, '
-      + 'under <strong>Teams</strong>. Either way the paste stays in the box — check it again '
+      + 'under <strong>Teams &amp; Stages</strong>. Either way the paste stays in the box — check it again '
       + 'and they will be included.</div>'
       + '</div>';
   }
@@ -7664,7 +7671,7 @@ function showMultiNote(res, route, mode) {
     html += '<div class="note err" style="margin-top:var(--sp-4)">'
       + '<strong>' + n + ' project id' + (n === 1 ? ' is' : 's are') + ' on more than one team.</strong> '
       + 'Nothing can decide which team those rows belong to, so they were not loaded. Change one '
-      + 'of the ids under <strong>Teams</strong> and check again.'
+      + 'of the ids under <strong>Teams &amp; Stages</strong> and check again.'
       + '<ul class="plain">' + route.ambiguous.map(a => '<li><strong>' + escapeHtml(a.projectId) + '</strong> — '
           + a.count + parsePlural(a.count) + ', claimed by '
           + a.names.map(escapeHtml).join(' and ') + '</li>').join('') + '</ul>'
@@ -7796,7 +7803,7 @@ function renderMultiTeamIds() {
   const without = state.teams.filter(t => !cleanProjectId(t.projectId));
   if (!withId.length) {
     el.className = 'note caution';
-    el.innerHTML = '<strong>No team has a project id yet.</strong> Open <strong>Teams</strong> '
+    el.innerHTML = '<strong>No team has a project id yet.</strong> Open <strong>Teams &amp; Stages</strong> '
       + 'and give each one the letters at the front of its issue keys — or paste below and '
       + 'create the teams from what is in it.';
     return;
@@ -7811,7 +7818,7 @@ function renderMultiTeamIds() {
     + (dupes.length
         ? '<div style="margin-top:var(--sp-4)"><strong>' + dupes.map(escapeHtml).join(', ') + '</strong> '
           + (dupes.length === 1 ? 'is on more than one team, so its' : 'are on more than one team, so their')
-          + ' rows go nowhere until that is settled under <strong>Teams</strong>.</div>'
+          + ' rows go nowhere until that is settled under <strong>Teams &amp; Stages</strong>.</div>'
         : '')
     + (without.length
         ? '<div style="margin-top:var(--sp-4)">No project id, so ' + (without.length === 1 ? 'it takes' : 'they take')

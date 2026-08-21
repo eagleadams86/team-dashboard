@@ -3084,6 +3084,14 @@ group('ARTs — the grouping, and the boundary it crosses');
      you manage, not a list of sections. */
   is(heads, ['Teams', 'Agile Release Trains', 'Workflow Stages'],
      'three sections, each headed by its name');
+  /* The header button NAMES the third section, which is the sibling app's rule
+     rather than this one's: its button has always read "Teams & PIs". This app
+     read plain "Teams" until 2026-08-21, when the feature behind it turned out
+     to be unfindable — a section nobody knows is there is a section nobody
+     opens. Pinned because "Teams" is the tidier-looking label and the obvious
+     thing for a later edit to shorten it back to. */
+  is(win.document.getElementById('manageBtn').textContent, 'Teams & Stages',
+     'and the header button names the third one, exactly as the sibling\u2019s names PIs');
   ok(win.document.getElementById('btnAddTeam').closest('.row.spread'),
      'the team Add button sits in the Teams header row');
   ok(win.document.getElementById('btnAddArt').closest('.row.spread'),
