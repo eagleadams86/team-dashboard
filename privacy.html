@@ -40,16 +40,17 @@
 <div class="wrap">
   <a class="back" href="index.html">← Back to Flow Metrics</a>
   <h1>Flow Metrics — Privacy Policy</h1>
-  <p class="meta">Effective August 20, 2026</p>
+  <p class="meta">Effective August 21, 2026</p>
 
   <p>Flow Metrics is built to work entirely in your browser. This page explains exactly what
   data exists, where it goes, and who can see it.</p>
 
   <h2>What Flow Metrics Stores</h2>
   <p>The only data the app holds is what you paste or type in: team names, an optional
-  <em>project id</em> for each team, and for each team a
+  <em>project id</em> for each team, the names of any workflow stages you set up, and for each team a
   list of work items — a completed date, an optional start date, an optional created date, an
-  optional work type and an optional issue key — plus the shared settings (labels, the text that
+  optional work type, an optional issue key and, where your export carried them, a number of days
+  against each stage — plus the shared settings (labels, the text that
   marks unplanned work, the thresholds, whether days are counted Monday to Friday, the work-type
   filter list) and your preferences (theme, chosen team, date window). No account
   is required to use the app, and there is no analytics, tracking or advertising of any kind.</p>
@@ -68,12 +69,24 @@
   label used to route a paste; it changes no figure, and it is never sent in a share link,
   because someone reading a link has nothing to paste.</p>
 
+  <p><strong>Workflow stages are yours, and no status name from your export is ever
+  stored.</strong> A stage is something you create and name in the app — <em>Build</em>,
+  <em>Review</em> — and you tell the app which Jira statuses feed it by typing their names
+  yourself. When you paste a Time in Status export, the status names in its column headings are
+  matched against what you typed, turned into a number of days, and then thrown away with the
+  rest of the pasted text. What is saved is the stage name you chose and a number. That is also
+  why the app has no button that picks status names up out of an export: doing so would put
+  work-system text into storage, which is the one thing it is built not to do. A share link
+  carries the stage names and the day counts, because they are what the figures are; it does
+  not carry the list of statuses you typed. Before August 21, 2026 there were no stages at all;
+  a copy saved before then simply has none.</p>
+
   <p>Note what is <em>not</em> stored: no ticket titles or summaries, no descriptions, no
-  statuses, no names of people, and no free-text or comment fields anywhere. Apart from the
-  key, the app only ever needs dates and a type, and the work type is held to a short category
-  label — a cell that looks like anything longer (a ticket summary, a description) is discarded
-  rather than saved. The rest of what you paste is read for its dates on the spot and never
-  stored.</p>
+  status names, no names of people, and no free-text or comment fields anywhere. Apart from the
+  key, the app only ever needs dates, numbers and a type, and the work type is held to a short
+  category label — a cell that looks like anything longer (a ticket summary, a description) is
+  discarded rather than saved. The rest of what you paste is read for its dates and numbers on
+  the spot and never stored.</p>
 
   <h2>Where That Data Lives</h2>
   <div class="card">
@@ -107,7 +120,8 @@
   sent, so share it as deliberately as you would email a spreadsheet. It carries the same
   fields the app stores, <strong>issue keys included</strong> — they are what names the items
   on the charts, and a link without them would show the recipient a different picture from
-  yours.</p>
+  yours. It carries stage names and day counts for the same reason, but only the stages the
+  items in the link actually spent time in.</p>
 
   <h2>What Is Never Sent Anywhere</h2>
   <ul>

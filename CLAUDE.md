@@ -11,13 +11,16 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
-## Only Numbers, Dates and Two Guarded Labels Are Ever Saved (2026-08-12/13, amended 2026-08-20)
+## Only Numbers, Dates and Two Guarded Labels Are Ever Saved (2026-08-12/13, amended 2026-08-20/21)
 
-- **A row is three ISO dates, one short work-type label and one issue key.
+- **A row is three ISO dates, one short work-type label, one issue key and a
+  set of NUMBERS keyed by stage id.
   Nothing else. There are no free-text or comment fields anywhere in this app —
   don't add one.** A team carries a name, an optional `artId` and an optional
   project id — the last added 2026-08-20 and guarded by the same shape as the
-  front of a key. See the project id section below.
+  front of a key. See the project id section below. `state.stages` carries names
+  and aliases the reader typed; **nothing on a row is ever a word** — see the
+  workflow stages section, which is the longest one in this file for a reason.
 - **The issue key was added on 2026-08-20 at Charles's explicit request**, and it
   reverses the "no ticket keys, ever" line this file used to carry. It is worth
   knowing why it was allowed where a summary field never would be: a key is
@@ -31,6 +34,11 @@ file records what is specific to this repo and what must never regress.
   probably be a summary or a status, and neither has a shape — the test to apply
   is "can a regex tell this from a sentence?", not "is a key stored, so why not
   this?".
+  **A status was in fact the next thing wanted (2026-08-21), and it did NOT get
+  in on this reasoning** — it could not, because it fails that test outright.
+  What got in was a stage the reader names in a dialog and a number of days. If
+  that distinction is not clear, read the workflow stages section before
+  touching anything near it.
 - `cleanWorkType()` pins the type to a ≤40-char label at BOTH boundaries — the
   paste (`parsePastedRows`) and every read-back (`hydrateRows`). A longer cell (a
   ticket summary in the wrong column) is **dropped whole, never truncated** — 40
@@ -104,11 +112,131 @@ file records what is specific to this repo and what must never regress.
   now `persist()` plus the viewOnly guard — and the distinction is kept anyway:
   persist() means "write the shape down", save() means "the user changed
   something", and collapsing them would lose the only marker of which is which.)
-- Settings labels and team names are short and capped (120); rows carry **one
-  identifier and no other** — the issue key, shape-checked — and no titles,
-  summaries, statuses or names of people. `privacy.html` promises exactly that,
-  keep it true and update its effective date in the same commit as any storage
-  change (it went to 2026-08-20 with the key).
+- Settings labels, team names, ART names and stage names are short and capped
+  (120); rows carry **one identifier and no other** — the issue key,
+  shape-checked — and no titles, summaries, statuses or names of people.
+  `privacy.html` promises exactly that, keep it true and update its effective
+  date in the same commit as any storage change (it went to 2026-08-20 with the
+  key and to 2026-08-21 with stages).
+
+## Workflow Stages (2026-08-21) — SCHEMA 7 → 8
+
+`state.stages` is a list of `{id, name, match[]}` and each row carries an optional `stages`
+object of day counts keyed by stage id (`g` on the wire). It is what blocked time, flow
+efficiency and a stage-by-stage age chart have always been waiting on — and it is the first
+field in this app whose source is a **Jira status**, which is the field every rule at the top of
+this file was written to keep out. **Read this whole section before changing anything near it.**
+
+- **THE SAFETY ARGUMENT IS NOT A GUARD ON THE VALUE. It is that no status name is ever
+  stored.** A status has no shape a regex can check — "Fix the login bug on prod" is
+  twenty-five characters of letters and spaces, which is every shape a status label has — so
+  the test that let the issue key and the project id in (*can a regex tell this from a
+  sentence?*) fails here, and a shape guard would be theatre. What is stored instead is a
+  stage **the reader named in a dialog**, which is the same class of data as a team name or an
+  ART name, plus **numbers**. The status name out of the export lives for the length of one
+  parse: it is matched against the aliases the reader typed, turned into a day count, and
+  discarded with the rest of the pasted text. `tests.html` asserts this directly — it
+  stringifies the parsed rows and greps for the column headings.
+- **That is why matching is by ALIASES YOU TYPE and there is no "adopt this heading" button.**
+  It is the obvious convenience and it is deliberately absent: one click that copies
+  work-system text into permanent storage is exactly the thing this design exists to avoid.
+  The project id's "create the team from the report" button is not precedent — a project id has
+  a shape, and this does not. If it is ever wanted it is a decision to take deliberately and
+  write down here, not a convenience to add in passing.
+- **Only the days-per-status export shape is supported, and the other one must never be.**
+  One row per issue, one column per status, every per-item cell a number: the free text is
+  confined to a single header row. The transition-log shape — one row per transition with a
+  status name in a cell on every row — puts untrusted text on every item row, which is the
+  shape this design refuses.
+- **Matching is EXACT on the normalised form, never a substring.** A substring rule looks
+  kinder and is worse: an alias of `Testing` would silently swallow a "Waiting on Testing Env"
+  column and add somebody's environment queue to their test time — a wrong number nobody can
+  see. `normalizeAlias` collapses case and punctuation, so `In-Progress` and `In Progress` are
+  one status; that is the only latitude there is.
+- **Two columns may feed ONE stage and are added together** (the point of aliases — a workflow
+  with "Ready for Code Review" and "Code Review" is one Review stage). **Two stages claiming one
+  alias is the opposite**: a contradiction the app must not resolve silently, so the first in the
+  list keeps it and `duplicateStageAliases` puts the clash on screen as it is typed, exactly as
+  two teams sharing a project id already are.
+- **Stage columns are found by HEADING ONLY — no headerless fallback, deliberately.** Every
+  other role can be found from the values, because a date looks like a date and a key looks
+  like a key. A column of day counts looks like a column of day counts whatever stage it
+  belongs to, so guessing would mean assigning somebody's review time to their test stage on
+  the strength of column order. A date, type or key role also **wins a contested column
+  outright**, and the stage that wanted it goes into `columns.stageClash` so the report can say
+  so — otherwise a stage aliased `Created` simply reports nothing and nobody can see why.
+- **The report names columns BY POSITION and stages by the reader's own name — never the
+  heading out of the export.** This report has never echoed a pasted cell and a heading is a
+  pasted cell. Somebody matching up a column reads the heading off the export they still have
+  open. Showing unmapped headings in the mapping dialog was considered and left out; it is the
+  narrowest possible widening of that rule, and it is still a widening.
+- **Zero is a REAL value and is kept.** An item that passed through a stage inside a day
+  genuinely spent no measurable time there, and dropping those would quietly lift every median.
+  An EMPTY cell is different — no data for that stage — and `parsePastedRows` tells the two
+  apart by looking at the raw text, exactly as it does for the dates.
+- **The card reports a share of the time MEASURED, never a share of cycle time.** They are not
+  the same number and only one is honest: a status export counts calendar days in every status
+  it was asked about, including ones outside the started-to-finished span, so a share of cycle
+  time can exceed 100% for perfectly ordinary data. A wrong number with an explanation attached
+  is still a wrong number.
+- **These are CALENDAR days whatever the working-days setting says, and the card title says so
+  in its own words.** That setting governs the three durations this app works out itself, from
+  dates it holds; these are worked out by Jira from a status history this app never sees, and
+  there is no honest way to re-measure a single total Monday-to-Friday. Re-labelling them would
+  be the one thing worse than not converting them. This is the one deliberate exception to
+  "don't let the two measures diverge", and it is safe only because it is stated on the card.
+- **`stageTimesOf` is pure and NAMELESS** — it returns figures keyed by stage id and never
+  touches `state.stages`, so the one place a stage's name is decided stays the dialog it was
+  typed into. The renderer joins the two, **in the reader's own stage order**: a workflow has a
+  direction, and sorting the table by size would throw away the one thing a reader already
+  knows how to scan.
+- **The whitelists, in the same commit as the SCHEMA bump, as always**: `sanitizeStages` (ids
+  through `ID_OK`, names at 120, aliases at 60 each and 24 of them, duplicates collapsed),
+  `hydrateStageDays` (ids through `ID_OK`, values through `cleanStageDays`), and `hydrateState`
+  pruning day counts whose stage no longer exists — the dangling-`artId` treatment, once at the
+  boundary rather than guarded at every read. A row left with none loses the object entirely, so
+  it goes back to serialising as it did before the feature.
+- **The day counts object has NO PROTOTYPE.** `Object.create(null)` in both the parse and the
+  hydrate. `ID_OK` happily matches `__proto__`, and this is the first field in the app whose
+  keys come from outside; with no prototype there is nothing for that to reach. Pinned.
+- **`g` is omitted when empty**, so a team that never pastes a status export serialises
+  byte-identically to before — the rule `k`, `i` and `projectId` already follow, and what keeps
+  the first save after this build from rewriting the whole stored document. Likewise no
+  `stages` key on the document until a stage exists.
+- **`SHARE_PAYLOAD_V` was NOT bumped**, matching ARTs and keys. A link carries the day counts
+  and **only the stages its own rows spent time in** — the ARTs rule, for the ARTs reason: a
+  stage name describes the reader's workflow, and sharing one team should not publish the shape
+  of a workflow that team has nothing to do with. **The ALIASES deliberately do not travel**:
+  they are matching rules for a paste box the recipient does not have, and they are the one
+  field in this app typed to mirror a work system's own words. An older cached build drops both
+  and shows the app as it was — graceful degradation.
+- **`tdAdopt`'s losing-a-field prompt WAS extended to stage times**, where it was not extended
+  to ARTs or the project id. The test is re-typeability: a train's name and a project id are one
+  word typed in a dialog, and a per-item column of day counts is not — it comes back only by
+  finding the export again. Same test, opposite answer, and that is the line to apply next time.
+- **The manage dialog is now "Teams, ARTs & Stages" and the header button is "Teams & Stages"**
+  — three sections against the sibling's three (Teams, ARTs & PIs). The two windows share a
+  SHAPE — one section per thing you manage, each headed by its name with its own Add button —
+  not a list of sections; the sibling has no stage times and this app has no PIs.
+  **The button rename (2026-08-21) is the sibling's rule being followed, not a divergence from
+  it**: SV's button has always read "Teams & PIs", naming its own distinctive section rather
+  than hiding it behind the first one, and this app's plain "Teams" was the drift. It was
+  reported the day stages shipped, by Charles, who could not find the feature — a section
+  nobody knows is there is a section nobody opens. Every in-app sentence that points at the
+  window was renamed with it. Pinned, because "Teams" is the tidier-looking label and exactly
+  what a later edit would shorten it back to.
+- **The demo sets the stages up BEFORE it parses**, because a stage column is only ever found
+  by an alias that already exists. Kingfisher spends most of its time building, **Heron spends
+  more of its time queueing than building** — the finding the whole feature exists to produce,
+  and the reason the demo lands on Heron — and Wagtail carries none, so the card's empty face is
+  reachable. Review is fed by two of Heron's columns. The demo's split is **deterministic and
+  never drawn from `rnd()`**, exactly like the issue key counter: a draw consumed here would
+  silently move Heron's tail and Kingfisher's aged count. It is written in **tenths of a day**,
+  because whole days on a four-day board report that every item spent zero time in review.
+- What this unblocks and what it does not: blocked time and flow efficiency now have their
+  export, but both still need a per-stage **waiting or working** flag, which is a decision about
+  meaning rather than a parse. The work item age chart could now put stage on its x axis. None
+  of that is built.
 
 ## The Project Id and the Multi-Team Paste (2026-08-20) — SCHEMA 6 → 7
 
@@ -327,7 +455,7 @@ Teams comparison into a Monday status mail.
   interpreted — a train name with a slash would propose a path.
 - The Settings and Teams-dialog tables deliberately have no buttons: configuration, not figures.
 
-## The Teams Dialog Follows the Sibling's (2026-08-20)
+## The Teams Dialog Follows the Sibling's (2026-08-20, third section 2026-08-21)
 
 Reordering landed the same afternoon, in both apps at once:
 
@@ -538,8 +666,9 @@ type. What must not regress:
   would keep it: a tile wants figures lining up on the decimal point, a chart label wants every
   character it can give back to the chart under the chip.
 - **Columns are work types, and that is a compromise the README states.** The canonical chart puts
-  workflow STAGE on the x axis, which needs the status-history export blocked time and flow
-  efficiency are both waiting on. `AGE_UNTYPED` and `AGE_OTHER` are pushed to the right-hand end
+  workflow STAGE on the x axis. The export that needs arrived on 2026-08-21 — see the workflow
+  stages section — so this is now a chart that COULD be built rather than one that is waiting on
+  data; it has not been. `AGE_UNTYPED` and `AGE_OTHER` are pushed to the right-hand end
   regardless of count — neither is a work type, and keeping both there is what preserves the quiet
   corner above. `AGE_MAX_COLUMNS` counts REAL types only, so an untyped item can never push a real
   one off the chart.

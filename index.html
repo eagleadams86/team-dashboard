@@ -272,6 +272,11 @@ select { cursor: pointer; }
    centre, and the auto margins would shrink the card to fit its contents rather
    than fill the row. */
 .chart-card.solo { grid-column: 1 / -1; }
+/* Spans both columns and STAYS spanning — unlike .solo, which narrows to one
+   column's width above the breakpoint so a lone chart doesn't read as the
+   important one. A table is not a chart: its width is its columns, and half the
+   grid puts a five-column table into a sideways scroll on an ordinary laptop. */
+.chart-card.wide { grid-column: 1 / -1; }
 @media (min-width: 941px) {
   .chart-card.solo { width: calc(50% - 9px); margin-inline: auto; }
 }
@@ -546,6 +551,11 @@ table.manage select { max-width: 220px; }
    The placeholder is exempt: "E.G. DAE" is shouting an example. */
 table.manage input.projid { max-width: 110px; text-transform: uppercase; }
 table.manage input.projid::placeholder { text-transform: none; }
+/* The alias box holds a LIST — three or four status names and their commas —
+   where every other box in this table holds one short value, so it is the one
+   that is allowed past the 320px cap. Also after it, and for the same
+   specificity reason the project id is. */
+table.manage input.aliases { max-width: none; }
 /* A row with nothing in it yet — the ARTs table before the first train. */
 table.manage td.empty-row { text-align: left; color: var(--text-secondary);
   border-bottom: 0; padding-left: 0; }
@@ -574,6 +584,7 @@ table.filters td.act { width: 1%; }
 table.manage td:first-child { min-width: 150px; }
 table.manage td.art { min-width: 130px; }
 table.manage td.projid { min-width: 110px; }
+table.manage td.aliases { min-width: 220px; width: 45%; }
 /* A count belongs under its heading, not hard against the box to its left, and
    these columns are only as wide as their widest cell. */
 table.filters th.act, table.filters td.act { text-align: right; }
@@ -798,7 +809,14 @@ main:focus { outline: none; }
       >Flow&nbsp;Metrics <span>· Charlie’s Epic Flow Clinic</span></h1>
     <label class="sr-only" for="teamSel">Team</label>
     <select id="teamSel" title="Which team you're looking at"><option>—</option></select>
-    <button class="btn small" id="manageBtn" type="button" title="Add or rename teams, and group them into ARTs">Teams</button>
+    <!-- "Teams & Stages", not "Teams", and the sibling app is why: its button has
+         always read "Teams & PIs" — it names its own distinctive section rather
+         than hiding it behind the first one. This app's third section is stages,
+         so following that pattern is what keeps the two headers parallel, and a
+         feature nobody can find behind a button called something else is a
+         feature nobody has. Reported 2026-08-21 by Charles, who could not find
+         it. -->
+    <button class="btn small" id="manageBtn" type="button" title="Add or rename teams, group them into ARTs, and set up workflow stages">Teams &amp; Stages</button>
     <label class="sr-only" for="themeSel">Theme</label>
     <!-- The four unified themes, listed alphabetically (matches the sibling app).
          Midnight is pre-selected to match the theme the boot script in <head>
@@ -1025,7 +1043,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <section class="panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
     <div class="card">
       <h2>Labels &amp; Work Types</h2>
-      <p class="hint">Shared by every team. Team names live behind the <strong>Teams</strong> button in the header.</p>
+      <p class="hint">Shared by every team. Team names live behind the <strong>Teams &amp; Stages</strong> button in the header.</p>
       <div class="grid two" style="margin-top:var(--sp-6)">
         <div>
           <label for="setCycleLabel">Word to use for cycle time on charts</label>
@@ -1244,6 +1262,26 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           <div class="chart-title" id="titleDefectRate"></div>
           <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
         </div>
+
+        <!-- The only card in the app that is a TABLE rather than a chart, and it
+             is one on purpose: five stages is five numbers, a bar chart of five
+             numbers says less than the numbers do, and a table is the one thing
+             here that can be copied into a stand-up note. It spans both columns
+             because a five-column table in half a grid scrolls sideways on a
+             laptop, which is exactly the orphaned-control problem the layout
+             rules exist to stop. -->
+        <div class="chart-card wide" id="cardStageTime">
+          <div class="chart-name" id="nameStageTime"></div>
+          <div class="chart-title" id="titleStageTime"></div>
+          <div class="row spread" style="margin-bottom:var(--sp-4)">
+            <span></span>
+            <span id="stageTimeExport"></span>
+          </div>
+          <div class="table-scroll">
+            <table class="data" id="stageTimeTable"></table>
+          </div>
+          <div class="note info" id="stageTimeNone" hidden></div>
+        </div>
       </div>
 
       <!-- The only group that looks forward, and the only one with inputs of its
@@ -1354,7 +1392,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
      its three sections flat, the two dialogs are read side by side, and a
      section somebody has to open is a section they have to find first. -->
 <dialog id="manageDialog" aria-labelledby="manageDialogTitle">
-  <h2 id="manageDialogTitle">Teams &amp; ARTs</h2>
+  <h2 id="manageDialogTitle">Teams, ARTs &amp; Stages</h2>
 
   <div class="row spread">
     <strong class="manage-head">Teams</strong>
@@ -1383,6 +1421,35 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <div class="table-scroll">
     <table class="manage" id="artTable" aria-label="Agile Release Trains"><tbody id="artRows"></tbody></table>
   </div>
+
+  <!-- ── Workflow stages ──────────────────────────────────────────────────
+       The third section, and the one that needs the most saying, because what
+       it asks for looks like it could be picked up from the export and
+       deliberately isn't. Every word of the note below is load-bearing: the
+       reason this app can hold stage times at all is that a stage is something
+       you named here, and the only thing a paste contributes is numbers. -->
+  <div class="row spread" style="margin-top:20px">
+    <strong class="manage-head">Workflow Stages</strong>
+    <button class="btn small" id="btnAddStage" type="button">+ Add a stage</button>
+  </div>
+  <p class="manage-note">A stage is a part of your workflow you want to measure the wait in —
+    <em>Build</em>, <em>Review</em>, <em>Test</em>. Paste a <strong>Time in Status</strong>
+    export with a column per status and each item's days land in the stage you have matched
+    that status to. Several statuses can feed one stage: list them all and their days are
+    added together.</p>
+  <p class="manage-note"><strong>You type the status names, and this app never stores them.</strong>
+    A status name is work-system text, so it is matched while your paste is being read and
+    then thrown away with the rest of it — what is saved is the stage name you chose and a
+    number of days. That is also why there is no button to pick the statuses up out of an
+    export: it would put those words into storage, which is the one thing this app will not do.
+    Match on the status name exactly as Jira spells it; capitals and punctuation don't matter.</p>
+  <div class="table-scroll">
+    <table class="manage" id="stageTable" aria-label="Workflow stages"><tbody id="stageRows"></tbody></table>
+  </div>
+  <!-- Two stages listing one status makes a column's destination unanswerable,
+       so it is said here as it happens rather than left for a paste to
+       discover — exactly as two teams sharing a project id already are. -->
+  <p class="note err" id="stageAliasWarn" hidden style="margin-top:10px"></p>
 
   <div class="row" style="justify-content:flex-end;margin-top:18px">
     <button class="btn primary" id="manageCloseBtn" type="button">Done</button>
@@ -2019,7 +2086,7 @@ function columnStats(rows, order) {
  * Cycle time keeps working; lead time comes out equal to it, which is honest,
  * and the parse note says so.
  */
-function detectColumns(rows, header, order) {
+function detectColumns(rows, header, order, stages) {
   const stats = columnStats(rows, order);
   /* Only the strict start patterns — "In Progress"/"Start"/"Begin" — so that a
      Created column can be recognised as created first, and then fall back into
@@ -2031,7 +2098,16 @@ function detectColumns(rows, header, order) {
     started:   startedStrict,
     created:   -1,
     type:      matchHeader(header, 'type'),
-    key:       matchHeader(header, 'key')
+    key:       matchHeader(header, 'key'),
+    /* Stage columns are found by HEADING ONLY, and there is no headerless
+       fallback for them — deliberately. Every other role here can be found from
+       the values when a heading is missing, because a date looks like a date and
+       a key looks like a key. A column of day counts looks like a column of day
+       counts whatever stage it belongs to, so guessing would mean assigning
+       somebody's review time to their test stage on the strength of column
+       order. A stage column is only ever a column whose heading matches an alias
+       the reader typed. */
+    stages: stageColumnsFor(header, stages)
   };
   const createdByHeader = matchHeader(header, 'created');
   if (createdByHeader >= 0 && createdByHeader !== map.completed && createdByHeader !== map.started) {
@@ -2047,12 +2123,22 @@ function detectColumns(rows, header, order) {
      ambiguous it is the one that yields. */
   if (map.key >= 0 && [map.completed, map.started, map.created, map.type].includes(map.key)) map.key = -1;
 
+  /* A date, type or key role wins a contested column outright, and the stage
+     that wanted it is set aside rather than dropped quietly. It happens when an
+     alias names something that is also a heading this app reads — "Created" is
+     the obvious one — and the reader needs to be told, because from their side
+     a stage they set up is simply reporting nothing. columnsReadHtml says which
+     column and which stage. */
+  const roleCols = [map.completed, map.started, map.created, map.type, map.key].filter(i => i >= 0);
+  map.stageClash = map.stages.filter(sc => roleCols.includes(sc.index));
+  map.stages = map.stages.filter(sc => !roleCols.includes(sc.index));
+
   /* A Set, not a list: started and created may share an index, and a list would
      make the type detector below think one more column was consumed than is.
      The key belongs in it too — with two rows of two distinct types the type
      detector would otherwise be free to pick the key column. */
   const taken = () => new Set([map.completed, map.started, map.created, map.type, map.key]
-    .filter(i => i >= 0));
+    .filter(i => i >= 0).concat(map.stages.map(sc => sc.index)));
 
   /* No heading, or a heading this app declined to trust: find the key column by
      what is IN it. Unlike the type detector below, which has to guess from
@@ -2219,7 +2305,144 @@ function projectIdOf(key) {
   return dash > 0 ? s.slice(0, dash).toUpperCase() : '';
 }
 
-function parsePastedRows(text, order) {
+/* ── Workflow stages ────────────────────────────────────────────────────────
+   How long an item sat in each part of the workflow — the thing blocked time
+   and flow efficiency have always been waiting on, and the reason the work item
+   age chart puts work TYPE on its x axis where the canonical chart puts stage.
+
+   READ THIS BEFORE ADDING ANYTHING NEAR IT. A Jira status is exactly the field
+   the rules at the top of CLAUDE.md were written to keep out, and it is kept
+   out here: NO STATUS NAME IS EVER STORED, and none is ever put on screen.
+   The guard everything else in this app leans on — "can a regex tell this from
+   a sentence?" — fails on a status and cannot be made to work. "Fix the login
+   bug on prod" is twenty-five characters of letters and spaces, which is every
+   shape a status label has. So a shape guard here would be theatre.
+
+   What is stored instead is a stage YOU named, in a dialog, in this app:
+
+     • `state.stages` is a list of {id, name, match[]} — every character of it
+       typed by the person using the app, capped, and escaped where it renders.
+       It is the same class of data as a team name or an ART name, which this
+       app has always stored, and NOT the same class as a pasted cell.
+     • A row stores NUMBERS: `{stageId: days}` and nothing else. There is no
+       route by which a word out of the export reaches storage.
+     • The status name out of the export lives for the length of one parse. It
+       is matched against the aliases you typed, turned into a day count, and
+       discarded with the rest of the pasted text.
+
+   That is the whole safety argument, and it is why the matching is by ALIASES
+   YOU TYPE rather than by anything picked up from the paste. An "adopt this
+   heading as an alias" button would be one click that copies work-system text
+   into permanent storage, which is the thing this design exists to avoid. If it
+   is ever wanted, it is a decision to take deliberately and to write down here,
+   not a convenience to add in passing.
+
+   The export to ask Jira for is a **Time in Status** one in its days-per-status
+   shape: one row per issue, one column per status, every per-item cell a
+   number. The other shape — one row per transition, with a status name in a
+   cell on every row — must NOT be supported: it puts untrusted text on every
+   item row, which is exactly the shape this design refuses. */
+
+/* A status heading and the alias you typed for it are "the same" when they say
+   the same word — case, punctuation and spacing are noise that differs between
+   one export and the next. Everything that is not a letter or a digit collapses
+   to a single space, so "Ready For Code-Review" and "ready for code review"
+   match, and "In Progress" and "In-Progress" do too. Used for COMPARISON only:
+   what is stored is the alias exactly as it was typed. */
+function normalizeAlias(s) {
+  return String(s == null ? '' : s).toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/* An alias is a Jira status name, typed by hand. Capped at 60 rather than the
+   120 every other label here gets, and that is deliberate: a status is two or
+   three words, and the shorter cap is one more thing standing between this
+   field and somebody pasting a sentence into it. Control characters go, as
+   everywhere else. An alias that normalises to nothing — punctuation, spaces —
+   is dropped rather than stored as a rule that could never match. */
+const STAGE_ALIAS_MAX_LEN = 60;
+const STAGE_ALIAS_MAX = 24;
+function cleanStageAlias(a) {
+  if (typeof a !== 'string') return '';
+  const s = a.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!s || s.length > STAGE_ALIAS_MAX_LEN) return '';
+  return normalizeAlias(s) ? s : '';
+}
+
+/* A day count out of a Time in Status export. STRICT, like every other cell
+   guard here: digits, optionally a decimal point and a few more digits, and
+   nothing else. No leading sign, no "3d 4h", no "12:30" — a cell this app
+   cannot read as a plain number of days is not guessed at, it is reported.
+
+   Null means "nothing usable here", which covers both an empty cell and a cell
+   the parser refuses; parsePastedRows tells the two apart by looking at the raw
+   text, exactly as it does for the dates. Zero is a REAL value and is kept: an
+   item that passed through a stage inside a day genuinely spent no measurable
+   time there, and dropping those would quietly lift every median.
+
+   The ceiling is ten years. Nothing legitimate reaches it, and without one a
+   hand-edited backup could put a number on a chart that squashes every real
+   figure into the axis. */
+const STAGE_DAYS_RE = /^[0-9]{1,5}(\.[0-9]{1,4})?$/;
+const STAGE_DAYS_MAX = 3650;
+function cleanStageDays(v) {
+  const s = typeof v === 'number' ? String(v) : (typeof v === 'string' ? v.trim() : '');
+  if (!STAGE_DAYS_RE.test(s)) return null;
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.min(Math.round(n * 100) / 100, STAGE_DAYS_MAX);
+}
+
+/* Which columns of a paste are stage columns, and whose stage each one is.
+   PURE — it takes the stage list rather than reading `state` — so the paste
+   report can show the plan before anything is written and the tests can pin it.
+
+   Matching is EXACT on the normalised form, never a substring. A substring rule
+   would look kinder and be worse: an alias of "Testing" would silently swallow
+   a "Waiting on Testing Env" column and add somebody's environment queue to
+   their test time, which is a wrong number nobody can see.
+
+   Two columns may map to ONE stage, and that is the point of aliases: a board
+   whose workflow has both "Ready for Code Review" and "Code Review" is one
+   Review stage as far as the flow is concerned, and their days are added
+   together. Two STAGES claiming one alias is the opposite — a contradiction the
+   app must not resolve silently — so the first stage in the list keeps the
+   alias and duplicateStageAliases() puts the clash on screen. */
+function stageColumnsFor(header, stages) {
+  if (!Array.isArray(header) || !Array.isArray(stages)) return [];
+  const byAlias = new Map();
+  stages.forEach(st => {
+    if (!st || typeof st.id !== 'string') return;
+    (Array.isArray(st.match) ? st.match : []).forEach(a => {
+      const n = normalizeAlias(a);
+      if (n && !byAlias.has(n)) byAlias.set(n, st.id);
+    });
+  });
+  const out = [];
+  header.forEach((h, i) => {
+    const id = byAlias.get(normalizeAlias(h));
+    if (id) out.push({ index: i, stageId: id });
+  });
+  return out;
+}
+
+/* Aliases claimed by more than one stage. Said in the dialog as it happens
+   rather than left for a paste to discover, the way two teams answering to one
+   project id already are — and reported as the ALIAS, which is the reader's own
+   text, never as anything out of an export. */
+function duplicateStageAliases(stages) {
+  const seen = new Map(), dupes = new Map();
+  (Array.isArray(stages) ? stages : []).forEach(st => {
+    (st && Array.isArray(st.match) ? st.match : []).forEach(a => {
+      const n = normalizeAlias(a);
+      if (!n) return;
+      if (seen.has(n)) dupes.set(n, seen.get(n)); else seen.set(n, a);
+    });
+  });
+  return [...dupes.values()].sort();
+}
+
+function parsePastedRows(text, order, stages) {
   /* Trim spaces but never tabs: in a tab-separated paste a leading tab is an
      empty first cell — a work-in-progress row in a completed-first export.
      l.trim() here once ate that tab and shifted every cell left, so the start
@@ -2233,7 +2456,7 @@ function parsePastedRows(text, order) {
   if (raw.length && looksLikeHeader(raw[0])) { header = raw.shift(); skippedHeader = true; }
 
   const resolved = (!order || order === 'auto') ? detectDateOrder(raw) : order;
-  const cols = detectColumns(raw, header, resolved);
+  const cols = detectColumns(raw, header, resolved, stages);
 
   const at = (cells, i) => (i >= 0 && cells[i] != null ? String(cells[i]).trim() : '');
 
@@ -2257,6 +2480,12 @@ function parsePastedRows(text, order) {
   };
 
   const rows = [], badCompleted = [], badStarted = [], badCreated = [];
+  /* Cells in a stage column that are not a plain number of days. Counted per
+     COLUMN rather than listed per row: a Time in Status export that has been
+     asked for in the wrong format has every one of its cells wrong, and a
+     report naming four hundred rows is a report nobody reads. The column is
+     named by its position, like every other column in the parse report. */
+  const badStageCells = new Map();
   /* Two different orderings, two different meanings — see the checks below. */
   const startAfterDone = [], raisedAfterStart = [];
   let unfinished = 0, undated = 0;
@@ -2274,6 +2503,32 @@ function parsePastedRows(text, order) {
        reporter's name — all of it comes out as '' rather than as a shortened
        version of itself. See cleanIssueKey. */
     const key       = cleanIssueKey(at(cells, cols.key));
+
+    /* The day counts, one per stage column, summed where two columns feed one
+       stage — a workflow with "Ready for Code Review" and "Code Review" is one
+       Review stage, and the whole reason a stage carries several aliases.
+
+       Object.create(null), not {}. This object is rebuilt from a saved copy on
+       the way back in, its keys are stage ids, and an id arriving from a
+       hand-edited backup could be spelled `__proto__`. With no prototype there
+       is nothing for that to reach; hydrateRows builds it the same way. */
+    const stageDays = Object.create(null);
+    let anyStage = false;
+    cols.stages.forEach(sc => {
+      const rawDays = at(cells, sc.index);
+      if (rawDays === '') return;
+      const days = cleanStageDays(rawDays);
+      if (days == null) {
+        badStageCells.set(sc.index, (badStageCells.get(sc.index) || 0) + 1);
+        return;
+      }
+      stageDays[sc.stageId] = (stageDays[sc.stageId] || 0) + days;
+      anyStage = true;
+    });
+    /* Capped again AFTER the summing, or two aliases at the ceiling would make
+       one stage twice it. */
+    if (anyStage) for (const id of Object.keys(stageDays))
+      stageDays[id] = Math.min(Math.round(stageDays[id] * 100) / 100, STAGE_DAYS_MAX);
 
     /* An empty completion date is not an error — it is work in progress, and it
        counts: the "started this week" tally never looks at completion at all.
@@ -2333,12 +2588,20 @@ function parsePastedRows(text, order) {
     if (!completed && !started) { undated++; return; }
     if (!completed) unfinished++;
 
-    rows.push({ completed: completed || null, started: usableStarted || null,
-                created: usableCreated || null, type, key });
+    const out = { completed: completed || null, started: usableStarted || null,
+                  created: usableCreated || null, type, key };
+    /* Absent unless this paste actually had stage columns with something in
+       them, so a team whose export has none serialises byte-identically to
+       before the feature existed — the rule the created date, the issue key and
+       the project id all follow. */
+    if (anyStage) out.stages = stageDays;
+    rows.push(out);
   });
 
   return { rows, badCompleted, badStarted, badCreated, startAfterDone, raisedAfterStart,
-           unfinished, undated, skippedHeader, dateOrder: resolved, columns: cols };
+           unfinished, undated, skippedHeader, dateOrder: resolved, columns: cols,
+           badStageCells: [...badStageCells.entries()]
+             .map(([index, count]) => ({ index, count })).sort((a, b) => a.index - b.index) };
 }
 
 /* ── One paste, several teams ────────────────────────────────────────────────
@@ -2514,6 +2777,58 @@ function percentileOf(values, p) {
   return sorted[Math.min(sorted.length - 1, Math.max(0, rank - 1))];
 }
 const CYCLE_PERCENTILE = 85;
+
+/* ── Time in stage ──────────────────────────────────────────────────────────
+   PURE, and deliberately NAMELESS: it returns figures keyed by stage id and
+   never touches state.stages, so the one place a stage's name is decided stays
+   the dialog the reader typed it into. The renderer joins the two, in the
+   reader's own stage order.
+
+   What it reports, and what it deliberately does not:
+
+   • MEDIAN and 85th percentile, per stage, over the items that carry a figure
+     for that stage. The same pair the cycle time tiles lead with, and for the
+     same reason — a mean over a stage that occasionally holds an item for three
+     weeks describes no item that ever existed.
+   • SHARE of the total measured time, not share of cycle time. Those are not
+     the same number and only one of them is honest here: a Time in Status
+     export counts calendar days in every status it was asked about, including
+     ones that sit outside the started-to-finished span this app calls cycle
+     time. A share of cycle time could exceed 100% for perfectly ordinary data,
+     which is a wrong number with an explanation attached. A share of what was
+     measured is self-consistent whatever the export covers.
+   • CALENDAR DAYS, always, and the card says so. The working-days setting
+     governs the three durations this app works out ITSELF, from dates it holds.
+     These are worked out by Jira, from a status history this app never sees, and
+     there is no honest way to re-measure them Monday-to-Friday from a single
+     total. Re-labelling them would be the one thing worse than not converting
+     them. */
+function stageTimesOf(items) {
+  const perStage = new Map();
+  let measured = 0;
+  items.forEach(r => {
+    if (!r.stages) return;
+    const ids = Object.keys(r.stages);
+    if (!ids.length) return;
+    measured++;
+    ids.forEach(id => {
+      if (!perStage.has(id)) perStage.set(id, []);
+      perStage.get(id).push(r.stages[id]);
+    });
+  });
+  const byStage = [...perStage.entries()].map(([id, days]) => ({
+    id,
+    count: days.length,
+    total: Math.round(days.reduce((a, b) => a + b, 0) * 100) / 100,
+    median: percentileOf(days, 50),
+    p85: percentileOf(days, CYCLE_PERCENTILE)
+  }));
+  const totalDays = Math.round(byStage.reduce((a, st) => a + st.total, 0) * 100) / 100;
+  /* A share of nothing is nothing, not a division by zero: a board whose every
+     measured item passed through every stage inside a day is unusual but real. */
+  byStage.forEach(st => { st.share = totalDays > 0 ? st.total / totalDays : 0; });
+  return { byStage, measured, totalDays };
+}
 /* The edges of the delivery band, mirrored around the middle and tied to the
    cycle time percentile so the app holds one convention rather than two: the
    same 85 that says "most items finish within this many days" says "most
@@ -3410,6 +3725,9 @@ function derive(rows, settings, view) {
   const completedTotal = throughput.reduce((a, b) => a + b, 0);
   const unplannedShare = completedTotal > 0 ? unplannedTotal / completedTotal : null;
 
+  /* Computed before the wording below, which states how many items it covers. */
+  const stageTimes = stageTimesOf(items);
+
   return {
     empty: weeks.length === 0,
     /* `buckets` is the name the code uses; `weeks` is the same array under the
@@ -3420,6 +3738,10 @@ function derive(rows, settings, view) {
     avgLeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
     throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
     wip, agedCount, agedDays, ageing, cycleScatter, forecast,
+    /* Keyed by stage id and carrying no names — see stageTimesOf. Read over the
+       same filtered `items` every figure above it is read over, so the work-type
+       filter reaches it exactly as it reaches everything else on the screen. */
+    stageTimes,
     /* `endDate` is what every figure was read as of; `dataEnd` is what this
        team's own export runs to. Equal unless a caller imposed a shared date. */
     dataEnd,
@@ -3490,7 +3812,10 @@ function derive(rows, settings, view) {
       /* The two forecast cards. Named for the question each answers rather than
          for the method: nobody walks up to a board asking for a Monte Carlo. */
       forecastWhen: 'Time to finish',
-      forecastHowMany: 'Items by a date'
+      forecastHowMany: 'Items by a date',
+      /* Named for the question, like the two above it: nobody asks for the
+         time-in-status table, they ask where the time goes. */
+      stageTime: 'Time in stage'
     },
     /* Title Case, matching the dialog headings — minor words stay lowercase
        unless they lead, so it is "per Week" and "Work in Progress". The user's
@@ -3519,7 +3844,15 @@ function derive(rows, settings, view) {
         + (fcItems === 1 ? '' : 's') + ', over ' + FORECAST_TRIALS.toLocaleString()
         + ' Simulated Runs',
       forecastHowMany: 'How Many Items Finished by ' + prettyDate(fcTarget) + ', over '
-        + FORECAST_TRIALS.toLocaleString() + ' Simulated Runs'
+        + FORECAST_TRIALS.toLocaleString() + ' Simulated Runs',
+      /* Says CALENDAR DAYS in the title itself rather than only in the ⓘ, and
+         says it whichever way the working-days setting is set. It is the one
+         set of durations on this screen that setting does not reach — they are
+         counted by Jira out of a status history this app never sees — and a
+         reader who has turned working days on has every reason to assume it
+         reached these too. */
+      stageTime: 'Where the Time Goes, over ' + stageTimes.measured + ' Item'
+        + (stageTimes.measured === 1 ? '' : 's') + ' with Stage Data — Calendar Days'
     },
     axisTitles: {
       /* Deliberately short: a rotated axis title gets truncated on a narrow
@@ -3662,7 +3995,11 @@ window.TD = {
      declared far below this line and are hoisted, which is why naming them here
      is safe where naming a `const` from a later section is a TDZ error that
      takes the whole app down — see ART_NONE above. */
-  issueSortKey, dotName
+  issueSortKey, dotName,
+  /* Stages: the guards, the pure column matcher and the pure figures, so the
+     whole feature can be pinned without a dialog or a paste box on screen. */
+  normalizeAlias, cleanStageAlias, cleanStageDays, stageColumnsFor, duplicateStageAliases,
+  stageTimesOf, STAGE_DAYS_MAX, STAGE_ALIAS_MAX, STAGE_ALIAS_MAX_LEN
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3843,7 +4180,7 @@ function haltForNewerData(found) {
 /* state.teams[] each hold their own rows; settings are shared by all of them.
    Everything in `state` is your data; everything in `view` is where you happen
    to be standing in it. Only `state` goes into a backup or a share link. */
-let state  = { teams: [], arts: [], settings: Object.assign({}, DEFAULT_SETTINGS) };
+let state  = { teams: [], arts: [], stages: [], settings: Object.assign({}, DEFAULT_SETTINGS) };
 let view   = Object.assign({}, DEFAULT_VIEW);
 let charts = {};
 /* The All Teams throughput chart is held HERE rather than in `charts` above.
@@ -3866,6 +4203,21 @@ const newId = () => 't' + Date.now().toString(36) + Math.random().toString(36).s
    unless it is plainly safe. Same boundary check as the sibling app. */
 const ID_OK = /^[A-Za-z0-9_-]{1,64}$/;
 
+/* `__proto__` passes ID_OK — underscores and letters — and it is the one id that
+   is not just a name. A stage id is used as an OBJECT KEY on a row's day counts,
+   which no other id in this app is, and that makes the difference: hydrateRows
+   builds those with Object.create(null), where an own `__proto__` reaches
+   nothing, but serializeRows has to hand JSON.stringify a plain object, and
+   Object.assign copying that key onto one goes through the prototype SETTER.
+   So it is refused at both stage doors — as an id, and as a key in a stored `g`
+   — rather than relied on being pruned later by hydrateState, which only prunes
+   ids no stage answers to and would happily keep this one if a hand-edited
+   backup named a stage after it.
+
+   Named rather than written inline so the reason is in one place, and so the
+   next id that turns out to be a key rather than a name has somewhere to go. */
+const PROTO_KEY = '__proto__';
+
 /* sanitizeArts is the ARTs' boundary; the grouping helpers themselves live with
    the rest of the pure domain code in section 4, above the window.TD export
    that hands them to the tests. */
@@ -3879,6 +4231,35 @@ function sanitizeArts(arts) {
     let id = (a && typeof a.id === 'string' && ID_OK.test(a.id) && !seen.has(a.id)) ? a.id : newId();
     seen.add(id);
     return { id, name: String((a && a.name) || 'Untitled ART').slice(0, 120) };
+  });
+}
+
+/* The stages' boundary, and the one place a stage arriving from outside this
+   browser — a backup file, a share link, a hand-edited localStorage — is
+   allowed to turn into a stage this app will use.
+
+   Names are capped like every other label here. The ALIASES are capped harder,
+   in three ways at once, because they are the only field in this app whose job
+   is to be compared against text out of a work system: each one at 60
+   characters by cleanStageAlias, at most 24 of them, and duplicates within a
+   stage collapsed. None of that changes what can be MATCHED — it bounds what a
+   copy from outside can plant in somebody's dialog. */
+function sanitizeStages(stages) {
+  const seen = new Set();
+  return (Array.isArray(stages) ? stages : []).map(st => {
+    let id = (st && typeof st.id === 'string' && ID_OK.test(st.id) && st.id !== PROTO_KEY
+      && !seen.has(st.id)) ? st.id : newId();
+    seen.add(id);
+    const aliases = [], byNorm = new Set();
+    (st && Array.isArray(st.match) ? st.match : []).forEach(a => {
+      if (aliases.length >= STAGE_ALIAS_MAX) return;
+      const clean = cleanStageAlias(a);
+      const norm = normalizeAlias(clean);
+      if (!clean || byNorm.has(norm)) return;
+      byNorm.add(norm);
+      aliases.push(clean);
+    });
+    return { id, name: String((st && st.name) || 'Untitled stage').slice(0, 120), match: aliases };
   });
 }
 
@@ -3904,6 +4285,24 @@ function sanitizeTeams(teams) {
              artId, projectId: cleanProjectId(t && t.projectId),
              rows: hydrateRows(t && t.rows) };
   });
+}
+
+/* The per-row day counts, rebuilt from whatever a stored copy claims they are.
+   Returns null rather than an empty object when there is nothing usable, so a
+   row that never had stage data does not gain an empty one and start writing a
+   `g` key it never had. */
+function hydrateStageDays(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = Object.create(null);
+  let any = false;
+  for (const id of Object.keys(raw)) {
+    if (!ID_OK.test(id) || id === PROTO_KEY) continue;
+    const days = cleanStageDays(raw[id]);
+    if (days == null) continue;
+    out[id] = days;
+    any = true;
+  }
+  return any ? out : null;
 }
 
 function hydrateRows(raw) {
@@ -3936,7 +4335,17 @@ function hydrateRows(raw) {
          Anything that is not exactly a key shape is dropped here, so a hostile
          or hand-edited document cannot use this field as a free-text smuggling
          route — which is the whole reason the guard is a shape and not a cap. */
-      key: cleanIssueKey(r && r.i)
+      key: cleanIssueKey(r && r.i),
+      /* `g` is the wire name; `stages` is what the app calls it everywhere else.
+         Rebuilt key by key rather than taken as it stands: an id that is not a
+         plainly safe id is dropped, a value that is not a day count is dropped,
+         and the object has NO PROTOTYPE, so an id spelled `__proto__` on a
+         hand-edited backup is an ordinary own property that reaches nothing.
+         Ids pointing at a stage that no longer exists are pruned in
+         hydrateState, where the stage list is known — the same treatment a
+         dangling artId gets, and for the same reason: once, at the boundary,
+         rather than guarded at every read. */
+      stages: hydrateStageDays(r && r.g)
     };
   })
   /* An item with no completion is work in progress, not a broken row — keep it,
@@ -3954,6 +4363,25 @@ const serializeRows = rows => rows.map(r => {
   const out = { c: isoOf(r.completed), s: isoOf(r.started), t: r.type };
   if (r.created) out.k = isoOf(r.created);
   if (r.key) out.i = r.key;
+  /* Same rule again: no `g` key at all unless this row has stage data, so a
+     browser that never pastes a Time in Status export stores exactly what it
+     stored before stages existed.
+
+     Copied key by key into a plain object — which is what JSON.stringify wants —
+     rather than with Object.assign, and skipping PROTO_KEY on the way. Both
+     Object.assign and a plain `out[k] = v` go through [[Set]], and on a plain
+     object `__proto__` has a SETTER: copying that key would move the new
+     object's prototype rather than store a day count. Nothing upstream can
+     produce that key any more (see PROTO_KEY), and this is the door it would
+     have to come through, so it is closed here too. */
+  if (r.stages && Object.keys(r.stages).length) {
+    const g = {};
+    for (const id of Object.keys(r.stages)) {
+      if (id === PROTO_KEY) continue;
+      g[id] = r.stages[id];
+    }
+    if (Object.keys(g).length) out.g = g;
+  }
   return out;
 });
 
@@ -4017,7 +4445,8 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 7 added the per-team project id — the address a multi-team paste is
+/* SCHEMA 8 added workflow stages — `state.stages` and a `g` of day counts on
+   each row; 7 added the per-team project id — the address a multi-team paste is
    split by; 6 added the per-row issue key; 5 added ARTs — `state.arts` and an
    `artId` on each team; 4 added the working-days setting; 3 added the per-row
    created date.
@@ -4030,7 +4459,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 7;
+const SCHEMA = 8;
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
    hydrateState() keeps only the keys it knows, which is right for a hostile
@@ -4074,6 +4503,11 @@ function serializeState() {
     }),
     /* Likewise: no key at all until an ART exists. */
     arts: state.arts.length ? state.arts.map(a => ({ id: a.id, name: a.name })) : undefined,
+    /* And no `stages` key until a stage exists — so a browser that never sets
+       one up writes exactly the document it wrote before the feature landed. */
+    stages: state.stages.length
+      ? state.stages.map(st => ({ id: st.id, name: st.name, match: st.match.slice() }))
+      : undefined,
     settings: state.settings
   };
 }
@@ -4084,8 +4518,17 @@ const countCreated = teams =>
    by the same prompt rather than a second one. See tdAdopt. */
 const countKeys = teams =>
   teams.reduce((n, t) => n + t.rows.filter(r => r.key).length, 0);
+/* And stage times, in the same position again: a column pasted per item that an
+   older build drops without a word. This is the test the ART and the project id
+   deliberately FAIL — those are a name and a word, re-typed in a dialog in
+   seconds, which is why the prompt was not extended to them. A stage's day
+   counts are not re-typeable; they come back only by finding the export again
+   and pasting it. So they join the prompt. */
+const countStageDays = teams =>
+  teams.reduce((n, t) => n + t.rows.filter(r => r.stages).length, 0);
 function hydrateState(raw) {
   const arts = sanitizeArts(raw && raw.arts);
+  const stages = sanitizeStages(raw && raw.stages);
   const teams = sanitizeTeams(raw && raw.teams);
   /* A team pointing at an ART that isn't in the list is on no train, not on a
      ghost one. It happens for real: an older build drops `arts` while keeping
@@ -4094,7 +4537,25 @@ function hydrateState(raw) {
      the pointer might dangle. */
   const ids = new Set(arts.map(a => a.id));
   teams.forEach(t => { if (t.artId && !ids.has(t.artId)) t.artId = null; });
-  return { teams, arts, settings: normalizeSettings(raw && raw.settings) };
+  /* And the same for a row's day counts. A stage id pointing at a stage that
+     isn't in the list is dropped rather than kept "just in case": it happens for
+     real — an older build hydrates the rows and drops `stages` — and a figure
+     attributed to a stage with no name is a figure nothing on screen can
+     explain. A row left with no counts at all loses the object too, so it goes
+     back to serialising byte-identically to a row that never had one. */
+  const stageIds = new Set(stages.map(st => st.id));
+  teams.forEach(t => t.rows.forEach(r => {
+    if (!r.stages) return;
+    const kept = Object.create(null);
+    let any = false;
+    for (const id of Object.keys(r.stages)) {
+      if (!stageIds.has(id)) continue;
+      kept[id] = r.stages[id];
+      any = true;
+    }
+    r.stages = any ? kept : null;
+  }));
+  return { teams, arts, stages, settings: normalizeSettings(raw && raw.settings) };
 }
 
 /* v1 stored a single team's rows under td-rows with the name in td-settings.
@@ -4217,8 +4678,8 @@ window.tdRaisesKeyboard = raisesKeyboard;
 /* Pure helpers tests.html pins. Grouped because they are one boundary:
    everything here decides what a copy arriving from outside this browser — a
    backup file, a share link — is allowed to turn into. */
-window.TDState = { sanitizeTeams, sanitizeArts, hydrateState, normalizeSettings, isBackup, ID_OK,
-  serializeRows, hydrateRows, SCHEMA };
+window.TDState = { sanitizeTeams, sanitizeArts, sanitizeStages, hydrateState, normalizeSettings,
+  isBackup, ID_OK, PROTO_KEY, serializeRows, hydrateRows, hydrateStageDays, SCHEMA };
 window.tdCounts = (d) => ({
   teams: (d && d.teams) ? d.teams.length : 0,
   items: (d && d.teams) ? d.teams.reduce((n, t) => n + ((t.rows && t.rows.length) || 0), 0) : 0
@@ -4255,19 +4716,23 @@ window.tdAdopt = (data) => {
      does not cover it — that fires on a NEWER copy, and this one is older. */
   const hadCreated = countCreated(state.teams);
   const hadKeys = countKeys(state.teams);
+  const hadStages = countStageDays(state.teams);
   const incoming = hydrateState(data);
   const losingCreated = hadCreated > 0 && countCreated(incoming.teams) === 0;
   const losingKeys = hadKeys > 0 && countKeys(incoming.teams) === 0;
+  const losingStages = hadStages > 0 && countStageDays(incoming.teams) === 0;
 
-  /* ONE prompt covering both fields, not one each. They are lost together in
-     the case this exists for — a build that predates either drops both — and
-     two dialogs in a row for the same event is how somebody learns to dismiss
-     them without reading. */
-  if (losingCreated || losingKeys) {
+  /* ONE prompt covering all three fields, not one each. They are lost together
+     in the case this exists for — a build that predates any of them drops the
+     lot — and three dialogs in a row for the same event is how somebody learns
+     to dismiss them without reading. */
+  if (losingCreated || losingKeys || losingStages) {
     const stale = !(data && data.schema >= SCHEMA);
     const lost = [];
     if (losingCreated) lost.push(hadCreated + ' Created date' + (hadCreated === 1 ? '' : 's'));
     if (losingKeys) lost.push(hadKeys + ' issue key' + (hadKeys === 1 ? '' : 's'));
+    if (losingStages) lost.push('the stage times on ' + hadStages + ' item'
+      + (hadStages === 1 ? '' : 's'));
     const noun = lost.join(' and ');
     const keep = !confirm(
       'The copy you are restoring is missing what this browser has: ' + noun + '.\n\n'
@@ -5126,6 +5591,16 @@ const METRIC_HELP = {
       + 'defect text in Settings as a share of everything completed. Lower is better — but '
       + 'a rate near zero in a maturing team usually means defects are being logged '
       + 'somewhere other than the board, not that there are none.' },
+  stageTime: { title: 'Time in Stage',
+    body: 'Where does the time actually go? Cycle time says an item took eleven days; this '
+      + 'says how many of them it spent waiting to be reviewed. The median is the typical '
+      + 'wait in that stage and the percentile is the one to plan against, exactly as they '
+      + 'are for cycle time — and the share column is of the time MEASURED here, not of '
+      + 'cycle time, because a status export counts days in statuses that sit outside the '
+      + 'started-to-finished span. These days are CALENDAR days as your export counted them: '
+      + 'they are worked out by Jira, so the working-days setting does not reach them. '
+      + 'Stages are ones you set up under Teams & Stages in the header — this app never stores the '
+      + 'status names out of your export, only the days and the stage name you chose.' },
   cycleTime: { title: 'Cycle Time',
     body: 'How long does an item take once work has actually started? The average of the '
       + 'items completed in each period, in days. Steady and falling is the good direction — '
@@ -5393,6 +5868,70 @@ function renderTeamRows() {
    field that clears itself while you are still looking at it is worse than a
    line telling you what is wrong. Routing refuses the id until it is settled,
    and says the same thing there. */
+/* The stage rows. One name box, one box of aliases, and a count of how many
+   items across every team carry time in that stage — which is the only honest
+   answer to "is this stage set up right?", and the number that goes to zero the
+   moment an alias stops matching. */
+function renderStageRows() {
+  const tb = $('stageRows');
+  if (!tb) return;
+  const counts = new Map();
+  state.teams.forEach(t => t.rows.forEach(r => {
+    if (!r.stages) return;
+    Object.keys(r.stages).forEach(id => counts.set(id, (counts.get(id) || 0) + 1));
+  }));
+  tb.innerHTML = '';
+  state.stages.forEach((st, i) => {
+    const n = counts.get(st.id) || 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><input type="text" data-stage="' + escapeHtml(st.id) + '" maxlength="120" value="' +
+        escapeHtml(st.name) + '" aria-label="Name of stage, row ' + (i + 1) + '"></td>' +
+      /* The aliases as one comma-separated box rather than a row of boxes with an
+         add button: it is a short list that is typed once, in one go, off an
+         export somebody already has open. maxlength is the per-alias cap times
+         the alias cap, which is a bound on the whole box rather than on any one
+         entry — sanitizeStages does the real capping, per alias, at both ends. */
+      '<td class="aliases"><input class="aliases" type="text" data-stagematch="' +
+        escapeHtml(st.id) + '" maxlength="' + (STAGE_ALIAS_MAX_LEN * STAGE_ALIAS_MAX) +
+        '" spellcheck="false" autocomplete="off" ' +
+        'placeholder="e.g. Code Review, Ready for Code Review" value="' +
+        escapeHtml(st.match.join(', ')) + '" aria-label="Jira statuses that feed stage in row ' +
+        (i + 1) + ', separated by commas"></td>' +
+      '<td class="count">' + n + (n === 1 ? ' item' : ' items') + '</td>' +
+      '<td>' + rowActs('stage', st.id, st.name, i, state.stages.length, false) + '</td>';
+    tb.appendChild(tr);
+  });
+  if (!state.stages.length) {
+    tb.innerHTML = '<tr><td colspan="4" class="empty-row">' +
+      'No stages yet. Add one, name the statuses that feed it, and paste an export with a ' +
+      'column per status.</td></tr>';
+  }
+  renderStageAliasWarning();
+}
+
+/* Two stages listing the same status. Reported as the alias — the reader's own
+   text — and never as anything read out of an export. */
+function renderStageAliasWarning() {
+  const el = $('stageAliasWarn');
+  if (!el) return;
+  const dupes = duplicateStageAliases(state.stages);
+  el.hidden = !dupes.length;
+  if (!dupes.length) { el.textContent = ''; return; }
+  const named = dupes.map(a => {
+    const norm = normalizeAlias(a);
+    const on = state.stages
+      .filter(st => st.match.some(m => normalizeAlias(m) === norm))
+      .map(st => st.name);
+    return '"' + a + '" (' + on.join(' and ') + ')';
+  });
+  el.textContent = (dupes.length === 1
+      ? 'Two stages are matching the same status: '
+      : 'Some statuses are matched by more than one stage: ')
+    + named.join('; ') + '. Its column goes to whichever stage is higher in the list, '
+    + 'so remove it from the other one — nothing else can decide where those days belong.';
+}
+
 function renderTeamIdWarning() {
   const el = $('teamIdWarn');
   if (!el) return;
@@ -5651,12 +6190,99 @@ function renderDashboard() {
       'share of completed work', 'defectRate');
 
   renderForecast(d);
+  renderStageTime(d);
 
   drawCharts(d);
   /* The panels' hidden state lives in the markup, so re-apply the chosen group
      after every render — and this is what resizes the canvases that were 0×0
      while their panel was hidden. */
   selectChartTab(view.chartTab);
+}
+
+/* ── Time in stage ───────────────────────────────────────────────────────────
+   The one card in the app that draws a table. Everything it shows comes out of
+   derive() — see stageTimesOf — and the ONLY thing decided here is which stage
+   a figure belongs to by name, in the order the reader arranged their stages
+   in. That order is theirs on purpose: a workflow has a direction, and sorting
+   this table by size would throw away the one thing a reader already knows how
+   to scan.
+
+   Three faces, because there are three genuinely different reasons this table
+   can be empty and only one of them is a problem:
+     • no stages set up at all — the feature has not been reached yet;
+     • stages set up, no data — the paste had no matching columns;
+     • data, but the work-type filter has taken every measured item out. */
+function renderStageTime(d) {
+  const card = $('cardStageTime');
+  const table = $('stageTimeTable');
+  const none = $('stageTimeNone');
+  const st = d.stageTimes;
+  /* In the reader's order, and only the stages that actually carry figures: a
+     row of dashes for a stage nothing has passed through is a row that says
+     nothing, and five of them would push the real ones off a phone. */
+  const byId = new Map(st.byStage.map(x => [x.id, x]));
+  const rows = state.stages.filter(s2 => byId.has(s2.id))
+    .map(s2 => ({ name: s2.name, fig: byId.get(s2.id) }));
+
+  const showTable = rows.length > 0;
+  table.hidden = !showTable;
+  $('stageTimeExport').innerHTML = showTable ? exportButtons('stageTimeTable', 'time-in-stage') : '';
+  none.hidden = showTable;
+  card.classList.toggle('no-chart', !showTable);
+  if (!showTable) {
+    table.innerHTML = '';
+    /* Whether this team has ANY stage data is a question about the team, not
+       about what the filter left behind — `st` is read over the filtered items,
+       so asking it would tell somebody who has just filtered to Spikes that
+       their export never carried stage times at all. */
+    const team = activeTeam();
+    const teamHasStages = !!(team && team.rows.some(r => r.stages));
+    none.textContent = !state.stages.length
+      ? 'No workflow stages yet. Open Teams & Stages in the header, add the parts of your workflow you '
+        + 'want to measure — Build, Review, Test — and list the Jira statuses that feed each '
+        + 'one. Then paste a Time in Status export with a column per status.'
+      : teamHasStages
+        ? 'No item under the ' + view.filterDisplay + ' work type filter has stage data. '
+          + 'Pick another type — or All — above.'
+        : 'None of this team\u2019s items carry stage times yet. Paste a Time in Status export '
+          + '— one row per issue, one column per status — and the days land in the stage each '
+          + 'status is matched to.';
+    return;
+  }
+
+  /* Built with createElement rather than innerHTML: a stage name is the
+     reader's own text and escapeHtml would do, but this table is also read
+     straight back off the page by the CSV writer, and building it as nodes is
+     the version where there is no markup to get wrong in the first place. */
+  const head = ['Stage', 'Items', 'Median days', d.cyclePercentile + 'th percentile', 'Share of measured time'];
+  table.innerHTML = '';
+  const thead = document.createElement('thead');
+  const htr = document.createElement('tr');
+  head.forEach((h, i) => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    if (i > 0) th.className = 'num';
+    htr.appendChild(th);
+  });
+  thead.appendChild(htr);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const cells = [r.name, String(r.fig.count), num1(r.fig.median), num1(r.fig.p85), pct1(r.fig.share)];
+    cells.forEach((v, i) => {
+      const td = document.createElement('td');
+      td.textContent = v;
+      /* `figure`, not `num` — that one is the muted monospace the Loaded Data
+         table uses for a date. These are figures to read against each other, so
+         they take the right-aligned tabular-nums treatment every other column
+         of figures in the app has. */
+      if (i > 0) td.className = 'figure';
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
 }
 
 /* ── The Forecast group ──────────────────────────────────────────────────────
@@ -5964,7 +6590,7 @@ function renderAllTeams() {
        fits it: there is no filter to blame and nothing to paste, because the
        train has no teams rather than no data. */
     none.textContent = (scope && !inScope.length)
-      ? 'No team is on ' + artName + ' yet. Open Teams in the header and set a team\u2019s '
+      ? 'No team is on ' + artName + ' yet. Open Teams & Stages in the header and set a team\u2019s '
         + 'ART to put it on this train.'
       : inScope.some(t => t.rows.length)
         ? 'Nothing completed matches the ' + view.filterDisplay + ' work type filter in any team'
@@ -6314,6 +6940,7 @@ function renderAll() {
   renderTeamSelect();
   renderTeamRows();
   renderArtRows();
+  renderStageRows();
   renderFilterSelect();
   renderDataTable();
   renderEmptyState();
@@ -6530,6 +7157,11 @@ $('dataBtn').addEventListener('click', () => openModal($('dataDialog')));
 $('dataCloseBtn').addEventListener('click', () => $('dataDialog').close());
 $('manageBtn').addEventListener('click', () => openModal($('manageDialog')));
 $('manageCloseBtn').addEventListener('click', () => $('manageDialog').close());
+/* The stage boxes deliberately redraw nothing while they are typed in (see the
+   handler above), so the dashboard behind this dialog catches up when it closes
+   — including on a backdrop click or Escape, which is why this hangs off the
+   dialog's own close event rather than off the Done button. */
+$('manageDialog').addEventListener('close', () => renderAll());
 
 /* ── Opening a dialog on a touch screen ─────────────────────────────────────
    `showModal()` runs the spec's dialog focusing steps: focus the `autofocus`
@@ -6811,7 +7443,63 @@ function columnsReadHtml(res) {
     (res.columns.created < 0
       ? '<br>No created date in this paste — lead time needs one. Add a '
         + '<em>Created</em> column and paste again to see it.'
-      : '');
+      : '') +
+    stagesReadHtml(res);
+}
+
+/* What the paste did with the stage columns — and, when it did nothing, why.
+
+   Columns are named BY POSITION, exactly as every other column in this report
+   is. The stage is named by the name the reader gave it, which is their own
+   text. Neither of those is the heading out of the export, and that is
+   deliberate: this report has never echoed a pasted cell, and a heading is a
+   pasted cell. Somebody matching up a column reads the heading off the export
+   they still have open. */
+function stagesReadHtml(res) {
+  const cols = (res.columns && res.columns.stages) || [];
+  const clash = (res.columns && res.columns.stageClash) || [];
+  const nameOf = (id) => {
+    const st = state.stages.find(x => x.id === id);
+    return st ? escapeHtml(st.name) : 'a stage that has since been deleted';
+  };
+  let html = '';
+  if (cols.length) {
+    /* Several columns can feed one stage, so this reads as "these columns → this
+       stage" rather than one line per column: it is the sum that becomes the
+       figure, and a list that hid the summing would be a list that misleads. */
+    const byStage = new Map();
+    cols.forEach(sc => {
+      if (!byStage.has(sc.stageId)) byStage.set(sc.stageId, []);
+      byStage.get(sc.stageId).push(sc.index + 1);
+    });
+    html += '<br>Read ' + [...byStage.entries()].map(([id, list]) =>
+      '<strong>column' + (list.length > 1 ? 's ' : ' ') + list.join(' and ') +
+      '</strong> as days in ' + nameOf(id) +
+      (list.length > 1 ? ' (added together)' : '')).join(', ') +
+      '. Only the day counts are saved — the status names in your headings are not.';
+  } else if (state.stages.length) {
+    html += '<br>No stage columns in this paste: none of the headings match a status you have '
+      + 'listed against a stage. Open <strong>Teams &amp; Stages</strong> in the header and check the '
+      + 'spellings against this export\u2019s own column headings.';
+  }
+  if (clash.length) {
+    html += '<br><strong>Column ' + clash.map(sc => sc.index + 1).join(', ') + '</strong> matches '
+      + 'a status you listed against ' + [...new Set(clash.map(sc => nameOf(sc.stageId)))].join(' and ')
+      + ', but it was read as a date, type or key column instead — those come first. Rename that '
+      + 'stage\u2019s status list so it does not claim a column the dashboard already needs.';
+  }
+  if (res.badStageCells && res.badStageCells.length) {
+    const total = res.badStageCells.reduce((n, c) => n + c.count, 0);
+    html += '<br><strong>' + total + ' cell' + (total === 1 ? ' in ' : 's in ')
+      + 'stage column' + (res.badStageCells.length > 1 ? 's ' : ' ')
+      + res.badStageCells.map(c => c.index + 1).join(', ')
+      + (total === 1 ? ' could not be read as a number of days and was left out.'
+                     : ' could not be read as a number of days and were left out.')
+      + '</strong> This app reads a plain number — '
+      + '<em>3</em> or <em>3.5</em> — so an export written as <em>3d 4h</em> or <em>12:30</em> '
+      + 'needs asking for in days.';
+  }
+  return html;
 }
 
 /* `adopted` is a project id this paste has just written onto the team — see
@@ -6841,7 +7529,7 @@ function showParseNote(res, mode, team, adopted) {
       ? '<br>Every key in this paste starts <strong>' + escapeHtml(adopted) + '</strong>, and this '
         + 'team had no project id — so that is now its project id, and a paste covering several '
         + 'teams will send its ' + escapeHtml(adopted) + ' rows here. Change it under '
-        + '<strong>Teams</strong>.'
+        + '<strong>Teams &amp; Stages</strong>.'
       : '') +
     '</div>';
 }
@@ -6849,7 +7537,7 @@ function showParseNote(res, mode, team, adopted) {
 function doLoad(mode) {
   const team = activeTeam();
   if (!team) return;
-  const res = parsePastedRows($('pasteBox').value, view.dateOrder);
+  const res = parsePastedRows($('pasteBox').value, view.dateOrder, state.stages);
   /* Fill in the team's project id from its own export, when the export answers
      the question unanimously and nobody has answered it already. Typing an id
      per team is the setup step that would otherwise stand between a first paste
@@ -6879,7 +7567,7 @@ function doLoad(mode) {
    is about saying what it decided before anything is written. */
 
 function multiParse() {
-  const res = parsePastedRows($('multiPasteBox').value, view.dateOrder);
+  const res = parsePastedRows($('multiPasteBox').value, view.dateOrder, state.stages);
   return { res, route: routeRowsToTeams(res.rows, state.teams) };
 }
 
@@ -6950,7 +7638,7 @@ function showMultiNote(res, route, mode) {
   } else {
     html += '<div class="note caution" style="margin-top:var(--sp-4)">'
       + '<strong>Nothing in this paste belongs to a team yet.</strong> Every row carries a project '
-      + 'id no team answers to — see below, or set one on a team under <strong>Teams</strong>.'
+      + 'id no team answers to — see below, or set one on a team under <strong>Teams &amp; Stages</strong>.'
       + '</div>';
   }
 
@@ -6970,7 +7658,7 @@ function showMultiNote(res, route, mode) {
       + (n > 1 ? '<div style="margin-top:var(--sp-4)"><button class="btn small" type="button" '
           + 'data-create-team="*">Create all ' + n + ' teams</button></div>' : '')
       + '<div style="margin-top:var(--sp-4)">Or give one of these ids to a team you already have, '
-      + 'under <strong>Teams</strong>. Either way the paste stays in the box — check it again '
+      + 'under <strong>Teams &amp; Stages</strong>. Either way the paste stays in the box — check it again '
       + 'and they will be included.</div>'
       + '</div>';
   }
@@ -6983,7 +7671,7 @@ function showMultiNote(res, route, mode) {
     html += '<div class="note err" style="margin-top:var(--sp-4)">'
       + '<strong>' + n + ' project id' + (n === 1 ? ' is' : 's are') + ' on more than one team.</strong> '
       + 'Nothing can decide which team those rows belong to, so they were not loaded. Change one '
-      + 'of the ids under <strong>Teams</strong> and check again.'
+      + 'of the ids under <strong>Teams &amp; Stages</strong> and check again.'
       + '<ul class="plain">' + route.ambiguous.map(a => '<li><strong>' + escapeHtml(a.projectId) + '</strong> — '
           + a.count + parsePlural(a.count) + ', claimed by '
           + a.names.map(escapeHtml).join(' and ') + '</li>').join('') + '</ul>'
@@ -7115,7 +7803,7 @@ function renderMultiTeamIds() {
   const without = state.teams.filter(t => !cleanProjectId(t.projectId));
   if (!withId.length) {
     el.className = 'note caution';
-    el.innerHTML = '<strong>No team has a project id yet.</strong> Open <strong>Teams</strong> '
+    el.innerHTML = '<strong>No team has a project id yet.</strong> Open <strong>Teams &amp; Stages</strong> '
       + 'and give each one the letters at the front of its issue keys — or paste below and '
       + 'create the teams from what is in it.';
     return;
@@ -7130,7 +7818,7 @@ function renderMultiTeamIds() {
     + (dupes.length
         ? '<div style="margin-top:var(--sp-4)"><strong>' + dupes.map(escapeHtml).join(', ') + '</strong> '
           + (dupes.length === 1 ? 'is on more than one team, so its' : 'are on more than one team, so their')
-          + ' rows go nowhere until that is settled under <strong>Teams</strong>.</div>'
+          + ' rows go nowhere until that is settled under <strong>Teams &amp; Stages</strong>.</div>'
         : '')
     + (without.length
         ? '<div style="margin-top:var(--sp-4)">No project id, so ' + (without.length === 1 ? 'it takes' : 'they take')
@@ -7226,6 +7914,86 @@ $('artRows').addEventListener('click', e => {
   save();
   renderAll();
   window.toast('Deleted ' + art.name);
+});
+
+/* ── Workflow stages ──────────────────────────────────────────────────────── */
+$('btnAddStage').addEventListener('click', () => {
+  const stage = { id: newId(), name: 'Stage ' + (state.stages.length + 1), match: [] };
+  state.stages.push(stage);
+  save();
+  renderAll();
+  /* Same landing as a new team or a new ART: the only thing to do next is name it. */
+  const input = $('stageRows').querySelector('[data-stage="' + stage.id + '"]');
+  if (input) { input.focus(); input.select(); }
+});
+
+$('stageRows').addEventListener('input', e => {
+  const d = e.target.dataset || {};
+  const stage = state.stages.find(st => st.id === (d.stage || d.stagematch));
+  if (!stage) return;
+  if (d.stage) {
+    stage.name = e.target.value.slice(0, 120);   /* sanitizeStages' cap, where it is written */
+    save();
+    /* Nothing is redrawn on a keystroke, unlike the ART box above — and the
+       difference is what is VISIBLE. An ART's name is on the team pickers in
+       this same dialog, so it has to keep up; a stage's name appears only on the
+       dashboard card, which is behind a modal nobody can see past. Redrawing it
+       here would rebuild every Chart.js chart on the page per keystroke to
+       update a heading the typist cannot see. The dialog's close re-renders. */
+    return;
+  }
+  /* The alias list, split on commas and cleaned entry by entry — the same guard
+     sanitizeStages applies on the way in from a backup, so what a keystroke can
+     produce and what a file can produce are the same set. Empty entries are
+     dropped rather than stored, which is what makes typing a trailing comma
+     harmless while the next name is still being thought of. */
+  const seen = new Set(), aliases = [];
+  e.target.value.split(',').forEach(part => {
+    if (aliases.length >= STAGE_ALIAS_MAX) return;
+    const clean = cleanStageAlias(part);
+    const norm = normalizeAlias(clean);
+    if (!clean || seen.has(norm)) return;
+    seen.add(norm);
+    aliases.push(clean);
+  });
+  stage.match = aliases;
+  save();
+  /* The clash warning is the one thing on screen that has to keep up with a
+     keystroke — it is the reason somebody is looking at this row — and it sits
+     outside the table, so redrawing it cannot take the caret with it. */
+  renderStageAliasWarning();
+});
+
+$('stageRows').addEventListener('click', e => {
+  const btn = e.target.closest ? e.target.closest('[data-movestage]') : null;
+  if (btn) { moveInList(state.stages, 'stage', btn.dataset.movestage, Number(btn.dataset.dir)); return; }
+  const id = e.target.dataset && e.target.dataset.delstage;
+  if (!id) return;
+  const i = state.stages.findIndex(st => st.id === id);
+  if (i < 0) return;
+  const stage = state.stages[i];
+  /* Unlike deleting an ART, this DOES take data with it: the day counts stored
+     against this stage have nowhere to live once its name is gone, and
+     hydrateState would prune them on the next load anyway. So they go here, in
+     the open, and the confirm counts them first. Re-pasting the same export
+     brings them back — the export still has the column — which is what makes
+     this a recoverable delete and worth doing plainly. */
+  let items = 0;
+  state.teams.forEach(t => t.rows.forEach(r => { if (r.stages && r.stages[id] != null) items++; }));
+  if (!confirm(items
+      ? 'Delete ' + stage.name + '?\n\nThe time ' + items + ' item'
+        + (items === 1 ? '' : 's') + ' spent in it will be removed with it. No work item is '
+        + 'deleted, and re-pasting an export with that column brings the figures back.'
+      : 'Delete ' + stage.name + '?')) return;
+  state.stages.splice(i, 1);
+  state.teams.forEach(t => t.rows.forEach(r => {
+    if (!r.stages || r.stages[id] == null) return;
+    delete r.stages[id];
+    if (!Object.keys(r.stages).length) r.stages = null;
+  }));
+  save();
+  renderAll();
+  window.toast('Deleted ' + stage.name);
 });
 
 $('btnAddTeam').addEventListener('click', () => {
@@ -7852,6 +8620,26 @@ function buildSharePayload(teamIds, win) {
   const used = new Set(teams.map(t => t.artId).filter(Boolean));
   const arts = state.arts.filter(a => used.has(a.id)).map(a => ({ id: a.id, name: a.name }));
 
+  /* And only the stages the shared rows actually carry time in — the same rule
+     the ARTs above follow, for the same reason: a stage name is the reader's own
+     description of their workflow, and sharing one team's figures should not
+     publish the shape of a workflow that team has nothing to do with. Sending
+     exactly the stages the payload references is also what keeps a link
+     self-consistent: hydrateState prunes a day count whose stage is missing, so
+     a link that carried the counts without the names would arrive showing
+     nothing.
+
+     The ALIASES are deliberately left behind. They are matching rules for a
+     paste box the recipient of a link does not have, and they are the one field
+     in this app whose contents were typed to mirror a work system's own words.
+     A link carries what the figures need and no more. */
+  const usedStages = new Set();
+  teams.forEach(t => t.rows.forEach(r => {
+    if (r.g) Object.keys(r.g).forEach(id => usedStages.add(id));
+  }));
+  const stages = state.stages.filter(st => usedStages.has(st.id))
+    .map(st => ({ id: st.id, name: st.name }));
+
   const payload = {
     v: SHARE_PAYLOAD_V,
     sharedAt: Date.now(),
@@ -7860,6 +8648,7 @@ function buildSharePayload(teamIds, win) {
     settings: state.settings
   };
   if (arts.length) payload.arts = arts;
+  if (stages.length) payload.stages = stages;
   if (cutoff) payload.from = isoOf(cutoff);
   return payload;
 }
@@ -8358,11 +9147,25 @@ const DEMO_TEAMS = [
   { name: 'Team Kingfisher', seed: 20260819, dated: true, art: true, key: 'KFR',
     weeks: 40, perWeek: [4, 7], cycle: [2, 6], tailChance: 0.05, tail: [8, 14],
     wait: [1, 4], wip: [3, 5, 8, 11],
+    /* Where Kingfisher's time goes: mostly into building the thing. That is what
+       a healthy board looks like, and it is the reading Heron's has to be
+       compared against for either to mean anything. The headings are the Jira
+       statuses; DEMO_STAGES matches them to the four stages the demo sets up. */
+    stageCols: [['Development', 0.62], ['Code Review', 0.14], ['Testing', 0.18], ['Deployment', 0.06]],
     types: ['Story', 'Story', 'Story', 'Story', 'Story', 'Story',
             'Task', 'Task', 'Bug', 'Spike'] },
   { name: 'Team Heron', seed: 71104, dated: true, art: true, key: 'HRN',
     weeks: 40, perWeek: [3, 6], cycle: [3, 8], tailChance: 0.18, tail: [22, 48],
     wait: [2, 9], wip: [4, 9, 13, 17, 21, 26, 31, 38, 45],
+    /* Heron's whole story in one row of the table: barely a third of its time is
+       spent building, and more than half of it is spent waiting to be reviewed
+       or waiting to be tested. That is the finding the feature exists to
+       produce, and it is invisible in a cycle time figure — Heron's tail looks
+       like slow work until this says it is mostly queue. Its Review is fed by
+       TWO statuses, so the demo also shows several statuses adding into one
+       stage rather than only the one-to-one case. */
+    stageCols: [['Development', 0.30], ['Ready for Code Review', 0.19], ['Code Review', 0.16],
+                ['Testing', 0.27], ['Deployment', 0.08]],
     /* A twenty-slot bag so the defect share can be tuned finer than tenths — the
        bag's LENGTH doesn't move the seeded sequence, only which type each draw
        lands on, so the dates stay identical however this is retuned. Three in
@@ -8422,15 +9225,53 @@ function demoPaste(profile) {
   /* Wagtail's paste has no Created column at all, rather than a column of blanks:
      a team that has never exported one is the case lead time has to handle, and
      detectColumns() should be seeing the three-column shape it would really get. */
-  const row = (created, started, completed, type) => {
+  /* The day counts for one item, split across this team's stage columns.
+     DETERMINISTIC and NOT drawn from rnd(), for exactly the reason the issue key
+     counter is not: the sequence is seeded and every pinned figure in the demo
+     hangs off it, so a new field that consumed a draw would silently move
+     Heron's tail and Kingfisher's aged count. The split is the profile's fixed
+     shares of the item's own span, with the rounding remainder given to the
+     largest stage so the columns add back up to the span. `span` is the item's
+     cycle in days, or its age for something still in flight.
+
+     They add to roughly the cycle time rather than exceeding it, which is the
+     tidy case. A real export can and does exceed it — it counts days in statuses
+     that sit outside the started-to-finished span — which is why the table
+     reports a share of the time MEASURED and never a share of cycle time. */
+  const stageCells = (span) => {
+    if (!profile.stageCols) return [];
+    /* Worked in TENTHS of a day and written with one decimal place, not in whole
+       days. A real Time in Status export gives fractions, and rounding to whole
+       days here would report that every item on Kingfisher's four-day board
+       spent zero days in review — a table of zeroes, which teaches the reader
+       that the feature is broken rather than where the time goes. It also puts
+       the decimal path through cleanStageDays on every load of the demo.
+
+       Largest-remainder allocation, so the columns add back to the span exactly
+       and the leftover tenth goes to the stage with the best claim on it rather
+       than always to the same one. */
+    const total = Math.round(span * 10);
+    const exact = profile.stageCols.map(([, share]) => share * total);
+    const parts = exact.map(Math.floor);
+    let left = total - parts.reduce((a, b) => a + b, 0);
+    const order = exact.map((v, i) => ({ i, frac: v - Math.floor(v) }))
+      .sort((a, b) => b.frac - a.frac || a.i - b.i);
+    for (let n = 0; n < order.length && left > 0; n++, left--) parts[order[n].i]++;
+    return parts.map(t => (t / 10).toFixed(1));
+  };
+
+  const row = (created, started, completed, type, span) => {
     const cells = profile.dated ? [created, started, completed, type]
                                 : [started, completed, type];
-    return (profile.key ? [key()].concat(cells) : cells).join('\t');
+    return (profile.key ? [key()].concat(cells) : cells)
+      .concat(stageCells(span)).join('\t');
   };
 
   const lines = [((profile.key ? 'Issue key\t' : '')
                   + (profile.dated ? 'Created\tIn Progress\tResolved\tIssue Type'
-                                   : 'In Progress\tResolved\tIssue Type'))];
+                                   : 'In Progress\tResolved\tIssue Type')
+                  + (profile.stageCols
+                      ? '\t' + profile.stageCols.map(([h]) => h).join('\t') : ''))];
 
   for (let w = profile.weeks; w >= 1; w--) {
     const n = between(profile.perWeek[0], profile.perWeek[1]);
@@ -8441,13 +9282,17 @@ function demoPaste(profile) {
         : between(profile.cycle[0], profile.cycle[1]);
       const start = done - cycle;
       lines.push(row(iso(start - between(profile.wait[0], profile.wait[1])),
-                     iso(start), iso(done), pick(profile.types)));
+                     iso(start), iso(done), pick(profile.types), cycle));
     }
   }
   /* Started, never completed — work in progress. It contributes nothing to
      throughput or cycle time and everything to the WIP and aged-work tiles. */
   profile.wip.forEach(age => {
-    lines.push(row(iso(-age - between(1, 5)), iso(-age), '', pick(profile.types)));
+    /* An item still in flight has spent its time somewhere too, and a Time in
+       Status export says so — which is what makes the table's item count larger
+       than the completed count, and what will let a future stage-by-stage age
+       chart read off the same field. */
+    lines.push(row(iso(-age - between(1, 5)), iso(-age), '', pick(profile.types), age));
   });
 
   return lines.join('\n');
@@ -8461,6 +9306,8 @@ function loadSample() {
     + 'no created dates, so you can see what lead time does without them.\n\n'
     + 'Kingfisher and Heron are grouped onto one Agile Release Train and Wagtail is on '
     + 'none, so the All Teams view has something to group.\n\n'
+    + 'Kingfisher and Heron also carry stage times, so the Health tab can show where their '
+    + 'time goes — Heron spends more of it queueing than building. Wagtail carries none.\n\n'
     + 'It is added alongside anything you already have, and you can delete it later.')) return;
 
   /* A first run auto-creates an empty "My team" (hydrateState), so loading the
@@ -8482,9 +9329,28 @@ function loadSample() {
   const demoArt = { id: newId(), name: 'Estuary ART' };
   state.arts.push(demoArt);
 
+  /* The four stages the demo's two keyed teams export columns for. Set up
+     BEFORE the pastes are parsed, because a stage column is only ever found by
+     an alias that already exists — which is the whole safety property, and the
+     demo has to come through the same door as a real paste.
+
+     Review carries TWO aliases. Heron's export has a "Ready for Code Review"
+     column as well as a "Code Review" one, and the two adding into one stage is
+     the case that makes aliases worth having; Kingfisher's export has only the
+     one, and the same stage reads it happily. Deployment is deliberately a
+     stage almost nothing sits in — a table where every row is a big number
+     teaches nobody where to look. */
+  const demoStages = [
+    { id: newId(), name: 'Build',  match: ['Development'] },
+    { id: newId(), name: 'Review', match: ['Ready for Code Review', 'Code Review'] },
+    { id: newId(), name: 'Test',   match: ['Testing'] },
+    { id: newId(), name: 'Deploy', match: ['Deployment'] }
+  ];
+  demoStages.forEach(st => state.stages.push(st));
+
   let landOn = null;
   DEMO_TEAMS.forEach(profile => {
-    const parsed = parsePastedRows(demoPaste(profile), 'auto');
+    const parsed = parsePastedRows(demoPaste(profile), 'auto', state.stages);
     /* The demo's teams carry the project ids their own keys are built from, so
        "Paste several teams" is reachable from Load sample data rather than only
        after somebody types three ids in. Wagtail has no keys and so no id —
