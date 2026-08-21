@@ -830,7 +830,9 @@ worth knowing:
   but nothing finished yet is plotted with a true zero, so the started tally, net flow and the
   work-in-progress tile all see it — and "as of" on the tiles means the date it says.
 - **Cycle time** is `completed − started`, floored at 0, with same-day items taking the
-  configured value. **Lead time** is `completed − created` by exactly the same rules — the
+  configured value — **half a day out of the box**, so an item opened and closed inside one day
+  stays distinguishable from one that genuinely took a full day. Change it in Settings; a browser
+  that already has a value keeps it. **Lead time** is `completed − created` by exactly the same rules — the
   whole wait, including the time an item sat in the backlog before anyone picked it up. Lead
   time is therefore always the longer of the two, and the gap between them is queue.
 - **Days are calendar days unless you turn working days on.** Flow metrics measure the wait the

@@ -2326,7 +2326,15 @@ async function run(TD, win) {
      what every new browser measures. SAMPLE_SETTINGS above is deliberately
      independent of these, so none of the derive() expectations move with them. */
   const def = S.normalizeSettings(null);
-  is(def.sameDayValue, 1, 'a same-day item counts as a whole day out of the box');
+  /* Half a day out of the box since 2026-08-21, reversing an earlier default of
+     1. A whole day made an item opened and closed inside one day identical to
+     one that genuinely took a full day, so the two could not be told apart in
+     any percentile or average. It reaches only a first run and Reset settings —
+     a browser with a saved copy keeps what it has, which is what makes moving a
+     default safe, and the next assertion is the one that guarantees it. */
+  is(def.sameDayValue, 0.5, 'a same-day item counts as half a day out of the box');
+  is(S.normalizeSettings({ sameDayValue: 1 }).sameDayValue, 1,
+     'and a browser that already had a whole day keeps it — a default fills gaps, never overwrites');
   is(def.unplannedType, 'Bug', 'defects are Jira Bugs out of the box');
   is(def.unplannedLabel, 'Defect', 'and are called a Defect on charts — singular, it reads as a rate');
   is(def.agedDays, 14, 'work ages after two weeks out of the box');
@@ -3696,15 +3704,23 @@ group('ARTs — the grouping, and the boundary it crosses');
     { filterValue: '', months: 'all', bucket: 'week' }).cycleScatter;
   is(scOf().points.length, 2,
      'an item finished with no start date has no cycle time, so it gets no dot rather than one at zero');
-  is(scOf().points.map(p => p.y).sort((a, b) => a - b), [1, 10],
-     'a same-day item takes the same-day value, and the rest their real span');
-  is(scOf({ sameDayValue: 0.5 }).points.map(p => p.y).sort((a, b) => a - b), [0.5, 10],
+  is(scOf().points.map(p => p.y).sort((a, b) => a - b), [0.5, 10],
+     'a same-day item takes the same-day value — half a day out of the box — and the rest '
+     + 'their real span');
+  /* Deliberately 2 rather than 0.5. This pair exists to show the SETTING moving
+     the dot, and it stopped showing anything the day the default became 0.5 and
+     the two calls started asserting the same number. A contrast test has to
+     contrast with something the default is not. */
+  is(scOf({ sameDayValue: 2 }).points.map(p => p.y).sort((a, b) => a - b), [2, 10],
      'so changing that setting moves the dot');
   /* 1 to 11 May 2015 is Friday to Monday: the weekdays after the Friday up to and
      including the Monday are 4–8 May and 11 May, which is 6 rather than the 10
-     calendar days above. */
-  is(scOf({ workingDays: true }).points.map(p => p.y).sort((a, b) => a - b), [1, 6],
-     'and working days shortens the span exactly as it does on the tile');
+     calendar days above. The same-day value is pinned here rather than left to
+     the default, because this test is about the SPAN — one that moves when an
+     unrelated default is changed is a test with a hidden dependency, which is
+     exactly how this one announced itself. */
+  is(scOf({ workingDays: true, sameDayValue: 1 }).points.map(p => p.y).sort((a, b) => a - b),
+     [1, 6], 'and working days shortens the span exactly as it does on the tile');
 
   /* Nothing with a start date at all: the card says so rather than drawing an
      empty grid, and the app still plots everything else. */

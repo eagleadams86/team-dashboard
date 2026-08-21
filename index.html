@@ -4688,10 +4688,24 @@ window.TD = {
    defaults" — a browser with saved settings keeps whatever it has, because
    normalizeSettings fills in gaps rather than overwriting. */
 const DEFAULT_SETTINGS = {
-  /* A whole day, not half. An item opened and closed inside one day still
-     occupied someone for that day, and half-days made the cycle time chart
-     dip below anything the team recognised. */
-  sameDayValue: 1,
+  /* HALF A DAY, and this reverses what this file used to say. The old default
+     was 1, on the reasoning that "an item opened and closed inside one day still
+     occupied someone for that day, and half-days made the cycle time chart dip
+     below anything the team recognised". Changed at Charles's request
+     2026-08-21.
+
+     The argument against it is that a whole day is the same figure as an item
+     that took a full day start to finish, so the two become indistinguishable
+     in every percentile and every average — and on a team that closes a lot of
+     small work, that quietly pulls the cycle time distribution UP rather than
+     down. Half a day says "inside one day" as a number, which is the honest
+     reading of a span the dates cannot resolve any further.
+
+     It reaches ONLY a first run and "Reset settings to defaults": every browser
+     with a saved copy keeps whatever it has, because normalizeSettings fills
+     gaps rather than overwriting. So no existing dashboard's figures move under
+     it, which is the property that makes changing a default safe here at all. */
+  sameDayValue: 0.5,
   unplannedType: 'Bug',
   /* Singular: it is read as "Defect rate" and "Defect Percentage Rate", where
      a plural would give "Defects rate". */
