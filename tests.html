@@ -4031,6 +4031,61 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(RK({ tagName: 'DIALOG' }), false, 'nor the dialog itself, once focus lands there');
   is(RK(null), false, 'nothing focused is not a keyboard');
 
+  group('Select-on-focus versus a number field’s spin arrows');
+
+  /* Clicking a box selects what is in it, which takes cancelling the mouseup —
+     that is what would otherwise place the caret and collapse the selection.
+     Chrome’s number spinner ALSO ends its press on the mouseup’s default
+     action: it repeats while an arrow is held down and stops when the release is
+     allowed through. Cancelling it there left ONE click on the ageing
+     threshold’s down arrow running the value all the way to its minimum.
+
+     Press, focus and release are all dispatched by hand, for two reasons: a
+     synthetic press never reaches the browser’s own spin button, and focus()
+     inside a frame nobody is looking at sets activeElement without firing
+     focusin until the frame is focused. So what a real click looks like is not
+     observable from here — but the DECISION the guard makes is, and the
+     decision is the part that was wrong. The value moving between the press and
+     the release means a spin, and a spin has no caret to protect. Same block in
+     Sprint Predictability, Money Map, Golf Handicap and PAPTrack. */
+  const focusIn = (box) => box.dispatchEvent(new win.FocusEvent('focusin', { bubbles: true }));
+  const pressOn = (el)  => el.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles: true }));
+
+  const spinProbe = (setUp) => {
+    const box = win.document.createElement('input');
+    box.type = 'number'; box.value = '14'; box.min = '1';
+    win.document.body.appendChild(box);
+    try {
+      setUp(box);
+      const up = new win.MouseEvent('mouseup', { bubbles: true, cancelable: true });
+      box.dispatchEvent(up);
+      return up.defaultPrevented;
+    } finally {
+      /* Releases the pointer flag as a real release would; without it the next
+         probe would inherit a press that never ended. */
+      box.dispatchEvent(new win.PointerEvent('pointerup', { bubbles: true }));
+      box.remove();
+    }
+  };
+
+  ok(spinProbe((box) => { pressOn(box); focusIn(box); }),
+     'a plain click keeps the select-all — the caret placement is cancelled');
+
+  is(spinProbe((box) => { pressOn(box); focusIn(box); box.value = '13'; }), false,
+     'a spin press is let through, so the browser stops repeating on the release');
+
+  ok(spinProbe((box) => {
+    /* A click on the LABEL rather than the box: no press of its own to compare
+       against, so the value as it stands at focus stands in and that path is
+       left exactly as it was. */
+    const lab = win.document.createElement('label');
+    win.document.body.appendChild(lab);
+    pressOn(lab); focusIn(box); lab.remove();
+  }), 'a click on the label still selects, exactly as before');
+
+  is(spinProbe((box) => { focusIn(box); }), false,
+     'and a focus with no press behind it guards nothing — a Tab has no caret to place');
+
   /* ────────────────────────────────────────────────────────── */
   const sum = document.getElementById('summary');
   sum.className = failed ? 'bad' : 'ok';
