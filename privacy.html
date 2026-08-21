@@ -46,7 +46,8 @@
   data exists, where it goes, and who can see it.</p>
 
   <h2>What Flow Metrics Stores</h2>
-  <p>The only data the app holds is what you paste or type in: team names, and for each team a
+  <p>The only data the app holds is what you paste or type in: team names, an optional
+  <em>project id</em> for each team, and for each team a
   list of work items — a completed date, an optional start date, an optional created date, an
   optional work type and an optional issue key — plus the shared settings (labels, the text that
   marks unplanned work, the thresholds, whether days are counted Monday to Friday, the work-type
@@ -59,6 +60,13 @@
   nothing else — rather than trimmed to fit, so a cell that is anything other than a key is
   discarded whole. That check runs at the paste and again whenever a saved copy is read back.
   Before August 20, 2026 the app stored no key at all; a copy saved before then simply has none.</p>
+
+  <p><strong>The project id is the letters at the front of those keys</strong> — DAE, for
+  DAE-1552 — held against the team it belongs to so that one export covering several teams can
+  be pasted in one go and split between them. It is checked against the same shape as the front
+  of a key: up to ten letters or digits, starting with a letter, and nothing else. It is a
+  label used to route a paste; it changes no figure, and it is never sent in a share link,
+  because someone reading a link has nothing to paste.</p>
 
   <p>Note what is <em>not</em> stored: no ticket titles or summaries, no descriptions, no
   statuses, no names of people, and no free-text or comment fields anywhere. Apart from the

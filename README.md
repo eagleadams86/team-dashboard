@@ -279,7 +279,11 @@ Each team keeps its own list of work items; the picker in the header chooses whi
 dashboard is showing. Teams can be [grouped into ARTs](#grouping-teams-into-arts), in which case
 the picker groups them the same way. Add, rename, reorder and delete teams from the **Teams**
 button beside that picker — a name is edited in place, **↑** and **↓** move a team up or down,
-and **×** deletes it. The order matters: it is the order teams appear in that picker and down
+and **×** deletes it. Each row also holds a **project id** — the letters at the front of that
+team's issue keys, `DAE` for `DAE-1552` — which is what lets [one export covering several
+teams](#pasting-several-teams-at-once) be pasted in one go and split between them. It is
+optional, it changes no figure, and a team without one simply takes nothing from a split. The
+order matters: it is the order teams appear in that picker and down
 the All Teams table. That window also holds your [Agile Release Trains](#grouping-teams-into-arts), and is
 laid out to match the sibling app's **Teams, ARTs & PIs** — same width, a section per thing you
 manage, each with its own *+ Add* button at the right-hand end of its heading. Settings are
@@ -311,9 +315,14 @@ that has a tail.
 
 | Team | What it's there to show |
 |---|---|
-| **Kingfisher** | The healthy board. Carries issue keys (`KFR-…`), as Heron does (`HRN-…`), so the charts have something to name their dots with. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. The baseline the other two read against. |
+| **Kingfisher** | The healthy board. Carries issue keys (`KFR-…`), as Heron does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. The baseline the other two read against. |
 | **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Kingfisher's. |
 | **Wagtail** | A newer team: four months of history, **no created dates and no issue keys at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
+
+Kingfisher and Heron also arrive with the **project ids their own keys are built from** (`KFR`
+and `HRN`), so [pasting several teams at once](#pasting-several-teams-at-once) works straight
+off the demo rather than only after three ids are typed in — and Wagtail, with no keys, is the
+team the split's *takes nothing* line is about.
 
 The demo also puts **Kingfisher and Heron on one train (Estuary ART) and leaves Wagtail on
 none** — the smallest arrangement where every part of [ARTs](#grouping-teams-into-arts) does
@@ -368,8 +377,10 @@ can't reach is a feature nobody you share this with will find.
 ## Getting Your Data In
 
 The **Your Data** tab takes a paste from Jira, a CSV or any other export and loads it into the
-team currently selected in the header. Paste the export as it comes — a Jira export looks like this
-and works unchanged:
+team currently selected in the header. One export covering *several* teams goes in through
+[**Paste several teams…**](#pasting-several-teams-at-once) instead, which splits it by the
+project id at the front of each issue key. Paste the export as it comes — a Jira export looks
+like this and works unchanged:
 
 ```
 Key        Created     In Progress   Resolved    Issue Type
@@ -489,6 +500,52 @@ the app says so rather than calling it a few odd rows.
 
 There's no inline row editing — to fix something, correct it at the source and paste again.
 
+## Pasting Several Teams at Once
+
+A real Jira export is usually a whole train, not one board. Splitting it by hand — filter, copy,
+switch team, paste, repeat — is the chore that stops a dashboard being kept current, so
+**Paste several teams…** on the Your Data tab takes the whole export in one go and routes each
+row to the team it belongs to.
+
+**The routing is the project id at the front of each issue key.** Each team is one Jira project,
+so `DAE-1552` belongs to whichever team is set to `DAE`. You set that id once per team, in the
+**Teams** window — or let the app fill it in for you: when a team with no id yet is given a
+single-team paste whose keys are *unanimously* one project, that project becomes its id and the
+paste report says so. Unanimity is the bar, not a majority: a paste that is 90% one project is a
+question, not a fact.
+
+The whole export is parsed **once**, as one export, so every team is read with the same column
+map and the same date convention — detecting the columns per team would let one file be read two
+different ways.
+
+Three buttons, and the first of them writes nothing:
+
+- **Check this paste** shows the plan — which teams the export splits into, how many items each
+  would take, and how many each holds now. Nothing is loaded.
+- **Split into teams** replaces the items in each team the paste names. A team the paste does
+  *not* name is left exactly as it is. Where that would overwrite existing items it asks first,
+  naming each team and what it stands to lose.
+- **Append to each team** adds to what is already there instead.
+
+**Anything the app cannot place is named, never guessed at** — a row in the wrong team's
+throughput is a wrong number nobody can see, while a homeless row is a message on screen. There
+are three ways a row can fail to land, and they have three different fixes:
+
+| What the report says | What it means | The fix |
+|---|---|---|
+| *N project ids no team claims* | Rows for a project nothing answers to | One press creates a team for it, named after the id and with the id already set — or give the id to a team you already have |
+| *N project ids are on more than one team* | Two teams share an id, so nothing can decide | Change one of them in **Teams** |
+| *N items had no readable issue key* | Nothing to route by | Add a `Key` column to the export |
+
+When something is still unplaced, the paste **stays in the box** — create the team, press
+**Check this paste** again, and those rows are included. A paste with no key column at all is
+refused with that reason rather than reported as a split into nothing.
+
+The project id is a **label and an address, never a level of maths** — the same rule ARTs and
+issue keys follow. Nothing counts, groups, filters or sorts by it. It also never travels in a
+share link: someone reading a link has no paste box, and every key in the payload carries its
+project at the front anyway.
+
 ## Settings
 
 Everything the charts depend on, shared by all your teams:
@@ -573,11 +630,13 @@ re-entered:
 
 Rows gained an optional created date (`k` on the wire, backup `version: 3`, `schema: 3` in the
 saved state; the working-days setting later took both markers to `4`, ARTs to `5`,
-and the issue key to `6`). A row without one is left exactly as it was — no `k` key is written —
+the issue key to `6` and the per-team project id to `7`). A row without one is left exactly as it was — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before. **The issue key
 (`i` on the wire) follows exactly the same rule**: absent unless there is one, so a team whose
 export has no key column saves byte-identically to before that field existed, and the first save
-after upgrading doesn't rewrite the whole stored document.
+after upgrading doesn't rewrite the whole stored document. **The project id follows it too** — a team
+without one writes no `projectId` key at all, so a browser that never splits a paste stores
+exactly what it stored before the feature existed.
 
 **Created dates and issue keys are never dropped silently.** A backup saved by a build older
 than the one that added a field simply has none of it in the file. It restores without
