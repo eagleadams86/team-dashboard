@@ -21,7 +21,7 @@ measures that move together are read together:
 |---|---|---|
 | **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); **every finished item, as a dot**; lead time |
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started) |
-| **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **work item age**; defect rate — defects resolved and defects raised |
+| **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **work item age**; defect rate — defects resolved and defects raised; **[time in stage](#where-the-time-goes-time-in-stage)**, where the wait actually goes |
 | **Forecast** — what that implies | When will this batch be done, and how much by a date? | Two distributions from ten thousand simulated runs, one per question |
 
 The first three describe what already happened. **Forecast** is the only one that looks
@@ -29,7 +29,9 @@ forward, and it is the reason for collecting any of the rest — see
 [Forecasting](#forecasting-what-the-pace-youve-had-implies) below.
 
 Charts sit two to a row at any window wide enough for the pair. Every group holds an even number
-of them today, so none is left over — but a group with an odd count leaves its last chart alone
+of them today, so none is left over — the one card that isn't a chart, **time in stage**, spans
+both columns instead, because a five-column table in half a row scrolls sideways on an ordinary
+laptop. A group with an odd count of real charts leaves its last one alone
 on its row, keeping a single column's width and sitting **centred** rather than stretching the
 full width. A chart drawn twice as wide as the ones above it reads as the more important one,
 which it isn't, and its bars stop being comparable with theirs at a glance. On a narrow window
@@ -284,9 +286,11 @@ team's issue keys, `DAE` for `DAE-1552` — which is what lets [one export cover
 teams](#pasting-several-teams-at-once) be pasted in one go and split between them. It is
 optional, it changes no figure, and a team without one simply takes nothing from a split. The
 order matters: it is the order teams appear in that picker and down
-the All Teams table. That window also holds your [Agile Release Trains](#grouping-teams-into-arts), and is
+the All Teams table. That window also holds your [Agile Release Trains](#grouping-teams-into-arts)
+and your [workflow stages](#where-the-time-goes-time-in-stage), and is
 laid out to match the sibling app's **Teams, ARTs & PIs** — same width, a section per thing you
-manage, each with its own *+ Add* button at the right-hand end of its heading. Settings are
+manage, each with its own *+ Add* button at the right-hand end of its heading. The third section
+differs between the two apps, and that is the point: they share a shape, not a list of sections. Settings are
 shared by every team — one place to say what a "defect" is.
 
 The picker only appears once there are **two or more** teams: with one team it is not a
@@ -315,14 +319,21 @@ that has a tail.
 
 | Team | What it's there to show |
 |---|---|
-| **Kingfisher** | The healthy board. Carries issue keys (`KFR-…`), as Heron does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. The baseline the other two read against. |
-| **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Kingfisher's. |
-| **Wagtail** | A newer team: four months of history, **no created dates and no issue keys at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
+| **Kingfisher** | The healthy board. Carries issue keys (`KFR-…`), as Heron does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. The baseline the other two read against. |
+| **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Kingfisher's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. |
+| **Wagtail** | A newer team: four months of history, **no created dates, no issue keys and no stage times at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
 
 Kingfisher and Heron also arrive with the **project ids their own keys are built from** (`KFR`
 and `HRN`), so [pasting several teams at once](#pasting-several-teams-at-once) works straight
 off the demo rather than only after three ids are typed in — and Wagtail, with no keys, is the
 team the split's *takes nothing* line is about.
+
+The demo also arrives with **four workflow stages set up** — Build, Review, Test and Deploy —
+because a stage column is only ever read when a stage already lists that status, so the demo has
+to set them up before it pastes, exactly as you would. Kingfisher and Heron carry the columns and
+Wagtail carries none, so both faces of the [Time in stage](#where-the-time-goes-time-in-stage)
+card are reachable. Deploy is deliberately a stage almost nothing sits in: a table where every
+row is a big number teaches nobody where to look.
 
 The demo also puts **Kingfisher and Heron on one train (Estuary ART) and leaves Wagtail on
 none** — the smallest arrangement where every part of [ARTs](#grouping-teams-into-arts) does
@@ -391,6 +402,10 @@ DAE-1491   7/28/2026   8/5/2026                  Story
 
 The **Created** column is optional and unlocks lead time. Without it everything else works
 exactly as before, and that chart says so on its face rather than disappearing.
+
+Extra columns holding a **number of days per Jira status** are read too, once you have set up
+the [workflow stages](#where-the-time-goes-time-in-stage) that name those statuses — a column
+whose heading matches nothing you've set up is simply ignored, and always was.
 
 **The columns are worked out from the data, not assumed by position.** Header names win when
 they're there (`Resolved`/`Completed`, `In Progress`/`Start`, `Created`, `Issue Type`);
@@ -579,10 +594,12 @@ Nothing else is here on purpose: a setting that changes nothing is worse than a 
 
 **Blocked time** — how long an item couldn't move because something was in its way. A plain
 Jira export doesn't carry it: "Flagged" is a state, not a duration, and reconstructing the
-duration needs the issue's status history. To add it you'd need a **Time in Status** export —
-one row per issue per status with entry and exit timestamps, or per-status day totals — plus a
-mapping of which statuses count as blocked. That's a second paste surface and a status-category
-setting, so it's deliberately out of scope rather than half-built.
+duration needs the issue's status history. Half of what that needed
+[now exists](#where-the-time-goes-time-in-stage): a Time in Status export is read, and its days
+land against stages you named. What's still missing is a way to say **which of your stages is
+blocked time** rather than working time — which is a decision about meaning, not a parse, and
+it hasn't been built. Set up a stage for your blocked statuses and the table will at least show
+you how much of the wait they account for.
 
 **Flow efficiency** — what share of an item's total wait was actually spent working. This app
 carried an approximation of it for a while: `cycle time ÷ lead time`, i.e. the share of the
@@ -590,10 +607,12 @@ raised-to-delivered span that the item was in progress. It was removed, because 
 measures the queue *before* work starts. On a team that picks work up the day it's raised — as
 the team this was built for does, its start date set by automation on the Ready → In Progress
 transition — the figure pins at ~95% and never moves, while the waiting that actually matters
-happens *inside* the in-progress span: in review, blocked, waiting on an environment. Measuring
-that needs the same **Time in Status** export as blocked time, plus a mapping of which statuses
-count as working. Until then the 85th percentile and aged work are the honest way to see the
-same problem. Half a metric that always reads 95% is worse than no metric at all.
+happens *inside* the in-progress span: in review, blocked, waiting on an environment.
+[Time in stage](#where-the-time-goes-time-in-stage) now shows that waiting directly — it is
+exactly what Heron's row in the demo is for — but turning it back into a single efficiency
+percentage needs each stage marked as **working or waiting**, and that flag doesn't exist. The
+table is arguably the better answer anyway: it says *where* the wait is, where a percentage only
+says how much. Half a metric that always reads 95% is worse than no metric at all.
 
 **Value delivered** and **story readiness** need data that doesn't exist in a flow export at
 all — business outcomes, and how often a story was rewritten after being picked up. Neither is
@@ -630,7 +649,7 @@ re-entered:
 
 Rows gained an optional created date (`k` on the wire, backup `version: 3`, `schema: 3` in the
 saved state; the working-days setting later took both markers to `4`, ARTs to `5`,
-the issue key to `6` and the per-team project id to `7`). A row without one is left exactly as it was — no `k` key is written —
+the issue key to `6`, the per-team project id to `7` and workflow stages to `8`). A row without one is left exactly as it was — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before. **The issue key
 (`i` on the wire) follows exactly the same rule**: absent unless there is one, so a team whose
 export has no key column saves byte-identically to before that field existed, and the first save
@@ -638,12 +657,18 @@ after upgrading doesn't rewrite the whole stored document. **The project id foll
 without one writes no `projectId` key at all, so a browser that never splits a paste stores
 exactly what it stored before the feature existed.
 
-**Created dates and issue keys are never dropped silently.** A backup saved by a build older
+**Stage times follow the same rule**: no `g` key on a row until there are day counts to put
+in it, and no `stages` list on the document until you set one up, so a browser that never uses
+the feature saves exactly what it saved before it existed.
+
+**Created dates, issue keys and stage times are never dropped silently.** A backup saved by a build older
 than the one that added a field simply has none of it in the file. It restores without
 complaint, and the column is gone — and since [sync was
 removed](#cross-device-sync-was-removed-2026-08-20) there is no second copy anywhere to get it
-back from. So a restore that would lose them **asks first**, in one prompt covering both
+back from. So a restore that would lose them **asks first**, in one prompt covering all three
 fields, and Cancel means nothing is restored at all rather than "restored, minus a column".
+ARTs and project ids are deliberately *not* in that prompt: a train's name and a project id are
+one word re-typed in a dialog, where a column of day counts pasted per item is not.
 The boot version check doesn't cover this: that fires on a copy from a *newer* build, and this
 one is older.
 
@@ -783,6 +808,79 @@ be a lie about when something finished.
 An item that finished with **no start date** has no cycle time, so it gets no dot rather than one
 at zero. If nothing in the window has a start date the card says so instead of drawing an empty
 grid.
+
+## Where the Time Goes: Time in Stage
+
+Cycle time says an item took eleven days. It cannot say that seven of them were spent waiting
+for someone to review it. **Time in stage** does, and it is the one card on the dashboard that
+is a table rather than a chart — five stages is five numbers, and a bar chart of five numbers
+says less than the numbers do.
+
+### You Name the Stages. Your Export's Status Names Are Never Stored
+
+This is the part worth reading even if you skip the rest.
+
+A **stage** is a part of your workflow you want to measure the wait in — *Build*, *Review*,
+*Test*. You create and name them under **Teams** in the header, and against each one you type
+the **Jira statuses that feed it**, separated by commas. Several statuses can feed one stage:
+a workflow with both *Ready for Code Review* and *Code Review* is one Review stage as far as
+the flow is concerned, and their days are added together.
+
+Then you paste a **Time in Status** export — one row per issue, one column per status, each
+cell a number of days — and the days land in the stage each status is matched to.
+
+**The status names in your export's headings are matched while the paste is being read, and
+then thrown away with the rest of it.** What is saved is the stage name *you* chose and a
+number. Every other field this app stores is guarded by asking whether a regex can tell it
+from a sentence — a key can, a project id can. **A status cannot**: "Fix the login bug on
+prod" is twenty-five characters of letters and spaces, which is every shape a status label
+has. So the safety here is not a guard on the value; it is that the value is never stored.
+
+That is also why **there is no button that picks the status names up out of your export**, even
+though the app has just read them and it would save you the typing. One click that copies
+work-system text into permanent storage is the thing this design exists to avoid.
+
+Matching ignores capitals and punctuation — `In-Progress` and `In Progress` are the same
+status — but it is **exact, never a partial match**. An alias of `Testing` will not quietly
+swallow a *Waiting on Testing Env* column and add somebody's environment queue to your test
+time. If two stages list the same status, the app says so as you type rather than picking one.
+
+### Reading the Table
+
+| Column | What it says |
+|---|---|
+| **Items** | How many items have a figure for *that* stage — not how many have stage data at all. |
+| **Median days** | The typical wait in that stage. |
+| **85th percentile** | The one to plan against, exactly as it is for cycle time — and a real duration some item actually took, never an interpolation. |
+| **Share of measured time** | That stage's days as a share of **all** the stage time measured. |
+
+**The share is of measured time, not of cycle time**, and the difference matters. A status
+export counts calendar days in every status you asked about, including ones that sit outside
+the started-to-finished span this app calls cycle time — so a share of cycle time could come
+out above 100% on perfectly ordinary data. A share of what was measured is self-consistent
+whatever your export covers.
+
+**These are calendar days whatever the working-days setting says**, and the card title says so
+in its own words. That setting governs the three durations the app works out itself, from dates
+it holds. These are worked out by Jira, from a status history the app never sees, and there is
+no honest way to re-measure a single total Monday to Friday.
+
+Stages appear **in the order you arranged them in**, not biggest first: a workflow has a
+direction, and that order is the one thing you already know how to scan. Only stages that
+actually carry figures get a row. The table copies and downloads like [every other table of
+figures](#taking-a-table-off-the-page).
+
+### What the Parse Report Tells You
+
+After a paste it names which columns were read as which stage — **by position and by your stage
+name**, never by the heading out of your export, because this report has never echoed a pasted
+cell and a heading is a pasted cell. If nothing matched, it says so and points you at the Teams
+window. If a stage's alias named a column the dashboard already needs — aliasing `Created`, say
+— the date wins and the report tells you which stage lost, rather than leaving you with a stage
+that silently reports nothing.
+
+Cells it cannot read as a plain number of days are counted per column and left out. The app
+reads `3` and `3.5`; an export written as `3d 4h` or `12:30` needs asking for in days.
 
 ## Work Item Age: What to Do This Morning
 
@@ -957,7 +1055,8 @@ are not, that shows up as a wide spread rather than as a wrong answer quietly gi
 
 ## Taking a Table off the Page
 
-Both tables of figures — **All Teams** and the **Loaded Data** list on Your Data — carry
+All three tables of figures — **All Teams**, the **Loaded Data** list on Your Data, and
+**[Time in stage](#where-the-time-goes-time-in-stage)** on the Health tab — carry
 **Copy** and **⬇ CSV** in their heading.
 
 | Button | What it does |
@@ -1110,6 +1209,14 @@ no summaries, no statuses, no names — and a key in a link has passed the same 
 key in storage, so a link cannot carry anything in that field the app would not have saved. The
 dialog says so above the link. A recipient still on an older cached build simply sees dots named
 by work type, as they were before keys existed.
+
+**Stage times travel too, and so do the stage names they belong to** — they are what the figures
+*are*, and a link carrying counts without names would arrive showing nothing. Only the stages
+the shared items actually spent time in go, on the same reasoning that sends only the trains
+those teams are on: a stage name describes your workflow, and sharing one team should not
+publish the shape of a workflow that team has nothing to do with. **The list of Jira statuses
+you typed does not travel at all** — it is a matching rule for a paste box the recipient does
+not have, and it is the one field in the app typed to mirror a work system's own words.
 
 This dialog carries more than any other, so on a screen 760px or wider it opens **820px wide
 with its two choices side by side**, matched in height, rather than stacked. That is the point of the extra width —
@@ -1295,6 +1402,18 @@ coerced to strings), `normalizeSettings()`
 same-day value being coerced rather than trusted), `hasData()`, the predicate the
 "empty never beats data" rule rests on, and `isBackup()`, the guard that stops the wrong JSON
 file being restored over real data.
+
+**Workflow stages get the longest guard group in the suite**, because they are the one field
+whose source is a Jira status and the safety does not come from a check on the value. Both
+halves are pinned: the *guards* (a day count is a plain number — `3d 4h`, `12:30`, a negative
+and a six-digit value all refused; an alias is capped and dropped whole past it; a hostile or
+dangling stage id never reaches a stored day count, and the day-count object has no prototype
+for a `__proto__` key to reach) and the *route* (matching is exact rather than substring, the
+stage *name* is not an alias, two columns feeding one stage are added, two stages claiming one
+status is reported rather than resolved, and a status nobody has listed is simply not read —
+so a paste can never add the rule that reads it). The claim underneath the whole design is
+asserted directly: the parsed rows are stringified and checked to contain **no status name at
+all**, on hand-written fixtures and again on the demo's own data.
 
 Two promises get pinned end to end rather than function by function:
 `buildSharePayload()` — a share link holds **only the chosen teams** plus the shared settings,

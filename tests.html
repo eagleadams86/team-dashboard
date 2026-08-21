@@ -675,6 +675,228 @@ async function run(TD, win) {
      'and by its work type when the paste had no key — exactly as before the field existed');
   is(TD.dotName({ key: '', type: '' }), TD.AGE_UNTYPED, 'with the same last resort as before');
 
+  /* ══════════════════════════════════════════════════════════
+     WORKFLOW STAGES
+
+     The one field in this app whose source is a Jira STATUS, and the reason
+     these tests are the longest guard group in the suite: a status has no shape
+     a regex can check, so the safety does not come from a guard on the value —
+     it comes from the fact that no status name is ever stored at all. What is
+     stored is a stage the reader named and a number of days.
+
+     So these pin two different things. The GUARDS (an alias is short, a day
+     count is a plain number, an id is an id) bound what a hand-edited copy can
+     plant. The ROUTE (matching is exact, on aliases that already exist, and the
+     matched heading is discarded) is what makes the storage claim true.
+     ══════════════════════════════════════════════════════════ */
+  group('workflow stages — the day count guard');
+
+  const SD = TD.cleanStageDays;
+  is(SD('3'), 3, 'a whole number of days passes');
+  is(SD('3.5'), 3.5, 'and a fractional one — a real export gives fractions');
+  is(SD('0'), 0, 'zero is a REAL value, not a missing one: it passed through inside a day');
+  is(SD(' 4 '), 4, 'whitespace is trimmed');
+  is(SD(4), 4, 'a number arrives from a saved copy rather than a paste, and is accepted');
+  is(SD('3d 4h'), null, 'a duration written the Jira way is refused, not guessed at');
+  is(SD('12:30'), null, 'and so is a clock time');
+  is(SD('-4'), null, 'a negative number of days is not a number of days');
+  is(SD('1,234'), null, 'a thousands separator is refused rather than silently reinterpreted');
+  is(SD('two'), null, 'a word is not a day count');
+  is(SD('999999'), null, 'six digits is past the cap, and is dropped WHOLE rather than clamped');
+  is(SD('3.5 days'), null, 'a unit suffix makes it text, and text is refused');
+  is(SD(''), null, 'an empty cell is nothing usable, which the parser reads as no data');
+  is(SD(null), null, 'and so is nothing at all');
+  ok(TD.STAGE_DAYS_MAX === 3650, 'the ceiling is ten years — nothing legitimate reaches it');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('workflow stages — an alias is a short label you typed');
+
+  const SA = TD.cleanStageAlias;
+  is(SA('Code Review'), 'Code Review', 'a status name passes and is stored AS TYPED');
+  is(SA('  In  Progress  '), 'In Progress', 'runs of whitespace collapse, so two spellings match');
+  is(SA('x'.repeat(TD.STAGE_ALIAS_MAX_LEN)), 'x'.repeat(TD.STAGE_ALIAS_MAX_LEN),
+     'the cap itself passes');
+  is(SA('x'.repeat(TD.STAGE_ALIAS_MAX_LEN + 1)), '',
+     'one character past it is dropped WHOLE — the drop-whole rule, again');
+  is(SA('   '), '', 'an alias of nothing is not a rule that could ever match');
+  is(SA('---'), '', 'nor is one with no letter or digit in it');
+  is(SA('Code\u0000Review'), 'Code Review', 'control characters go, as everywhere else here');
+  is(SA(42), '', 'and a non-string is not an alias');
+
+  const NA = TD.normalizeAlias;
+  is(NA('Ready For Code-Review'), 'ready for code review',
+     'case and punctuation are noise between one export and the next');
+  is(NA('In-Progress'), NA('In Progress'), 'so these two are the same status');
+  is(NA('Testing'), 'testing', 'and the normalised form is what comparison uses');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('workflow stages — matching columns to stages');
+
+  const STG = [
+    { id: 'sb', name: 'Build',  match: ['Development'] },
+    { id: 'sr', name: 'Review', match: ['Ready for Code Review', 'Code Review'] },
+    { id: 'st', name: 'Test',   match: ['Testing'] }
+  ];
+  const head = ['Key', 'Created', 'In Progress', 'Resolved', 'Type',
+                'Development', 'Ready for Code Review', 'Code Review', 'Testing', 'Blocked'];
+
+  is(TD.stageColumnsFor(head, STG).map(c => [c.index, c.stageId]),
+     [[5, 'sb'], [6, 'sr'], [7, 'sr'], [8, 'st']],
+     'each heading finds its stage, and TWO columns may feed one stage');
+  is(TD.stageColumnsFor(['DEVELOPMENT', 'code-review'], STG).map(c => c.stageId), ['sb', 'sr'],
+     'matching ignores case and punctuation, so an export need not be spelled the app\u2019s way');
+  is(TD.stageColumnsFor(['Waiting on Testing Env'], STG), [],
+     'matching is EXACT, never a substring — this column is not test time');
+  is(TD.stageColumnsFor(['Test'], STG), [],
+     'and the stage NAME is not an alias: only the statuses you listed match');
+  is(TD.stageColumnsFor(head, []), [], 'no stages, no stage columns');
+  is(TD.stageColumnsFor(null, STG), [], 'and no heading row at all is not an error');
+
+  /* The whole safety property in one assertion: a column can only be read when
+     an alias for it already exists, so nothing a paste contains can create the
+     rule that reads it. */
+  is(TD.stageColumnsFor(['Compliance Review'], STG), [],
+     'a status nobody has listed is simply not read — a paste can never add its own rule');
+
+  const stageClash = [{ id: 'a', name: 'A', match: ['Testing'] }, { id: 'b', name: 'B', match: ['Testing'] }];
+  is(TD.stageColumnsFor(['Testing'], stageClash).map(c => c.stageId), ['a'],
+     'two stages claiming one status: the first in the list keeps it');
+  is(TD.duplicateStageAliases(stageClash), ['Testing'], 'and the clash is reported, not left quiet');
+  is(TD.duplicateStageAliases(STG), [], 'an ordinary set of stages reports nothing');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('workflow stages — reading a Time in Status paste');
+
+  const tisPaste = [
+    'Issue key\tCreated\tIn Progress\tResolved\tIssue Type\tDevelopment\tCode Review\tTesting',
+    'DAE-1\t2026-08-01\t2026-08-02\t2026-08-09\tStory\t3.5\t2\t1.5',
+    'DAE-2\t2026-08-01\t2026-08-03\t2026-08-12\tBug\t4\t\t2',
+    'DAE-3\t2026-08-01\t2026-08-03\t2026-08-12\tBug\tnot a number\t1\t2'
+  ].join('\n');
+  const tis = TD.parsePastedRows(tisPaste, 'auto', STG);
+
+  is(tis.columns.stages.map(c => c.index), [5, 6, 7], 'the three stage columns are found');
+  is(tis.columns.type, 4, 'and a numeric stage column is not mistaken for the work type');
+  is(tis.rows[0].stages, { sb: 3.5, sr: 2, st: 1.5 }, 'the day counts land against stage ids');
+  is(tis.rows[1].stages, { sb: 4, st: 2 },
+     'an empty cell is no data for that stage, not a zero — the row keeps the rest');
+  is(tis.rows[2].stages, { sr: 1, st: 2 }, 'and an unreadable cell costs that cell only');
+  is(tis.badStageCells, [{ index: 5, count: 1 }],
+     'unreadable cells are counted per COLUMN — a bad export has hundreds, and a list of rows is unreadable');
+
+  /* The claim the whole design rests on, asserted directly. */
+  const serialised = JSON.stringify(TD.parsePastedRows(tisPaste, 'auto', STG).rows);
+  ok(!/Development|Code Review|Testing|Issue Type/i.test(serialised),
+     'NO STATUS NAME survives the parse — the rows carry stage ids and numbers only');
+
+  const summed = TD.parsePastedRows(
+    ['Resolved\tIn Progress\tReady for Code Review\tCode Review',
+     '2026-08-09\t2026-08-02\t1.5\t2'].join('\n'), 'auto', STG);
+  is(summed.rows[0].stages, { sr: 3.5 },
+     'two columns feeding one stage are ADDED — the point of having several aliases');
+
+  const noStages = TD.parsePastedRows(tisPaste, 'auto', []);
+  ok(noStages.rows.every(r => !r.stages),
+     'with no stages set up the same paste stores nothing extra at all');
+  is(noStages.rows.length, tis.rows.length, 'and reads exactly the same items either way');
+
+  const clashPaste = TD.parsePastedRows(tisPaste, 'auto',
+    [{ id: 'x', name: 'X', match: ['Created', 'Testing'] }]);
+  is(clashPaste.columns.stageClash.map(c => c.index), [1],
+     'an alias naming a date column loses to the date, and the clash is reported');
+  is(clashPaste.columns.created, 1, 'the created date is still read from it');
+  is(clashPaste.columns.stages.map(c => c.index), [7], 'the stage keeps its other column');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('workflow stages — the storage boundary');
+
+  const StS = win.TDState;
+  const roundTrip = (rows, stages) => StS.hydrateState({
+    schema: StS.SCHEMA, stages, teams: [{ id: 't1', name: 'T', rows }]
+  });
+
+  const good = roundTrip([{ c: '2026-08-09', s: '2026-08-02', t: 'Story', g: { sb: 3, sr: 1.5 } }],
+                         [{ id: 'sb', name: 'Build', match: [] }, { id: 'sr', name: 'Review', match: [] }]);
+  is(good.teams[0].rows[0].stages, { sb: 3, sr: 1.5 }, 'a good copy round-trips unchanged');
+
+  const pruned = roundTrip([{ c: '2026-08-09', s: '2026-08-02', t: 'Story', g: { sb: 3, ghost: 9 } }],
+                           [{ id: 'sb', name: 'Build', match: [] }]);
+  is(pruned.teams[0].rows[0].stages, { sb: 3 },
+     'a count against a stage that does not exist is dropped, like a dangling artId');
+  const orphan = roundTrip([{ c: '2026-08-09', s: '2026-08-02', t: 'Story', g: { ghost: 9 } }], []);
+  is(orphan.teams[0].rows[0].stages, null,
+     'and a row left with none loses the object, so it serialises as it did before stages existed');
+
+  const nasty = roundTrip([{ c: '2026-08-09', s: '2026-08-02', t: 'Story',
+    g: { sb: 3, '__proto__': 9, 'bad id!': 1, sb2: 'nope', sb3: -5 } }],
+    [{ id: 'sb', name: 'Build', match: [] }]);
+  is(nasty.teams[0].rows[0].stages, { sb: 3 },
+     'a hostile id, a bad id, a non-number and a negative are all dropped');
+  ok(({}).toString !== 9 && Object.prototype[9] === undefined,
+     'and nothing reached Object.prototype — the day counts object has none');
+
+  is(StS.hydrateStageDays('not an object'), null, 'a `g` that is not an object is nothing');
+  is(StS.hydrateStageDays([1, 2]), null, 'and neither is an array');
+
+  const stagesIn = StS.sanitizeStages([
+    { id: 's1', name: 'Build', match: ['Development', 'development', 'DEV', ''] },
+    { id: '\"><script>', name: 'X', match: [] },
+    { id: 's1', name: 'Duplicate id', match: [] },
+    'not a stage'
+  ]);
+  is(stagesIn[0].match, ['Development', 'DEV'],
+     'aliases that differ only in case are ONE rule, and an empty one is not stored');
+  ok(StS.ID_OK.test(stagesIn[1].id), 'an id from outside is replaced unless it is plainly safe');
+  ok(stagesIn[2].id !== 's1', 'a duplicate id gets a fresh one rather than two stages answering to it');
+  is(stagesIn[3].name, 'Untitled stage', 'and anything that is not a stage becomes an empty one');
+  is(StS.sanitizeStages([{ id: 's', name: 'A', match: Array(40).fill(0).map((_, i) => 'S' + i) }])[0]
+       .match.length, TD.STAGE_ALIAS_MAX,
+     'the alias list is capped, so a hand-edited copy cannot plant hundreds of rules');
+
+  /* The whitelist rule at the top of CLAUDE.md, pinned for this field: a stored
+     shape that is not in the whitelist is stripped. */
+  const strayStage = StS.sanitizeStages([{ id: 's', name: 'A', match: [], colour: 'red', wip: 3 }])[0];
+  is(Object.keys(strayStage), ['id', 'name', 'match'], 'a stray key on a stage is stripped, not carried');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('workflow stages — the wire format stays byte-identical without them');
+
+  const noG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
+                                   created: null, type: 'Story', key: '', stages: null }]);
+  ok(!('g' in noG[0]), 'no `g` key at all on a row with no stage times');
+  is(Object.keys(noG[0]), ['c', 's', 't'],
+     'so a team that never pastes one serialises exactly as it did before the feature');
+  const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
+                                     created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
+  is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
+  ok(StS.SCHEMA === 8, 'SCHEMA was bumped in the same commit as the whitelist widening');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('workflow stages — the figures');
+
+  const stRows = [
+    { stages: { sb: 1, sr: 10 } },
+    { stages: { sb: 2, sr: 20 } },
+    { stages: { sb: 3, sr: 30 } },
+    { stages: { sb: 4 } },
+    { }
+  ];
+  const stFig = TD.stageTimesOf(stRows);
+  is(stFig.measured, 4, 'only items carrying stage data are counted as measured');
+  const byId = Object.fromEntries(stFig.byStage.map(x => [x.id, x]));
+  is(byId.sb.count, 4, 'a stage counts the items that have a figure for IT');
+  is(byId.sr.count, 3, 'not the items that have any stage data at all');
+  is(byId.sb.total, 10, 'totals are the stage\u2019s own days');
+  is(byId.sr.median, 20, 'the median is over that stage\u2019s figures');
+  is(byId.sb.median, 2, 'and uses the same percentile rule as cycle time — a real value, never interpolated');
+  is(stFig.totalDays, 70, 'the total is every stage added up');
+  near(byId.sr.share, 60 / 70, 'a share is of the time MEASURED, never of cycle time', 1e-9);
+  near(byId.sb.share + byId.sr.share, 1, 'and the shares add to one', 1e-9);
+
+  const allZero = TD.stageTimesOf([{ stages: { sb: 0 } }]);
+  is(allZero.byStage[0].share, 0, 'a share of nothing is nothing, not a division by zero');
+  is(TD.stageTimesOf([]).byStage, [], 'and no items is an empty answer rather than an error');
+
   /* ────────────────────────────────────────────────────────── */
   group('Cycle time');
 
@@ -778,7 +1000,7 @@ async function run(TD, win) {
      that opens one sits on the name. */
   is(Object.keys(d.names).sort(),
      ['agedWork', 'cycleScatter', 'cycleTime', 'defectRate', 'forecastHowMany', 'forecastWhen',
-      'itemAge', 'leadTime', 'netFlow', 'throughput', 'wip'],
+      'itemAge', 'leadTime', 'netFlow', 'stageTime', 'throughput', 'wip'],
      'every chart has a name of its own');
   ok(Object.keys(d.names).every(k => d.titles[k]),
      'and a sentence under it saying what it plots');
@@ -1372,7 +1594,16 @@ async function run(TD, win) {
   /* ────────────────────────────────────────────────────────── */
   group('detectColumns — finding the right columns in a real export');
 
-  const cols = s => TD.parsePastedRows(s, 'auto').columns;
+  /* The five roles a column can have in an ordinary export. Stage columns are a
+     sixth, and they are left out here on purpose: every case below is pasted
+     with NO stages set up, so both stage lists are empty in all of them and
+     restating that thirty times would say nothing. They have their own group
+     above, which pins the empty case directly. */
+  const cols = s => {
+    const c = TD.parsePastedRows(s, 'auto').columns;
+    return { completed: c.completed, started: c.started, created: c.created,
+             type: c.type, key: c.key };
+  };
 
   is(cols(['Completed Date\tStart Date\tType',
            '2015-01-21\t2015-01-14\t',
@@ -1548,7 +1779,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 7, 'the schema marker is 7 — the version that added the per-team project id');
+  is(St.SCHEMA, 8, 'the schema marker is 8 — the version that added workflow stages');
 
   /* ────────────────────────────────────────────────────────── */
   group('Work in progress — started but not finished');
@@ -2804,18 +3035,27 @@ group('ARTs — the grouping, and the boundary it crosses');
      'the same width as the sibling’s Teams, ARTs & PIs window');
   is(win.document.querySelectorAll('#manageDialog thead').length, 0,
      'no header row on either table — every cell says what it is instead');
-  is(win.document.querySelectorAll('#manageDialog table.manage').length, 2,
-     'one table per section, both in the shared treatment');
+  is(win.document.querySelectorAll('#manageDialog table.manage').length, 3,
+     'one table per section, all three in the shared treatment');
 
   /* Each section is headed by its name with its own Add button at the right,
      which is the layout the sibling uses and what makes the two read as one
      design. Both buttons live OUTSIDE the tables, in those headers. */
   const heads = [...win.document.querySelectorAll('#manageDialog .manage-head')].map(e => e.textContent);
-  is(heads, ['Teams', 'Agile Release Trains'], 'two sections, each headed by its name');
+  /* Three sections here against the sibling's three (Teams, ARTs & PIs). The
+     third differs — this app has no PIs and the sibling has no stage times —
+     and that is the point: the two windows share a SHAPE, one section per thing
+     you manage, not a list of sections. */
+  is(heads, ['Teams', 'Agile Release Trains', 'Workflow Stages'],
+     'three sections, each headed by its name');
   ok(win.document.getElementById('btnAddTeam').closest('.row.spread'),
      'the team Add button sits in the Teams header row');
   ok(win.document.getElementById('btnAddArt').closest('.row.spread'),
      'and the ART Add button in the ARTs header row');
+  ok(win.document.getElementById('btnAddStage').closest('.row.spread'),
+     'and the stage Add button in the Stages header row');
+  is(win.document.querySelector('#stageRows .empty-row').textContent.slice(0, 13), 'No stages yet',
+     'an empty stages table says what to do, like the ARTs table above it');
 
   /* With no header row, a bare number would be a number with no noun. */
   const teamRow = win.document.querySelector('#teamRows tr');
@@ -3435,6 +3675,48 @@ group('ARTs — the grouping, and the boundary it crosses');
      put the same name on a Kingfisher dot and a Heron dot. */
   const allKeys = demo.flatMap(t => t.rows.map(r => r.key)).filter(Boolean);
   is(new Set(allKeys).size, allKeys.length, 'no two demo items share a key');
+
+  /* Workflow stages, on the same two-faces reasoning as the keys: two teams
+     carry stage times and one deliberately does not, so both the table and its
+     "no stage times yet" face are reachable from Load sample data. The stages
+     themselves come in through loadSample, so they are pinned here too — a
+     paste can never invent one, which means the demo's columns are readable
+     only because these four exist first. */
+  const demoStages = win.tdGet().stages;
+  is(demoStages.map(st => st.name), ['Build', 'Review', 'Test', 'Deploy'],
+     'the demo sets up four stages, in workflow order');
+  is(demoStages[1].match, ['Ready for Code Review', 'Code Review'],
+     'and Review carries TWO aliases, so several statuses feeding one stage is demonstrable');
+
+  const stageDaysOf = (team) => TD.stageTimesOf(demoOf(demo, team).rows);
+  const kingStage = stageDaysOf('Team Kingfisher');
+  const heronStage = stageDaysOf('Team Heron');
+  const wagStage = stageDaysOf('Team Wagtail');
+  ok(kingStage.measured === demoOf(demo, 'Team Kingfisher').rows.length,
+     'every Kingfisher item carries stage times, in-flight ones included');
+  is(wagStage.measured, 0,
+     'while Wagtail carries none — the empty face of the card has to stay reachable');
+
+  const shareOf = (fig, name) => {
+    const st = demoStages.find(x => x.name === name);
+    const row = fig.byStage.find(x => x.id === st.id);
+    return row ? row.share : 0;
+  };
+  /* The finding the feature exists to produce, and the reason Heron is the team
+     the demo lands on: its cycle time looks like slow work until this says most
+     of it is queue. Tidy these shares and the card stops making its own case. */
+  ok(shareOf(heronStage, 'Review') + shareOf(heronStage, 'Test')
+       > shareOf(heronStage, 'Build') * 1.5,
+     'Heron spends far more of its time waiting to be reviewed and tested than building');
+  ok(shareOf(kingStage, 'Build') > 0.5,
+     'while Kingfisher spends most of its time building — the healthy reading to compare against');
+  ok(shareOf(kingStage, 'Deploy') < 0.1,
+     'and Deploy is a stage almost nothing sits in, so the table is not four equal numbers');
+
+  /* The demo comes in through parsePastedRows like a real export, so this is
+     the storage claim asserted against the one dataset everybody sees. */
+  ok(!/Development|Code Review|Testing|Deployment/i.test(JSON.stringify(win.tdGet().teams)),
+     'and no status name from the demo\u2019s own columns is anywhere in what it stored');
 
   /* Project ids, on the same reasoning as the keys above: the multi-team paste
      is unreachable until some team has one, so the demo arrives with them set
