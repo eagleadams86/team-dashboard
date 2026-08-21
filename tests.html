@@ -4617,6 +4617,134 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and a focus with no press behind it guards nothing — a Tab has no caret to place');
 
   /* ────────────────────────────────────────────────────────── */
+  group('one chart, filling the window');
+
+  /* Charles asked for this on 2026-08-21: a button on each chart that fills the
+     window with it, "with the menu still visible". That last phrase is the whole
+     design — it is why this is a plain overlay under a sticky header rather than
+     the Fullscreen API or a modal <dialog>, both of which take the header away —
+     and the first two assertions here are what stop a later tidy-up from
+     quietly turning it into one of those. */
+  const mDoc = win.document;
+  const maxiOf = (id) => mDoc.getElementById(id).closest('.chart-card');
+  const overlay = mDoc.getElementById('chartMaxi');
+
+  is(win.getComputedStyle(mDoc.querySelector('header')).zIndex, '20',
+     'the header sits on a layer of its own');
+  ok(Number(win.getComputedStyle(overlay).zIndex) < 20,
+     'and the overlay is painted UNDER it, so the menu stays visible and clickable',
+     win.getComputedStyle(overlay).zIndex);
+  ok(!mDoc.querySelector('.shell').contains(overlay),
+     'the overlay is outside .shell — which is marked inert while it is open');
+
+  plant({ stages: [], arts: [], settings: {},
+          teams: [{ id: 'mx1', name: 'Dated', rows: [
+                     { c: '2026-08-09', s: '2026-08-02', k: '2026-07-28', t: 'Story', i: 'DAE-1' },
+                     { c: '2026-08-12', s: '2026-08-04', k: '2026-07-30', t: 'Bug', i: 'DAE-2' },
+                     { s: '2026-08-05', t: 'Story', i: 'DAE-3' } ] },
+                   { id: 'mx2', name: 'Undated', rows: [
+                     { c: '2026-08-09', s: '2026-08-02', t: 'Story' } ] }] });
+  win.renderAll();
+
+  const cardsWithCharts = [...mDoc.querySelectorAll('.chart-card')]
+    .filter(c => c.querySelector('.chart-wrap'));
+  is(mDoc.querySelectorAll('.chart-max').length, cardsWithCharts.length,
+     'every card that draws a chart carries a button, and nothing else does');
+  is(mDoc.querySelectorAll('#cardStageTime .chart-max').length, 0,
+     'the time-in-stage card is a TABLE, and a bigger box would show no more of it');
+
+  /* The button hangs off the card and not off the heading row, because that
+     row's innerHTML is rewritten on every render. If it ever moves in there,
+     this is the assertion that fails. */
+  const flowCard = maxiOf('chartCycleTime');
+  const flowBtn = flowCard.querySelector('.chart-max');
+  ok(flowBtn.parentElement === flowCard, 'the button is a child of the CARD');
+  win.renderAll();
+  ok(flowCard.querySelector('.chart-max') === flowBtn,
+     'and the same element survives a re-render, rather than being rebuilt');
+
+  /* Moved, not copied. A second canvas up here would leave every re-render —
+     a filter change, a theme change — painting the one nobody is looking at. */
+  const home = { parent: flowCard.parentElement, at: [...flowCard.parentElement.children].indexOf(flowCard) };
+  const liveChart = win.tdCharts().chartCycleTime;
+  flowBtn.click();
+  ok(flowCard.parentElement === overlay, 'pressing it moves the card into the overlay');
+  ok(win.tdMaxi.current() === flowCard, 'and the app knows which card is up');
+  ok(win.tdCharts().chartCycleTime === liveChart,
+     'the Chart.js instance is the same one — the card was moved, not copied');
+  ok(win.tdCharts().chartCycleTime.canvas === flowCard.querySelector('canvas'),
+     'and it still owns the canvas that is now on screen');
+  ok(overlay.classList.contains('open'), 'the overlay is showing');
+  ok(mDoc.querySelector('.shell').inert, 'the page underneath is out of the tab order');
+  ok(mDoc.body.classList.contains('maxi-open'), 'and it is not scrolling behind the chart');
+  is(win.getComputedStyle(mDoc.documentElement).getPropertyValue('--maxi-top').trim(),
+     Math.round(mDoc.querySelector('header').getBoundingClientRect().height) + 'px',
+     'the overlay starts exactly where the header ends — measured, never guessed');
+  ok(/Leave full screen/.test(flowBtn.getAttribute('aria-label')),
+     'the button now says how to get out', flowBtn.getAttribute('aria-label'));
+
+  flowBtn.click();
+  ok(flowCard.parentElement === home.parent, 'pressing it again puts the card back');
+  is([...flowCard.parentElement.children].indexOf(flowCard), home.at,
+     'in the same place in the grid it came from');
+  is(mDoc.querySelectorAll('.chart-slot').length, 0, 'and the placeholder is cleared away');
+  ok(win.tdMaxi.current() === null, 'nothing is maximised');
+  ok(!mDoc.querySelector('.shell').inert, 'the page is reachable again');
+  ok(!mDoc.body.classList.contains('maxi-open'), 'and scrolling again');
+
+  /* Escape is the second way out. The third — a click on the backdrop — is the
+     app's rule for every dialog, and is why the overlay keeps a margin round the
+     card rather than filling the window edge to edge. */
+  flowBtn.click();
+  mDoc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  ok(win.tdMaxi.current() === null, 'Escape closes it');
+  ok(Number(win.getComputedStyle(overlay).paddingTop.replace('px', '')) > 0,
+     'and there is a margin round the card for a click-outside to land on');
+
+  /* …but not while a dialog is open on top of it. A ⓘ pressed on a maximised
+     chart is exactly that case, and Escape there belongs to the dialog. */
+  flowBtn.click();
+  const help = mDoc.getElementById('helpDialog');
+  help.showModal();
+  mDoc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  ok(win.tdMaxi.current() === flowCard, 'Escape with a dialog open leaves the chart up');
+  help.close();
+  win.tdMaxi.close();
+
+  /* A card with nothing drawn under it offers no button at all: lead time on a
+     team with no created dates is the case that is always reachable. */
+  const leadCard = mDoc.getElementById('cardLeadTime');
+  ok(!leadCard.querySelector('.chart-max').hidden,
+     'lead time is on offer for a team that has created dates');
+
+  /* The header stays live while a chart fills the window — that is the point of
+     the whole design — so the case that must not be left standing is the chart
+     going away underneath it. Changing team is how anybody would meet it. */
+  leadCard.querySelector('.chart-max').click();
+  ok(win.tdMaxi.current() === leadCard, 'lead time fills the window');
+
+  const teamPicker = mDoc.getElementById('teamSel');
+  teamPicker.value = 'mx2';
+  teamPicker.dispatchEvent(new win.Event('change', { bubbles: true }));
+  ok(leadCard.querySelector('.chart-max').hidden,
+     'a team with no created dates has no lead time chart, so no button either');
+  ok(win.tdMaxi.current() === null,
+     'and the window came back down rather than holding an empty card up');
+  ok(leadCard.parentElement !== overlay, 'with the card back on the page it came from');
+
+  /* The bluntest version of the same thing: a render with nothing left to plot
+     at all, which destroys every chart in the app. */
+  teamPicker.value = 'mx1';
+  teamPicker.dispatchEvent(new win.Event('change', { bubbles: true }));
+  maxiOf('chartCycleTime').querySelector('.chart-max').click();
+  ok(win.tdMaxi.current(), 'a chart is up again');
+  plant({ stages: [], arts: [], settings: {}, teams: [{ id: 'mx1', name: 'Dated', rows: [] }] });
+  win.renderAll();
+  ok(win.tdMaxi.current() === null,
+     'and a render with nothing left to plot brings it down rather than leaving a dead canvas up');
+  ok(!mDoc.querySelector('.shell').inert, 'with the page handed back');
+
+  /* ────────────────────────────────────────────────────────── */
   const sum = document.getElementById('summary');
   sum.className = failed ? 'bad' : 'ok';
   sum.textContent = failed

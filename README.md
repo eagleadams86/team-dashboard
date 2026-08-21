@@ -37,6 +37,9 @@ full width. A chart drawn twice as wide as the ones above it reads as the more i
 which it isn't, and its bars stop being comparable with theirs at a glance. On a narrow window
 every chart is full width, so there is nothing to centre.
 
+Any one of them can be **[filled to the window](#one-chart-filling-the-window)** with the ⤢ in
+its corner, with the header still there above it.
+
 **Choose how much history to show** — 1 month, **12 weeks (a PI)**, 3, 6, 9 or 12 months, or All.
 Every option but the PI is a number of calendar months; a planning increment is six two-week
 sprints, so it is 84 days flat rather than three months rounded — a few days out of step with the
@@ -1136,6 +1139,38 @@ question anyone asked, and the chart would be four bars wide.
 **It counts items, not points or value.** So it is only as good as your items being roughly
 comparable in size — which, on a board whose cycle times cluster, they usually are, and if they
 are not, that shows up as a wide spread rather than as a wrong answer quietly given.
+
+## One Chart, Filling the Window
+
+Every chart card has a **⤢** button in its top-right corner. Press it and that chart fills the
+window — the same chart, the same figures, drawn at four or five times the size, which is the
+difference between "there is a spike around week 29" and being able to read which week it is.
+Press it again, press **Esc**, or click the margin around the card to come back. Everything
+else on the page stays exactly where you left it, including which tab and which chart group you
+were on.
+
+**The menu stays put.** The header — the team picker, the theme, Teams & Stages, Back up and
+Share — is still there above the chart and still works, so you can flick a chart between two
+teams without leaving it. That is why this isn't the browser's own full-screen mode: that one
+takes the header, the tabs and the address bar with it, and you would have to come back out to
+change anything.
+
+A few details:
+
+- **The button only appears when there is a chart under it.** Lead time on a team with no
+  created dates shows its explanation instead, and there is nothing to enlarge — so no button.
+- **If the chart goes away while it is filling the window, the window comes back down.**
+  Switching to a team that can't draw that chart is the way you would meet this.
+- Charts still do everything they do at ordinary size. The ⓘ still opens, tooltips still follow
+  the pointer, and on the two scatters [pressing a dot still copies its
+  key](#click-a-dot-to-copy-its-key).
+- The **Time in stage** card has no button, because it is a table rather than a chart — the
+  **Copy** button beside it is the thing worth having there.
+- It works in a [shared link](#sharing-a-read-only-link) too. Like everything else on a chart it
+  writes nothing: which chart is enlarged isn't saved anywhere, so a reload brings back the
+  dashboard as it was.
+- On a phone it is worth more, not less: the header takes two or three rows and the chart gets
+  everything under it, which is roughly twice the height a card gives it.
 
 ## Taking a Table off the Page
 
