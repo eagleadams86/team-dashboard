@@ -914,6 +914,79 @@ async function run(TD, win) {
      on EVERY ROW rather than in one header, which makes the storage claim
      matter more, not less: what is stored is the stage id, never the word.
      ══════════════════════════════════════════════════════════ */
+  group('a paste separated by single spaces');
+
+  /* Reported by Charles on 2026-08-21, typing four rows by hand:
+       1/1/26 1/1/26 story
+     splitCells takes a tab, then a comma, then TWO-OR-MORE spaces, so every one
+     of those lines was a single cell, no column of dates was found, every row
+     was dropped as undated — and the app answered "Nothing to load — paste some
+     rows first" under four rows he had plainly just pasted. */
+  {
+    const spaced = ['1/1/26 1/1/26 story', '1/1/26 1/3/26 story',
+                    '1/2/26 1/3/26 story', '1/2/26 1/2/26 story'].join('\n');
+    const sp = TD.parsePastedRows(spaced, 'mdy', []);
+    is(sp.rows.length, 4, 'a single space is read as a separator when nothing else works');
+    is([sp.columns.started, sp.columns.completed, sp.columns.type], [0, 1, 2],
+       'and the three columns land where they should');
+    is(sp.undated, 0, 'so no row is dropped for want of a date it actually had');
+    is(iso(sp.rows[1].completed), '2026-01-03', 'a two-digit year is read as this century');
+
+    /* THE GUARD IS THE WHOLE DESIGN. A single space is not a separator in
+       general — a work type is "Tech Debt" and a date is "21 Jan 2015" — so the
+       loose split is tried only where the ordinary one found no date column at
+       all, and kept only if it finds one. These are what stop it reaching a
+       paste that already works. */
+    const oneCol = TD.parsePastedRows(['21 Jan 2015', '22 Jan 2015', '23 Jan 2015'].join('\n'),
+      'auto', []);
+    is(oneCol.rows.length, 3,
+       'a lone column of month-name dates still reads as ONE column, not three');
+    is(iso(oneCol.rows[0].completed), '2015-01-21', 'with the date intact');
+
+    const spacedType = TD.parsePastedRows(
+      ['1/1/26  1/1/26  Tech Debt', '1/2/26  1/3/26  Tech Debt'].join('\n'), 'mdy', []);
+    is(spacedType.rows.map(x => x.type), ['Tech Debt', 'Tech Debt'],
+       'and a two-space paste keeps a work type that has a space in it');
+
+    /* The count the note needs to tell "nothing pasted" from "nothing read". */
+    is(TD.parsePastedRows('', 'auto', []).lineCount, 0, 'an empty box reads as no lines');
+    is(TD.parsePastedRows(['no dates here', 'nor here'].join('\n'), 'auto', []).lineCount, 2,
+       'and two unreadable lines are still two lines');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('an ambiguous date order says it was a guess');
+
+  /* The second half of the same report, and the more dangerous half: every date
+     in that paste reads either way round, so detectDateOrder has nothing to go
+     on and falls back to day-first. 1/1/26 → 1/3/26 is then a 59-day cycle time
+     where an American reader meant two days. The order was always stated; what
+     it never said was that it had been guessed. */
+  {
+    is(TD.dateEvidence([['1/1/26', '1/3/26'], ['1/2/26', '1/2/26']]),
+       { dayFirst: 0, monthFirst: 0, ambiguous: 4 },
+       'nothing in a paste of small numbers can settle the order');
+    is(TD.dateEvidence([['21/01/2015', '3/4/2015']]),
+       { dayFirst: 1, monthFirst: 0, ambiguous: 1 },
+       'one cell over 12 decides it, and the rest are still counted as ambiguous');
+    is(TD.dateEvidence([['2015-01-21']]), { dayFirst: 0, monthFirst: 0, ambiguous: 0 },
+       'an ISO date is never ambiguous, so it is not counted either way');
+
+    const guessed = TD.parsePastedRows('1/1/26 1/3/26 story', 'auto', []);
+    ok(guessed.orderGuessed, 'a paste with no decisive date says the order was a guess');
+    is(guessed.dateOrder, 'dmy', 'the fallback itself is unchanged — day first');
+
+    /* Two ways it is NOT a guess, and both matter: the reader chose, or the data
+       decided. Saying "this was a guess" over either would be noise. */
+    ok(!TD.parsePastedRows('1/1/26 1/3/26 story', 'mdy', []).orderGuessed,
+       'choosing an order in the picker is not guessing');
+    ok(!TD.parsePastedRows('21/01/2015\t03/04/2015\tStory', 'auto', []).orderGuessed,
+       'and neither is a paste that settles it on its own');
+    ok(!TD.parsePastedRows('2015-01-19\t2015-01-21\tStory', 'auto', []).orderGuessed,
+       'nor one with no ambiguous date in it at all');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('current stage — reading an ordinary Status column');
 
   const SIS = TD.stageIdForStatus;
@@ -5015,6 +5088,45 @@ group('ARTs — the grouping, and the boundary it crosses');
 
   is(spinProbe((box) => { focusIn(box); }), false,
      'and a focus with no press behind it guards nothing — a Tab has no caret to place');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('delete all data takes the ARTs and the stages with it');
+
+  /* Reported by Charles on 2026-08-21: "arts and stages aren't deleting when I
+     hit delete all data". They were not in the reset at all, so a reader who had
+     set up four stages and a train found both still there under a toast reading
+     "Everything deleted — starting fresh" — and the dialog had said nothing
+     about either, so there was no way to have expected it.
+
+     They are DATA: a stage carries the status names typed off an export, an ART
+     is a grouping of teams. `settings` — the labels, the thresholds, the work
+     type filters — is what the dialog promises to keep, and that line is what
+     this pins from both sides. */
+  {
+    plant({
+      teams: [{ id: 'dz1', name: 'Alpha', artId: 'dza',
+                rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] }],
+      arts: [{ id: 'dza', name: 'Estuary' }],
+      stages: [{ id: 'dzs', name: 'Review', match: ['Code Review'] }],
+      settings: { agedDays: 21, unplannedLabel: 'Defect' }
+    });
+    const before = win.tdGet();
+    is(before.arts.length, 1, 'the fixture really does hold an ART');
+    is(before.stages.length, 1, 'and a stage');
+
+    win.document.getElementById('clearConfirm').click();
+    const after = win.tdGet();
+    is(after.arts, undefined, 'the ARTs are gone');
+    is(after.stages, undefined, 'and so are the stages');
+    is(after.teams.length, 1, 'one empty team is left to paste into');
+    is(after.teams[0].rows.length, 0, 'with nothing in it');
+    /* The half that must NOT go, which is what the dialog promises. */
+    is(after.settings.agedDays, 21, 'the settings are kept, exactly as the dialog says');
+    is(after.settings.unplannedLabel, 'Defect', 'labels included');
+    /* A filter pointing into a list that no longer exists is cleared with it. */
+    is(JSON.parse(localStorage.getItem('td-view') || '{}').artFilter, '',
+       'and the ART filter that pointed at one is cleared too');
+  }
 
   /* ────────────────────────────────────────────────────────── */
   group('one page, one surface — in all four themes');

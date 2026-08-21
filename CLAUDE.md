@@ -242,6 +242,53 @@ this file was written to keep out. **Read this whole section before changing any
   meaning rather than a parse. Neither is built. The work item age chart's stage axis WAS
   built — off the current stage rather than off these durations; see the section above it.
 
+## Three Reports From One Paste (2026-08-21) — no schema change
+
+Charles pasted four hand-typed rows, got "Nothing to load — paste some rows first" under rows he
+was looking at, and asked why. Three separate things came out of it.
+
+- **A SINGLE SPACE IS NOW A SEPARATOR, BUT ONLY AS A FALLBACK.** `splitCells` takes a tab, a
+  comma, then two-or-more spaces, and one space is deliberately not a separator: a work type is
+  "Tech Debt" and a date is "21 Jan 2015". That is still true. What changed is the case where the
+  rule leaves EVERY line as one cell — no columns at all, every row dropped as undated, nothing
+  loaded. `parsePastedRows` now reads the paste through `readAs()` twice: the loose split is tried
+  only when the ordinary one found neither a completion nor a start column, and kept only if it
+  finds one. **That guard is the whole design** — it can never reach a paste that works today (a
+  lone column of "21 Jan 2015" dates already found its date column, so the fallback never runs)
+  and can only improve on one that was going to fail outright. Pinned from both sides.
+- **"Nothing to load — paste some rows first" was being said over four pasted rows.** Two
+  different failures shared one sentence. `nothingLoadedHtml()` now tells them apart on
+  `res.lineCount`, and is shared by both paste surfaces — the rule `parseProblemsHtml` and
+  `columnsReadHtml` already follow, because two reports drifting apart on what went wrong is the
+  failure this app spends the most words preventing.
+- **AN UNEVIDENCED DATE ORDER NOW SAYS IT GUESSED, and this is the dangerous one.** Every date in
+  that paste read either way round, so `detectDateOrder` had nothing to go on and returned its
+  day-first tie-break: 1/1/26 → 1/3/26 became a 59-day cycle time where an American reader meant
+  two. The order has always been stated in the report; what it never said was that it was a
+  guess. `dateEvidence()` was split out of `detectDateOrder` to count the ambiguous cells as well
+  as the decisive ones — the second number is worth as much as the first — and `orderGuessed`
+  fires only on Auto-detect with no decisive date and at least one ambiguous one. A reader who
+  chose an order is not guessing, and a paste of ISO dates has nothing to guess about.
+
+## Delete All Data Takes the ARTs and Stages (2026-08-21)
+
+Reported in the same breath: "arts and stages aren't deleting when I hit delete all data". They
+were not in the reset at all, so a reader who had set up four stages and a train found both still
+there under a toast reading "Everything deleted — starting fresh", with the dialog having said
+nothing about either.
+
+- **The line is DATA vs SETTINGS.** A stage carries the status names typed off an export and an
+  ART is a grouping of teams; `settings` is the labels, thresholds and work-type filters the
+  dialog explicitly promises to keep. Both halves are pinned, so neither can drift.
+- **The dialog now lists what it will take**, ARTs and stages included, built from what is
+  actually there. A delete that destroys something it never mentioned is the part that made this
+  a bug rather than a preference.
+- **`view.artFilter` is cleared with them**, rather than left for `currentArtScope()` to correct
+  on read: leaving a stale id in the saved view means the next thing to read it has to know that.
+- **The sibling does NOT have this bug** — Sprint Predictability clears through `blankState()`,
+  which wipes every collection by construction. This app rebuilt `state.teams` by hand, which is
+  exactly how a collection gets forgotten. Checked, not assumed.
+
 ## Charts Draw in the Pack's Series Ramp, Not the Accent (2026-08-21)
 
 `--series-1` and `--series-5` for the two data colours, where every chart used `--accent` and

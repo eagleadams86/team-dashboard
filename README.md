@@ -111,6 +111,14 @@ dashboard into two tones that meant nothing. That edge went from 4px to **6px** 
 change, and for the same reason: the tile used to be told apart by its fill, and now it is told
 apart by the edge, so the edge has to be able to carry it.
 
+### Starting Again
+
+**Back up → Start again** deletes every team and work item, **and the ARTs and workflow stages
+with them** — the dialog lists what it is about to take. Your settings are kept: the labels, the
+thresholds, the work type filters and your theme. A stage carries status names you typed off an
+export and an ART is a grouping of teams, so both are data; settings are the configuration the
+dialog promises to leave alone, and that is the line the delete draws.
+
 ### How Many Items the Window Covers
 
 The window note under the date range reads **"14 weeks · 67 of 190 items (9 in progress)"** when
@@ -1002,6 +1010,22 @@ After a paste it says which column it read as the current status and how many it
 under a stage, and it names which columns were read as which stage — **by position and by your
 stage name**, never by the heading or the cell out of your export, because this report has never
 echoed a pasted cell.
+
+**Columns are separated by a tab, a comma, or two or more spaces.** A single space is not a
+separator in general — a work type is *Tech Debt* and a date is *21 Jan 2015*, and both contain
+one — but a paste that yields no columns at all is retried on single spaces and kept if that finds
+a column of dates. So `1/1/26 1/1/26 Story` typed out by hand works, while a lone column of
+*21 Jan 2015* dates still reads as one column.
+
+If nothing loads, the note says which of the two happened: an empty box gets "paste some rows
+first", and a box with rows in it that produced nothing says so and names the likely cause,
+rather than telling you to paste rows you are looking at.
+
+**An ambiguous date order announces itself.** With Auto-detect on, the order is read off the data
+— `21/01/2015` can only be day-first. When *nothing* in the paste settles it, as in a set of dates
+that are all 12 or under, the app falls back to day first **and says that it guessed**, with the
+picker to change. The difference is not cosmetic: `1/1/26` to `1/3/26` is two days read one way
+and fifty-nine the other.
 
 If items had a status **no stage answers to**, it says how many. It does not say what they were:
 that is work-system text, and the count is what tells you your aliases are wrong rather than one
