@@ -672,6 +672,19 @@ it into Jira.
 - **The cursor is the whole affordance** — a canvas gives no other hint that anything under it
   can be pressed — so it turns to a pointer ONLY over a dot that will actually copy. The
   tooltip's last line says "Click to copy DAE-1234", and only when there is a key.
+- **ONE copy line per tooltip, naming the dot the click will really take.** Reported by Charles
+  the day this shipped: items that finished on the same day in the same number of days land on
+  ONE pixel, Chart.js hands the hover to every one of them, and the tooltip drew six identical
+  sentences each offering a different key — when a click can only ever take the first. The
+  tooltip now keeps the first item only (`onlyTopDot`, installed by `dotsCopyKeys` so both
+  scatters get it), which is the same element, in the same order, that `onDotClick` copies. How
+  many are underneath is NOT dropped: `stackDots` writes a `stack` count onto every dot of both
+  scatters in `derive`, and `dotTipFooter` says "6 items sit on this dot" above the copy line.
+  Counted on exact x/y equality, which is the same test Chart.js applies to decide two dots are
+  equally near the pointer — so the number stated is the number of items really under it. Do NOT
+  put the copy line back on `afterLabel`: per-item is exactly what made it lie. The age chart
+  spreads its dots, so nothing there ever stacks; it is stamped anyway so the shared tooltip
+  never has to ask which chart it is on.
 - **Reference lines cannot be hit**: `pointHitRadius: 0`, and their points carry no key anyway.
   `dotUnder` returns null for a dataset with no `data`, which is pinned.
 - **Alive in a shared view**, on exactly the reasoning the table export buttons carry: it writes

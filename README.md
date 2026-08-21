@@ -1008,6 +1008,12 @@ A dot with **no** key says so rather than copying something else. Without a Key 
 tooltip falls back to the work type, which is a useful label and useless on a clipboard — quietly
 copying `Story` would be worse than doing nothing.
 
+Where several items finished on the same day in the same number of days, their dots land on one
+pixel. The tooltip describes **the one a press would copy** — the item it names at the top — and
+says how many are underneath it: *"6 items sit on this dot"*, then *"Click to copy DAE-1306, the
+one named above"*. The others are not reachable by pressing a dot they are hidden under; the
+[Loaded Data table](#sorting-the-loaded-data-table) lists every one of them.
+
 It works the same on **both** scatters — this one and [every finished
 item](#every-finished-item-the-spread-not-the-average) — from one piece of code, so the pair
 can never behave differently. It works in a [shared link](#sharing-a-read-only-link) too: it

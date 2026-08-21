@@ -1055,6 +1055,42 @@ async function run(TD, win) {
   ok(/no issue key/.test(said[0]) && !/Story/.test(said[0]),
      'and says it has no key rather than copying its work type', said[0]);
 
+  /* ── One copy line per tooltip ──
+     Reported 2026-08-21: on a day where six items finished in the same number
+     of days, the six dots land on one pixel, Chart.js hands the hover to all
+     six, and the tooltip drew six identical sentences each offering a DIFFERENT
+     key to copy — when a click can only ever take the first of them. */
+  is(TD.stackDots([{ x: 1, y: 2 }, { x: 1, y: 2 }, { x: 1, y: 3 }]).map(p => p.stack),
+     [2, 2, 1], 'dots on one spot know how many they are, and a lone dot reads 1');
+  is(TD.stackDots([{ x: 1, y: 2 }, { x: 1.0001, y: 2 }]).map(p => p.stack), [1, 1],
+     'near is not the same spot — the count is exact, like Chart.js\u2019s own tie');
+  is(TD.stackDots([]), [], 'and no dots is no work rather than an error');
+
+  const stackRows = [
+    { started: D(2026, 8, 3), completed: D(2026, 8, 5), type: 'Story', key: 'DAE-1' },
+    { started: D(2026, 8, 3), completed: D(2026, 8, 5), type: 'Story', key: 'DAE-2' },
+    { started: D(2026, 8, 3), completed: D(2026, 8, 6), type: 'Story', key: 'DAE-3' }
+  ];
+  const stacked = TD.derive(stackRows, SAMPLE_SETTINGS,
+    { filterValue: '', months: 'all', bucket: 'week', asOf: D(2026, 8, 10) });
+  is(stacked.cycleScatter.points.map(p => p.stack), [2, 2, 1],
+     'and derive stamps it on the finished-item dots, so the tooltip need not guess');
+  ok(stacked.ageing.count === 0 || stacked.ageing.points.every(p => p.stack === 1),
+     'age dots are spread across their column, so none of them ever stack');
+
+  const tip = (raw) => Dots.dotTipFooter([{ raw }]);
+  is(tip({ key: 'DAE-9', stack: 1 }), ['Click to copy DAE-9'],
+     'a lone dot offers its key, once');
+  is(tip({ key: 'DAE-9', stack: 6 }),
+     ['6 items sit on this dot', 'Click to copy DAE-9, the one named above'],
+     'a stacked dot says how many are under the pointer, and WHICH one a click takes');
+  is(tip({ key: '', stack: 6 }), ['6 items sit on this dot'],
+     'a stack with no keys still reports its density, and offers no copy');
+  is(tip({ key: '', stack: 1 }), [], 'a lone dot with no key adds nothing at all');
+  is(Dots.dotTipFooter([]), '', 'and a tooltip over nothing has no footer');
+  ok(Dots.onlyTopDot({}, 0) && !Dots.onlyTopDot({}, 1),
+     'the tooltip keeps the FIRST item only \u2014 the one the click will copy');
+
   /* The wiring. No pure test can see a renderer that forgot to attach the
      handler, and "it works on one scatter and not the other" is a bug nobody
      could describe — so both are pinned, and pinned as the SAME function. */
@@ -1075,6 +1111,14 @@ async function run(TD, win) {
      'and it is ONE handler shared by both, so the pair cannot drift apart');
   is(liveCharts.chartCycleScatter.options.onHover, liveCharts.chartItemAge.options.onHover,
      'the cursor affordance likewise');
+  is(liveCharts.chartCycleScatter.options.plugins.tooltip.filter,
+     liveCharts.chartItemAge.options.plugins.tooltip.filter,
+     'and both tooltips describe one dot through the same filter');
+  is(liveCharts.chartCycleScatter.options.plugins.tooltip.filter, Dots.onlyTopDot,
+     'which is the top-dot filter, not something a render improvised');
+  is(liveCharts.chartCycleScatter.options.plugins.tooltip.callbacks.afterBody,
+     liveCharts.chartItemAge.options.plugins.tooltip.callbacks.afterBody,
+     'and one shared footer writes the single copy line on both');
   /* Charts that are not scatters of items must NOT copy: their points are
      periods and buckets, and there is nothing to put on a clipboard. */
   ok(!liveCharts.chartThroughput || !liveCharts.chartThroughput.options.onClick,
@@ -4505,7 +4549,6 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(ragged.map(r => r.length), [3, 3], 'a colspan row is padded to the full width');
   is(ragged[1], ['none', '', ''], 'with the value in the first cell and blanks after it');
 
-  /* ────────────────────────────────────────────────────────── */
   group('escapeHtml — the free-text boundary (a team name reaching innerHTML)');
 
   /* `sanitizeTeams` has had a hostile-id test since it was written; this

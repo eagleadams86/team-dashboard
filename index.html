@@ -3046,6 +3046,34 @@ function dotName(p) {
   return (p && p.key) || (p && p.type) || AGE_UNTYPED;
 }
 
+/* How many items are sitting on this exact dot, written onto every dot of both
+   scatters as `stack`.
+
+   A dot is one item, but two items that finished on the same day in the same
+   number of days land on the same pixel and are drawn as one — which is what
+   the translucent fill is for. Chart.js hands a hover over a stack to EVERY
+   item in it, so the tooltip used to repeat itself once per item and, once dots
+   could be copied, offer a copy line for each of six items when a click could
+   only ever take one of them. Counting the stack here lets the tooltip describe
+   the one dot a click will actually copy and say plainly how many others are
+   underneath it.
+
+   Counted on exact x/y equality, which is the same test Chart.js applies when
+   it decides two dots are equally near the pointer — so the number the tooltip
+   states is the number of items the pointer is really over, not an estimate
+   from pixel rounding. The age chart spreads its dots across their column, so
+   nothing there stacks and every dot reads 1; it is run over both anyway, so
+   the pair cannot drift apart. */
+function stackDots(points) {
+  const counts = new Map();
+  points.forEach((p) => {
+    const k = p.x + '|' + p.y;
+    counts.set(k, (counts.get(k) || 0) + 1);
+  });
+  points.forEach((p) => { p.stack = counts.get(p.x + '|' + p.y); });
+  return points;
+}
+
 /* Ten thousand deals. Enough that the answers stop moving at the resolution
    they are reported in — whole items, whole periods — and cheap enough (a
    couple of milliseconds for both questions) to run on every render alongside
@@ -3661,6 +3689,11 @@ function derive(rows, settings, view, stages) {
   if (ageP85 != null) scatterLines.push({ key: 'p85', value: ageP85,
     text: CYCLE_PERCENTILE + '% took under ' + ageShort(ageP85) });
 
+  /* Written before the points leave derive, so how crowded a dot is is a pinned
+     property of the data rather than something the tooltip works out on the
+     fly. */
+  stackDots(scatterPoints);
+
   const cycleScatter = {
     points: scatterPoints,
     lines: scatterLines,
@@ -3682,10 +3715,10 @@ function derive(rows, settings, view, stages) {
      beside it, and measured with spanDays so the working-days setting reaches
      it exactly as it reaches the ageing threshold it is drawn against.
 
-     The dots carry no ticket key, and cannot: this app stores none, on purpose.
-     What a dot does carry — its work type and its start date — is enough to
-     find the item in the export it came from, which is what the tooltip and the
-     ⓘ both say. */
+     A dot carries its issue key where the paste had a Key column — the one
+     shape-checked field this app stores — and its work type and start date
+     where it did not, either of which finds the item in the export it came
+     from. That is what the tooltip and the ⓘ both say. */
   const inFlight = items
     .filter(r => r.started && !r.completed)
     .map(r => ({
@@ -3798,6 +3831,10 @@ function derive(rows, settings, view, stages) {
       });
     });
   });
+  /* Always 1 here — the spread above guarantees it — and run anyway so both
+     scatters carry the same field and the tooltip they share can read it
+     without asking which chart it is on. */
+  stackDots(agePoints);
 
   /* The lines the dots are read against. Two are this team's own finished work
      — the same median and percentile the headline tile states, taken from the
@@ -4200,7 +4237,7 @@ window.TD = {
      declared far below this line and are hoisted, which is why naming them here
      is safe where naming a `const` from a later section is a TDZ error that
      takes the whole app down — see ART_NONE above. */
-  issueSortKey, dotName,
+  issueSortKey, dotName, stackDots,
   /* Stages: the guards, the pure column matcher and the pure figures, so the
      whole feature can be pinned without a dialog or a paste box on screen. */
   normalizeAlias, cleanStageAlias, cleanStageDays, stageColumnsFor, duplicateStageAliases,
@@ -4903,7 +4940,7 @@ window.tdRaisesKeyboard = raisesKeyboard;
 window.TDState = { sanitizeTeams, sanitizeArts, sanitizeStages, hydrateState, normalizeSettings,
   isBackup, ID_OK, PROTO_KEY, serializeRows, hydrateRows, hydrateStageDays, SCHEMA };
 /* Click-to-copy's pure part, and the entry point the suite drives. */
-window.tdDots = { dotUnder, copyDotKey };
+window.tdDots = { dotUnder, copyDotKey, dotTipFooter, onlyTopDot };
 /* The live Chart.js instances, for the suite alone. It is how the two scatters
    are pinned as still carrying the click-to-copy handlers — wiring a renderer
    forgets is exactly the kind of regression no pure test can see. */
@@ -5316,11 +5353,50 @@ function onDotHover(e, els, chart) {
   chart.canvas.style.cursor = (p && p.key) ? 'pointer' : 'default';
 }
 
+/* A tooltip describes ONE dot: the one a click would copy.
+
+   Chart.js hands a hover over a stack of coincident dots to every item in it,
+   so a busy day used to draw the same sentence six times over, each with its
+   own "Click to copy DAE-xxxx" — and five of those six were a lie, because a
+   click copies the first item and nothing on the chart can reach the others.
+   Keeping the first item is what makes the tooltip agree with the click: it is
+   the same element, in the same order, from the same interaction settings, and
+   it is the one the title already names. How many are underneath is not lost —
+   `stack` carries it, and dotTipFooter says it in words. */
+function onlyTopDot(item, index) {
+  return index === 0;
+}
+
+/* The last lines of both scatters' tooltips: how crowded this dot is, then what
+   pressing it does — in that order, because the density is the thing that makes
+   the copy line need explaining.
+
+   Said here rather than per item precisely because there must be exactly one of
+   it. A dot with no key still reports its stack: the crowding is worth knowing
+   whether or not there is anything to copy, and offering a copy of nothing is
+   what this callback exists to avoid. */
+function dotTipFooter(items) {
+  const p = items && items.length ? items[0].raw : null;
+  if (!p) return '';
+  const lines = [];
+  const stack = p.stack || 1;
+  if (stack > 1) lines.push(stack + ' items sit on this dot');
+  if (p.key) {
+    lines.push(stack > 1 ? 'Click to copy ' + p.key + ', the one named above'
+      : 'Click to copy ' + p.key);
+  }
+  return lines;
+}
+
 /* Mutates and returns the options object, the way every other scatter tweak in
-   this file does. */
+   this file does. The tooltip half is set here rather than beside each chart's
+   own callbacks for the same reason the handlers are: a copy line that read one
+   way on one scatter and another way on the other would be a bug nobody could
+   describe. */
 function dotsCopyKeys(opts) {
   opts.onClick = onDotClick;
   opts.onHover = onDotHover;
+  opts.plugins.tooltip.filter = onlyTopDot;
   return opts;
 }
 
@@ -5612,16 +5688,16 @@ function drawCharts(d) {
        the rest can be named and then looked up. Without a key it reads exactly
        as it always did: the type and the date, which is what finds the item in
        the export it came from. Same shape on the age chart below, so the pair
-       still reads together. */
+       still reads together.
+
+       One dot per tooltip — see onlyTopDot — so the title, the figure and the
+       copy line all describe the same item, however many are stacked under the
+       pointer. The copy line itself is dotTipFooter, said once. */
     scatOpts.plugins.tooltip.callbacks = {
       title: (its) => dotName(its[0].raw) + ' \u00b7 finished '
         + prettyDate(its[0].raw.completed),
       label: (c) => num1(c.raw.y) + ' ' + d.dayNoun + ' from start to finish',
-      /* Said on the tooltip rather than anywhere else, because the tooltip is
-         the only thing on screen at the moment the pointer is over a dot — and
-         only when there is a key, so it never advertises something that would
-         do nothing. */
-      afterLabel: (c) => c.raw.key ? 'Click to copy ' + c.raw.key : ''
+      afterBody: dotTipFooter
     };
     dotsCopyKeys(scatOpts);
 
@@ -5759,12 +5835,11 @@ function drawCharts(d) {
         return dotName(p) + ' \u00b7 started ' + prettyDate(p.started);
       },
       label: (c) => int0(c.raw.y) + ' ' + d.dayNoun + ' in progress',
-      /* Two lines under the figure, in the order they matter: what is wrong
-         with this item, then what pressing it does. */
-      afterLabel: (c) => [
-        c.raw.aged ? 'Past the ' + a.threshold + '-' + d.dayNoun + ' threshold' : '',
-        c.raw.key ? 'Click to copy ' + c.raw.key : ''
-      ].filter(Boolean).join('\n')
+      /* What is wrong with this item comes first; what pressing it does is
+         dotTipFooter, under this and said once. */
+      afterLabel: (c) => c.raw.aged
+        ? 'Past the ' + a.threshold + '-' + d.dayNoun + ' threshold' : '',
+      afterBody: dotTipFooter
     };
     dotsCopyKeys(ageOpts);
 
