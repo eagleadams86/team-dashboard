@@ -4560,6 +4560,86 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(ragged[1], ['none', '', ''], 'with the value in the first cell and blanks after it');
 
   /* ────────────────────────────────────────────────────────── */
+  group('a reload puts you back on the view you were using');
+
+  /* Reported on 2026-08-21: a refresh always threw you back to the dashboard.
+     It was deliberate — `activeTab` was kept out of the saved view on the
+     reasoning that "a reload should open on the dashboard" — but both sibling
+     apps restore theirs, and All Teams is where somebody with several teams
+     actually works. These pin the new behaviour AND the three ways a remembered
+     tab has to fail safe. */
+  {
+    /* TWO teams, and that is not incidental: All Teams is taken away below two,
+       so without this selectTab refuses it and every assertion below reads
+       "dashboard" — which is the guard working, not the feature failing. Got
+       this wrong the first time and the failure said so. */
+    plant({ teams: [
+      { id: 'ta', name: 'Alpha', rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] },
+      { id: 'tb', name: 'Beta',  rows: [{ c: '2015-01-22', s: '2015-01-20', t: 'Story' }] }
+    ], settings: {} });
+    const stored = () => JSON.parse(localStorage.getItem('td-view') || '{}').activeTab;
+
+    win.selectTab('allteams');
+    is(stored(), 'allteams', 'moving to All Teams is remembered');
+    win.selectTab('dashboard');
+    is(stored(), 'dashboard', 'and so is moving back');
+
+    /* Settings and Your Data are places you go to do a thing and then leave.
+       Opening the app in Settings would be its own small wrong-footing, so
+       neither overwrites what is remembered. */
+    win.selectTab('allteams');
+    win.selectTab('settings');
+    is(stored(), 'allteams', 'a trip to Settings does not become where the app opens');
+    win.selectTab('data');
+    is(stored(), 'allteams', 'and neither does Your Data');
+
+    /* The stale-value case, which is real: All Teams is taken away below two
+       teams, so a position saved while it was there outlives the team that was
+       deleted. selectTab already refused a hidden tab — this is why nothing
+       extra was needed to make remembering safe. */
+    win.selectTab('allteams');
+    const tabEl = win.document.getElementById('tab-allteams');
+    const was = tabEl.hidden;
+    tabEl.hidden = true;
+    win.selectTab('allteams');
+    is(win.document.getElementById('panel-dashboard').hidden, false,
+       'a remembered tab that is no longer on offer falls back to the dashboard');
+    tabEl.hidden = was;
+
+    win.selectTab('nonsense');
+    is(win.document.getElementById('panel-dashboard').hidden, false,
+       'and so does a junk value from a hand-edited copy');
+    win.selectTab('dashboard');
+  }
+
+  /* The end-to-end version of the same thing: a real boot, in its own frame,
+     with a remembered tab already in localStorage. This is the behaviour that
+     was actually reported, so it is worth testing the way it is experienced
+     rather than only through the function underneath. */
+  {
+    const keep = { view: localStorage.getItem('td-view'), state: localStorage.getItem('td-state') };
+    localStorage.setItem('td-state', JSON.stringify({
+      v: 3, teams: [
+        { id: 'a', name: 'Alpha', rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] },
+        { id: 'b', name: 'Beta',  rows: [{ c: '2015-01-22', s: '2015-01-20', t: 'Story' }] }
+      ], settings: {}
+    }));
+    localStorage.setItem('td-view', JSON.stringify({ activeTab: 'allteams', months: 'all' }));
+    const f = document.createElement('iframe');
+    f.setAttribute('data-td-tests', '');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
+    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html'; document.body.appendChild(f); });
+    const doc = f.contentWindow.document;
+    is(doc.getElementById('panel-allteams').hidden, false,
+       'the app opens on All Teams when that is where it was left');
+    is(doc.getElementById('panel-dashboard').hidden, true, 'and not on the dashboard');
+    f.remove();
+    /* Put the suite's own storage back — everything after this reads it. */
+    if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
+    if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
   group('All Teams — the per-team trend column');
 
   /* The column answers the one question the rest of that table cannot: not

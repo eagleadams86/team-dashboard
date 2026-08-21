@@ -4331,6 +4331,22 @@ const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', act
      where a reader expects to find a team before they have asked for anything
      else. Validated at its point of use like every other view field — an
      unknown key just means no sort. */
+  /* Which of the two number views you were last on, so a reload puts you back
+     where you were working. It used to be deliberately NOT saved, on the
+     reasoning that "a reload should open on the dashboard" — but both sibling
+     apps restore theirs (Sprint Predictability keeps `settings.view`, Money Map
+     keeps `ui.activeTab`), and Sprint Predictability is the design lead for the
+     chrome this app shares with it, so the odd one out was this. Reported as
+     annoying on 2026-08-21, which it is: All Teams is where somebody with
+     several teams actually works, and a refresh threw them back every time.
+
+     ONLY the two number views are remembered. Settings and Your Data are places
+     you go to do a thing and then leave, and opening the app in Settings would
+     be its own small wrong-footing. selectTab already refuses a tab that is
+     hidden or unknown and falls back to the dashboard, so nothing extra is
+     needed to make a stale value safe — All Teams disappearing below two teams
+     is exactly that case, and it was already handled. */
+  activeTab: 'dashboard',
   teamSort: null, teamSortDir: 'desc',
   /* How the Loaded Data table is sorted, on the same terms: null is the order it
      opens in — unfinished first, then newest — which is where a reader expects
@@ -6145,7 +6161,7 @@ const METRIC_HELP = {
       + 'export reports that quarter. One caveat: the clean-up tool’s option to also remove '
       + 'unfinished items deletes long-running work in progress, which is exactly what this '
       + 'chart counts, so history before a clean-up like that will read low.' },
-  teamTrend: { title: 'Trend',
+  teamTrend: { title: 'Throughput Trend',
     body: 'Which way this team\u2019s throughput has been going across the window on screen \u2014 '
       + 'the same fitted line the chart above draws, one per team. The figure is what that line '
       + 'rises or falls by from one end of the window to the other, in items per '
@@ -6944,7 +6960,12 @@ function teamColumns(train) {
        first press, like Data to and for the same reason: every other column's
        interesting end is its biggest figure, and this one's is its most
        NEGATIVE — the team sliding is the team that needs you. */
-    { key: 'trend', label: 'Trend', spark: true, desc: false, help: 'teamTrend',
+    /* "Trend" alone was the first label and it was not enough: every other
+       column here names its metric, so a bare "Trend" made the reader ask
+       "trend of what?" — with eight columns beside it, that is a fair question
+       and the ⓘ is not an answer a table should need. It names throughput, the
+       app's own word for the thing the chart above plots. */
+    { key: 'trend', label: 'Throughput trend', spark: true, desc: false, help: 'teamTrend',
       get: (d) => { const t = throughputTrend(d); return t ? t.change : null; },
       fmt: (v) => or(v, num1) },
     { key: 'p85', label: train.cyclePercentile + 'th ' + cycle.toLowerCase(), desc: true,
@@ -7502,6 +7523,13 @@ function selectTab(name) {
      that was deleted — or the share link that arrived with one team in it. */
   if (!TABS.includes(name) || $('tab-' + name).hidden) name = 'dashboard';
   activeTab = name;
+  /* Remembered for the next load — the two number views only, see DEFAULT_VIEW.
+     saveView() is a no-op in a shared view, so someone else's link can never
+     move where YOUR copy opens. */
+  if (NUMBER_TABS.includes(name) && view && view.activeTab !== name) {
+    view.activeTab = name;
+    saveView();
+  }
   TABS.forEach(t => {
     const sel = t === name;
     const tab = $('tab-' + t);
@@ -10244,7 +10272,9 @@ if (viewOnly) {
   $('dateOrder').value = view.dateOrder;
   renderSettingsForm();
   renderAll();
-  selectTab(activeRows().length ? 'dashboard' : 'data');
+  /* No rows at all still wins: there is nothing for either number view to show,
+     and Your Data is the one place that can do anything about it. */
+  selectTab(activeRows().length ? view.activeTab : 'data');
 }
 </script>
 
