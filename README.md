@@ -699,11 +699,14 @@ Everything the charts depend on, shared by all your teams:
 - **Word for defects on charts** (`Defect` by default — singular, because it reads as
   "Defect rate") and the **word for cycle time** (Cycle Time / Time in Process / TiP /
   In Process Time)
-- **Work type filter list** — the Display → Value pairs behind the dashboard's filter. Out of
-  the box: `All`, `Defects → Bug`, `Spikes → Spike`, `Stories → Story`, `Tasks → Task`, so the
-  filter is useful on the first paste rather than after a trip back here. Spikes especially —
-  they are timeboxed investigations rather than delivered value, and taking them out of
-  throughput changes the picture
+- **Work type filter list** — the Display → Value pairs behind the dashboard's filter. Out of the
+  box just two: `All`, which is the locked no-filter row, and `Defects → Bug`, which is paired
+  with the defect type above so the filter and the defect rate agree without being told to.
+  **Add the types your own board uses** with *Add a type* — the parse report names the work types
+  it found in your paste, so you can copy them straight across. It used to ship Spikes, Stories and
+  Tasks as well; they were guesses at somebody else's board, and on a team whose types read
+  Feature, Chore and Incident they were three filters matching nothing, which reads as broken data
+  rather than as a setting nobody has set
 
 Nothing else is here on purpose: a setting that changes nothing is worse than a missing one.
 

@@ -242,6 +242,37 @@ this file was written to keep out. **Read this whole section before changing any
   meaning rather than a parse. Neither is built. The work item age chart's stage axis WAS
   built — off the current stage rather than off these durations; see the section above it.
 
+## Two Defaults Trimmed, and a Delete That Did Not Look Like One (2026-08-21)
+
+- **`sameDayValue` is 0.5**, reversing a default of 1 and the reasoning that came with it ("an item
+  opened and closed inside one day still occupied someone for that day"). A whole day is the same
+  figure as an item that genuinely took a full day, so the two cannot be told apart in any
+  percentile or average — on a board that closes a lot of small work that pulls the distribution UP,
+  not down. Half a day is the most an app working in whole dates can honestly say about a span its
+  dates cannot resolve.
+- **The default filter list is two rows**, trimmed from five: `All` and `Defects → Bug`. The three
+  that went — Spikes, Stories, Tasks — were guesses at somebody else's board, and on a team whose
+  types read Feature, Chore and Incident they were three filters matching nothing, which reads as
+  broken data rather than as a setting nobody set. `Defects → Bug` stays because it PAIRS with
+  `unplannedType`: the same word and the same match, so the strip and the defect rate agree out of
+  the box. A test pins that pairing, not just the list.
+- **BOTH ARE SAFE FOR THE SAME REASON, and it is the reason a default can be moved here at all**:
+  `normalizeSettings` fills gaps rather than overwriting, so they reach only a first run and "Reset
+  settings to defaults" and no existing dashboard's figures move. There is a test saying so
+  directly beside each new value — that property is the whole licence.
+- **WATCH FOR TESTS THAT READ A DEFAULT INSTEAD OF SETTING ONE.** Two scatter tests moved with
+  `sameDayValue`, and one of them was a PAIR meant to show that changing the setting moves a dot —
+  it had quietly stopped showing anything the moment its contrast value became the new default. A
+  contrast test has to contrast with something the default is not, and a test about something else
+  should pin the settings it does not care about.
+- **`.icon-btn.danger` on the work type filter's delete.** The base hover is neutral and `.danger`
+  is what turns it red — the same split `.btn` and `.btn.danger` use — and that row was the one
+  place the class had been left off, so the only destructive control on the Settings tab was also
+  the only one that gave no warning as the pointer arrived. Pinned as an INVARIANT over the page
+  rather than as a check on that button: every icon button that deletes carries it, and every one
+  that merely MOVES something does not, because reordering is not destructive and must not light up
+  as though it were.
+
 ## Two Alignment Rules the Grid and the Table Were Missing (2026-08-21)
 
 Both reported by Charles looking at the app, and both are the same shape: something stated for one

@@ -4721,16 +4721,30 @@ const DEFAULT_SETTINGS = {
      setting. */
   workingDays: false,
   cycleTimeLabel: 'Cycle Time',
-  /* The four types a Jira board actually produces, so the dashboard filter is
-     useful on the first paste instead of after a trip to Settings. Spikes
-     especially: they are timeboxed investigations rather than delivered value,
-     and being able to take them out of throughput matters. */
+  /* TWO ROWS, and this trims a list of five. It used to ship Spikes, Stories and
+     Tasks as well, on the reasoning that they are "the four types a Jira board
+     actually produces, so the dashboard filter is useful on the first paste
+     instead of after a trip to Settings". Cut at Charles's request 2026-08-21.
+
+     What is left is the one split the app is built around and the one row that
+     cannot be removed. `All` means no filter at all and is locked. `Defects`
+     pairs with `unplannedType` above — the same word, the same match — so the
+     defect rate on the dashboard and the filter in the strip agree out of the
+     box, which is the one pairing here that would be wrong if it disagreed.
+
+     The three that went were guesses at somebody else's board. A team whose
+     type column reads Feature, Chore and Incident got three rows matching
+     nothing, which is worse than an empty list: a filter that silently returns
+     no items reads as broken data rather than as a setting nobody set. Adding
+     the types you do have is one press of Add a type, and the paste report
+     already names the work types it found.
+
+     Reaches only a first run and Reset settings to defaults — normalizeSettings
+     fills gaps rather than overwriting, so a browser that already has five
+     keeps five. */
   filters: [
     { display: 'All',     value: 'All' },
-    { display: 'Defects', value: 'Bug' },
-    { display: 'Spikes',  value: 'Spike' },
-    { display: 'Stories', value: 'Story' },
-    { display: 'Tasks',   value: 'Task' }
+    { display: 'Defects', value: 'Bug' }
   ]
 };
 
@@ -7989,7 +8003,11 @@ function renderFilterRows() {
         ' aria-label="Type text to match, work type row ' + (i + 1) + '"' +
         (locked ? ' readonly' : '') + '></td>' +
       '<td class="act">' + (locked ? '' :
-        '<button class="icon-btn" data-del="' + i + '" title="Remove this type" aria-label="Remove ' +
+        /* `.danger`, like every other delete in the app — the base hover is
+           neutral and that class is what turns it red. This was the one that
+           did not, so the only destructive control in Settings was also the
+           only one that gave no warning as the pointer reached it. */
+        '<button class="icon-btn danger" data-del="' + i + '" title="Remove this type" aria-label="Remove ' +
         escapeHtml(f.display) + '">&times;</button>') + '</td>';
     tb.appendChild(tr);
   });

@@ -2341,17 +2341,29 @@ async function run(TD, win) {
   is(def.cycleTimeLabel, 'Cycle Time', 'and cycle time is called cycle time');
   is(def.workingDays, false,
      'and days are calendar days out of the box — the measure every saved board was taken in');
-  is(def.filters.map(f => f.display + '→' + f.value),
-     ['All→All', 'Defects→Bug', 'Spikes→Spike', 'Stories→Story', 'Tasks→Task'],
-     'the filter list covers the four types a Jira board actually produces');
+  /* TWO rows since 2026-08-21, trimmed from five — Spikes, Stories and Tasks
+     went. They were guesses at somebody else's board, and on a team whose types
+     read Feature, Chore and Incident they were three filters matching nothing,
+     which reads as broken data rather than as a setting nobody set. What is left
+     is the locked All row and the one pairing that would be wrong if it
+     disagreed: Defects→Bug matches `unplannedType`, so the defect rate and the
+     filter say the same thing out of the box. */
+  is(def.filters.map(f => f.display + '→' + f.value), ['All→All', 'Defects→Bug'],
+     'the filter list ships the no-filter row and the defect split, and nothing guessed');
+  is(def.filters[1].value, def.unplannedType,
+     'and the defect row matches the defect type, or the strip and the chart would disagree');
 
-  is(S.normalizeSettings({ filters: [] }).filters.length, 5, 'an empty filter list is restored to the defaults');
-  is(S.normalizeSettings(null).filters.length, 5, 'null settings give the defaults');
-  is(S.normalizeSettings({ filters: 'nope' }).filters.length, 5, 'a non-array filter list is restored');
+  /* Against the default's own length rather than a literal, so trimming it again
+     does not send someone hunting through four unrelated assertions. */
+  is(S.normalizeSettings({ filters: [] }).filters.length, def.filters.length,
+     'an empty filter list is restored to the defaults');
+  is(S.normalizeSettings(null).filters.length, def.filters.length, 'null settings give the defaults');
+  is(S.normalizeSettings({ filters: 'nope' }).filters.length, def.filters.length,
+     'a non-array filter list is restored');
 
   /* Settings cross the same boundary as teams — a hand-edited backup or cloud
      doc can hold anything — so entries and scalars are coerced, not trusted. */
-  is(S.normalizeSettings({ filters: ['junk', 42, null] }).filters.length, 5,
+  is(S.normalizeSettings({ filters: ['junk', 42, null] }).filters.length, def.filters.length,
      'junk filter entries are dropped — and an emptied list gets the defaults back');
   is(S.normalizeSettings({ filters: [{ display: 'OK', value: 'ok' }, 'junk'] }).filters,
      [{ display: 'OK', value: 'ok' }], 'a junk entry is dropped, a real one kept');
@@ -5277,7 +5289,49 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
-  group('delete all data takes the ARTs and the stages with it');
+group('a delete looks like a delete, everywhere');
+
+  /* Reported by Charles on 2026-08-21: the × on a work type filter row lit up
+     neutral where the ones in Teams & Stages go red. `.icon-btn`'s hover is
+     deliberately neutral and `.danger` is what turns it — the same split `.btn`
+     and `.btn.danger` already use — and that row was the one place the class had
+     been left off. So the only destructive control on the Settings tab was also
+     the only one that gave no warning as the pointer arrived.
+
+     Pinned as an INVARIANT over the whole page rather than as a check on that
+     one button: every icon button that deletes carries it, and every one that
+     merely MOVES something does not. Reordering is not destructive and must not
+     light up as though it were, which is the other half of the same rule. */
+  {
+    plant({
+      teams: [{ id: 'dg1', name: 'A', rows: [] }, { id: 'dg2', name: 'B', rows: [] }],
+      arts: [{ id: 'dga', name: 'Train' }],
+      stages: [{ id: 'dgs', name: 'Review', match: [] }],
+      settings: {}
+    });
+    win.renderAll();
+    win.renderSettingsForm();
+
+    const icons = [...win.document.querySelectorAll('.icon-btn')];
+    ok(icons.length > 4, 'there are icon buttons on the page to check', icons.length);
+
+    const isDelete = (b) => Object.keys(b.dataset).some(k => k.toLowerCase().startsWith('del'));
+    const isMove = (b) => Object.keys(b.dataset).some(k => k.toLowerCase().startsWith('move'));
+
+    const deletes = icons.filter(isDelete);
+    ok(deletes.length >= 4,
+       'including a delete on teams, ARTs, stages and the work type filters', deletes.length);
+    is(deletes.filter(b => !b.classList.contains('danger')).map(b => b.title || b.ariaLabel), [],
+       'every one of them carries .danger, so every one of them goes red on hover');
+
+    const moves = icons.filter(isMove);
+    ok(moves.length >= 2, 'and there are reorder arrows to check against', moves.length);
+    is(moves.filter(b => b.classList.contains('danger')).map(b => b.title), [],
+       'while not one of the reorder arrows does — moving something is not destructive');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+    group('delete all data takes the ARTs and the stages with it');
 
   /* Reported by Charles on 2026-08-21: "arts and stages aren't deleting when I
      hit delete all data". They were not in the reset at all, so a reader who had
