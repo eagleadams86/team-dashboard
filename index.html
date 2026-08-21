@@ -4838,6 +4838,12 @@ window.tdRaisesKeyboard = raisesKeyboard;
    backup file, a share link — is allowed to turn into. */
 window.TDState = { sanitizeTeams, sanitizeArts, sanitizeStages, hydrateState, normalizeSettings,
   isBackup, ID_OK, PROTO_KEY, serializeRows, hydrateRows, hydrateStageDays, SCHEMA };
+/* Click-to-copy's pure part, and the entry point the suite drives. */
+window.tdDots = { dotUnder, copyDotKey };
+/* The live Chart.js instances, for the suite alone. It is how the two scatters
+   are pinned as still carrying the click-to-copy handlers — wiring a renderer
+   forgets is exactly the kind of regression no pure test can see. */
+window.tdCharts = () => charts;
 window.tdCounts = (d) => ({
   teams: (d && d.teams) ? d.teams.length : 0,
   items: (d && d.teams) ? d.teams.reduce((n, t) => n + ((t.rows && t.rows.length) || 0), 0) : 0
@@ -5190,6 +5196,70 @@ function trendDataset(values) {
   };
 }
 
+/* ── Click a dot, get its key on the clipboard ───────────────────────────────
+   Asked for on 2026-08-21, and it is the natural end of what the issue key was
+   stored for in the first place: the tooltip NAMES the item furthest up the
+   column, and the next thing anybody does with that name is paste it into Jira.
+   Reading it off a tooltip and retyping it is the step this removes.
+
+   ONE helper shared by both scatters, like `dotName` and for the same reason:
+   they are read as a pair, and a copy that worked on one chart and not the
+   other would be a bug nobody could describe.
+
+   A dot with no key says so rather than copying something else. `dotName` falls
+   back to the work type for a paste with no Key column — useful as a LABEL,
+   useless on a clipboard, and silently copying "Story" would be worse than
+   doing nothing. The reference lines cannot be hit at all: they carry
+   pointHitRadius 0, and their points have no key either way.
+
+   Deliberately alive in a shared view, on the same reasoning as the table
+   export buttons: it writes nothing and reads only what is already drawn on the
+   recipient's screen. Keyboard and screen-reader users reach the same keys
+   through the Loaded Data table on the Your Data tab, which is where every
+   chart's aria-label already points and which has its own Copy button. */
+function dotUnder(chart, els) {
+  if (!els || !els.length) return null;
+  const set = chart.data.datasets[els[0].datasetIndex];
+  const raw = set && set.data ? set.data[els[0].index] : null;
+  return (raw && typeof raw === 'object') ? raw : null;
+}
+
+async function copyDotKey(p) {
+  if (!p.key) {
+    window.toast('That item has no issue key — add a Key column to your paste and it will '
+      + 'name the dots', 4000);
+    return;
+  }
+  const ok = await copyText(p.key);
+  window.toast(ok ? 'Copied ' + p.key
+    : 'Could not copy ' + p.key + ' — this browser refused the clipboard', ok ? 2600 : 4000);
+}
+
+/* Declared ONCE and shared by both charts rather than built per render, so the
+   two carry the identical function — which is a property a test can assert, and
+   the cheapest possible guard on the pair drifting apart. It also stops a new
+   pair of closures being allocated on every keystroke that redraws a chart. */
+function onDotClick(e, els, chart) {
+  const p = dotUnder(chart, els);
+  if (p) copyDotKey(p);
+}
+
+/* The cursor is the whole affordance — a canvas gives no other hint that
+   anything under it can be pressed — so it turns to a pointer only over a dot
+   that will actually copy something. */
+function onDotHover(e, els, chart) {
+  const p = dotUnder(chart, els);
+  chart.canvas.style.cursor = (p && p.key) ? 'pointer' : 'default';
+}
+
+/* Mutates and returns the options object, the way every other scatter tweak in
+   this file does. */
+function dotsCopyKeys(opts) {
+  opts.onClick = onDotClick;
+  opts.onHover = onDotHover;
+  return opts;
+}
+
 function renderChart(id, config) {
   if (charts[id]) charts[id].destroy();
   charts[id] = new Chart(document.getElementById(id).getContext('2d'), config);
@@ -5482,8 +5552,14 @@ function drawCharts(d) {
     scatOpts.plugins.tooltip.callbacks = {
       title: (its) => dotName(its[0].raw) + ' \u00b7 finished '
         + prettyDate(its[0].raw.completed),
-      label: (c) => num1(c.raw.y) + ' ' + d.dayNoun + ' from start to finish'
+      label: (c) => num1(c.raw.y) + ' ' + d.dayNoun + ' from start to finish',
+      /* Said on the tooltip rather than anywhere else, because the tooltip is
+         the only thing on screen at the moment the pointer is over a dot — and
+         only when there is a key, so it never advertises something that would
+         do nothing. */
+      afterLabel: (c) => c.raw.key ? 'Click to copy ' + c.raw.key : ''
     };
+    dotsCopyKeys(scatOpts);
 
     const refLine = (value, colour, dash) => ({
       label: '', type: 'line', data: [{ x: 0, y: value }, { x: scat.lastDay, y: value }],
@@ -5619,8 +5695,14 @@ function drawCharts(d) {
         return dotName(p) + ' \u00b7 started ' + prettyDate(p.started);
       },
       label: (c) => int0(c.raw.y) + ' ' + d.dayNoun + ' in progress',
-      afterLabel: (c) => c.raw.aged ? 'Past the ' + a.threshold + '-' + d.dayNoun + ' threshold' : ''
+      /* Two lines under the figure, in the order they matter: what is wrong
+         with this item, then what pressing it does. */
+      afterLabel: (c) => [
+        c.raw.aged ? 'Past the ' + a.threshold + '-' + d.dayNoun + ' threshold' : '',
+        c.raw.key ? 'Click to copy ' + c.raw.key : ''
+      ].filter(Boolean).join('\n')
     };
+    dotsCopyKeys(ageOpts);
 
     renderChart('chartItemAge', {
       type: 'scatter',

@@ -652,6 +652,41 @@ span is `addDays(endDate, -(PI_WEEKS * 7 - 1))`, i.e. 84 days flat.
   would then disagree with it.
 - It reaches All Teams for free, because `deriveTeams` passes the view straight through.
 
+## Click a Dot, Copy Its Key (2026-08-21)
+
+Asked for by Charles, and the natural end of what the issue key was stored for: the tooltip
+names the item furthest up the column, and the next thing anybody does with that name is paste
+it into Jira.
+
+- **ONE handler shared by both scatters** (`onDotClick` / `onDotHover`, declared once and
+  assigned by `dotsCopyKeys`), like `dotName` and for the same reason: the two charts are read
+  as a pair, and a copy that worked on one and not the other is a bug nobody could describe.
+  Declared at module level rather than built per render so the two carry the *identical*
+  function — which is what lets a test assert it, and the cheapest guard there is on the pair
+  drifting. Pinned, along with both charts actually carrying it: a renderer that forgot to
+  attach the handler is a regression no pure test can see.
+- **A dot with no key says so and copies nothing.** `dotName` falls back to the work type for a
+  paste with no Key column — useful as a label, useless on a clipboard, and silently putting
+  "Story" there would be worse than doing nothing. The no-key branch toasts synchronously,
+  which is why it is the one the suite asserts on; the success branch awaits `copyText`.
+- **The cursor is the whole affordance** — a canvas gives no other hint that anything under it
+  can be pressed — so it turns to a pointer ONLY over a dot that will actually copy. The
+  tooltip's last line says "Click to copy DAE-1234", and only when there is a key.
+- **Reference lines cannot be hit**: `pointHitRadius: 0`, and their points carry no key anyway.
+  `dotUnder` returns null for a dataset with no `data`, which is pinned.
+- **Alive in a shared view**, on exactly the reasoning the table export buttons carry: it writes
+  nothing and reads only what is already drawn on the recipient's screen.
+- **Charts whose points are PERIODS must never get this.** There is nothing to put on a
+  clipboard, and a pointer cursor over a bar would promise one. Pinned.
+- **Keyboard and screen-reader users are not served by this and cannot be** — a canvas has no
+  focusable points. The route to the same keys is the Loaded Data table, which every chart's
+  `aria-label` already points at and which has its own Copy button. Say that in the README
+  rather than pretending the chart is reachable; do NOT "fix" it by making the canvas focusable,
+  which would put one tab stop in front of a hundred invisible dots.
+- `copyText()` was already there for the table exports — clipboard API first, `execCommand`
+  behind it, and an honest toast when both refuse. Nothing new was written for the copying
+  itself.
+
 ## The Cycle Time Scatter (2026-08-20)
 
 One dot per finished item, beside the cycle time line — the same measure at two resolutions, and
