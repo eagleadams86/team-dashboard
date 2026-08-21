@@ -594,8 +594,12 @@ app now holds identifiers out of a work system, and the answer to "where does th
   (measured, real, and not something a fresh implementation would think of), the
   never-guess-by-timestamp reconciliation, the empty-copy-never-wins rule, and the
   `serverAt` server-clock ordering. It is all in one commit in `git log`.
-- **Data written before the removal still sits in Firestore.** Removing the client does not
-  delete it. `privacy.html` tells anyone who used sync how to ask for deletion.
+- **The Firestore data was deleted too, 2026-08-20**, by hand in the console — removing a
+  client deletes nothing server-side, so this was a separate deliberate step. The
+  `teamdashboard` collection is empty. `privacy.html` states that rather than promising
+  deletion on request. The project `teamdashboard-6723f` itself still exists; deleting it
+  outright is a further step nobody has taken, and would also kill the API key that GitHub's
+  secret scanner flags on this repo — see [[firebase-api-key-secret-alerts]].
 
 ## Offline (`sw.js`)
 

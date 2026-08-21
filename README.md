@@ -1140,9 +1140,9 @@ personally identifying thing this app ever wrote down — and keeping it after r
 feature that needed it would be keeping an identifier for no reason. Pinned by a test that
 plants both keys, boots the app and checks they are gone.
 
-**Data written before the removal still exists in Firestore.** Removing the client does not
-delete what the server holds; that has to be done in the Firebase console (or the project
-deleted outright), and `privacy.html` now tells anyone who used sync how to ask for it.
+**The data written before the removal was deleted too**, on the same day — removing the
+client deletes nothing server-side, so the Firestore collection was emptied by hand in the
+console. `privacy.html` says so rather than promising to do it on request.
 
 **If it is ever wanted back**, `git log` has the whole module in one commit, including the
 Google Identity Services workaround for corporate networks that block
