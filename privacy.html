@@ -49,8 +49,8 @@
   <p>The only data the app holds is what you paste or type in: team names, an optional
   <em>project id</em> for each team, the names of any workflow stages you set up, and for each team a
   list of work items — a completed date, an optional start date, an optional created date, an
-  optional work type, an optional issue key and, where your export carried them, a number of days
-  against each stage — plus the shared settings (labels, the text that
+  optional work type, an optional issue key and, where your export carried them, which stage the
+  item is currently in and a number of days against each stage — plus the shared settings (labels, the text that
   marks unplanned work, the thresholds, whether days are counted Monday to Friday, the work-type
   filter list) and your preferences (theme, chosen team, date window). No account
   is required to use the app, and there is no analytics, tracking or advertising of any kind.</p>
@@ -72,9 +72,11 @@
   <p><strong>Workflow stages are yours, and no status name from your export is ever
   stored.</strong> A stage is something you create and name in the app — <em>Build</em>,
   <em>Review</em> — and you tell the app which Jira statuses feed it by typing their names
-  yourself. When you paste a Time in Status export, the status names in its column headings are
-  matched against what you typed, turned into a number of days, and then thrown away with the
-  rest of the pasted text. What is saved is the stage name you chose and a number. That is also
+  yourself. When you paste an export, the status names in it — whether they are column headings
+  in a Time in Status export or the values in an ordinary <em>Status</em> column — are matched
+  against what you typed, turned into a stage or a number of days, and then thrown away with the
+  rest of the pasted text. From a Status column only work still in progress is filed at all;
+  finished items are skipped. What is saved is the stage name you chose and a number. That is also
   why the app has no button that picks status names up out of an export: doing so would put
   work-system text into storage, which is the one thing it is built not to do. A share link
   carries the stage names and the day counts, because they are what the figures are; it does
