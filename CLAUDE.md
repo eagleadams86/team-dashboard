@@ -687,6 +687,63 @@ it into Jira.
   behind it, and an honest toast when both refuse. Nothing new was written for the copying
   itself.
 
+## One Chart, Filling the Window (2026-08-21)
+
+Asked for by Charles: a button on each chart to see it full screen, fitted to the window,
+**"with the menu still visible"**. That last phrase decided the whole implementation and is the
+thing to read before changing any of it.
+
+- **It is NOT `requestFullscreen()` and NOT a modal `<dialog>`**, because both take the menu
+  away: the Fullscreen API drops the browser's own chrome as well as the page's, and a modal
+  dialog is promoted to the top layer, which paints over the sticky header and makes it inert.
+  What is here is an ordinary fixed overlay (`#chartMaxi`) at **z-index 15 against the header's
+  20**, starting at `--maxi-top` — the header's own measured height. Both numbers are pinned in
+  tests.html, because the obvious "tidy-up" for this feature is to reach for one of the two APIs
+  that would silently undo it. The header staying live is not decoration: changing team while a
+  chart fills the window and watching it redraw is the thing the feature is for.
+- **The CARD IS MOVED into the overlay, not copied.** `renderChart()` finds its canvas by id and
+  a theme change destroys and rebuilds every chart in the app, so a second canvas up there would
+  leave every redraw painting the copy left behind on the page — the maximised chart would go
+  stale without anything looking wrong. A hidden `.chart-slot` holds the card's place in the grid
+  so it goes back exactly where it came from, index and all. Pinned, including that the Chart.js
+  instance is the same object afterwards.
+- **The button hangs off the CARD, not off `.chart-name`.** That row's `innerHTML` is rewritten
+  on every render (`setTitle`), so a button inside it would be destroyed and rebuilt on every
+  keystroke that redraws a chart; both heading lines carry a matching `padding-right` instead. It
+  is built once at boot for every `.chart-card` that contains a `.chart-wrap` — which is what
+  keeps `#cardStageTime` out of it without naming it: a table has nothing a bigger box would show
+  more of.
+- **`syncMaxiButtons()` runs at the end of every render that can change what is drawable** —
+  both exits of `renderDashboard()`, including the nothing-to-plot branch that destroys every
+  chart, and both exits of `drawTrainThroughput()`. It does two jobs: take the button away from a
+  card with no chart under it, and **bring the window down if the chart that was filling it has
+  gone**. The header is live up there, so changing team is the ordinary way to reach that; without
+  this the overlay would hold a destroyed canvas over a dashboard showing an empty state.
+- **Nothing about it is stored.** Which chart is up is not in `view`, not in `state` and not in a
+  share payload — no `SCHEMA` bump, no whitelist entry. It is a position on a screen for as long
+  as you are looking at it, like a scroll position. It is **alive in a shared view** on the same
+  reasoning the dot-copy handler is: it writes nothing and reads only what is already drawn.
+- **Three ways out** — the same button (it toggles, and swaps to an arrows-in icon), Escape, and
+  a click on the backdrop, which is the app's rule for every dialog. That last one is why the
+  overlay keeps a 20px margin round the card rather than filling the window edge to edge: with no
+  outside there is nothing for a click-outside to land on. Escape defers to an open `<dialog>` —
+  the ⓘ pressed on a maximised chart is exactly that case — and that is pinned.
+- **The ground is `--bg`, not a translucent scrim.** A dialog-style `rgba(0,0,0,.55)` over that
+  20px margin left a ghosted band of the chart underneath showing through at the bottom edge,
+  right where the eye goes to read an x axis.
+- **`--maxi-top` is measured by a `ResizeObserver` on the header, not on window resize.** That
+  row wraps to two or three lines on a phone, and it does so for reasons that are not a window
+  resize — picking a team with a longer name is enough. The observer runs only while something is
+  maximised.
+- **`.shell` is marked `inert` while it is open**, so Tab runs round the header and the overlay
+  and never wanders into the page underneath. The overlay and the dialogs live OUTSIDE `.shell`
+  for that reason — anything inside would go inert with it. `role="dialog"` without
+  `aria-modal`, because the header really is still live and `aria-modal="true"` would tell a
+  screen reader the opposite.
+- **The demo needed no new data**, and that is not a hole in the sample-data rule: the button is
+  on every chart the demo already draws, and the one state worth seeing — a card with no chart
+  under it and so no button — is Wagtail's lead time, which the demo already carries.
+
 ## The Cycle Time Scatter (2026-08-20)
 
 One dot per finished item, beside the cycle time line — the same measure at two resolutions, and
