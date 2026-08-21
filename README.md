@@ -126,6 +126,11 @@ Two things worth knowing:
 
 - **The dates are date pickers, so there is nothing to guess at.** The ambiguous
   day-first/month-first question a pasted `1/3/26` raises does not arise here at all.
+- **Press anywhere on a row** in Loaded Data to open it, not just its name — though a click that
+  ends a text selection is ignored, so dragging a figure out to copy it still works.
+- **A date in the future is refused**, in any of the three fields, and the message says why: every
+  window on the dashboard is measured back from the newest date in your data, so one item dated
+  next year would empty every chart on it.
 - **A typed row and a pasted row are the same thing once saved.** Both cross the same guards — the
   work type capped and dropped whole if it is really a sentence, the item name kept only if it is
   the shape of an issue key. The one difference is that the form **refuses** a bad ordering rather

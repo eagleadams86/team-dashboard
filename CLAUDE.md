@@ -242,6 +242,27 @@ this file was written to keep out. **Read this whole section before changing any
   meaning rather than a parse. Neither is built. The work item age chart's stage axis WAS
   built — off the current stage rather than off these durations; see the section above it.
 
+## Two Alignment Rules the Grid and the Table Were Missing (2026-08-21)
+
+Both reported by Charles looking at the app, and both are the same shape: something stated for one
+half of a pair and never for the other.
+
+- **A CARD WITH NO CHART NOW MATCHES THE ONE BESIDE IT.** It carried `align-self: start` on the
+  reasoning that it "has no reason to stand as tall as the chart beside it" — true of the card and
+  false of the ROW: one card ending 200px above its neighbour is a ragged step across the grid, and
+  the empty half reads as something that failed to draw. Stretch is the grid's own default, so the
+  fix is removing that rule; what replaces it makes the leftover height not be DEAD space — the
+  card becomes a flex column and the note grows into what is left with its text centred. **Alone on
+  its row it is unchanged**, which is what was asked for and what the `.wide` stage-time card and
+  everything below the 940px breakpoint rely on. Pinned in a 1240px frame, because the whole
+  assertion is about having a neighbour — measuring it in a one-column layout measures nothing.
+- **`td.num` IS RIGHT-ALIGNED NOW.** `th.num` always was, so every numeric column in Loaded Data
+  ran its figures down the left of a heading sitting on the right. It is the same failure the All
+  Teams table's own comment states in the other direction ("a heading sitting over the left edge of
+  a column of right-aligned figures reads as belonging to the column before it") — it had simply
+  never been said about the cells. The test asserts the cell and its heading AGREE rather than
+  asserting a value, so a future re-alignment has to move both.
+
 ## Typing an Item In (2026-08-21) — no schema change
 
 Asked for by Charles: "should we add an easy way to type data manually? not everyone is going to
@@ -282,6 +303,22 @@ a Jira and the knowledge to export from it.
   until rows exist — so the reader this was built for met a paste box explaining a Jira export and
   nothing else. It hides once this team has rows, the same reasoning the demo button beside it
   follows: the Loaded Data card then carries "+ Add item" where you would look for it.
+- **THE WHOLE ROW opens the editor**, not only the name in it (asked for the same day).
+  `data-item` sits on the row AND on the button inside it holding the same index, so the one
+  delegated listener's `closest()` finds the button when the name is pressed and the row
+  otherwise — the same number either way, no double-open, and no `stopPropagation` to remember.
+  The button stays because a `<tr>` cannot take focus: it is what a keyboard and a screen reader
+  reach, and the row is the pointer's larger target. **A click with a text selection in hand is
+  ignored** — this table has Copy and CSV buttons precisely because people drag figures out of it,
+  and a drag ends in a click.
+- **A DATE IN THE FUTURE IS REFUSED, not warned about, and the severity is why.** Every window in
+  this app hangs off the LATEST date in the data rather than off today, so one item finished in
+  2027 drags the whole dashboard forward a year and empties every chart on it — a mistyped year is
+  the easiest typo on a date field and its consequence is a screen that looks broken for a reason
+  nothing on it explains. All three date fields are checked. **`todayLocalISO()`, never UTC**: the
+  rows are UTC dates, but "in the future" is a claim about the reader's own calendar, and a UTC
+  comparison refuses this morning's item for anyone far enough east. The paste path deliberately
+  does NOT gain this check — it reports rather than refuses, which is its whole stance.
 - **The row's index is carried on the button, not its position on screen.** The table sorts, so
   what is drawn is a permutation of the array being written back to; a Map is built once per render
   rather than an `indexOf` per row.

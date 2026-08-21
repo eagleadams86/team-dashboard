@@ -5160,6 +5160,28 @@ group('ARTs — the grouping, and the boundary it crosses');
     const carried = TD.buildManualRow(
       { started: '2026-01-19', keepStages: { sr: 3 } }, stages);
     is(carried.row.stages, { sr: 3 }, 'an edit keeps the stage times it cannot show');
+
+    /* ── A DATE THAT HAS NOT HAPPENED YET ────────────────────────────────────
+       Refused rather than warned-and-saved, because of how badly it fails:
+       every window in this app hangs off the LATEST date in the data, not off
+       today, so one item finished next year drags the dashboard forward a year
+       and empties every chart on it. A mistyped year is the easiest typo on a
+       date field and its consequence is a screen that looks broken for a reason
+       nothing on it explains. Relative to the machine's own clock, since the
+       date the app calls "today" moves. */
+    const dayFrom = (n) => {
+      const d = new Date();
+      d.setDate(d.getDate() + n);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+        + '-' + String(d.getDate()).padStart(2, '0');
+    };
+    ok(B({ started: dayFrom(-3), completed: dayFrom(1) }).error,
+       'a completion date in the future is refused');
+    ok(/future/i.test(B({ started: dayFrom(1) }).error || ''), 'and a start date, saying why');
+    ok(B({ started: dayFrom(-9), completed: dayFrom(-1), created: dayFrom(400) }).error,
+       'and a created date — every field is checked, not only the two that must exist');
+    is(B({ started: dayFrom(-1), completed: dayFrom(0) }).error, undefined,
+       'while TODAY is not the future — an item finished this morning saves');
   }
 
   /* ── and the same thing through the real dialog ──────────────────────────── */
@@ -5199,6 +5221,39 @@ group('ARTs — the grouping, and the boundary it crosses');
     ok(rowBtn, 'every row in Loaded Data is a control that opens its editor');
     rowBtn.click();
     is(mDoc.getElementById('itemStarted').value, '2026-01-19', 'which opens on that row');
+    mDoc.getElementById('itemCancel').click();
+
+    /* A heading and its column have to agree. th.num was right-aligned and
+       td.num never was, so the cycle time and period figures ran down the left
+       of headings sitting on the right — the same failure the All Teams table
+       states in the other direction, never said about the cells. */
+    const headOf = (key) => [...mDoc.querySelectorAll('#dataItemsTable thead th')]
+      .find(th => th.querySelector('[data-datasort="' + key + '"]'));
+    const cellIn = (key) => mDoc.querySelector('#dataItemsTable tbody tr')
+      .cells[[...mDoc.querySelectorAll('#dataItemsTable thead th')].indexOf(headOf(key))];
+    ['cycle', 'period'].forEach(key => {
+      is(win.getComputedStyle(cellIn(key)).textAlign,
+         win.getComputedStyle(headOf(key)).textAlign,
+         key + ': the column reads the same way its heading does');
+      is(win.getComputedStyle(cellIn(key)).textAlign, 'right',
+         key + ': and both of them right, because it is a column of figures');
+    });
+    /* The text columns are untouched — they were never the problem. */
+    is(win.getComputedStyle(cellIn('type')).textAlign,
+       win.getComputedStyle(headOf('type')).textAlign,
+       'a text column still agrees with its own heading too');
+
+    /* THE WHOLE ROW is the target, not only the name in it. One delegated
+       listener resolves the click with closest(), so pressing a plain cell finds
+       the ROW's index and pressing the name finds the button's — the same
+       number either way, and no double-open to guard against. */
+    const tr = mDoc.querySelector('#dataItemsTable tbody tr');
+    is(tr.dataset.item, rowBtn.dataset.item, 'the row carries the same index as its button');
+    ok(tr.classList.contains('clickable'), 'and says so with a pointer');
+    tr.cells[4].click();                       /* the Type cell — no button in it */
+    ok(mDoc.getElementById('itemDialog').open, 'so pressing an ordinary cell opens the editor');
+    is(mDoc.getElementById('itemStarted').value, '2026-01-19', 'on that same row');
+    rowBtn.click();
     mDoc.getElementById('itemType').value = 'Bug';
     mDoc.getElementById('itemSave').click();
     is(win.tdGet().teams[0].rows.length, 1, 'an edit replaces the row rather than adding one');
@@ -5341,7 +5396,80 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
-  group('one chart, filling the window');
+group('a card with no chart matches the one beside it');
+
+  /* Reported by Charles on 2026-08-21: an empty card ended 200px above its
+     neighbour, which left a ragged step across the grid and made the empty half
+     read as something that failed to draw. It used to carry `align-self: start`
+     on exactly that reasoning ("no reason to stand as tall as the chart beside
+     it") — true of the card, false of the ROW.
+
+     Measured in a frame wide enough for the two-column grid (the breakpoint is
+     940px), because the whole assertion is about what happens when a card HAS a
+     neighbour. The state planted below finishes both its items, so nothing is in
+     flight and the work item age card is the empty one. */
+  {
+    const keep = { view: localStorage.getItem('td-view'), state: localStorage.getItem('td-state') };
+    localStorage.setItem('td-state', JSON.stringify({
+      schema: win.TDState.SCHEMA,
+      teams: [{ id: 'ch1', name: 'A', rows: [
+        { c: '2026-01-02', s: '2025-12-29', t: 'Story' },
+        { c: '2026-01-03', s: '2025-12-30', t: 'Bug' }] }],
+      settings: {}
+    }));
+    localStorage.setItem('td-view', JSON.stringify({ activeTab: 'dashboard', chartTab: 'health',
+      months: 'all' }));
+
+    const f = document.createElement('iframe');
+    f.setAttribute('data-td-tests', '');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;left:-9999px;width:1240px;height:900px;border:0';
+    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html'; document.body.appendChild(f); });
+    const cw = f.contentWindow, cd = cw.document;
+    cd.getElementById('stab-health').click();
+
+    const cards = [...cd.querySelectorAll('#spanel-health .chart-card')];
+    const byTop = new Map();
+    cards.forEach(c => {
+      const r = c.getBoundingClientRect();
+      const k = Math.round(r.top);
+      if (!byTop.has(k)) byTop.set(k, []);
+      byTop.get(k).push({ el: c, h: Math.round(r.height),
+                          empty: c.classList.contains('no-chart') });
+    });
+
+    ok(cd.documentElement.clientWidth > 940,
+       'the frame is wide enough for two columns, or this measures nothing',
+       cd.documentElement.clientWidth);
+
+    const paired = [...byTop.values()].filter(r => r.length === 2);
+    ok(paired.length > 0, 'at least one row holds two cards');
+    const withEmpty = paired.filter(r => r.some(c => c.empty));
+    ok(withEmpty.length > 0,
+       'and at least one of those rows has an empty card in it — the case reported');
+    withEmpty.forEach(r => {
+      is(r[0].h, r[1].h, 'an empty card is exactly as tall as the chart beside it');
+    });
+
+    /* The other half of what was asked for: alone on its row, it keeps the
+       height it had. The wide card spans both columns, so it is never paired —
+       if stretching ever started inflating a lone card, this is what catches it. */
+    const alone = [...byTop.values()].filter(r => r.length === 1 && r[0].empty);
+    alone.forEach(r => {
+      const note = r[0].el.querySelector('.note');
+      ok(r[0].h < 400, 'a lone empty card is still only as tall as its message',
+         r[0].h + 'px');
+      ok(note && note.getBoundingClientRect().height < 260,
+         'with the note inside it not stretched either');
+    });
+
+    f.remove();
+    if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
+    if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+    group('one chart, filling the window');
 
   /* Charles asked for this on 2026-08-21: a button on each chart that fills the
      window with it, "with the menu still visible". That last phrase is the whole
