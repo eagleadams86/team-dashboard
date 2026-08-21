@@ -196,11 +196,31 @@ people actually scan for:
 | Column | The question |
 |---|---|
 | **Completed** / **Per week** | Who is delivering, and at what pace? |
+| **Trend** | Which team is *changing*? |
 | **85th cycle time** | Who is slow, and who is unpredictable? |
 | **In progress** / **WIP vs month** | Who is overloaded? |
 | **Aged** | Who has work going stale? |
 | **Defect rate** | Who has a quality problem? |
 | **Data to** | …and whose figures are worth trusting at all |
+
+**Trend** deserves its own paragraph, because it answers something none of the other columns can.
+Every other figure here is a snapshot, so a team halfway down a decline reads exactly like a team
+that was always that slow — and the chart above hides it, because one team's slide is another's
+gain. The sparkline is that team's throughput across the window on screen, drawn from the same
+fitted line the chart uses, with the signed figure beside it showing what the line rises or falls
+by end to end. Sort by it to put the steepest fallers on top.
+
+The trace is **scale-free** — normalised to its own range — so what it shows is the *shape*. Two
+teams with identical traces can be delivering at very different rates; Per week beside it is the
+magnitude. And check **Data to** before reading a fall as a slowdown: a team whose export stopped
+three weeks ago has a trace that falls away for exactly the same reason it has a stale date, which
+is a reporting problem rather than a delivery one. (The demo shows this on purpose — Wagtail has
+both the steepest fall and the oldest export.)
+
+There is deliberately **no line-per-team chart**. This view is written for somebody with eight
+teams, the shared theme pack's categorical ramp stops at five, and eight lines on one card is a
+spaghetti chart even where the colours exist. A column sits beside the numbers it explains and
+scales to any number of teams.
 
 **Press a column heading to sort by it.** Every numeric column runs worst-first on the first
 press — most aged, longest cycle time — because the reason anyone presses a heading is to find

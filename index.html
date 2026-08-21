@@ -766,6 +766,20 @@ dialog { background: var(--surface); color: var(--text-primary);
     gap: 0 14px; }
 }
 dialog::backdrop { background: rgba(0, 0, 0, .55); }
+/* ── The All Teams trend column ──────────────────────────────────────────────
+   The trace takes the accent through `color`, so `currentColor` inside the SVG
+   resolves per theme with no token read at draw time. `nowrap` keeps the trace
+   and its figure on one line — wrapped, the number reads as a row of its own. */
+.spark-cell { white-space: nowrap; }
+.spark { vertical-align: middle; color: var(--accent); }
+.spark-val {
+  display: inline-block; min-width: 3.4em; margin-left: 6px;
+  font-variant-numeric: tabular-nums; color: var(--text-secondary);
+}
+/* Printed and in a shared view the trace still means something, so it is not
+   hidden — but a 62px graphic in a narrow column is the first thing to give up
+   room when the table has to fit a phone. */
+@media (max-width: 620px) { .spark { display: none; } .spark-val { margin-left: 0; } }
 dialog h2 { font-size: 16px; margin-bottom: 12px; }
 dialog p { color: var(--text-secondary); font-size: 14px; }
 
@@ -978,11 +992,19 @@ main:focus { outline: none; }
     <div id="allTeamsTiles" class="tiles"></div>
 
     <!-- The four tiles above say where the train IS; this says where it has been.
-         One series and one colour on purpose: a line per team would need a
-         categorical palette the theme pack does not have, and inventing one
-         locally is the drift the pack exists to stop. The aggregate needs only
-         the accent, and it answers the question the tiles cannot — is the whole
-         train's delivery steady? Which team moved is the table underneath. -->
+         One series and one colour on purpose, and the reason has been rewritten
+         once: it used to be that a line per team would need a categorical
+         palette the theme pack did not have. The pack HAS one now
+         (`--series-1`…`--series-5`, added 2026-08-21), and the answer is still
+         no — for a better reason. This view is written for somebody with eight
+         teams, the ramp stops at five because past that no two colours can be
+         held apart under red-green deficiency, and eight lines on a card this
+         size is a spaghetti chart even where the colours exist.
+         The aggregate needs only the accent, and it answers the question the
+         tiles cannot — is the whole train's delivery steady? WHICH team moved,
+         and which one is changing, are both the table underneath: its Trend
+         column carries a sparkline per team, which is the shape a per-team
+         comparison actually wants. -->
     <div class="chart-card" id="cardTrainThroughput" style="margin-bottom:18px">
       <div class="chart-name" id="nameTrainThroughput"></div>
       <div class="chart-title" id="titleTrainThroughput"></div>
@@ -5282,6 +5304,86 @@ function forecastFill(confidence) {
   return tint(token('--accent'), band.tint);
 }
 
+/* ── The per-team trend column ───────────────────────────────────────────────
+   All Teams answers "which of my teams needs me?" as a snapshot: one row per
+   team, today's figures. The chart above answers "is the whole train steady?".
+   Neither answers the third question, which is the one that catches a problem
+   early — WHICH TEAM IS CHANGING. An aggregate hides it (one team's slide is
+   another's gain), and a table of current numbers cannot show it at all: a team
+   halfway down a decline reads exactly like a team that was always there.
+
+   A sparkline per row answers it in the table that already answers the
+   neighbouring question, which is why it is a column and not a second chart.
+   Deliberately NOT one chart with a line per team: the README's own framing for
+   this view is somebody with eight teams, the theme pack's categorical ramp
+   stops at five, and eight lines on a card this size is a spaghetti chart even
+   where the colours exist. Small multiples were the other candidate and would
+   also work; a column is what fits beside the numbers it explains.
+
+   The trace is scale-free — normalised to its own range — so what it shows is
+   SHAPE. The magnitude lives in the figure beside it, and in Per week. */
+function throughputTrend(d) {
+  if (!d || d.empty || !Array.isArray(d.throughput)) return null;
+  /* The SAME fit the chart above draws, so the column and the chart can never
+     disagree about which way a train is going. linearTrend returns the fitted
+     line rather than its slope, and the change across the window is the two
+     ends of it — no second regression to drift from the first. */
+  const line = linearTrend(d.throughput);
+  const fit = line.filter(v => v != null && isFinite(v));
+  if (fit.length < 2) return null;
+  return { series: d.throughput, change: fit[fit.length - 1] - fit[0] };
+}
+
+/* A scale-free trace, drawn in `currentColor` so the theme decides the colour
+   in one place — the CSS rule — rather than a token read at draw time.
+
+   No red-for-falling, green-for-rising, and that is not an oversight: this
+   account's palette rules put nothing on the red-green axis, and throughput
+   rising is not unambiguously good anyway (a team can raise it by shipping
+   smaller things). Direction is carried by the SHAPE and by the signed figure
+   beside it, both of which survive any colour vision. */
+function sparkSvg(values) {
+  const pts = [];
+  (values || []).forEach((v, i) => { if (v != null && isFinite(v)) pts.push([i, v]); });
+  if (pts.length < 2) return '';
+  const W = 62, H = 18, PAD = 2;
+  const span = Math.max(1, (values.length - 1));
+  let lo = pts[0][1], hi = pts[0][1];
+  for (const p of pts) { if (p[1] < lo) lo = p[1]; if (p[1] > hi) hi = p[1]; }
+  /* A flat series has no range to normalise against; draw it down the middle
+     rather than dividing by zero, which is a real case (a team completing the
+     same count every week is exactly the news this column exists to show). */
+  if (hi === lo) { hi = lo + 1; lo -= 1; }
+  const x = (i) => (PAD + (i / span) * (W - PAD * 2)).toFixed(1);
+  const y = (v) => (H - PAD - ((v - lo) / (hi - lo)) * (H - PAD * 2)).toFixed(1);
+  const path = pts.map((pt, k) => (k ? 'L' : 'M') + x(pt[0]) + ' ' + y(pt[1])).join(' ');
+  const last = pts[pts.length - 1];
+  /* aria-hidden, and that is load-bearing twice over: a screen reader gets the
+     signed figure beside this instead, and the CSV exporter strips anything
+     hidden from assistive technology as decoration — so the file gets the
+     number rather than a column of empty cells. */
+  return '<svg class="spark" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H
+    + '" aria-hidden="true" focusable="false">'
+    + '<path d="' + path + '" fill="none" stroke="currentColor" stroke-width="1.5"'
+    + ' stroke-linejoin="round" stroke-linecap="round"/>'
+    + '<circle cx="' + x(last[0]) + '" cy="' + y(last[1]) + '" r="1.9" fill="currentColor"/>'
+    + '</svg>';
+}
+
+/* The whole cell: the trace, then the figure that carries its magnitude and its
+   direction in text. Both halves are built from numbers this app computed, so
+   nothing here needs escaping — but the figure still goes through it, because
+   "everything that reaches innerHTML is escaped" is cheaper to keep true than
+   to keep checking. */
+function sparkCell(d) {
+  const t = throughputTrend(d);
+  if (!t) return '<td class="figure">—</td>';
+  const sign = t.change > 0.05 ? '+' : (t.change < -0.05 ? '−' : '±');
+  const mag = num1(Math.abs(t.change));
+  return '<td class="figure spark-cell">' + sparkSvg(t.series)
+    + '<span class="spark-val">' + escapeHtml(sign + mag) + '</span></td>';
+}
+
 function trendDataset(values) {
   return {
     label: 'Trend',
@@ -6043,6 +6145,19 @@ const METRIC_HELP = {
       + 'export reports that quarter. One caveat: the clean-up tool’s option to also remove '
       + 'unfinished items deletes long-running work in progress, which is exactly what this '
       + 'chart counts, so history before a clean-up like that will read low.' },
+  teamTrend: { title: 'Trend',
+    body: 'Which way this team\u2019s throughput has been going across the window on screen \u2014 '
+      + 'the same fitted line the chart above draws, one per team. The figure is what that line '
+      + 'rises or falls by from one end of the window to the other, in items per '
+      + 'bucket; the trace is the actual weekly counts, normalised to their own range so what '
+      + 'it shows is the SHAPE. Two teams with identical traces can be delivering at very '
+      + 'different rates \u2014 Per week beside it is the magnitude.\n\n'
+      + 'This is the column for the question the rest of the table cannot answer. Every other '
+      + 'figure here is a snapshot, so a team halfway down a decline reads exactly like a team '
+      + 'that was always that slow. Sort by it to put the steepest fallers at the top.\n\n'
+      + 'Check Data to before reading a fall as a slowdown: a team whose export stopped three '
+      + 'weeks ago has a trace that falls away to nothing for exactly the same reason it has a '
+      + 'stale date, and that is a reporting problem rather than a delivery one.' },
   trainThroughput: { title: 'Throughput Across Every Team',
     body: 'What pace is the whole train delivering at, week by week? The same count the '
       + 'dashboard plots for one team, added up across every team in scope \u2014 a total is '
@@ -6825,6 +6940,13 @@ function teamColumns(train) {
       get: (d) => d.summary.completedTotal, fmt: (v) => or(v, String) },
     { key: 'rate', label: 'Per ' + n, desc: true, help: 'throughput',
       get: (d) => d.summary.avgThroughput, fmt: (v) => or(v, num1) },
+    /* Beside Per week, because it is that number's history. Ascending on the
+       first press, like Data to and for the same reason: every other column's
+       interesting end is its biggest figure, and this one's is its most
+       NEGATIVE — the team sliding is the team that needs you. */
+    { key: 'trend', label: 'Trend', spark: true, desc: false, help: 'teamTrend',
+      get: (d) => { const t = throughputTrend(d); return t ? t.change : null; },
+      fmt: (v) => or(v, num1) },
     { key: 'p85', label: train.cyclePercentile + 'th ' + cycle.toLowerCase(), desc: true,
       help: 'cycleTimePercentile',
       get: (d) => d.summary.p85CycleTime, fmt: (v) => or(v, num1) },
@@ -7120,6 +7242,9 @@ function renderAllTeams() {
       if (c.key === 'dataEnd') return figure(r.d.dataEnd ? escapeHtml(prettyDate(r.d.dataEnd)) : '—');
       return figure('—');
     }
+    /* Its own branch rather than a fmt(): this cell is markup, and everything
+       that goes through the line below is escaped on the way past. */
+    if (c.spark) return sparkCell(r.d);
     return figure(escapeHtml(c.fmt(c.get(r.d))));
   };
 
@@ -7133,8 +7258,9 @@ function renderAllTeams() {
      is the shared date every row was read as of. */
   const foot = '<tfoot><tr><td>' + escapeHtml(scope ? 'All teams ' + scopePhrase : 'All teams')
     + '</td>' + cols.slice(1).map(c =>
-    '<td class="figure">' + escapeHtml(c.key === 'dataEnd' ? prettyDate(train.endDate)
-      : c.fmt(c.get(train))) + '</td>').join('') + '</tr></tfoot>';
+    c.spark ? sparkCell(train)
+      : '<td class="figure">' + escapeHtml(c.key === 'dataEnd' ? prettyDate(train.endDate)
+        : c.fmt(c.get(train))) + '</td>').join('') + '</tr></tfoot>';
 
   table.innerHTML = head + body + foot;
 }

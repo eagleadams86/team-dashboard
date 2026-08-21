@@ -4273,7 +4273,17 @@ group('ARTs — the grouping, and the boundary it crosses');
   win.document.querySelector('[data-sort="name"]').click();   /* Z to A, so Petrel leads */
   const petrel = [...win.document.querySelectorAll('#allTeamsTable tbody tr')]
     .find(tr => /Petrel/.test(tr.cells[0].innerText));
-  is(petrel.cells[4].innerText.trim(), '1', 'Petrel’s one open item is counted');
+  /* The column is looked up by its heading rather than counted to. It used to be
+     cells[4], which broke the day a column was inserted to its left — and the
+     failure ("expected 1, got 3.0") named the wrong thing entirely, because the
+     figure it read was a real number from a different question. */
+  /* Keyed off data-sort, the same stable handle press() uses — a heading's text
+     carries its ⓘ button and can be renamed in Settings, so neither is a handle. */
+  const colIndex = (key) => [...win.document.querySelectorAll('#allTeamsTable thead th')]
+    .findIndex(th => th.querySelector('[data-sort="' + key + '"]'));
+  const wipCol = colIndex('wip');
+  ok(wipCol > 0, 'the In progress column is on the table', wipCol);
+  is(petrel.cells[wipCol].innerText.trim(), '1', 'Petrel’s one open item is counted');
 
   plant({ teams: [{ id: 'only', name: 'Only', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] }],
           settings: {} });
@@ -4550,6 +4560,61 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(ragged[1], ['none', '', ''], 'with the value in the first cell and blanks after it');
 
   /* ────────────────────────────────────────────────────────── */
+  group('All Teams — the per-team trend column');
+
+  /* The column answers the one question the rest of that table cannot: not
+     "which team is slowest today" but "which team is CHANGING". Every other
+     figure there is a snapshot, so a team halfway down a decline reads exactly
+     like a team that was always that slow. These pin the parts that would go
+     wrong quietly. */
+  {
+    const rising  = [1, 2, 3, 4, 5, 6];
+    const falling = [9, 8, 6, 5, 3, 1];
+    const flat    = [4, 4, 4, 4, 4, 4];
+
+    /* The fit is the SAME one the chart above draws — linearTrend — so the
+       column and the chart can never disagree about which way a train is going.
+       If this ever needs its own regression, that is the bug. */
+    const change = (vals) => win.throughputTrend({ throughput: vals }).change;
+    ok(change(rising) > 0, 'a rising series reads positive', change(rising));
+    ok(change(falling) < 0, 'a falling series reads negative', change(falling));
+    ok(Math.abs(change(flat)) < 1e-9, 'a flat series reads as no change', change(flat));
+    /* End to end across the window, not per bucket: 1→6 over six points is a
+       fitted rise of 5, which is the number a reader can check against the
+       trace beside it. */
+    ok(Math.abs(change(rising) - 5) < 1e-9, 'the figure is the fitted line end to end',
+       change(rising));
+
+    is(win.throughputTrend({ empty: true }), null, 'a team with no data in the window has no trend');
+    is(win.throughputTrend({ throughput: [3] }), null, 'and neither has one bucket');
+    is(win.throughputTrend(null), null, 'nor a missing derive');
+
+    /* The trace is drawn from numbers this app computed, but it is still markup
+       reaching innerHTML — so what it emits has to be checkable. */
+    const svg = win.sparkSvg(falling);
+    ok(/^<svg /.test(svg), 'it draws an svg');
+    ok(svg.includes('aria-hidden="true"'),
+       'hidden from assistive tech — the signed figure beside it is the text equivalent, '
+       + 'and the CSV exporter strips anything aria-hidden as decoration');
+    ok(svg.includes('currentColor'),
+       'coloured through currentColor, so one CSS rule themes it rather than a token read at draw time');
+    ok(!/NaN|Infinity|undefined/.test(svg), 'and never emits a broken coordinate', svg);
+    is(win.sparkSvg([5]), '', 'one point is not a line');
+    is(win.sparkSvg([]), '', 'and nor is nothing');
+
+    /* The flat case is the one that divides by zero if nobody thinks about it,
+       and it is a real reading: a team completing the same count every week is
+       exactly the news this column exists to show. */
+    const flatSvg = win.sparkSvg(flat);
+    ok(flatSvg && !/NaN/.test(flatSvg), 'a flat series draws without dividing by its own zero range');
+
+    /* Scale-free on purpose: shape, not magnitude. Two teams delivering 2/week
+       and 200/week with the same shape get the same trace, and Per week beside
+       it is what separates them. */
+    is(win.sparkSvg([1, 2, 3]), win.sparkSvg([100, 200, 300]),
+       'the trace is normalised to its own range');
+  }
+
   group('package.json — the manifest Dependabot scans');
 
   /* The manifest exists only so Dependabot has something to read. Nothing is

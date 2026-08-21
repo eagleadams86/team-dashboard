@@ -119,6 +119,8 @@ file records what is specific to this repo and what must never regress.
   date in the same commit as any storage change (it went to 2026-08-20 with the
   key and to 2026-08-21 with stages).
 
+- **The All Teams Trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart.
+
 ## Workflow Stages (2026-08-21) — SCHEMA 7 → 8
 
 `state.stages` is a list of `{id, name, match[]}` and each row carries an optional `stages`
