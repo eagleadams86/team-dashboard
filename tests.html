@@ -1548,7 +1548,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 6, 'the schema marker is 6 — the version that added the issue key');
+  is(St.SCHEMA, 7, 'the schema marker is 7 — the version that added the per-team project id');
 
   /* ────────────────────────────────────────────────────────── */
   group('Work in progress — started but not finished');
@@ -2484,7 +2484,311 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', artId: '"><script>', rows: [] }])[0].artId,
      null, 'a hostile pointer is dropped, not swapped for a fresh id');
   is(Object.keys(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', rows: [] }])[0]).sort(),
-     ['artId', 'id', 'name', 'rows'], 'and every team carries the field, set or not');
+     ['artId', 'id', 'name', 'projectId', 'rows'], 'and every team carries the field, set or not');
+
+  /* ══════════════════════════════════════════════════════════
+     The project id — a team's address, and the only thing that can say which
+     team a row out of a whole-train export belongs to. Guarded by the same kind
+     of SHAPE as the issue key it is the front of, for the same reason, and
+     pinned here so a later "just accept whatever they type" cannot pass.
+     ══════════════════════════════════════════════════════════ */
+  group('project id — a shape, and a team’s address');
+
+  const P = TD.cleanProjectId;
+
+  is(P('DAE'), 'DAE', 'a plain project id passes');
+  is(P('dae'), 'DAE', 'lower case is folded up — one team, not two');
+  is(P('  KFR  '), 'KFR', 'whitespace is trimmed');
+  is(P('A'), 'A', 'a single letter is a real Jira project key');
+  is(P('PROJ2'), 'PROJ2', 'a digit inside it is allowed, as Jira allows');
+  is(P('ABCDEFGHIJ'), 'ABCDEFGHIJ', 'ten characters — the stated maximum');
+
+  is(P('ABCDEFGHIJK'), '', 'an eleventh is dropped WHOLE, never truncated to fit');
+  is(P('DAE-1552'), '', 'a whole key is not a project id — this field holds the front of one');
+  is(P('1DAE'), '', 'it must start with a letter, exactly as a key must');
+  is(P('DA E'), '', 'a space is not part of one');
+  is(P('Team Kingfisher'), '', 'and neither is a team name');
+  is(P('<img src=x onerror=alert(1)>'), '', 'markup cannot pass the shape at all');
+  is(P(''), '', 'an empty box is simply no project id');
+  is(P(null), '', 'and so is a non-string');
+
+  /* The front of a STORED key, which has already passed ISSUE_KEY_RE — so the
+     dash is there and what precedes it is a project id by construction. */
+  is(TD.projectIdOf('DAE-1552'), 'DAE', 'the id is read off the front of a key');
+  is(TD.projectIdOf('dae-1'), 'DAE', 'and folded up, so it matches a stored id');
+  is(TD.projectIdOf(''), '', 'a row with no key has no project');
+  is(TD.projectIdOf('-5'), '', 'and nor does a key shape that never had a project');
+
+  /* ── Routing ─────────────────────────────────────────────── */
+  const routeTeams = [
+    { id: 'r1', name: 'Kingfisher', projectId: 'KFR', rows: [] },
+    { id: 'r2', name: 'Heron',      projectId: 'HRN', rows: [] },
+    { id: 'r3', name: 'Wagtail',    projectId: '',    rows: [] }
+  ];
+  const routed = TD.routeRowsToTeams([
+    { key: 'KFR-1' }, { key: 'HRN-9' }, { key: 'KFR-2' },
+    { key: 'ZZZ-1' }, { key: 'ZZZ-2' }, { key: '' }
+  ], routeTeams);
+
+  is(routed.assigned.map(a => [a.name, a.rows.length]), [['Kingfisher', 2], ['Heron', 1]],
+     'each row lands in the team whose project id fronts its key');
+  is(routed.assigned[0].rows.map(r => r.key), ['KFR-1', 'KFR-2'],
+     'and it is the actual rows that travel, not a count of them');
+  is(routed.unclaimed, [{ projectId: 'ZZZ', count: 2 }],
+     'an id no team answers to is named and counted, never sent to the first team');
+  is(routed.noKey, 1, 'a row with no key cannot be routed at all, and is counted');
+  is(routed.projects, 3, 'and the paste is reported as covering three projects');
+  is(routed.ambiguous, [], 'nothing is ambiguous while every id is on one team');
+  /* The whole point of the feature, stated as a rule: a row this app cannot
+     place is reported, never guessed at. A row in the wrong team's throughput
+     is a wrong number nobody can see; a homeless row is a message on screen. */
+  is(routed.assigned.reduce((n, a) => n + a.rows.length, 0), 3,
+     'exactly the rows it could place are placed — the other three go nowhere');
+
+  is(TD.routeRowsToTeams([{ key: 'HRN-1' }, { key: 'KFR-1' }], routeTeams).map,
+     undefined, 'the result is a plain report, not a Map somebody has to walk');
+  is(TD.routeRowsToTeams([{ key: 'HRN-1' }, { key: 'KFR-1' }], routeTeams)
+       .assigned.map(a => a.name), ['Kingfisher', 'Heron'],
+     'teams come back in the team list’s own order, not the order rows arrived in');
+
+  /* Biggest first, so the id worth acting on is at the top of the list. */
+  is(TD.routeRowsToTeams([{ key: 'AAA-1' }, { key: 'BBB-1' }, { key: 'BBB-2' }], routeTeams)
+       .unclaimed.map(u => u.projectId), ['BBB', 'AAA'],
+     'unclaimed ids are listed biggest first');
+
+  /* Two teams on one id: the one question the app cannot answer for anybody. */
+  const clash = [
+    { id: 'c1', name: 'One', projectId: 'DAE', rows: [] },
+    { id: 'c2', name: 'Two', projectId: 'dae', rows: [] }
+  ];
+  is(TD.duplicateProjectIds(clash), ['DAE'],
+     'a clash is found however it was typed — the ids are compared folded up');
+  const clashed = TD.routeRowsToTeams([{ key: 'DAE-1' }, { key: 'DAE-2' }], clash);
+  is(clashed.assigned, [], 'and NOTHING is routed on a clashed id — not even to the first team');
+  is(clashed.ambiguous, [{ projectId: 'DAE', count: 2, names: ['One', 'Two'] }],
+     'it is reported with both team names, so the fix is obvious');
+  is(TD.duplicateProjectIds(routeTeams), [],
+     'two teams with no id at all are not a clash — blank is not an address');
+
+  /* ── Adopting an id from a team's own paste ───────────────── */
+  const three = [{ key: 'DAE-1' }, { key: 'DAE-2' }, { key: 'DAE-3' }];
+  is(TD.soleProjectId(three), 'DAE', 'a paste that is unanimously one project says so');
+  is(TD.soleProjectId(three.slice(0, 2)), '',
+     'two rows are not evidence — the floor is ' + TD.PROJECT_ID_ADOPT_MIN);
+  is(TD.soleProjectId(three.concat([{ key: 'KFR-9' }])), '',
+     'and a single foreign key makes it not unanimous — a majority is a question, not a fact');
+  is(TD.soleProjectId(three.concat([{ key: '' }, { type: 'Story' }])), 'DAE',
+     'rows with no key at all do not spoil unanimity — they simply say nothing');
+  is(TD.soleProjectId([]), '', 'an empty paste adopts nothing');
+
+  /* ── The storage boundary ─────────────────────────────────── */
+  const teamOf = (t) => win.TDState.sanitizeTeams([t])[0];
+  is(teamOf({ id: 'x', name: 'X', projectId: 'dae', rows: [] }).projectId, 'DAE',
+     'a project id is folded up on the way in, like a key');
+  is(teamOf({ id: 'x', name: 'X', projectId: 'a summary that is not an id', rows: [] }).projectId, '',
+     'and anything that is not one is dropped WHOLE at the boundary');
+  is(teamOf({ id: 'x', name: 'X', projectId: '"><script>', rows: [] }).projectId, '',
+     'a hostile value cannot use this field as a free-text smuggling route');
+  is(teamOf({ id: 'x', name: 'X', projectId: 42, rows: [] }).projectId, '',
+     'nor can a non-string');
+
+  /* Nothing is written until there is something to write — the rule the created
+     date, the issue key and ARTs all follow, and what keeps a browser that never
+     splits a paste from rewriting its whole stored document on the first save. */
+  plant({ teams: [{ id: 'p1', name: 'Plain', rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Story' }] }],
+          settings: {} });
+  ok(!('projectId' in JSON.parse(win.localStorage.getItem('td-state')).teams[0]),
+     'a team with no project id serialises without the key at all');
+  plant({ teams: [{ id: 'p1', name: 'Plain', projectId: 'DAE',
+                    rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Story' }] }], settings: {} });
+  is(JSON.parse(win.localStorage.getItem('td-state')).teams[0].projectId, 'DAE',
+     'and one that has it writes it');
+
+  /* A project id is a routing rule for THIS browser's paste box, and a viewer of
+     a link has no paste box. Sharing it would publish the name of a Jira project
+     to no purpose — and every key in the payload already carries it anyway. */
+  const spProj = win.TDShare.buildSharePayload(['p1']);
+  is(spProj.teams[0].projectId, undefined, 'a project id never travels in a share link');
+  is(Object.keys(spProj).sort(), ['label', 'settings', 'sharedAt', 'teams', 'v'],
+     'so a link from this build has exactly the keys it had before the split existed');
+
+  /* ── The dialog ───────────────────────────────────────────── */
+  plant({ arts: [],
+          teams: [{ id: 'd1', name: 'Kingfisher', projectId: 'KFR', rows: [] },
+                  { id: 'd2', name: 'Heron', projectId: 'HRN', rows: [] },
+                  { id: 'd3', name: 'Wagtail', rows: [] }],
+          settings: {} });
+  const appDoc = win.document;
+  appDoc.getElementById('btnMultiOpen').click();
+  ok(appDoc.getElementById('multiDialog').open, 'the multi-team paste has its own dialog');
+  ok(/KFR → Kingfisher/.test(appDoc.getElementById('multiTeamIds').innerText),
+     'which opens by saying where rows will go');
+  ok(/Wagtail/.test(appDoc.getElementById('multiTeamIds').innerText),
+     'and names the team that has no id, since an absence is invisible if left out');
+
+  const multiPaste = (text) => {
+    appDoc.getElementById('multiPasteBox').value = text;
+    appDoc.getElementById('btnMultiCheck').click();
+    return appDoc.getElementById('multiNote').innerText;
+  };
+  const wholeTrain = ['Issue key\tIn Progress\tResolved\tIssue Type',
+    'KFR-1\t2015-01-14\t2015-01-21\tStory',
+    'KFR-2\t2015-01-15\t2015-01-22\tBug',
+    'HRN-1\t2015-01-16\t2015-01-23\tStory',
+    'ZZZ-1\t2015-01-17\t2015-01-24\tTask'].join('\n');
+
+  const checked = multiPaste(wholeTrain);
+  ok(/splits into 2 teams/.test(checked), 'a check says how the paste splits', checked.slice(0, 200));
+  ok(/Nothing has been loaded yet/.test(checked), 'and says plainly that nothing was written');
+  is(win.tdGet().teams.map(t => t.rows.length), [0, 0, 0],
+     'which is true — checking a paste writes nothing at all');
+  ok(/no team claims/.test(checked), 'the id nobody claims is reported rather than dropped quietly');
+
+  /* Offered, not done: a paste is not a reason to invent teams in somebody's
+     dashboard, and an export with a stray project in it is ordinary. */
+  const makeBtn = appDoc.querySelector('#multiNote [data-create-team="ZZZ"]');
+  ok(makeBtn, 'with one press to create the team it wants');
+  makeBtn.click();
+  is(win.tdGet().teams.map(t => t.name), ['Kingfisher', 'Heron', 'Wagtail', 'Team ZZZ'],
+     'pressing it creates the team, named for the id');
+  is(win.tdGet().teams[3].projectId, 'ZZZ', 'with the id already set — that was the point');
+  is(win.tdGet().teams[3].rows.length, 0,
+     'and NOT loaded — agreeing to the team is not agreeing to replace three others');
+  ok(appDoc.getElementById('multiPasteBox').value.length > 0,
+     'the paste is still in the box, so the split can simply be run again');
+
+
+  /* The load itself. tdAdopt's confirm is stubbed by plant(); this one is the
+     dialog's own, and it has to be answered for the replace to happen. */
+  const realConfirm = win.confirm;
+  let asked = '';
+  win.confirm = (m) => { asked = m; return true; };
+  appDoc.getElementById('btnMultiLoad').click();
+  win.confirm = realConfirm;
+  is(win.tdGet().teams.map(t => [t.name, t.rows.length]),
+     [['Kingfisher', 2], ['Heron', 1], ['Wagtail', 0], ['Team ZZZ', 1]],
+     'the split lands every row in its own team, and leaves the team it does not name alone');
+  is(asked, '', 'no confirm was needed — every team it touched was empty');
+  ok(/Loaded 4 items into 3 teams/.test(appDoc.getElementById('multiNote').innerText),
+     'and the report says what happened, in the same words afterwards as before');
+
+  /* Replacing over data is the one destructive thing this dialog can do, and it
+     can do it to boards nobody is looking at — so it names them and what they
+     lose before anything is written. */
+  win.confirm = (m) => { asked = m; return false; };
+  appDoc.getElementById('multiPasteBox').value = wholeTrain;
+  appDoc.getElementById('btnMultiLoad').click();
+  win.confirm = realConfirm;
+  ok(/Replace the work items in 3 teams/.test(asked), 'a replace over existing data asks first', asked);
+  ok(/Kingfisher — loses 2, takes 2/.test(asked), 'naming each team and what it stands to lose', asked);
+  is(win.tdGet().teams.map(t => t.rows.length), [2, 1, 0, 1],
+     'and answering no writes nothing whatsoever');
+
+  /* Append is the other half of the pair the single-team box already offers. */
+  appDoc.getElementById('multiPasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+    'KFR-9\t2015-02-14\t2015-02-21\tStory'].join('\n');
+  appDoc.getElementById('btnMultiAppend').click();
+  is(win.tdGet().teams.map(t => t.rows.length), [3, 1, 0, 1],
+     'append adds to the team it names and touches no other');
+
+  /* Without a key column there is no project id, and so nothing to split by.
+     Said plainly rather than reported as a split of zero teams. */
+  const noKeyNote = multiPaste(['In Progress\tResolved\tIssue Type',
+    '2015-01-14\t2015-01-21\tStory'].join('\n'));
+  ok(/No issue key column in this paste/.test(noKeyNote),
+     'a paste with no key column is refused with the reason, not with an empty plan');
+  is(win.tdGet().teams.map(t => t.rows.length), [3, 1, 0, 1], 'and nothing moves');
+  appDoc.getElementById('multiDialog').close();
+
+  /* The first-run path, which is the one that makes this feature worth having:
+     an empty app, one whole-train export, teams created from what is in it. The
+     auto-created "My team" goes with them — the same clean-up loadSample() does,
+     and only while it is untouched. */
+  plant({ teams: [{ id: 'mt', name: 'My team', rows: [] }], settings: {} });
+  appDoc.getElementById('multiPasteBox').value = wholeTrain;
+  appDoc.getElementById('btnMultiCheck').click();
+  appDoc.querySelector('#multiNote [data-create-team="*"]').click();
+  is(win.tdGet().teams.map(t => t.name), ['Team KFR', 'Team HRN', 'Team ZZZ'],
+     'a first run creates every team the export names, and the empty My team goes with them');
+  ok(win.tdGet().teams.some(t => t.id === appDoc.getElementById('teamSel').value),
+     'and the team on screen is one that still exists');
+  appDoc.getElementById('btnMultiLoad').click();
+  is(win.tdGet().teams.map(t => t.rows.length), [2, 1, 1],
+     'so one paste fills a dashboard that had nothing in it at all');
+
+  /* A team someone has renamed or pasted into is theirs, whatever it holds. */
+  plant({ teams: [{ id: 'mt', name: 'My team',
+                    rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Story' }] }], settings: {} });
+  appDoc.getElementById('multiPasteBox').value = wholeTrain;
+  appDoc.getElementById('btnMultiCheck').click();
+  appDoc.querySelector('#multiNote [data-create-team="ZZZ"]').click();
+  is(win.tdGet().teams.map(t => t.name), ['My team', 'Team ZZZ'],
+     'while a My team with items in it is left exactly where it is');
+
+  /* ── The id a team's own paste fills in for it ────────────── */
+  plant({ teams: [{ id: 'a1', name: 'Alpha', rows: [] }, { id: 'a2', name: 'Bravo', projectId: 'HRN', rows: [] }],
+          settings: {} });
+  appDoc.getElementById('teamSel').value = 'a1';
+  appDoc.getElementById('teamSel').dispatchEvent(new win.Event('change', { bubbles: true }));
+  appDoc.getElementById('pasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+    'KFR-1\t2015-01-14\t2015-01-21\tStory',
+    'KFR-2\t2015-01-15\t2015-01-22\tBug',
+    'KFR-3\t2015-01-16\t2015-01-23\tTask'].join('\n');
+  appDoc.getElementById('btnLoad').click();
+  is(win.tdGet().teams[0].projectId, 'KFR',
+     'a team with no id takes it from its own export — the setup step nobody would do');
+  ok(/that is now its project id/.test(appDoc.getElementById('parseNote').innerText),
+     'and the paste report says so rather than changing a stored field silently');
+
+  /* Never over a value somebody typed: a paste is data, an id is a decision. */
+  appDoc.getElementById('pasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+    'DAE-1\t2015-01-14\t2015-01-21\tStory',
+    'DAE-2\t2015-01-15\t2015-01-22\tBug',
+    'DAE-3\t2015-01-16\t2015-01-23\tTask'].join('\n');
+  appDoc.getElementById('btnLoad').click();
+  is(win.tdGet().teams[0].projectId, 'KFR', 'and never overwrites one that is already set');
+
+  /* Nor INTO a clash — that would break a split that works today in order to
+     fill in a field nobody asked for. */
+  plant({ teams: [{ id: 'b1', name: 'Alpha', rows: [] }, { id: 'b2', name: 'Bravo', projectId: 'HRN', rows: [] }],
+          settings: {} });
+  appDoc.getElementById('teamSel').value = 'b1';
+  appDoc.getElementById('teamSel').dispatchEvent(new win.Event('change', { bubbles: true }));
+  appDoc.getElementById('pasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+    'HRN-1\t2015-01-14\t2015-01-21\tStory',
+    'HRN-2\t2015-01-15\t2015-01-22\tBug',
+    'HRN-3\t2015-01-16\t2015-01-23\tTask'].join('\n');
+  appDoc.getElementById('btnLoad').click();
+  /* tdGet() is serializeState — an empty id is written as no key at all, which is
+     the "nothing until there is something to write" rule seen from the outside. */
+  is(win.tdGet().teams[0].projectId, undefined,
+     'a paste never adopts an id another team already answers to');
+
+  /* ── The Teams dialog's own guard ─────────────────────────── */
+  plant({ teams: [{ id: 'g1', name: 'Alpha', projectId: 'KFR', rows: [] },
+                  { id: 'g2', name: 'Bravo', rows: [] }], settings: {} });
+  appDoc.getElementById('manageBtn').click();
+  const projBox = appDoc.querySelector('[data-project-id="g2"]');
+  projBox.value = 'hrn';
+  projBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  is(win.tdGet().teams[1].projectId, 'HRN', 'typing an id stores it folded up');
+  is(appDoc.getElementById('teamIdWarn').hidden, true, 'two different ids are not a clash');
+  projBox.value = 'KFR';
+  projBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  is(appDoc.getElementById('teamIdWarn').hidden, false, 'and the clash is said as it is typed');
+  ok(/Alpha and Bravo/.test(appDoc.getElementById('teamIdWarn').textContent),
+     'naming both teams, since only the person typing knows which one is right');
+  /* Not repaired automatically: a field that clears itself while you are still
+     looking at it is worse than a line telling you what is wrong. */
+  is(win.tdGet().teams.map(t => t.projectId), ['KFR', 'KFR'],
+     'the value is kept as typed — routing refuses the id, the dialog does not fight you');
+  projBox.value = 'dae-1';
+  projBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  is(win.tdGet().teams[1].projectId, undefined,
+     'a value that is not an id stores nothing — the KFR that was there is gone, not kept');
+  projBox.dispatchEvent(new win.Event('change', { bubbles: true }));
+  is(projBox.value, '', 'and on blur the box shows what was actually stored');
+  appDoc.getElementById('manageCloseBtn').click();
 
   /* ────────────────────────────────────────────────────────── */
   group('the Teams dialog matches the sibling app’s window');
@@ -2517,12 +2821,17 @@ group('ARTs — the grouping, and the boundary it crosses');
   const teamRow = win.document.querySelector('#teamRows tr');
   is(teamRow.querySelector('.count').textContent, '1 item',
      'a count carries its own noun, singular when it should be');
-  is(teamRow.cells.length, 3, 'and there is no ART cell until an ART exists');
+  /* Name, project id, count, actions. The project id box is present from the
+     first team — unlike the ART picker below it, which needs an ART to exist
+     before it can offer anything. */
+  is(teamRow.cells.length, 4, 'and there is no ART cell until an ART exists');
+  ok(teamRow.querySelector('input.projid'),
+     'while the project id box is there from the first team — it is typed in, not chosen');
 
   plant({ arts: [{ id: 'ax', name: 'Estuary' }],
           teams: [{ id: 'z1', name: 'Zephyr', artId: 'ax', rows: [] },
                   { id: 'z2', name: 'Zither', rows: [] }], settings: {} });
-  is(win.document.querySelector('#teamRows tr').cells.length, 4,
+  is(win.document.querySelector('#teamRows tr').cells.length, 5,
      'the ART cell appears the moment there is a train to choose');
   is(win.document.querySelector('#artRows .count').textContent, '1 team',
      'and an ART states how many teams are on it, in its own words');
@@ -2546,7 +2855,10 @@ group('ARTs — the grouping, and the boundary it crosses');
      <dialog> is display:none and cannot take focus — which is the whole point of
      the three assertions below. */
   win.document.getElementById('manageBtn').click();
-  const dialogNames = (sel) => [...win.document.querySelectorAll(sel + ' input')].map(i => i.value);
+  /* [data-team], not every input in the row: a team row also holds a project id
+     box, and reading both back made this list twice as long as the team count. */
+  const dialogNames = (sel) => [...win.document.querySelectorAll(sel + ' input[data-team], '
+    + sel + ' input[data-art]')].map(i => i.value);
   const pressMove = (kind, id, dir) => {
     win.document.querySelector('[data-move' + kind + '="' + id + '"][data-dir="' + dir + '"]').click();
   };
@@ -3123,6 +3435,30 @@ group('ARTs — the grouping, and the boundary it crosses');
      put the same name on a Kingfisher dot and a Heron dot. */
   const allKeys = demo.flatMap(t => t.rows.map(r => r.key)).filter(Boolean);
   is(new Set(allKeys).size, allKeys.length, 'no two demo items share a key');
+
+  /* Project ids, on the same reasoning as the keys above: the multi-team paste
+     is unreachable until some team has one, so the demo arrives with them set
+     and matching the keys its own rows carry. Wagtail has neither, which is
+     also the "takes nothing from a split" line the dialog has to be able to
+     show. */
+  is(demo.map(t => t.projectId), ['KFR', 'HRN', ''],
+     'the demo teams carry the project ids their own keys are built from');
+  demo.filter(t => t.projectId).forEach(t => {
+    ok(t.rows.every(r => TD.projectIdOf(r.key) === t.projectId),
+       t.name + '\u2019s id is the one every one of its keys actually starts with');
+  });
+  is(TD.duplicateProjectIds(demo), [], 'and no two demo teams answer to the same id');
+  /* The demo IS a multi-team export, so it can be split — which is the whole
+     feature, reachable from Load sample data with nothing else set up. */
+  const demoSplit = TD.routeRowsToTeams(
+    demo.flatMap(t => t.rows), demo);
+  is(demoSplit.assigned.map(a => a.name), ['Team Kingfisher', 'Team Heron'],
+     'a paste holding the whole demo splits back into the teams it came from');
+  is(demoSplit.assigned.map(a => a.rows.length),
+     [demoOf(demo, 'Team Kingfisher').rows.length, demoOf(demo, 'Team Heron').rows.length],
+     'every one of their rows finding its way home');
+  is(demoSplit.noKey, demoOf(demo, 'Team Wagtail').rows.length,
+     'while Wagtail\u2019s keyless rows are reported as unplaceable rather than guessed at');
 
   /* Wagtail's export stops nine days before everybody else's, which is what
      makes the All teams view's Data to column demonstrable: without a team like

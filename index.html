@@ -498,6 +498,13 @@ table.data tr.no-data td.figure { color: var(--text-muted); }
 .note.caution { border-left-color: var(--warn); background: var(--warn-bg); color: var(--text-primary); }
 .note ul { margin: 8px 0 0; padding-left: 24px; }
 .note li { font-family: var(--font-mono); font-size: 12px; }
+/* The mono list above is for cells lifted out of an export — a problem row,
+   read back the way it was pasted. The multi-team plan's lists are the opposite:
+   team names and sentences about them, and a team's own name set in a monospace
+   face reads as data out of a work system rather than as something its owner
+   called it. Same list, ordinary prose. */
+.note ul.plain li { font-family: inherit; font-size: 13px; margin-bottom: 4px; }
+.note ul.plain li .btn { margin-left: 6px; vertical-align: baseline; }
 
 .empty { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
 .empty h2 { font-size: 16px; margin-bottom: 12px; color: var(--text-primary); }
@@ -529,8 +536,16 @@ table.manage td { text-align: right; padding: 10px 12px;
 table.manage td:first-child { text-align: left; padding-left: 0; }
 table.manage td:last-child { padding-right: 0; }
 table.manage td.count { color: var(--text-muted); white-space: nowrap; }
+
 table.manage input[type="text"] { max-width: 320px; }
 table.manage select { max-width: 220px; }
+/* AFTER the 320px cap above, which it has the same specificity as and would
+   otherwise lose to. The project id is stored upper case whatever is typed
+   (cleanProjectId folds it), so the box shows it that way as it is typed — a
+   field that rewrites what you entered the moment you leave it reads as a bug.
+   The placeholder is exempt: "E.G. DAE" is shouting an example. */
+table.manage input.projid { max-width: 110px; text-transform: uppercase; }
+table.manage input.projid::placeholder { text-transform: none; }
 /* A row with nothing in it yet — the ARTs table before the first train. */
 table.manage td.empty-row { text-align: left; color: var(--text-secondary);
   border-bottom: 0; padding-left: 0; }
@@ -558,6 +573,7 @@ table.filters td.act { width: 1%; }
    which is what .table-scroll is for and what the Your Data table already does. */
 table.manage td:first-child { min-width: 150px; }
 table.manage td.art { min-width: 130px; }
+table.manage td.projid { min-width: 110px; }
 /* A count belongs under its heading, not hard against the box to its left, and
    these columns are only as wide as their widest cell. */
 table.filters th.act, table.filters td.act { text-align: right; }
@@ -670,6 +686,13 @@ dialog { background: var(--surface); color: var(--text-primary);
    each other. Outside the media query below, because `width: calc(100% - 32px)`
    already shrinks it to fit a phone. */
 #manageDialog { max-width: 1100px; }
+/* The multi-team paste needs the same room, and for the same reason: it holds a
+   paste box, a plan listing every team the export names and a list of the
+   project ids nothing claims. At 560 the plan wraps into a column of fragments.
+   Its textarea is taller than the tab's, because what goes in it is several
+   teams' worth of export rather than one. */
+#multiDialog { max-width: 1100px; }
+#multiDialog textarea { min-height: 240px; }
 
 @media (min-width: 760px) {
   #shareDialog { max-width: 820px; }
@@ -926,6 +949,8 @@ main:focus { outline: none; }
         else is read for those and thrown away. Tabs and commas both work, and a header row
         is skipped. An <strong>issue key</strong> column like <em>DAE-1552</em> is picked up
         if there is one, and it names the dots on the charts.
+        One export covering several teams goes in through <strong>Paste several teams</strong>
+        instead, which splits it by the project id at the front of each key.
         Items that are started but not finished belong here too: they count as work started.
         A <strong>created date</strong> is optional and adds lead time.
       </p>
@@ -949,6 +974,10 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <div class="btn-row" style="margin-top:var(--sp-6)">
         <button class="btn primary" id="btnLoad">Load pasted rows</button>
         <button class="btn" id="btnAppend" hidden>Append to existing</button>
+        <!-- Always offered, unlike Append and Clear: this is the button that
+             makes sense BEFORE there is any data — one export covering the whole
+             train, split into teams that may not exist yet. -->
+        <button class="btn" id="btnMultiOpen" type="button">Paste several teams&hellip;</button>
         <!-- The demo is offered on BOTH empty surfaces, because there are two and
              either can be the first one you see: a first run opens on this tab
              (selectTab at boot picks 'data' when there are no rows), while
@@ -1333,9 +1362,16 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   </div>
   <p class="manage-note">Each team keeps its own work items. The picker in the header chooses
     which one the dashboard is showing; Settings are shared by all of them.</p>
+  <p class="manage-note"><strong>Project id</strong> is the letters at the front of the team's
+    issue keys — <em>DAE</em> for DAE-1552. It is what lets one export covering several teams be
+    pasted in one go and split between them; it changes no figure. Leave it blank and the team
+    simply takes nothing from a split.</p>
   <div class="table-scroll">
     <table class="manage" id="teamTable" aria-label="Teams"><tbody id="teamRows"></tbody></table>
   </div>
+  <!-- Two teams answering to one project id makes a split unanswerable, so it is
+       said here as it happens rather than left for the paste to discover. -->
+  <p class="note err" id="teamIdWarn" hidden style="margin-top:10px"></p>
 
   <div class="row spread" style="margin-top:20px">
     <strong class="manage-head">Agile Release Trains</strong>
@@ -1350,6 +1386,58 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
   <div class="row" style="justify-content:flex-end;margin-top:18px">
     <button class="btn primary" id="manageCloseBtn" type="button">Done</button>
+  </div>
+</dialog>
+
+<!-- ── One export, several teams ─────────────────────────────────────────────
+     Its own dialog rather than a mode on the paste box: the single-team paste is
+     the common case and should not grow a switch, and this one has a plan to
+     show and teams to offer to create before it can do anything. Every row is
+     routed by the project id at the front of its issue key — see
+     routeRowsToTeams — and anything that cannot be placed is named rather than
+     dropped or guessed at. -->
+<dialog id="multiDialog" aria-labelledby="multiTitle">
+  <h2 id="multiTitle">Paste Several Teams at Once</h2>
+  <p style="margin:0">
+    One export covering more than one team, split by the <strong>project id</strong> at the front
+    of each issue key — <em>DAE</em>-1552 goes to whichever team is set to DAE. It is read once,
+    as one export, so every team is read the same way. Nothing is written until you press one of
+    the load buttons, and a team this paste does not name is never touched.
+  </p>
+
+  <div id="multiTeamIds" class="note info" style="margin-top:var(--sp-5)"></div>
+
+  <div style="margin-top:var(--sp-5)">
+    <label for="multiPasteBox">Pasted rows</label>
+    <textarea id="multiPasteBox" spellcheck="false" placeholder="Issue key&#9;Created&#9;In Progress&#9;Resolved&#9;Issue Type
+DAE-1552&#9;2015-01-02&#9;2015-01-14&#9;2015-01-21&#9;Story
+KFR-207&#9;2015-01-09&#9;2015-01-14&#9;2015-01-26&#9;Bug
+HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
+  </div>
+
+  <div class="grid two" style="margin-top:var(--sp-5)">
+    <div>
+      <label for="multiDateOrder">Ambiguous dates like 03/04/2015 are&hellip;</label>
+      <select id="multiDateOrder">
+        <option value="auto">Auto-detect</option>
+        <option value="dmy">Day first — 3 April</option>
+        <option value="mdy">Month first — 4 March</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="btn-row" style="margin-top:var(--sp-6)">
+    <button class="btn" id="btnMultiCheck" type="button">Check this paste</button>
+    <button class="btn primary" id="btnMultiLoad" type="button">Split into teams</button>
+    <button class="btn" id="btnMultiAppend" type="button">Append to each team</button>
+  </div>
+
+  <!-- role="status", like the paste report on the tab: what a load did, and what
+       it could not place, is announced rather than only drawn. -->
+  <div id="multiNote" role="status" style="margin-top:var(--sp-6)"></div>
+
+  <div class="row" style="justify-content:flex-end;margin-top:18px">
+    <button class="btn" id="multiCloseBtn" type="button">Close</button>
   </div>
 </dialog>
 
@@ -2102,6 +2190,35 @@ function cleanIssueKey(k) {
   return ISSUE_KEY_RE.test(s) ? s.toUpperCase() : '';
 }
 
+/* ── The project id ─────────────────────────────────────────────────────────
+   The letters at the FRONT of an issue key — DAE in DAE-1552 — and the one
+   thing in a pasted row that can say which team it belongs to. Each team here
+   is one Jira project, so the project id is a team's address: set DAE on a team
+   and every DAE- row in a paste lands there. See routeRowsToTeams.
+
+   Its shape is the front half of ISSUE_KEY_RE and nothing else, because a value
+   that could never begin a key is a routing rule that could never fire — there
+   would be no honest way to tell somebody why their rows went nowhere. The
+   drop-whole rule is the same one cleanIssueKey and cleanWorkType follow: a cell
+   that is not a project id is not shortened into one. Folded to upper case for
+   the same reason a key is — "dae" and "DAE" must not be two different teams. */
+const PROJECT_ID_RE = /^[A-Za-z][A-Za-z0-9]{0,9}$/;
+function cleanProjectId(p) {
+  if (typeof p !== 'string') return '';
+  const s = p.trim();
+  return PROJECT_ID_RE.test(s) ? s.toUpperCase() : '';
+}
+
+/* The project id of a STORED key, which has already passed ISSUE_KEY_RE — so
+   there is exactly one dash and what precedes it is a project id by
+   construction. Anything else (an empty key, a row that never had one) has no
+   project and cannot be routed; it is counted and reported, never guessed at. */
+function projectIdOf(key) {
+  const s = typeof key === 'string' ? key : '';
+  const dash = s.indexOf('-');
+  return dash > 0 ? s.slice(0, dash).toUpperCase() : '';
+}
+
 function parsePastedRows(text, order) {
   /* Trim spaces but never tabs: in a tab-separated paste a leading tab is an
      empty first cell — a work-in-progress row in a completed-first export.
@@ -2222,6 +2339,115 @@ function parsePastedRows(text, order) {
 
   return { rows, badCompleted, badStarted, badCreated, startAfterDone, raisedAfterStart,
            unfinished, undated, skippedHeader, dateOrder: resolved, columns: cols };
+}
+
+/* ── One paste, several teams ────────────────────────────────────────────────
+   A real export often covers a whole train rather than one board, and splitting
+   it by hand — filter, copy, switch team, paste, repeat — is the sort of chore
+   that stops anybody keeping the dashboard current. This routes each parsed row
+   to the team whose project id matches the front of its issue key.
+
+   PURE, and takes the team list rather than reading `state`, so the dialog can
+   show what WOULD happen before anything is written and the tests can pin both.
+   It is also why the whole paste goes through parsePastedRows ONCE: one export
+   has one column layout, and detecting the columns per team would let the same
+   file be read two different ways.
+
+   The project id is a LABEL and an address, never a level of maths — the rule
+   ARTs and issue keys already follow. Nothing counts, groups or filters by it;
+   it decides which team's list a row joins and then has no further say.
+
+   Everything it cannot place is COUNTED AND NAMED rather than dropped or
+   guessed at, in three separate buckets, because the three have three different
+   fixes: an id no team claims wants a team, an id two teams claim wants one of
+   them changed, and a row with no key at all wants a Key column in the export.
+   Nothing is ever routed to "the first team" or to the active one — a row in
+   the wrong team's throughput is worse than a row plainly reported as homeless. */
+function projectIdIndex(teams) {
+  const index = new Map();
+  (Array.isArray(teams) ? teams : []).forEach(t => {
+    const p = cleanProjectId(t && t.projectId);
+    if (!p) return;
+    if (!index.has(p)) index.set(p, []);
+    index.get(p).push(t);
+  });
+  return index;
+}
+
+/* The ids more than one team answers to. The Teams dialog warns on these as
+   they are typed; routeRowsToTeams refuses to route them. */
+function duplicateProjectIds(teams) {
+  const out = [];
+  projectIdIndex(teams).forEach((owners, id) => { if (owners.length > 1) out.push(id); });
+  return out.sort();
+}
+
+function routeRowsToTeams(rows, teams) {
+  const index = projectIdIndex(teams);
+  const byTeam = new Map();       /* team id  → rows */
+  const unclaimed = new Map();    /* project id → count */
+  const ambiguous = new Map();    /* project id → { count, names } */
+  let noKey = 0;
+  const seen = new Set();
+
+  (Array.isArray(rows) ? rows : []).forEach(r => {
+    const p = projectIdOf(r && r.key);
+    if (!p) { noKey++; return; }
+    seen.add(p);
+    const owners = index.get(p);
+    if (!owners) { unclaimed.set(p, (unclaimed.get(p) || 0) + 1); return; }
+    if (owners.length > 1) {
+      const a = ambiguous.get(p) || { projectId: p, count: 0, names: owners.map(t => t.name) };
+      a.count++;
+      ambiguous.set(p, a);
+      return;
+    }
+    const id = owners[0].id;
+    if (!byTeam.has(id)) byTeam.set(id, []);
+    byTeam.get(id).push(r);
+  });
+
+  /* In the team list's own order, not the order the rows happened to arrive in:
+     this list is read down the report beside the picker and the All Teams table,
+     and three orders for one set of teams is three chances to misread it. */
+  const assigned = (Array.isArray(teams) ? teams : [])
+    .filter(t => byTeam.has(t.id))
+    .map(t => ({ teamId: t.id, name: t.name, projectId: cleanProjectId(t.projectId),
+                 rows: byTeam.get(t.id) }));
+
+  /* Biggest first — the id with 400 homeless rows is the one to act on, and it
+     should not be under an id with two. Ties fall back to the id itself so the
+     list is stable between two runs of the same paste. */
+  const bySize = (a, b) => b.count - a.count || (a.projectId < b.projectId ? -1 : 1);
+  return {
+    assigned,
+    unclaimed: [...unclaimed.entries()].map(([projectId, count]) => ({ projectId, count }))
+      .sort(bySize),
+    ambiguous: [...ambiguous.values()].sort(bySize),
+    noKey,
+    projects: seen.size
+  };
+}
+
+/* The project id a paste is unanimously about, or '' if it is not unanimous.
+   Used by the single-team paste to fill in a team's id for it: typing an id per
+   team before the split can work is exactly the setup step nobody does, and a
+   team's own export answers the question by itself. Unanimity is the bar rather
+   than a majority — a paste that is 90% DAE is a paste with something else in
+   it, and that is a question to ask rather than a fact to write down — and a
+   handful of rows is not evidence, hence the floor. */
+const PROJECT_ID_ADOPT_MIN = 3;
+function soleProjectId(rows) {
+  const ids = new Set();
+  let keyed = 0;
+  (Array.isArray(rows) ? rows : []).forEach(r => {
+    const p = projectIdOf(r && r.key);
+    if (!p) return;
+    keyed++;
+    ids.add(p);
+  });
+  if (ids.size !== 1 || keyed < PROJECT_ID_ADOPT_MIN) return '';
+  return [...ids][0];
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3412,6 +3638,10 @@ window.TD = {
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
   cleanIssueKey,
+  /* The project id and the routing it drives — pure, so the split can be pinned
+     without a paste box or a team list on screen. */
+  cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
+  soleProjectId, PROJECT_ID_ADOPT_MIN,
   cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, deriveTeams, utcDate,
   /* The forecast's pure pieces, so a test can deal a sample set it wrote itself
      rather than only reading the answers back off derive(). */
@@ -3665,8 +3895,14 @@ function sanitizeTeams(teams) {
        "on no train" is a real and ordinary answer where an invented id is not.
        hydrateState prunes pointers at ARTs that do not exist. */
     const artId = (t && typeof t.artId === 'string' && ID_OK.test(t.artId)) ? t.artId : null;
+    /* The same guard as the issue key it addresses, at the same kind of door:
+       a shape, applied on the way in as well as where it is typed, so a
+       hand-edited backup or a share link cannot use a team's project id as a
+       free-text field. Anything that is not a project id becomes no project id
+       — a team that routes nothing, which is an ordinary state. */
     return { id, name: String((t && t.name) || 'Untitled team').slice(0, 120),
-             artId, rows: hydrateRows(t && t.rows) };
+             artId, projectId: cleanProjectId(t && t.projectId),
+             rows: hydrateRows(t && t.rows) };
   });
 }
 
@@ -3781,7 +4017,8 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 6 added the per-row issue key; 5 added ARTs — `state.arts` and an
+/* SCHEMA 7 added the per-team project id — the address a multi-team paste is
+   split by; 6 added the per-row issue key; 5 added ARTs — `state.arts` and an
    `artId` on each team; 4 added the working-days setting; 3 added the per-row
    created date.
    The marker rides into localStorage and into a backup file, but deliberately
@@ -3793,7 +4030,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 6;
+const SCHEMA = 7;
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
    hydrateState() keeps only the keys it knows, which is right for a hostile
@@ -3830,6 +4067,9 @@ function serializeState() {
     teams: state.teams.map(t => {
       const out = { id: t.id, name: t.name, rows: serializeRows(t.rows) };
       if (t.artId) out.artId = t.artId;
+      /* Likewise the project id: written only when there is one, so a browser
+         that never splits a paste serialises byte-identically to before. */
+      if (t.projectId) out.projectId = t.projectId;
       return out;
     }),
     /* Likewise: no key at all until an ART exists. */
@@ -5117,6 +5357,19 @@ function renderTeamRows() {
       state.arts.map(a => opt(a.id, a.name, t.artId === a.id)).join('') +
       '</select></td>';
   };
+  /* The project id box. Always present, unlike the ART picker above — that one
+     needs an ART to exist before it can do anything, while this is a value typed
+     straight in and the feature it drives is unreachable until somebody types
+     one. `inputmode` is deliberately absent: the value is letters far more often
+     than digits, and the phone's ordinary keyboard is the one that has both. */
+  const projCell = (t, i) =>
+    '<td class="projid"><label class="sr-only" for="proj-of-' + escapeHtml(t.id) +
+    '">Project id for team in row ' + (i + 1) + '</label>' +
+    '<input class="projid" type="text" id="proj-of-' + escapeHtml(t.id) +
+    '" data-project-id="' + escapeHtml(t.id) + '" maxlength="10" spellcheck="false" ' +
+    'autocapitalize="characters" autocomplete="off" placeholder="e.g. DAE" value="' +
+    escapeHtml(t.projectId || '') + '"></td>';
+
   tb.innerHTML = '';
   state.teams.forEach((t, i) => {
     const tr = document.createElement('tr');
@@ -5124,6 +5377,7 @@ function renderTeamRows() {
     tr.innerHTML =
       '<td><input type="text" data-team="' + t.id + '" maxlength="120" value="' + escapeHtml(t.name) +
         '" aria-label="Name of team, row ' + (i + 1) + '"></td>' +
+      projCell(t, i) +
       artCell(t, i) +
       /* The count carries its own noun, the way the sibling's rows do. With no
          header row there is nothing else to say what the number is. */
@@ -5131,6 +5385,27 @@ function renderTeamRows() {
       '<td>' + rowActs('team', t.id, t.name, i, state.teams.length, only) + '</td>';
     tb.appendChild(tr);
   });
+  renderTeamIdWarning();
+}
+
+/* Two teams on one project id. Not repaired automatically — which of the two
+   the id belongs to is a question only the person typing can answer, and a
+   field that clears itself while you are still looking at it is worse than a
+   line telling you what is wrong. Routing refuses the id until it is settled,
+   and says the same thing there. */
+function renderTeamIdWarning() {
+  const el = $('teamIdWarn');
+  if (!el) return;
+  const dupes = duplicateProjectIds(state.teams);
+  el.hidden = !dupes.length;
+  if (!dupes.length) { el.textContent = ''; return; }
+  const named = dupes.map(id => {
+    const on = state.teams.filter(t => cleanProjectId(t.projectId) === id).map(t => t.name);
+    return id + ' (' + on.join(' and ') + ')';
+  });
+  el.textContent = (dupes.length === 1 ? 'Two teams share a project id: ' : 'Some project ids are on more than one team: ')
+    + named.join('; ') + '. A paste split by project id will leave those rows unassigned until '
+    + 'one of them changes — nothing can decide which team they belong to.';
 }
 
 /* ── The buttons at the end of a row ─────────────────────────────────────────
@@ -6389,7 +6664,8 @@ function closeOnBackdropClick(dlg) {
    reconciliation dialog, which refused to be dismissed because picking which
    copy of your data to keep had to be a choice — and it went with sync on
    2026-08-20, so the rule is now simply "every dialog". */
-['dataDialog', 'clearDialog', 'helpDialog', 'manageDialog'].forEach(id => closeOnBackdropClick($(id)));
+['dataDialog', 'clearDialog', 'helpDialog', 'manageDialog', 'multiDialog']
+  .forEach(id => closeOnBackdropClick($(id)));
 
 /* theme */
 const THEMES = [...$('themeSel').options].map(o => o.value);
@@ -6405,8 +6681,28 @@ $('themeSel').addEventListener('change', e => {
 });
 
 /* paste / load */
-function showParseNote(res, mode, team) {
-  const el = $('parseNote');
+/* ── The parts of a paste report both paste surfaces need ───────────────────
+   Two surfaces now report on a paste — one team's box on the Your Data tab, and
+   the multi-team dialog — and they must never explain the same export two
+   different ways. The pieces that belong to the PASTE rather than to its
+   destination live here and are used by both. */
+
+/* Line number and the readable cells, so a row can be found in the export
+   rather than hunted for. Capped, because a badly mismapped column can make
+   every row a problem and a list of 1300 helps nobody — the count above it is
+   always the true total. */
+const PARSE_LIST_CAP = 20;
+const parseListOf = (rows) => '<ul>' +
+  rows.slice(0, PARSE_LIST_CAP).map(b => '<li>line ' + b.line + ': ' + escapeHtml(b.text) + '</li>').join('') +
+  (rows.length > PARSE_LIST_CAP ? '<li>… and ' + (rows.length - PARSE_LIST_CAP) + ' more</li>' : '') +
+  '</ul>';
+const parsePlural = (n) => n === 1 ? ' row' : ' rows';
+
+/* The rows the parser had something to say about: the ones it could not use at
+   all, and the ones it kept minus a field. Returns the count as well as the
+   HTML, because "nothing pasted" and "everything went wrong" are different
+   messages and the caller has to tell them apart. */
+function parseProblemsHtml(res) {
   const skipped = res.badCompleted;
   /* Problems that cost a field rather than the row. Each carries its own rows,
      so every one of them can be listed under the sentence that explains it —
@@ -6430,27 +6726,11 @@ function showParseNote(res, mode, team) {
           + 'request and the work' }
   ].filter(g => g.rows.length);
 
-  if (!res.rows.length && !skipped.length && !kept.length) {
-    el.innerHTML = '<div class="note info">Nothing to load — paste some rows first.</div>';
-    return;
-  }
-
-  /* Line number and the line itself, so a row can be found in the export rather
-     than hunted for. Capped, because a badly mismapped column can make every
-     row a problem and a list of 1300 helps nobody — the count above it is
-     always the true total. */
-  const LIST_CAP = 20;
-  const listOf = (rows) => '<ul>' +
-    rows.slice(0, LIST_CAP).map(b => '<li>line ' + b.line + ': ' + escapeHtml(b.text) + '</li>').join('') +
-    (rows.length > LIST_CAP ? '<li>… and ' + (rows.length - LIST_CAP) + ' more</li>' : '') +
-    '</ul>';
-  const plural = (n) => n === 1 ? ' row' : ' rows';
-
   let html = '';
   if (skipped.length) {
-    html += '<div class="note err"><strong>Skipped ' + skipped.length + plural(skipped.length) +
+    html += '<div class="note err"><strong>Skipped ' + skipped.length + parsePlural(skipped.length) +
       ':</strong> the completion date could not be read, and every metric keys off one. ' +
-      'Correct these at the source and paste again.' + listOf(skipped) + '</div>';
+      'Correct these at the source and paste again.' + parseListOf(skipped) + '</div>';
   }
   if (kept.length) {
     /* A handful of late-raised tickets is ordinary. A large share is either a
@@ -6462,8 +6742,8 @@ function showParseNote(res, mode, team) {
     const mismapped = ooo && seen && (ooo / seen) > 0.2;
     html += '<div class="note caution" style="margin-top:var(--sp-4)">' +
       '<strong>Loaded, but worth a look:</strong>' +
-      kept.map(g => '<div style="margin-top:var(--sp-5)">' + g.rows.length + plural(g.rows.length) +
-        ' had ' + g.what + '.' + listOf(g.rows) + '</div>').join('') +
+      kept.map(g => '<div style="margin-top:var(--sp-5)">' + g.rows.length + parsePlural(g.rows.length) +
+        ' had ' + g.what + '.' + parseListOf(g.rows) + '</div>').join('') +
       (mismapped ? '<div style="margin-top:var(--sp-5)">That is ' + Math.round(ooo / seen * 100)
         + '% of the paste, which is too many to be the odd late ticket. Either column '
         + (res.columns.created + 1) + ' is a due or updated date rather than when the work '
@@ -6471,18 +6751,16 @@ function showParseNote(res, mode, team) {
         + 'in which case lead time will not tell you much.</div>' : '') +
       '</div>';
   }
-  /* Which column was read as what is the single most damaging thing to get wrong
-     silently, so it's stated every time rather than buried in a tooltip. */
+  return { html, problems: skipped.length + kept.length };
+}
+
+/* Which column was read as what is the single most damaging thing to get wrong
+   silently, so it's stated every time rather than buried in a tooltip. Opens
+   with a <br>: it always follows a sentence about what was loaded, and the two
+   belong in one block. */
+function columnsReadHtml(res) {
   const colName = i => (i < 0 ? 'none' : 'column ' + (i + 1));
-  html += '<div class="note ok" style="margin-top:var(--sp-4)">' +
-    (mode === 'append' ? 'Added ' : 'Loaded ') + res.rows.length + ' item' + (res.rows.length === 1 ? '' : 's') +
-    ' into <strong>' + escapeHtml(team.name) + '</strong>' +
-    (res.unfinished ? ', ' + res.unfinished + ' of them still in progress' : '') +
-    (res.skippedHeader ? ' (header row skipped)' : '') + '.' +
-    (res.undated ? ' <strong>' + res.undated + '</strong> row' + (res.undated === 1 ? ' had' : 's had') +
-      ' no dates at all and ' + (res.undated === 1 ? 'was' : 'were') + ' ignored — nothing started, ' +
-      'nothing finished, so nothing to plot.' : '') +
-    '<br>Read <strong>' + colName(res.columns.completed) + '</strong> as the completed date, ' +
+  return '<br>Read <strong>' + colName(res.columns.completed) + '</strong> as the completed date, ' +
     '<strong>' + colName(res.columns.started) + '</strong> as the start date' +
     (res.columns.created >= 0 && res.columns.created !== res.columns.started
       ? ', <strong>' + colName(res.columns.created) + '</strong> as the created date' : '') +
@@ -6493,7 +6771,8 @@ function showParseNote(res, mode, team) {
        whether it was saved is not something to leave anyone guessing at. */
     (res.columns.key >= 0
       ? '<br>Read <strong>' + colName(res.columns.key) + '</strong> as the issue key, and saved it '
-        + 'with each item — it names the dots on the charts. Only that shape is kept: '
+        + 'with each item — it names the dots on the charts, and its project id is what a '
+        + 'multi-team paste is split by. Only that shape is kept: '
         + 'letters, a dash and digits. Anything else in that column is dropped.'
       : '<br>No issue key in this paste. Add a <em>Key</em> column to name the items on '
         + 'the charts; without one they are named by their work type, as before.') +
@@ -6508,22 +6787,346 @@ function showParseNote(res, mode, team) {
     (res.columns.created < 0
       ? '<br>No created date in this paste — lead time needs one. Add a '
         + '<em>Created</em> column and paste again to see it.'
+      : '');
+}
+
+/* `adopted` is a project id this paste has just written onto the team — see
+   doLoad. It is reported in the same block as the columns, because it is the
+   same kind of fact: something the app worked out from the data rather than
+   something that was asked for. */
+function showParseNote(res, mode, team, adopted) {
+  const el = $('parseNote');
+  const probs = parseProblemsHtml(res);
+
+  if (!res.rows.length && !probs.problems) {
+    el.innerHTML = '<div class="note info">Nothing to load — paste some rows first.</div>';
+    return;
+  }
+
+  el.innerHTML = probs.html +
+    '<div class="note ok" style="margin-top:var(--sp-4)">' +
+    (mode === 'append' ? 'Added ' : 'Loaded ') + res.rows.length + ' item' + (res.rows.length === 1 ? '' : 's') +
+    ' into <strong>' + escapeHtml(team.name) + '</strong>' +
+    (res.unfinished ? ', ' + res.unfinished + ' of them still in progress' : '') +
+    (res.skippedHeader ? ' (header row skipped)' : '') + '.' +
+    (res.undated ? ' <strong>' + res.undated + '</strong> row' + (res.undated === 1 ? ' had' : 's had') +
+      ' no dates at all and ' + (res.undated === 1 ? 'was' : 'were') + ' ignored — nothing started, ' +
+      'nothing finished, so nothing to plot.' : '') +
+    columnsReadHtml(res) +
+    (adopted
+      ? '<br>Every key in this paste starts <strong>' + escapeHtml(adopted) + '</strong>, and this '
+        + 'team had no project id — so that is now its project id, and a paste covering several '
+        + 'teams will send its ' + escapeHtml(adopted) + ' rows here. Change it under '
+        + '<strong>Teams</strong>.'
       : '') +
     '</div>';
-  el.innerHTML = html;
 }
 
 function doLoad(mode) {
   const team = activeTeam();
   if (!team) return;
   const res = parsePastedRows($('pasteBox').value, view.dateOrder);
-  showParseNote(res, mode, team);
+  /* Fill in the team's project id from its own export, when the export answers
+     the question unanimously and nobody has answered it already. Typing an id
+     per team is the setup step that would otherwise stand between a first paste
+     and the multi-team split, and this is the one moment the app can be certain
+     what the answer is. Never overwrites one that is set: a paste is data, and
+     a value somebody typed is a decision. */
+  const sole = (!team.projectId && res.rows.length) ? soleProjectId(res.rows) : '';
+  /* And never into a clash. Another team already answering to this id means the
+     app has two candidates and no way to choose, which is the one state routing
+     cannot work in — writing it here would break a split that works today, in
+     order to fill in a field nobody asked for. */
+  const adopted = (sole && !state.teams.some(t => cleanProjectId(t.projectId) === sole)) ? sole : '';
+  if (adopted) team.projectId = adopted;
+  showParseNote(res, mode, team, adopted);
   if (!res.rows.length) return;
   team.rows = mode === 'append' ? team.rows.concat(res.rows) : res.rows;
   save();
   renderAll();
   if (mode !== 'append') $('pasteBox').value = '';
 }
+
+/* ── One paste, several teams ────────────────────────────────────────────────
+   Its own dialog rather than a mode on the box above, deliberately: the
+   single-team paste is the common case and gains nothing from a switch it has
+   to be in the right position of, and this one has a plan to show and teams to
+   create before it can run. routeRowsToTeams does the thinking; everything here
+   is about saying what it decided before anything is written. */
+
+function multiParse() {
+  const res = parsePastedRows($('multiPasteBox').value, view.dateOrder);
+  return { res, route: routeRowsToTeams(res.rows, state.teams) };
+}
+
+/* What each team holds right now — the figure that makes "replace" concrete. */
+const teamItemCount = (id) => {
+  const t = state.teams.find(x => x.id === id);
+  return t ? t.rows.length : 0;
+};
+
+function showMultiNote(res, route, mode) {
+  const el = $('multiNote');
+  /* Redrawn here rather than only when the dialog opens: creating a team from
+     the report below changes who claims what, and a header still listing the
+     old answer directly above a plan built on the new one is the kind of
+     disagreement that makes somebody distrust both. */
+  renderMultiTeamIds();
+  if (!$('multiPasteBox').value.trim()) {
+    el.innerHTML = '<div class="note info">Nothing pasted yet — paste an export covering '
+      + 'several teams and press <strong>Check this paste</strong>.</div>';
+    return;
+  }
+  const probs = parseProblemsHtml(res);
+  if (!res.rows.length && !probs.problems) {
+    el.innerHTML = '<div class="note info">Nothing to load — paste some rows first.</div>';
+    return;
+  }
+
+  let html = probs.html;
+
+  /* Fatal for this dialog, and only for this dialog: without a key column there
+     is no project id, and so nothing to split by. Said plainly, with the way
+     out, rather than reporting a split of zero teams. */
+  if (res.columns.key < 0) {
+    html += '<div class="note err" style="margin-top:var(--sp-4)">'
+      + '<strong>No issue key column in this paste.</strong> A split is made from the project id '
+      + 'at the front of each key — the <em>DAE</em> in DAE-1552 — so there is nothing here to '
+      + 'split by. Export a <em>Key</em> column alongside the dates, or paste this into one team '
+      + 'on the <strong>Your Data</strong> tab.'
+      + columnsReadHtml(res).replace(/^<br>/, '<br><br>') + '</div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  const item = (n) => n + ' item' + (n === 1 ? '' : 's');
+  const teamLine = (a) => '<li><strong>' + escapeHtml(a.name) + '</strong> (' +
+    escapeHtml(a.projectId) + ') — ' + item(a.rows.length) +
+    (mode === 'check'
+      ? (teamItemCount(a.teamId)
+          ? '; it holds ' + item(teamItemCount(a.teamId)) + ' now'
+          : '; it is empty now')
+      : '') + '</li>';
+
+  if (route.assigned.length) {
+    const total = route.assigned.reduce((n, a) => n + a.rows.length, 0);
+    const teams = route.assigned.length;
+    html += '<div class="note ' + (mode === 'check' ? 'info' : 'ok') + '" style="margin-top:var(--sp-4)">'
+      + (mode === 'check'
+          ? '<strong>This paste splits into ' + teams + ' team' + (teams === 1 ? '' : 's') + '.</strong>'
+          : '<strong>' + (mode === 'append' ? 'Added ' : 'Loaded ') + item(total) + ' into '
+            + teams + ' team' + (teams === 1 ? '' : 's') + '.</strong>')
+      + '<ul class="plain">' + route.assigned.map(teamLine).join('') + '</ul>'
+      + (mode === 'check'
+          ? 'Nothing has been loaded yet. <strong>Split into teams</strong> replaces what each of '
+            + 'these teams holds; <strong>Append to each team</strong> adds to it. Either way, a '
+            + 'team this paste does not name is left exactly as it is.'
+          : 'Teams this paste did not name were left exactly as they were.')
+      + '</div>';
+  } else {
+    html += '<div class="note caution" style="margin-top:var(--sp-4)">'
+      + '<strong>Nothing in this paste belongs to a team yet.</strong> Every row carries a project '
+      + 'id no team answers to — see below, or set one on a team under <strong>Teams</strong>.'
+      + '</div>';
+  }
+
+  /* The ids nobody claims, biggest first, each with the one-press way to fix it.
+     Offered rather than done: a paste is not a reason to invent teams in
+     somebody's dashboard, and an export with a stray project in it is common. */
+  if (route.unclaimed.length) {
+    const n = route.unclaimed.length;
+    html += '<div class="note caution" style="margin-top:var(--sp-4)">'
+      + '<strong>' + n + ' project id' + (n === 1 ? '' : 's') + ' no team claims.</strong> '
+      + (n === 1 ? 'Its rows were' : 'Their rows were')
+      + ' not loaded — nothing here can say which team they belong to.'
+      + '<ul class="plain">' + route.unclaimed.map(u => '<li><strong>' + escapeHtml(u.projectId) + '</strong> — '
+          + u.count + parsePlural(u.count)
+          + ' <button class="btn small" type="button" data-create-team="' + escapeHtml(u.projectId)
+          + '">Create Team ' + escapeHtml(u.projectId) + '</button></li>').join('') + '</ul>'
+      + (n > 1 ? '<div style="margin-top:var(--sp-4)"><button class="btn small" type="button" '
+          + 'data-create-team="*">Create all ' + n + ' teams</button></div>' : '')
+      + '<div style="margin-top:var(--sp-4)">Or give one of these ids to a team you already have, '
+      + 'under <strong>Teams</strong>. Either way the paste stays in the box — check it again '
+      + 'and they will be included.</div>'
+      + '</div>';
+  }
+
+  /* Two teams on one id. Deliberately NOT resolved by picking one: which team
+     the project belongs to is the one thing the app cannot work out, and a row
+     in the wrong team's throughput is worse than a row reported as homeless. */
+  if (route.ambiguous.length) {
+    const n = route.ambiguous.length;
+    html += '<div class="note err" style="margin-top:var(--sp-4)">'
+      + '<strong>' + n + ' project id' + (n === 1 ? ' is' : 's are') + ' on more than one team.</strong> '
+      + 'Nothing can decide which team those rows belong to, so they were not loaded. Change one '
+      + 'of the ids under <strong>Teams</strong> and check again.'
+      + '<ul class="plain">' + route.ambiguous.map(a => '<li><strong>' + escapeHtml(a.projectId) + '</strong> — '
+          + a.count + parsePlural(a.count) + ', claimed by '
+          + a.names.map(escapeHtml).join(' and ') + '</li>').join('') + '</ul>'
+      + '</div>';
+  }
+
+  html += '<div class="note info" style="margin-top:var(--sp-4)">'
+    + res.rows.length + ' readable item' + (res.rows.length === 1 ? '' : 's') + ' in this paste'
+    + (res.unfinished ? ', ' + res.unfinished + ' of them still in progress' : '')
+    + (res.skippedHeader ? ' (header row skipped)' : '') + '.'
+    + (res.undated ? ' <strong>' + res.undated + '</strong> row' + (res.undated === 1 ? ' had' : 's had')
+        + ' no dates at all and ' + (res.undated === 1 ? 'was' : 'were') + ' ignored.' : '')
+    /* A row with no key cannot be routed at all. Counted here rather than in a
+       bucket of its own above: the fix is a column in the export, which is the
+       same fix the missing-key sentence below already asks for. */
+    + (route.noKey ? ' <strong>' + route.noKey + '</strong> item'
+        + (route.noKey === 1 ? ' had' : 's had') + ' no readable issue key, so '
+        + (route.noKey === 1 ? 'it' : 'they') + ' could not be sent anywhere — paste '
+        + (route.noKey === 1 ? 'it' : 'them') + ' into a team by hand on the '
+        + '<strong>Your Data</strong> tab.' : '')
+    + columnsReadHtml(res)
+    + '</div>';
+
+  el.innerHTML = html;
+}
+
+function runMulti(mode) {
+  const { res, route } = multiParse();
+
+  if (mode !== 'check' && route.assigned.length) {
+    /* The one confirm in this flow, and only where it is earned: replacing
+       several teams at once is the single most destructive thing this dialog
+       can do, and unlike the team-at-a-time box above it can do it to boards
+       nobody is looking at. It names each one and what it stands to lose. */
+    if (mode === 'replace') {
+      const losing = route.assigned.filter(a => teamItemCount(a.teamId));
+      const CONFIRM_CAP = 8;
+      if (losing.length && !confirm(
+          'Replace the work items in ' + losing.length + ' team'
+          + (losing.length === 1 ? '' : 's') + '?\n\n'
+          + losing.slice(0, CONFIRM_CAP).map(a => '• ' + a.name + ' — loses ' + teamItemCount(a.teamId)
+              + ', takes ' + a.rows.length).join('\n')
+          + (losing.length > CONFIRM_CAP ? '\n• … and ' + (losing.length - CONFIRM_CAP) + ' more' : '')
+          + '\n\nTeams this paste does not name are untouched. This cannot be undone.')) return;
+    }
+    route.assigned.forEach(a => {
+      const team = state.teams.find(t => t.id === a.teamId);
+      if (!team) return;
+      team.rows = mode === 'append' ? team.rows.concat(a.rows) : a.rows.slice();
+    });
+    save();
+    renderAll();
+    const total = route.assigned.reduce((n, a) => n + a.rows.length, 0);
+    window.toast((mode === 'append' ? 'Added ' : 'Loaded ') + total + ' item'
+      + (total === 1 ? '' : 's') + ' into ' + route.assigned.length + ' team'
+      + (route.assigned.length === 1 ? '' : 's'), 5000);
+  }
+
+  showMultiNote(res, route, mode);
+
+  /* The box is cleared only when there is nothing left to do with it. With an
+     unclaimed id still listed, the next step is to create a team and split
+     again — and clearing the box would have thrown away the paste that step
+     needs. The single-team box has no such state and clears every time.
+
+     AFTER the report, not before: showMultiNote reads the box to tell "nothing
+     was pasted" from "nothing could be loaded", and clearing first made a
+     successful load report that nothing had been pasted at all. */
+  if (mode === 'replace' && route.assigned.length
+      && !route.unclaimed.length && !route.ambiguous.length) $('multiPasteBox').value = '';
+}
+
+/* Creating a team from the report. It takes the project id it was created for,
+   which is the whole point — the next check sends those rows to it. */
+$('multiNote').addEventListener('click', e => {
+  const btn = e.target.closest ? e.target.closest('[data-create-team]') : null;
+  if (!btn) return;
+  const want = btn.dataset.createTeam;
+  const { route } = multiParse();
+  const ids = want === '*' ? route.unclaimed.map(u => u.projectId) : [cleanProjectId(want)];
+  const made = [];
+  /* The same clean-up the demo does, for the same case: a first run auto-creates
+     an empty "My team", and creating teams from a paste would otherwise leave it
+     in the picker for ever. Dropped ONLY while it is untouched — still the only
+     team, still empty, still named what the app named it. A team someone has
+     renamed or pasted into is theirs. */
+  if (ids.filter(Boolean).length && state.teams.length === 1
+      && !state.teams[0].rows.length && state.teams[0].name === 'My team'
+      && !state.teams[0].projectId) state.teams = [];
+  ids.filter(Boolean).forEach(id => {
+    if (state.teams.some(t => cleanProjectId(t.projectId) === id)) return;
+    state.teams.push({ id: newId(), name: 'Team ' + id, artId: null, projectId: id, rows: [] });
+    made.push(id);
+  });
+  if (!made.length) return;
+  /* The dropped "My team" may have been the team on screen. Repointed here and
+     SAVED, the way a delete does it — renderTeamSelect would recover on its own,
+     but only in this tab and only until the next reload. */
+  if (!state.teams.some(t => t.id === view.activeTeamId)) {
+    view.activeTeamId = state.teams[0].id;
+    saveView();
+  }
+  save();
+  renderAll();
+  window.toast(made.length === 1
+    ? 'Created Team ' + made[0] + ' — check the paste again to load its items'
+    : 'Created ' + made.length + ' teams — check the paste again to load their items', 6000);
+  /* Straight back to the plan, which now has somewhere to put those rows. Not
+     loaded outright: pressing "create" is agreeing to the team, not to a
+     replace of everything else the paste names. */
+  runMulti('check');
+});
+
+function openMultiDialog() {
+  $('multiDateOrder').value = view.dateOrder;
+  renderMultiTeamIds();
+  const { res, route } = multiParse();
+  showMultiNote(res, route, 'check');
+  openModal($('multiDialog'));
+}
+
+/* Which team answers to what, at the top of the dialog — the setting the whole
+   feature rests on, shown where it is about to be used rather than behind
+   another button. A team with no id is listed too: "it takes nothing" is the
+   thing somebody needs to know, and an absence is invisible if it is left out. */
+function renderMultiTeamIds() {
+  const el = $('multiTeamIds');
+  const withId = state.teams.filter(t => cleanProjectId(t.projectId));
+  const without = state.teams.filter(t => !cleanProjectId(t.projectId));
+  if (!withId.length) {
+    el.className = 'note caution';
+    el.innerHTML = '<strong>No team has a project id yet.</strong> Open <strong>Teams</strong> '
+      + 'and give each one the letters at the front of its issue keys — or paste below and '
+      + 'create the teams from what is in it.';
+    return;
+  }
+  /* A clash makes this list a lie — it shows one id pointing at two teams, and
+     those rows go nowhere. Said here as well as in the report below, because
+     this is the line somebody reads to check the setup before pasting. */
+  const dupes = duplicateProjectIds(state.teams);
+  el.className = dupes.length ? 'note caution' : 'note info';
+  el.innerHTML = '<strong>Where rows will go:</strong> '
+    + withId.map(t => escapeHtml(t.projectId) + ' → ' + escapeHtml(t.name)).join(' · ')
+    + (dupes.length
+        ? '<div style="margin-top:var(--sp-4)"><strong>' + dupes.map(escapeHtml).join(', ') + '</strong> '
+          + (dupes.length === 1 ? 'is on more than one team, so its' : 'are on more than one team, so their')
+          + ' rows go nowhere until that is settled under <strong>Teams</strong>.</div>'
+        : '')
+    + (without.length
+        ? '<div style="margin-top:var(--sp-4)">No project id, so ' + (without.length === 1 ? 'it takes' : 'they take')
+          + ' nothing from a split: ' + without.map(t => escapeHtml(t.name)).join(', ') + '.</div>'
+        : '');
+}
+
+$('btnMultiOpen').addEventListener('click', openMultiDialog);
+$('multiCloseBtn').addEventListener('click', () => $('multiDialog').close());
+$('btnMultiCheck').addEventListener('click', () => runMulti('check'));
+$('btnMultiLoad').addEventListener('click', () => runMulti('replace'));
+$('btnMultiAppend').addEventListener('click', () => runMulti('append'));
+/* One date-order choice, two boxes that need it — kept in step both ways, so
+   the answer to "are these dates day first?" cannot depend on which paste
+   surface you happened to set it on. */
+$('multiDateOrder').addEventListener('change', e => {
+  view.dateOrder = e.target.value;
+  saveView();
+  $('dateOrder').value = view.dateOrder;
+});
 
 [$('btnSample'), $('btnSampleData')].forEach(b => b.addEventListener('click', loadSample));
 $('btnLoad').addEventListener('click', () => doLoad('replace'));
@@ -6537,7 +7140,11 @@ $('btnClear').addEventListener('click', () => {
   $('parseNote').innerHTML = '';
   renderAll();
 });
-$('dateOrder').addEventListener('change', e => { view.dateOrder = e.target.value; saveView(); });
+$('dateOrder').addEventListener('change', e => {
+  view.dateOrder = e.target.value;
+  saveView();
+  $('multiDateOrder').value = view.dateOrder;   /* one choice, two boxes */
+});
 
 /* teams */
 $('teamSel').addEventListener('change', e => {
@@ -6598,7 +7205,8 @@ $('artRows').addEventListener('click', e => {
 });
 
 $('btnAddTeam').addEventListener('click', () => {
-  const team = { id: newId(), name: 'Team ' + (state.teams.length + 1), artId: null, rows: [] };
+  const team = { id: newId(), name: 'Team ' + (state.teams.length + 1),
+                 artId: null, projectId: '', rows: [] };
   state.teams.push(team);
   view.activeTeamId = team.id;
   save();
@@ -6610,6 +7218,20 @@ $('btnAddTeam').addEventListener('click', () => {
 });
 
 $('teamRows').addEventListener('input', e => {
+  /* The project id shares this listener with the name box beside it. Cleaned on
+     every keystroke rather than on blur, because what is stored is what routes:
+     a box reading DAE- while the team is addressed as nothing is a lie the next
+     paste would have to explain. The box is not rewritten while it is being
+     typed in — see the 'change' handler, which puts it back in step on blur. */
+  const projOf = e.target.dataset && e.target.dataset.projectId;
+  if (projOf) {
+    const team = state.teams.find(t => t.id === projOf);
+    if (!team) return;
+    team.projectId = cleanProjectId(e.target.value);
+    save();
+    renderTeamIdWarning();
+    return;
+  }
   const id = e.target.dataset && e.target.dataset.team;
   if (!id) return;
   const team = state.teams.find(t => t.id === id);
@@ -6629,6 +7251,15 @@ $('teamRows').addEventListener('input', e => {
    render, where a text box being typed in would not, and the ART table's team
    counts and the All Teams grouping both follow immediately. */
 $('teamRows').addEventListener('change', e => {
+  /* On blur, show what was actually stored. Typing "dae-1" leaves the box
+     holding a value the app kept nothing of, and a field that quietly disagrees
+     with what it saved is how somebody comes to believe a split is broken. */
+  const projOf = e.target.dataset && e.target.dataset.projectId;
+  if (projOf) {
+    const team = state.teams.find(t => t.id === projOf);
+    if (team) e.target.value = team.projectId || '';
+    return;
+  }
   const id = e.target.dataset && e.target.dataset.artOf;
   if (!id) return;
   const team = state.teams.find(t => t.id === id);
@@ -7830,8 +8461,14 @@ function loadSample() {
   let landOn = null;
   DEMO_TEAMS.forEach(profile => {
     const parsed = parsePastedRows(demoPaste(profile), 'auto');
+    /* The demo's teams carry the project ids their own keys are built from, so
+       "Paste several teams" is reachable from Load sample data rather than only
+       after somebody types three ids in. Wagtail has no keys and so no id —
+       which is also the state the dialog has to be able to explain, and it
+       appears in its "takes nothing from a split" line. */
     const team = { id: newId(), name: profile.name,
-                   artId: profile.art ? demoArt.id : null, rows: parsed.rows };
+                   artId: profile.art ? demoArt.id : null,
+                   projectId: profile.key || '', rows: parsed.rows };
     state.teams.push(team);
     /* Land on Heron. Kingfisher's board is the prettier one and says less: the
        reason this app reads the 85th percentile rather than the average is only

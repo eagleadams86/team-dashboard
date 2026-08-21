@@ -15,7 +15,9 @@ file records what is specific to this repo and what must never regress.
 
 - **A row is three ISO dates, one short work-type label and one issue key.
   Nothing else. There are no free-text or comment fields anywhere in this app —
-  don't add one.**
+  don't add one.** A team carries a name, an optional `artId` and an optional
+  project id — the last added 2026-08-20 and guarded by the same shape as the
+  front of a key. See the project id section below.
 - **The issue key was added on 2026-08-20 at Charles's explicit request**, and it
   reverses the "no ticket keys, ever" line this file used to carry. It is worth
   knowing why it was allowed where a summary field never would be: a key is
@@ -107,6 +109,65 @@ file records what is specific to this repo and what must never regress.
   summaries, statuses or names of people. `privacy.html` promises exactly that,
   keep it true and update its effective date in the same commit as any storage
   change (it went to 2026-08-20 with the key).
+
+## The Project Id and the Multi-Team Paste (2026-08-20) — SCHEMA 6 → 7
+
+`t.projectId` on each team, `projectId` on the wire (no short name — a team is not a row, and
+its fields are already spelled out). One export covering a whole train, split by the letters at
+the front of each issue key: DAE-1552 goes to whichever team is set to DAE. It is the first
+thing the key made possible that is not a label on a chart.
+
+- **The guard is the SAME SHAPE as the front of `ISSUE_KEY_RE`**, deliberately, in
+  `cleanProjectId` — and it is built that way because a value that could never begin a key is a
+  routing rule that could never fire; there would be no honest way to tell somebody why their
+  rows went nowhere. Both boundaries again (the input handler and `sanitizeTeams`), drop-whole
+  again, folded to upper case again. The reasoning that let the issue key in covers this too: a
+  regex can tell it from a sentence. **Still not precedent for a third field.**
+- **A LABEL and an address, never a level of maths** — the ART rule, third time. Nothing counts,
+  groups, filters or sorts by the project id. `routeRowsToTeams` is the one place a row's team is
+  decided, and it is pure: it takes the team list, so the dialog can show the plan before
+  anything is written and the tests can pin both.
+- **Nothing is guessed at.** Three separate buckets — `unclaimed` (no team answers to the id),
+  `ambiguous` (two do), `noKey` (no key to read) — because the three have three different fixes.
+  Nothing is ever routed to the first team or to the active one: a row in the wrong team's
+  throughput is a wrong number nobody can see, where a homeless row is a message on screen.
+  **A clash is refused, not resolved.** Which team a project belongs to is the one question the
+  app cannot answer, and picking one would silently move somebody's throughput.
+- **The whole paste goes through `parsePastedRows` ONCE.** One export has one column layout;
+  detecting columns per team would let the same file be read two different ways.
+- **Check before load.** `runMulti('check')` writes nothing and says so; the replace names every
+  team it would overwrite and what each loses. This is the one surface that can destroy data on
+  boards nobody is looking at, which the team-at-a-time box cannot.
+- **The box is cleared only when there is nothing left to do with it** — with an unclaimed id
+  still listed the next step is "create the team, split again", and clearing would have thrown
+  away the paste that step needs. And the clear happens AFTER `showMultiNote`, which reads the
+  box to tell "nothing pasted" from "nothing loaded"; clearing first made a successful load
+  report that nothing had been pasted at all. Both bit during the build.
+- **Creating a team from the report is offered, never done.** A paste is not a reason to invent
+  teams in somebody's dashboard, and an export with a stray project in it is ordinary. Pressing
+  it creates the team with the id already set and re-runs the CHECK — agreeing to a team is not
+  agreeing to replace three others.
+- **A single-team paste fills in a team's id for it**, but only when the team has none, only
+  when the keys are UNANIMOUS (`soleProjectId`, floor of 3), and never into a clash. Typing an id
+  per team is exactly the setup step that would otherwise stand between a first paste and this
+  feature working. A majority is a question, not a fact; and adopting into a clash would break a
+  split that works today to fill in a field nobody asked for.
+- **`SHARE_PAYLOAD_V` was NOT bumped and the id does NOT travel** — the first field to be left
+  out of a link deliberately rather than by version. A viewer has no paste box, so it would
+  route nothing; and every key in the payload already carries its project at the front. The
+  payload's team whitelist is explicit, so this is what happens by default — pinned anyway.
+- **`tdAdopt`'s losing-a-field prompt was NOT extended to it.** That prompt exists for a column
+  pasted per item that cannot be got back; a project id is one word re-typed in a dialog, the
+  same reasoning that keeps ARTs out of it.
+- `parseProblemsHtml` and `columnsReadHtml` were split out of `showParseNote` so both paste
+  surfaces explain one export the same way. Two reports drifting apart on what a column was read
+  as is the failure this app has always spent the most words preventing.
+- The demo's two keyed teams carry the ids their keys are built from and Wagtail carries none,
+  so both faces are reachable from Load sample data — and the demo is itself a multi-team export
+  that splits back into the teams it came from, which a test pins.
+- `table.manage input.projid` has to sit AFTER the 320px `input[type="text"]` cap it shares its
+  specificity with, or it loses. `text-transform: uppercase` shows what is actually stored as it
+  is typed; the placeholder is exempted, or "e.g. DAE" shouts.
 
 ## The Issue Key (2026-08-20) — SCHEMA 5 → 6
 
