@@ -4549,6 +4549,40 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(ragged.map(r => r.length), [3, 3], 'a colspan row is padded to the full width');
   is(ragged[1], ['none', '', ''], 'with the value in the first cell and blanks after it');
 
+  /* ────────────────────────────────────────────────────────── */
+  group('package.json — the manifest Dependabot scans');
+
+  /* The manifest exists only so Dependabot has something to read. Nothing is
+     ever installed from it — CI passes `--omit=dev` precisely so npm does not
+     helpfully download the library this app already vendors — and the bytes
+     that ship are `chart.min.js` beside index.html.
+
+     That arrangement has one specific way of going wrong: Dependabot cannot
+     re-vendor a file. A version-bump PR would raise the manifest to 4.5.0 while
+     the app went on serving 4.4.1, and the repo would then state a version it
+     does not run. This is what stops that being quiet — a manifest-only bump
+     fails here, which turns the PR into the correct instruction ("a newer
+     Chart.js exists; now update the FILE too, in all three repos that carry
+     it") instead of a false record. It is the theme pack's rule in another
+     repo: a generated artefact has to match its source. */
+  const [pkgRes, libRes] = await Promise.all([fetch('package.json'), fetch('chart.min.js')]);
+  ok(pkgRes.ok, 'a manifest exists for Dependabot to scan');
+  ok(libRes.ok, 'and the library it names is vendored beside it');
+  const PKG_SRC = await pkgRes.text(), LIB_SRC = await libRes.text();
+  const pinned = (PKG_SRC.match(/"chart\.js"\s*:\s*"([^"]+)"/) || [])[1];
+  ok(pinned, 'the manifest declares chart.js');
+  ok(/^\d+\.\d+\.\d+$/.test(pinned),
+     'it is pinned exactly, so it can be checked against a file', pinned);
+  ok(LIB_SRC.includes('"' + pinned + '"'),
+     'the vendored bundle is that same version',
+     'manifest says ' + pinned + ' — re-vendor chart.min.js, and the sibling repos with it');
+  const pkg = JSON.parse(PKG_SRC);
+  is(pkg.private, true, 'the manifest is private, so it can never reach npm');
+  ok(!pkg.scripts, 'it declares no scripts — this repo has no build step');
+  ok(!pkg.dependencies, "the entry is a devDependency, which CI's --omit=dev skips");
+  is(Object.keys(pkg.devDependencies || {}).length, 1,
+     'and it names one thing only: the vendored library');
+
   group('escapeHtml — the free-text boundary (a team name reaching innerHTML)');
 
   /* `sanitizeTeams` has had a hostile-id test since it was written; this
