@@ -5055,6 +5055,64 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('a chart draws data in a chart colour, never in the ink');
+
+  /* Reported by Charles on 2026-08-21: "why do the charts in SV have colours in
+     the sepia theme but TD's don't? they are all just kinda black and gray."
+     They were drawn in `--accent`, which is the app's EMPHASIS colour and not a
+     chart colour — and in two themes out of four the palette makes it the ink.
+     Sepia's accent is its `--text-primary`, and so is Dark's, so a throughput
+     line was drawn in the body-text colour.
+
+     The assertion that matters is the one that names the bug: a data series is
+     never the text colour. The source check beside it is what says where the
+     colour should come from instead — the pack's categorical ramp, which is
+     gated for AA on every surface and picked off the blue-yellow axis. */
+  {
+    plant({ teams: [
+      { id: 'cc1', name: 'Alpha', rows: [
+        { c: '2015-01-21', s: '2015-01-19', t: 'Story' },
+        { c: '2015-01-28', s: '2015-01-22', t: 'Bug' } ] }
+    ], settings: {} });
+    win.renderAll();
+
+    const cDoc = win.document, themeSel = cDoc.getElementById('themeSel');
+    const wasTheme = themeSel.value;
+    const tok = (n) => win.getComputedStyle(cDoc.documentElement).getPropertyValue(n).trim();
+
+    ['midnight', 'dark', 'light', 'sepia'].forEach(theme => {
+      themeSel.value = theme;
+      themeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+      const charts = win.tdCharts();
+      const main = charts.chartThroughput.data.datasets[0].borderColor;
+      ok(main !== tok('--text-primary'),
+         theme + ': the throughput line is not the body-text colour', main);
+      is(main, tok('--series-1'),
+         theme + ': it is the shared pack\u2019s first categorical colour');
+      is(charts.chartCycleTime.data.datasets[1].borderColor, tok('--series-5'),
+         theme + ': and the second series on a chart is the fifth, the blue\u2019s rust');
+      /* Annotation stays muted. A trend line coloured like the data would be in
+         competition with the thing it exists to be read against. */
+      is(charts.chartThroughput.data.datasets[1].borderColor, tok('--text-muted'),
+         theme + ': while the trend line over it stays muted');
+    });
+
+    /* The sparkline in All Teams plots throughput too, so it takes the same
+       colour rather than going its own way. Read off the RULE rather than off an
+       element: the trace only exists while that view is on screen with two teams
+       in it, and the rule is the thing that would be edited back. */
+    const sparkRule = [...cDoc.styleSheets]
+      .flatMap(sh => { try { return [...sh.cssRules]; } catch (e) { return []; } })
+      .filter(r => r.selectorText === '.spark')
+      .map(r => r.style.color).join(' ');
+    is(sparkRule, 'var(--series-1)',
+       'and the trend sparkline is drawn in that same colour, not the ink');
+
+    themeSel.value = wasTheme;
+    themeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('one chart, filling the window');
 
   /* Charles asked for this on 2026-08-21: a button on each chart that fills the

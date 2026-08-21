@@ -840,11 +840,14 @@ dialog { background: var(--surface); color: var(--text-primary);
 }
 dialog::backdrop { background: rgba(0, 0, 0, .55); }
 /* ── The All Teams trend column ──────────────────────────────────────────────
-   The trace takes the accent through `color`, so `currentColor` inside the SVG
+   The trace takes the series colour through `color`, so `currentColor` inside the SVG
    resolves per theme with no token read at draw time. `nowrap` keeps the trace
    and its figure on one line — wrapped, the number reads as a row of its own. */
 .spark-cell { white-space: nowrap; }
-.spark { vertical-align: middle; color: var(--accent); }
+/* `--series-1`, the colour its own measure is drawn in on the chart above — not
+   `--accent`, which on Sepia and Dark is the body-text ink and would draw this
+   trace as one more piece of the table's text. */
+.spark { vertical-align: middle; color: var(--series-1); }
 .spark-val {
   display: inline-block; min-width: 3.4em; margin-left: 6px;
   font-variant-numeric: tabular-nums; color: var(--text-secondary);
@@ -1073,7 +1076,7 @@ main:focus { outline: none; }
          teams, the ramp stops at five because past that no two colours can be
          held apart under red-green deficiency, and eight lines on a card this
          size is a spaghetti chart even where the colours exist.
-         The aggregate needs only the accent, and it answers the question the
+         The aggregate needs only the one series colour, and it answers the question the
          tiles cannot — is the whole train's delivery steady? WHICH team moved,
          and which one is changing, are both the table underneath: its Trend
          column carries a sparkline per team, which is the shape a per-team
@@ -5435,7 +5438,7 @@ function baseOptions(yTitle, tipFormat, tickFormat, xTitle, partial) {
    ONE hue in four steps: full strength at the safest end, faded away toward the
    optimistic one. Strength rather than darkness, because tint() mixes toward
    each theme's own SURFACE — so the faded end is nearly black on Midnight and
-   nearly white on Light, while the solid end is the accent in both. "Darker is
+   nearly white on Light, while the solid end is the series colour in both. "Darker is
    safer" would be true in two themes and backwards in the other two.
 
    Not a red-amber-green ramp,
@@ -5458,7 +5461,9 @@ const FORECAST_BANDS = [
    50/85/95 by 100 before asking, so one scale reaches this. */
 function forecastFill(confidence) {
   const band = FORECAST_BANDS.find(b => confidence >= b.min) || FORECAST_BANDS[FORECAST_BANDS.length - 1];
-  return tint(token('--accent'), band.tint);
+  /* The same `--series-1` every other chart's main series is drawn in — see the
+     note at the head of drawCharts for why this is not `--accent`. */
+  return tint(token('--series-1'), band.tint);
 }
 
 /* ── The per-team trend column ───────────────────────────────────────────────
@@ -5683,7 +5688,37 @@ const num1 = v => (Math.round(v * 10) / 10).toFixed(1);
 const int0 = v => String(Math.round(v));
 
 function drawCharts(d) {
-  const accent = token('--accent'), serious = token('--serious');
+  /* ── The two colours every chart in this app draws DATA in ────────────────
+     `--series-1` and `--series-5` from the shared theme pack, and NOT
+     `--accent` / `--serious`, which is what these were until 2026-08-21.
+
+     The grammar is unchanged and deliberately so — one colour for the measure,
+     a second for the other thing on the chart, and every rule about which goes
+     where is exactly as it was. What changed is where the two colours come
+     from, because `--accent` is not a chart colour: it is the app's emphasis
+     colour, and in two of the four themes the palette makes it INK. Sepia's
+     accent is #3a3020, which is also its `--text-primary`; Dark's is #eef0f5,
+     which is also its. So a throughput line was drawn in the body-text colour,
+     and the whole dashboard read as black and grey on two themes out of four.
+     Reported by Charles looking at Sepia.
+
+     The pack shipped `--series-1`…`--series-5` on 2026-08-21 for exactly this
+     — a categorical ramp, gated for AA on every surface, and picked off the
+     blue-yellow axis so no two of them collapse under red-green deficiency.
+     This app links that stylesheet already; the colours were sitting in it
+     unused.
+
+     WHY 1 AND 5 rather than 1 and 2: the comments through this function have
+     always described the pair as blue and orange ("blue above zero, orange
+     below"), and `--series-1` and `--series-5` are the blue and the rust in all
+     four themes. The intent was already written down; this is the first build
+     where the colours match it on every theme rather than on two of them.
+
+     What did NOT move: the trend line and the reference lines stay
+     `--text-muted` / `--text-secondary`. Those are annotation drawn OVER the
+     data, and colouring them would put them in competition with the thing they
+     exist to be read against. */
+  const seriesMain = token('--series-1'), seriesAlt = token('--series-5');
 
   /* ── Defect rate per week ──
      Two series when the data can carry both: defects resolved as a share of
@@ -5691,15 +5726,15 @@ function drawCharts(d) {
      Resolved is the line this chart has always drawn and keeps its exact
      styling; raised is drawn with a different colour AND a different dash AND a
      different point shape, so the two are told apart by texture rather than by
-     colour alone. Accent-vs-serious is the pair the net flow chart already
+     colour alone. Blue-against-rust is the pair the net flow chart already
      uses, chosen because it isn't the red/green axis. */
   const qualOpts = baseOptions(d.axisTitles.defectRate, pct1, pct0, d.axisTitles.x, d.partial);
   qualOpts.scales.y.beginAtZero = true;
   const defectSets = [{
     label: state.settings.unplannedLabel + ' resolved',
     data: d.unplannedRate,
-    borderColor: accent,
-    backgroundColor: accent,
+    borderColor: seriesMain,
+    backgroundColor: seriesMain,
     borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false, order: 1
   }, trendDataset(d.unplannedRate)];
   if (d.hasCreated) {
@@ -5713,8 +5748,8 @@ function drawCharts(d) {
     defectSets.push({
       label: state.settings.unplannedLabel + ' raised',
       data: d.defectCreatedRate,
-      borderColor: serious,
-      backgroundColor: serious,
+      borderColor: seriesAlt,
+      backgroundColor: seriesAlt,
       borderWidth: 2, borderDash: [2, 3],
       pointStyle: 'triangle', pointRadius: 3, pointHoverRadius: 6,
       tension: 0, fill: false, spanGaps: false, order: 1
@@ -5747,14 +5782,14 @@ function drawCharts(d) {
       datasets: [{
         label: 'Avg ' + (state.settings.cycleTimeLabel || 'cycle time'),
         data: d.avgCycleTime,
-        borderColor: accent,
-        backgroundColor: accent,
+        borderColor: seriesMain,
+        backgroundColor: seriesMain,
         borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false, order: 1
       }, {
         label: d.cyclePercentile + 'th percentile',
         data: d.p85CycleTime,
-        borderColor: serious,
-        backgroundColor: serious,
+        borderColor: seriesAlt,
+        backgroundColor: seriesAlt,
         borderWidth: 2, borderDash: [2, 3],
         pointStyle: 'triangle', pointRadius: 3, pointHoverRadius: 6,
         tension: 0, fill: false, spanGaps: false, order: 1
@@ -5776,8 +5811,8 @@ function drawCharts(d) {
       datasets: [{
         label: 'Throughput',
         data: d.throughput,
-        borderColor: accent,
-        backgroundColor: accent,
+        borderColor: seriesMain,
+        backgroundColor: seriesMain,
         borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false, order: 1
       }, trendDataset(d.throughput)]
     },
@@ -5788,7 +5823,7 @@ function drawCharts(d) {
      Blue above zero, orange below. Deliberately not the red/green pair: the
      coaching goal is "keep around zero", so neither sign is good or bad, and
      RAG would assert otherwise. */
-  const netColours = d.netFlow.map(v => (v < 0 ? serious : accent));
+  const netColours = d.netFlow.map(v => (v < 0 ? seriesAlt : seriesMain));
   const netOpts = baseOptions(d.axisTitles.netFlow, int0, null, d.axisTitles.x, d.partial);
   netOpts.scales.y.ticks.precision = 0;
   renderChart('chartNetFlow', {
@@ -5827,8 +5862,8 @@ function drawCharts(d) {
         datasets: [{
           label: 'Avg lead time',
           data: d.avgLeadTime,
-          borderColor: accent,
-          backgroundColor: accent,
+          borderColor: seriesMain,
+          backgroundColor: seriesMain,
           borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false,
           spanGaps: false, order: 1
         }, trendDataset(d.avgLeadTime)]
@@ -5856,8 +5891,8 @@ function drawCharts(d) {
       datasets: [{
         label: 'Work in progress',
         data: d.wip,
-        backgroundColor: tint(accent, 0.68),
-        borderColor: accent,
+        backgroundColor: tint(seriesMain, 0.68),
+        borderColor: seriesMain,
         borderWidth: 1.5,
         order: 1
       }, trendDataset(d.wip)]
@@ -5872,16 +5907,16 @@ function drawCharts(d) {
     type: 'bar',
     data: {
       labels: d.bucketLabels,
-      /* Accent, not --serious. Orange would read as a warning, and this app
-         states figures rather than judging them — the threshold is one you set,
-         not a target it holds you to. It would also be a third meaning for that
-         colour on one dashboard, after "net flow below zero" and "defects
-         raised". */
+      /* The FIRST series colour, not the second. Rust would read as a warning,
+         and this app states figures rather than judging them — the threshold is
+         one you set, not a target it holds you to. It would also be a third
+         meaning for that colour on one dashboard, after "net flow below zero"
+         and "defects raised". */
       datasets: [{
         label: 'Aged items',
         data: d.agedCount,
-        backgroundColor: tint(accent, 0.68),
-        borderColor: accent,
+        backgroundColor: tint(seriesMain, 0.68),
+        borderColor: seriesMain,
         borderWidth: 1.5,
         order: 1
       }, trendDataset(d.agedCount)]
@@ -5903,7 +5938,7 @@ function drawCharts(d) {
      the pair reads together: one shows where finished work landed, the other
      where open work has got to.
 
-     Fill is the accent at partial ALPHA rather than a tint, and that is the
+     Fill is the series colour at partial ALPHA rather than a tint, and that is the
      overplotting fix: a busy board finishes several things on one day at the
      same cycle time, and opaque dots would stack into one. Overlapping
      translucent ones darken, so density is legible without jittering a date —
@@ -5923,7 +5958,7 @@ function drawCharts(d) {
   if (!hasScatter) {
     if (charts.chartCycleScatter) { charts.chartCycleScatter.destroy(); delete charts.chartCycleScatter; }
   } else {
-    const [ar, ag, ab] = hexToRgb(accent);
+    const [ar, ag, ab] = hexToRgb(seriesMain);
     const scatOpts = baseOptions(d.axisTitles.cycleScatter, num1, null, d.axisTitles.x, null);
     scatOpts.scales.y.beginAtZero = true;
     scatOpts.scales.x.type = 'linear';
@@ -5986,7 +6021,7 @@ function drawCharts(d) {
           label: 'Finished items',
           data: scat.points,
           backgroundColor: 'rgba(' + ar + ',' + ag + ',' + ab + ',0.55)',
-          borderColor: accent,
+          borderColor: seriesMain,
           borderWidth: 1,
           pointRadius: 3.5,
           pointHoverRadius: 7,
@@ -6013,9 +6048,9 @@ function drawCharts(d) {
      beside this one counts against.
 
      Aged dots are told apart by SHAPE as well as colour — a filled triangle in
-     --serious against accent circles — which is the same rule the defect and
-     cycle time charts follow, and the same non-RAG pair. Nothing here is
-     coloured "bad": the threshold is one the reader set. */
+     the second series colour against first-colour circles — which is the same
+     rule the defect and cycle time charts follow, and the same non-RAG pair.
+     Nothing here is coloured "bad": the threshold is one the reader set. */
   const ageCard = $('cardItemAge');
   const ageEmpty = $('itemAgeNone');
   const hasFlight = d.ageing.count > 0;
@@ -6051,7 +6086,7 @@ function drawCharts(d) {
     const REF_STYLE = {
       median:    { colour: token('--text-muted'),     dash: [6, 4] },
       p85:       { colour: token('--text-secondary'), dash: [2, 3] },
-      threshold: { colour: serious,                   dash: [10, 3] }
+      threshold: { colour: seriesAlt,                   dash: [10, 3] }
     };
     const refs = [], refTexts = [];
     a.lines.forEach((l) => {
@@ -6063,8 +6098,8 @@ function drawCharts(d) {
     const dot = (aged) => ({
       label: aged ? 'Past ' + a.threshold + ' ' + d.dayNoun : 'In progress',
       data: a.points.filter(p => p.aged === aged),
-      backgroundColor: aged ? serious : tint(accent, 0.45),
-      borderColor: aged ? serious : accent,
+      backgroundColor: aged ? seriesAlt : tint(seriesMain, 0.45),
+      borderColor: aged ? seriesAlt : seriesMain,
       borderWidth: 1.5,
       pointStyle: aged ? 'triangle' : 'circle',
       pointRadius: aged ? 6 : 5,
@@ -6167,7 +6202,7 @@ function drawCharts(d) {
           label: 'Simulated runs',
           data: block.hist.counts,
           backgroundColor: block.hist.confidence.map(forecastFill),
-          borderColor: accent,
+          borderColor: seriesMain,
           borderWidth: 1,
           /* Bars butt together: this is one distribution, not a set of separate
              categories, and gaps between them read as the latter. */
@@ -7239,7 +7274,9 @@ function drawTrainThroughput(train, scopePhrase) {
   $('titleTrainThroughput').textContent = 'Items Completed per ' + Noun
     + ' Across Every Team' + (scopePhrase ? ' ' + scopePhrase : '');
 
-  const accent = token('--accent');
+  /* The same colour the dashboard's throughput chart uses, because it is the
+     same measure over a wider scope — see the note at the head of drawCharts. */
+  const seriesMain = token('--series-1');
   const opts = baseOptions(train.axisTitles.throughput, int0, null, train.axisTitles.x, train.partial);
   opts.scales.y.beginAtZero = true;
   /* Counts are whole numbers: without this Chart.js picks fractional steps on a
@@ -7254,8 +7291,8 @@ function drawTrainThroughput(train, scopePhrase) {
       datasets: [{
         label: 'Throughput',
         data: train.throughput,
-        borderColor: accent,
-        backgroundColor: accent,
+        borderColor: seriesMain,
+        backgroundColor: seriesMain,
         borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false, order: 1
       }, trendDataset(train.throughput)]
     },

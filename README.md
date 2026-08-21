@@ -57,6 +57,13 @@ Weekly is the default and the finest grain; monthly smooths out the lumpiness th
 single week hard to read. The grouping also drives the last column of the Your Data table, so
 the table and the charts always name the same period.
 
+Charts draw their data in the shared theme pack's **categorical colours** — `--series-1`, a blue,
+for the measure, and `--series-5`, a rust, for the second series where a chart has one. They used
+to draw in the app's accent, which is fine on Midnight and Light and wrong on the other two: on
+Sepia and Dark the palette makes the accent the *body-text ink*, so a throughput line came out the
+same colour as the writing around it and the dashboard read as black and grey. Trend and reference
+lines stay muted grey on purpose — they are annotation over the data, not data.
+
 Each chart carries a dashed linear trend line, and four **summary tiles** above the tabs state
 the window-wide figures — one for each dimension a kanban team can act on:
 

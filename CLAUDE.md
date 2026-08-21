@@ -241,6 +241,39 @@ this file was written to keep out. **Read this whole section before changing any
   meaning rather than a parse. Neither is built. The work item age chart's stage axis WAS
   built — off the current stage rather than off these durations; see the section above it.
 
+## Charts Draw in the Pack's Series Ramp, Not the Accent (2026-08-21)
+
+`--series-1` and `--series-5` for the two data colours, where every chart used `--accent` and
+`--serious`. Reported by Charles: "why do the charts in SV have colours in the sepia theme but
+TD's don't? they are all just kinda black and gray."
+
+- **`--accent` IS NOT A CHART COLOUR.** It is the app's emphasis colour, and in two themes out of
+  four the palette makes it the INK — Sepia's `--accent` is `#3a3020`, which is also its
+  `--text-primary`, and Dark's is `#eef0f5`, which is also its. So a throughput line was drawn in
+  the body-text colour. It reads fine on Midnight (indigo) and Light (blue), which is why it went
+  unnoticed for so long: the two themes it is wrong on are the two nobody was developing in.
+- **The grammar did not change, only the source.** One colour for the measure, a second for the
+  other thing on the chart, and every rule about which goes where is exactly as it was — net flow
+  below zero, defects raised, the 85th percentile, aged dots and the ageing threshold line all
+  still take the second colour; aged BARS still deliberately do not.
+- **Why 1 and 5, not 1 and 2.** The comments through `drawCharts` have always described the pair
+  as blue and orange ("blue above zero, orange below"). `--series-1` and `--series-5` are the blue
+  and the rust in all four themes, so this is the first build where the colours match what the
+  code already said they were.
+- **Annotation stayed muted.** `trendDataset` and the median/85th reference lines keep
+  `--text-muted` / `--text-secondary`. They are drawn OVER the data, and colouring them puts them
+  in competition with the thing they exist to be read against. Pinned.
+- **The All Teams sparkline moved with them**, for the same reason it reuses `linearTrend`: it
+  plots throughput, so it is drawn in throughput's colour. On Sepia and Dark `--accent` made it
+  one more piece of the table's text.
+- **This is adoption, not drift.** The ramp is the pack's (added 2026-08-21, gated harder than the
+  status tokens, picked off the blue-yellow axis so no two collapse under red-green deficiency)
+  and this app already links the stylesheet — the colours were sitting in it unused. **Flow
+  Metrics' per-team lines were the open item in that adoption and remain closed for their own
+  reason**: eight teams, a ramp that stops at five, and a spaghetti chart either way.
+- Pinned across all four themes by the assertion that names the bug — a data series is never
+  `--text-primary` — plus a source check, and a rule check on `.spark`.
+
 ## One Surface for the Whole Page (2026-08-21) — a divergence from the sibling
 
 `.tile` moved from `--surface-alt` to `--surface`, the ground the chart cards and the tables are
