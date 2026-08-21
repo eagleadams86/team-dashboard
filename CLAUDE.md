@@ -546,10 +546,13 @@ type. What must not regress:
 - **Dot positions are computed in `derive()`, not improvised by the renderer**, so the spread is a
   pinned property of the data. Sorted by age within a column, spread across `±AGE_SPREAD`, and a
   column of one sits dead centre on its own tick.
-- **The dots carry no ticket key and never will** — this app stores none. The tooltip gives the
-  work type and the start date instead, which is what finds the item again in the export. Any
-  future change here must not smuggle identifying text onto the chart; the storage rule at the
-  top of this file is the reason.
+- **A dot is named by `dotName()`** — its issue key where the paste had one, and its work type
+  and start date where it didn't. This line read "no ticket key and never will" until the key
+  arrived (2026-08-20) and reversed it: naming the dots is the reason the field was asked for.
+  What did NOT change is the rule underneath it. A key is the ONE identifier this app stores,
+  and no future change may put any other identifying text on the chart — the storage rule at
+  the top of this file is why. The fallback is not a stopgap either: work type plus start date
+  is what finds the item again in an export with no key column.
 - Aged dots are told apart by SHAPE as well as colour (a `--serious` triangle against accent
   circles), the same rule the defect and cycle time charts follow, and the same non-RAG pair.
   Nothing is coloured "bad": the threshold is one the reader set.
