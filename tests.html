@@ -2816,6 +2816,18 @@ async function run(TD, win) {
      + 'a LICENSE is the terms, NOTICE is who owns it');
   ok(!/href="privacy\.html"/.test(PRIV_SRC),
      'and NOT a privacy link, which on the privacy page points at itself');
+  /* Comments stripped FIRST, and the footer matched by its CLASS. The notes
+     beside both elements name them in prose — and one of those notes is in the
+     <style> block, which an HTML-comment strip does not reach — so a bare
+     /<main>/ or a bare '<footer' would pass on a page that had lost the element
+     and kept the comment explaining it, which is the one way this could rot. */
+  const PRIV_BARE = PRIV_SRC.replace(/<!--[\s\S]*?-->/g, '');
+  ok(/<footer class="foot">/.test(PRIV_BARE),
+     'the footer is a real <footer> \u2014 a contentinfo landmark, not a styled paragraph');
+  ok(/<main>/.test(PRIV_BARE),
+     'and the policy sits in <main>, or contentinfo would be the only landmark on the page');
+  ok(PRIV_BARE.indexOf('</main>') < PRIV_BARE.indexOf('<footer class="foot"'),
+     'with main CLOSED before it: a <footer> inside main is not contentinfo at all');
 
   const cspMatch = APP_SRC.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/);
   ok(!!cspMatch, 'no CSP meta tag found');
