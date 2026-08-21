@@ -40,56 +40,55 @@
 <div class="wrap">
   <a class="back" href="index.html">← Back to Flow Metrics</a>
   <h1>Flow Metrics — Privacy Policy</h1>
-  <p class="meta">Effective August 19, 2026</p>
+  <p class="meta">Effective August 20, 2026</p>
 
   <p>Flow Metrics is built to work entirely in your browser. This page explains exactly what
   data exists, where it goes, and who can see it.</p>
 
   <h2>What Flow Metrics Stores</h2>
   <p>The only data the app holds is what you paste or type in: team names, and for each team a
-  list of work items — a completed date, an optional start date, an optional created date, and
-  an optional work type — plus the shared settings (labels, the text that marks unplanned work,
-  the thresholds, whether days are counted Monday to Friday, the work-type filter list) and your
-  preferences (theme, chosen team, date window). No account
+  list of work items — a completed date, an optional start date, an optional created date, an
+  optional work type and an optional issue key — plus the shared settings (labels, the text that
+  marks unplanned work, the thresholds, whether days are counted Monday to Friday, the work-type
+  filter list) and your preferences (theme, chosen team, date window). No account
   is required to use the app, and there is no analytics, tracking or advertising of any kind.</p>
 
-  <p>Note what is <em>not</em> stored: no ticket IDs, no ticket titles, no names of people, and
-  no free-text or comment fields anywhere. The app only ever needs dates and a type, and the
-  work type is held to a short category label — a cell that looks like anything longer (a
-  ticket summary, a description) is discarded rather than saved, at the paste and again
-  whenever a saved copy is read back. The rest of what you paste is read for its dates on the
-  spot and never stored.</p>
+  <p><strong>The issue key is the one identifier the app keeps</strong>, and it is kept so that a
+  dot on a chart can be named and then looked up in your own work system. It is checked against
+  the <em>shape</em> of a key — up to ten letters or digits, a dash, and up to six digits, and
+  nothing else — rather than trimmed to fit, so a cell that is anything other than a key is
+  discarded whole. That check runs at the paste and again whenever a saved copy is read back.
+  Before August 20, 2026 the app stored no key at all; a copy saved before then simply has none.</p>
+
+  <p>Note what is <em>not</em> stored: no ticket titles or summaries, no descriptions, no
+  statuses, no names of people, and no free-text or comment fields anywhere. Apart from the
+  key, the app only ever needs dates and a type, and the work type is held to a short category
+  label — a cell that looks like anything longer (a ticket summary, a description) is discarded
+  rather than saved. The rest of what you paste is read for its dates on the spot and never
+  stored.</p>
 
   <h2>Where That Data Lives</h2>
   <div class="card">
-    <p><strong>In your browser (always).</strong> Everything is stored in your browser's local
-    storage on your own device. This is the only copy that exists if you never sign in.</p>
+    <p><strong>In your browser. That is the only place.</strong> Everything is stored in your
+    browser's local storage on your own device. There is no server, no database and no
+    account — the app has nowhere to send your data even if it wanted to.</p>
     <p><strong>A copy of the app itself, so it opens offline.</strong> The page, its
     stylesheet, its chart library and its icon are kept on your device — the same public
     files anyone can read on GitHub, and nothing else. Your work items are never put
-    there, nor is anything that arrives from sync. Clearing the site's browser data
-    removes it along with everything else.</p>
-  </div>
-  <div class="card">
-    <p><strong>In Google Firebase (only if you sign in).</strong> Signing in with Google is
-    entirely optional and exists for one reason: seeing the same teams on your other devices.
-    If you do, a copy of your teams and settings is written to a Firestore database in a
-    Firebase project owned by the app's author.</p>
+    there. Clearing the site's browser data removes it along with everything else.</p>
   </div>
 
-  <h2>Who Can See Your Data If You Sync</h2>
-  <p>Your data is stored in a single document whose name is your Firebase authentication ID.
-  The database's security rules allow read and write access to that document
-  <em>only</em> from the signed-in account it belongs to:</p>
-  <div class="card">
-    <p><code>allow read, write: if request.auth != null &amp;&amp; request.auth.uid == uid;</code></p>
-  </div>
-  <p>No other user of the app can read your teams, and there is deliberately no shared-workspace
-  or multi-user editing model. The rules are kept in the repository as
-  <a href="https://github.com/eagleadams86/team-dashboard/blob/main/firestore.rules">firestore.rules</a>
-  so you can check them.</p>
-  <p>The app's author has administrative access to the Firebase project, as the owner of any
-  database necessarily does. That access is not used to look at anyone's data.</p>
+  <h2>Cross-Device Sync Was Removed on August 20, 2026</h2>
+  <p>Until that date the app offered optional Google sign-in, which mirrored your teams to a
+  Firestore database in a Firebase project owned by the app's author. <strong>That feature is
+  gone.</strong> The code, the sign-in button and every Google address were removed together,
+  and the page's Content-Security-Policy now names no external origin at all — which is what
+  makes this page's claims checkable rather than a promise. Any account id the old feature
+  left in your browser is deleted the next time you open the app.</p>
+  <p>If you used sync before that date, a copy of your teams may still exist in that Firestore
+  database. Email the address at the foot of this page and it will be deleted.</p>
+  <p>To use the app on more than one device now, use <strong>Back up</strong> to download a
+  JSON file and restore it on the other device.</p>
 
   <h2>Share Links</h2>
   <p>The Share button builds a read-only link to teams you choose. The data travels
@@ -97,34 +96,33 @@
   send to any server — so creating or opening one involves no upload, no download and no
   account, and nothing the recipient already has saved in their own browser is touched.
   A link is a frozen snapshot: it can't be edited through, and it can't be withdrawn once
-  sent, so share it as deliberately as you would email a spreadsheet.</p>
-
-  <h2>What Google Receives</h2>
-  <p>If you sign in, Google handles the sign-in itself and knows you have used this app, in the
-  same way it knows about any other site you sign in to with a Google account. The app receives
-  only your email address and display name, which are used to show who is signed in — they are
-  not stored in the database alongside your teams.</p>
+  sent, so share it as deliberately as you would email a spreadsheet. It carries the same
+  fields the app stores, <strong>issue keys included</strong> — they are what names the items
+  on the charts, and a link without them would show the recipient a different picture from
+  yours.</p>
 
   <h2>What Is Never Sent Anywhere</h2>
   <ul>
-    <li>Nothing you store in the app ever leaves your browser unless you sign in.</li>
-    <li>There is no analytics, no tracking pixels, no advertising, no cookies beyond what
-      Google's sign-in itself sets.</li>
-    <li>The page loads no third-party code except Firebase's SDK from Google's CDN and
-      Google's own sign-in client — both only while sync is switched on. A
-      Content-Security-Policy on the page restricts network access to that short list.</li>
+    <li>Nothing you store in the app ever leaves your browser. There is no exception to
+      this any more — the only way data leaves is if you deliberately create a share link
+      or download a backup, and both of those are files you control.</li>
+    <li>There is no analytics, no tracking pixels, no advertising and no cookies.</li>
+    <li>The page loads no third-party code of any kind. Its chart library is a copy kept in
+      the repository, served from the same address as the page itself.</li>
+    <li>The page's Content-Security-Policy sets <code>connect-src 'none'</code>, so the
+      browser itself refuses to let this page open a network connection — not to Google, not
+      to the author, not anywhere.</li>
   </ul>
 
   <h2>Deleting Your Data</h2>
   <ul>
-    <li><strong>Local copy:</strong> "Clear this team's data" on the Your Data tab empties one
-      team; deleting a team removes it entirely. Clearing your browser's site data removes
-      everything.</li>
-    <li><strong>Synced copy:</strong> deleting your teams while signed in replaces the cloud
-      copy with the empty one, on every device.</li>
-    <li><strong>Everything, permanently:</strong> email
-      <a href="mailto:eagleadams86@gmail.com">eagleadams86@gmail.com</a> and your stored
-      document will be deleted from Firestore.</li>
+    <li><strong>In this browser:</strong> "Clear this team's data" on the Your Data tab
+      empties one team; deleting a team removes it entirely; <strong>Back up → Start
+      again</strong> removes everything. Clearing your browser's site data does the same.
+      That is the whole of it — there is no other copy to chase.</li>
+    <li><strong>Anything left over from sync:</strong> if you signed in before August 20,
+      2026, email <a href="mailto:eagleadams86@gmail.com">eagleadams86@gmail.com</a> and the
+      document that was stored for your account will be deleted.</li>
   </ul>
 
   <h2>Changes to This Policy</h2>

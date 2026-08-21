@@ -14,25 +14,34 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'> <defs><linearGradient id='g' x1='10' y1='52' x2='54' y2='12' gradientUnits='userSpaceOnUse'> <stop offset='0' stop-color='%23818cf8'/><stop offset='1' stop-color='%23a5b4fc'/></linearGradient></defs> <rect width='64' height='64' rx='14' fill='%230a0e1a'/> <circle cx='14' cy='52' r='20' fill='%23141c33'/> <path d='M18 30V46M32 18V46M46 25V46' fill='none' stroke='url(%23g)' stroke-width='8' stroke-linecap='round'/> </svg>">
 <link rel="alternate icon" href="favicon.ico?v=1">
 <!--
-  Locked down to what the app actually uses: scripts from this origin, Firebase's
-  CDN and Google's sign-in client; network calls only to the endpoints sync
-  needs; and no frames except Google's own sign-in.
+  This app talks to NOTHING. Since sync was removed (2026-08-20) there is no
+  external origin left in this policy at all — no CDN, no Google, no analytics,
+  nothing. `default-src 'none'` is therefore the real rule rather than a
+  formality, and every directive below is an exception it has to earn:
 
-  ⚠️ If a new external endpoint is ever added it must be added here too, or it
-  fails silently in production and works fine on localhost.
+    script-src 'self' 'unsafe-inline'   the page's own code, and the theme
+                                        bootstrap that must run before paint
+    style-src  'self' 'unsafe-inline'   theme.css and inline style attributes
+    img-src    'self' data:             the favicon, and the SVG data: icon
+    worker-src 'self'                   sw.js, which is what makes it offline
+    connect-src 'none'                  stated OUTRIGHT rather than left to the
+                                        default, because this is the directive
+                                        that would carry data off the device and
+                                        it should take a deliberate edit to open
+    frame-src, form-action, base-uri     nothing may be framed, submitted or
+                                        re-based
 
-  accounts.google.com appears in script-src, connect-src AND frame-src because
-  sign-in goes through Google Identity Services rather than Firebase's hosted
-  handler at <project>.firebaseapp.com. That is deliberate — this project's
-  firebaseapp.com hostname is blocked outright on a corporate network, which
-  took sign-in out entirely there. accounts.google.com is not blocked in the
-  same way. See the sign-in block further down before changing any of this.
+  ⚠️ This app holds figures taken from a work system. Adding ANY origin here is
+  a decision about where that data may go, not a technical detail — and it fails
+  silently in production while working fine on localhost, so it will not
+  announce itself. Read the note where the sync module used to be, at the foot
+  of the page, before adding one.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com; worker-src 'self'; frame-src https://accounts.google.com; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; worker-src 'self'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <!--
-  Flow Metrics — weekly flow metrics from your work items. (The repo, the
-  Firebase project, the backup marker and the Pages path are all still
-  "team-dashboard": the app was renamed on screen, its identifiers were not.)
+  Flow Metrics — weekly flow metrics from your work items. (The repo, the backup
+  marker and the Pages path are all still "team-dashboard": the app was renamed
+  on screen, its identifiers were not.)
 
   Paste completed/started dates for your work items and it derives the standard
   Kanban measures: throughput, cycle time, work in progress and work item age
@@ -41,10 +50,11 @@
   Health — by what the data means, so the ones that move together are read
   together.
 
-  Single page, no build step, no account required. localStorage is the source
-  of truth; signing in with Google (optional) mirrors it to Firestore so other
-  devices see the same teams — see the sync module at the foot of the page.
-  The only local dependency is the vendored chart.min.js sitting next to this.
+  Single page, no build step, no account, no network. localStorage is the ONLY
+  copy of your data — cross-device sync through Google was removed on
+  2026-08-20, and the Back up dialog is now the only way to move data between
+  devices. The only local dependency is the vendored chart.min.js sitting next
+  to this.
 
   Every number comes out of derive() below — one function, one place the maths
   lives, pinned end to end by tests.html.
@@ -120,8 +130,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 /* header — sticky, the sibling app's shape. Everything in the row carries its
    final width in the markup: the header paints long before the script at the
    foot of the page runs, so anything sized by JS grows on screen. #teamSel has
-   a min-width and a placeholder option, and #syncBtn ships visible and
-   signed-out — it is taken away only when sync genuinely can't run. */
+   a min-width and a placeholder option for that reason. */
 header { position: sticky; top: 0; z-index: 20; background: var(--surface);
   border-bottom: 1px solid var(--border); padding: 10px 0; margin-bottom: 20px; }
 .headbar { max-width: 1500px; margin: 0 auto; padding: 0 16px;
@@ -175,8 +184,6 @@ header { position: sticky; top: 0; z-index: 20; background: var(--surface);
    never paints a team picker it is about to hide. renderEmptyState() clears the
    attribute and takes over with the `hidden` property. */
 html[data-first-run] #teamSel { display: none; }
-#syncBtn { min-width: 125px; }
-#syncBtn[data-state="error"] { color: var(--warn); border-color: var(--warn); }
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .row.spread { justify-content: space-between; }
@@ -755,11 +762,10 @@ main:focus { outline: none; }
 
 <!-- Everything in this row carries its final width in the markup. The header
      paints long before the script at the foot of the page runs, so anything
-     sized by JS grows on screen: an empty select goes 40px → 180px, and the
-     sync button would appear only once the Firebase SDK had come over the
-     wire, re-wrapping the row. #teamSel therefore has a min-width and a
-     placeholder option, and #syncBtn ships visible and signed-out — it is
-     taken away only when sync genuinely can't run. -->
+     sized by JS grows on screen — an empty select goes 40px → 180px. #teamSel
+     therefore has a min-width and a placeholder option. (A sign-in button used
+     to sit at the end of this row and had the same problem, for the same
+     reason; sync was removed on 2026-08-20.) -->
 <header>
   <div class="headbar">
     <!-- ?v= is not decoration: a browser holds on to a favicon for a long time, and
@@ -782,7 +788,6 @@ main:focus { outline: none; }
     </select>
     <button class="btn small" id="dataBtn" type="button" title="Back up, restore or clear your data">Back up</button>
     <button class="btn small" id="shareBtn" type="button" title="Create a read-only link to show someone your figures">Share</button>
-    <button class="btn small" id="syncBtn" type="button" title="Sign in with Google to see the same data on all your devices">☁️ Sign in to sync</button>
   </div>
 </header>
 
@@ -916,18 +921,20 @@ main:focus { outline: none; }
       <h2>Paste Work Items for <span id="pasteTeamName">This Team</span></h2>
       <p class="hint">
         Needs a <strong>completed date</strong>, a <strong>start date</strong> and a
-        <strong>work type</strong> somewhere in each row. Paste the export as it comes — extra
-        columns like the issue key are fine, the right ones are worked out from the data and
-        named back to you below. Tabs and commas both work, and a header row is skipped.
+        <strong>work type</strong> somewhere in each row. Paste the export as it comes — the
+        right columns are worked out from the data and named back to you below, and anything
+        else is read for those and thrown away. Tabs and commas both work, and a header row
+        is skipped. An <strong>issue key</strong> column like <em>DAE-1552</em> is picked up
+        if there is one, and it names the dots on the charts.
         Items that are started but not finished belong here too: they count as work started.
         A <strong>created date</strong> is optional and adds lead time.
       </p>
       <div style="margin-top:var(--sp-6)">
         <label for="pasteBox">Pasted rows</label>
-        <textarea id="pasteBox" spellcheck="false" placeholder="Created&#9;In Progress&#9;Resolved&#9;Issue Type
-2015-01-02&#9;2015-01-14&#9;2015-01-21&#9;Story
-2015-01-09&#9;2015-01-14&#9;2015-01-26&#9;Bug
-2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
+        <textarea id="pasteBox" spellcheck="false" placeholder="Issue key&#9;Created&#9;In Progress&#9;Resolved&#9;Issue Type
+DAE-1552&#9;2015-01-02&#9;2015-01-14&#9;2015-01-21&#9;Story
+DAE-1551&#9;2015-01-09&#9;2015-01-14&#9;2015-01-26&#9;Bug
+DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       </div>
       <div class="grid two" style="margin-top:var(--sp-5)">
         <div>
@@ -1264,17 +1271,22 @@ main:focus { outline: none; }
        .privacy keeps every rule that styles them. Mirrored in the sibling app. -->
   <footer>
   <div class="footnotes">
-  <!-- Live region: the sync module rewrites its text as the state changes, so it
-       must stay in the tree rather than being toggled hidden. -->
-  <p class="privacy" id="privacyNote" role="status">🔒 Private — your data is stored in this browser only.</p>
-  <!-- Its own element, not part of #privacyNote: the sync code rewrites that
-       note's textContent, which would silently delete links nested inside it. -->
+  <!-- Live region: a shared view rewrites its text (see the viewOnly block), so
+       it must stay in the tree rather than being toggled hidden. It said "…No
+       account needed. Sign in with Google if you want the same teams on your
+       other devices" until sync was removed on 2026-08-20; now the first
+       sentence is the whole story, and the second says so outright rather than
+       leaving "only" to carry it. -->
+  <p class="privacy" id="privacyNote" role="status">🔒 Private — your data is stored in this browser only. It is never sent anywhere, and there is no account to sign in to.</p>
+  <!-- Its own element, not part of #privacyNote: the viewOnly block rewrites
+       that note's textContent, which would silently delete links nested inside
+       it. -->
   <p class="privacy privacy-links"><a href="privacy.html">Privacy policy</a> &middot;
     <a href="https://github.com/eagleadams86/team-dashboard" target="_blank" rel="noopener noreferrer">How it works</a></p>
 
   <!-- Authorship line. Its own element, deliberately not part of #privacyNote:
-       the sync code rewrites that note's textContent, which would silently delete
-       a link nested inside it. Reuses .privacy-links only for the muted link
+       that note's textContent is rewritten in a shared view, which would silently
+       delete a link nested inside it. Reuses .privacy-links only for the muted link
        colour — no new CSS. Mirrored byte-for-byte in the sibling app.
        TWO links, not one: "MIT licensed" pointed at NOTICE until 2026-08-20,
        which is the authorship and provenance statement — its own second line
@@ -1346,7 +1358,8 @@ main:focus { outline: none; }
   <h2 id="dataDialogTitle">Back Up &amp; Restore</h2>
   <p>
     One JSON file holding every team, their work items and your shared settings — a copy
-    you keep, independent of this browser and of any Google account.
+    you keep, independent of this browser. It is the only copy of your data that exists
+    anywhere else, so it is worth taking one.
   </p>
   <div class="btn-row" style="margin-top:12px">
     <button class="btn" id="btnExport" type="button">⬇ Download backup (JSON)</button>
@@ -1355,8 +1368,8 @@ main:focus { outline: none; }
   </div>
   <div class="note info" style="margin-top:16px">
     Restoring <strong>replaces every team in this browser</strong>. You'll see what the file
-    holds and be asked to confirm first — and if you're signed in, the restored copy becomes
-    the one your other devices get.
+    holds and be asked to confirm first. A backup file is also how you move your data to
+    another device — download it here, and restore it there.
   </div>
   <details class="danger-zone">
     <summary>Start Again</summary>
@@ -1373,12 +1386,12 @@ main:focus { outline: none; }
 
 <!-- ── Confirming a delete-all ───────────────────────────────────────────────
      Its own dialog rather than a confirm(): this is the one action with no way
-     back, so it gets room to say exactly how much is going, whether it reaches
-     the other devices, and to offer the backup that is the only route back. -->
+     back, so it gets room to say exactly how much is going and to offer the
+     backup that is the only route back — and since sync was removed, the only
+     copy there is. -->
 <dialog id="clearDialog" aria-labelledby="clearTitle">
   <h2 id="clearTitle">Delete All Data?</h2>
   <p id="clearBody"></p>
-  <p class="warn" id="clearSyncWarn" role="status"></p>
   <div class="row spread" style="margin-top:18px">
     <button class="btn" id="clearBackupBtn" type="button">&#11015; Download backup first</button>
     <span class="row">
@@ -1515,6 +1528,11 @@ main:focus { outline: none; }
     </div>
   </fieldset>
 
+  <p class="hint" style="margin-top:14px">If your paste had an issue key column, those keys
+    travel in the link — they are what names the items on the charts, and a link without them
+    would show a different picture from yours. Nothing else out of your work system does: no
+    summaries, no statuses, no names.</p>
+
   <p class="hint" style="margin-top:14px">This is a <strong>snapshot</strong>, frozen as it
     looks right now — later edits won't appear, so send a fresh link when the numbers move.
     There's no way to withdraw one once sent, so treat it like emailing a spreadsheet. If you
@@ -1534,17 +1552,6 @@ main:focus { outline: none; }
   </div>
 </dialog>
 
-<!-- Reconciling two copies at first sign-in. Deliberately a question rather than
-     a timestamp guess: guessing once wiped a browser's data in the sibling app. -->
-<dialog id="syncChoiceDialog" aria-labelledby="syncChoiceTitle">
-  <h2 id="syncChoiceTitle">Which Copy Do You Want to Keep?</h2>
-  <p id="syncChoiceBody"></p>
-  <div class="btn-row" style="margin-top:var(--sp-6)">
-    <button class="btn primary" id="syncKeepDeviceBtn" type="button">Keep this device's</button>
-    <button class="btn" id="syncKeepGoogleBtn" type="button">Keep Google's</button>
-  </div>
-</dialog>
-
 <div id="toast" popover="manual" role="status" aria-live="polite"></div>
 
 <script src="chart.min.js"></script>
@@ -1556,8 +1563,8 @@ main:focus { outline: none; }
    showing someone else's snapshot. `viewOnly` strips every edit surface and,
    through the save()/persist()/saveView() guards below, guarantees nothing a
    visitor does can touch what's saved in their own browser — often another
-   copy of their own data. The sync module is gated separately via
-   window.tdViewOnly. */
+   copy of their own data. window.tdViewOnly carries the same flag to the
+   service-worker block, which is a script of its own. */
 const SHARE_PREFIX = '#share=';
 const shareToken = location.hash.startsWith(SHARE_PREFIX)
   ? location.hash.slice(SHARE_PREFIX.length) : null;
@@ -1868,7 +1875,15 @@ const HEADER_PATTERNS = {
   completed: [/complet|resolv|closed|done|finish/i, /end\s*date/i],
   started:   [/start|begin|in.?progress/i, /created/i],
   created:   [/creat|raised|reported|logged|opened|submitted/i],
-  type:      [/(issue\s*)?type|kind|category/i]
+  type:      [/(issue\s*)?type|kind|category/i],
+  /* ANCHORED, unlike every pattern above it, and that is the whole point: the
+     others may match anywhere in a heading because a date column can be called
+     almost anything, while the neighbours of a key column are "Issue Type",
+     "Issue id", "Parent key" and "Key changed date" — every one of which a loose
+     /key/ would swallow. Only a heading that is exactly Key or Issue key counts.
+     A column missed here is not lost: the shape test in detectColumns finds it
+     from the values, which is what a headerless paste relies on anyway. */
+  key:       [/^\s*(issue\s*)?key\s*$/i]
 };
 
 function matchHeader(header, field) {
@@ -1889,10 +1904,16 @@ function columnStats(rows, order) {
   for (let c = 0; c < width; c++) {
     const vals = rows.map(r => String(r[c] == null ? '' : r[c]).trim()).filter(Boolean);
     const dates = vals.filter(v => parseDate(v, order)).length;
+    const keys = vals.filter(v => ISSUE_KEY_RE.test(v)).length;
     stats.push({
       index: c,
       filled: vals.length,
       dateRate: vals.length ? dates / vals.length : 0,
+      /* The same regex the stored value must pass, so a column can only be read
+         as the key column if what is in it is what would actually be saved.
+         A date can never score here — every date format this app parses either
+         starts with a digit or holds a separator the key shape forbids. */
+      keyRate: vals.length ? keys / vals.length : 0,
       distinct: new Set(vals).size,
       distinctRatio: vals.length ? new Set(vals).size / vals.length : 1
     });
@@ -1921,7 +1942,8 @@ function detectColumns(rows, header, order) {
     completed: matchHeader(header, 'completed'),
     started:   startedStrict,
     created:   -1,
-    type:      matchHeader(header, 'type')
+    type:      matchHeader(header, 'type'),
+    key:       matchHeader(header, 'key')
   };
   const createdByHeader = matchHeader(header, 'created');
   if (createdByHeader >= 0 && createdByHeader !== map.completed && createdByHeader !== map.started) {
@@ -1931,9 +1953,32 @@ function detectColumns(rows, header, order) {
      is the start. Both roles then point at the same index. */
   if (map.started < 0 && map.created >= 0) map.started = map.created;
 
+  /* A date role always wins a contested index. Nothing legitimate reaches this
+     — the anchored heading and the key shape are both far too narrow — but the
+     key is the one role this app can do entirely without, so if it is ever
+     ambiguous it is the one that yields. */
+  if (map.key >= 0 && [map.completed, map.started, map.created, map.type].includes(map.key)) map.key = -1;
+
   /* A Set, not a list: started and created may share an index, and a list would
-     make the type detector below think one more column was consumed than is. */
-  const taken = () => new Set([map.completed, map.started, map.created, map.type].filter(i => i >= 0));
+     make the type detector below think one more column was consumed than is.
+     The key belongs in it too — with two rows of two distinct types the type
+     detector would otherwise be free to pick the key column. */
+  const taken = () => new Set([map.completed, map.started, map.created, map.type, map.key]
+    .filter(i => i >= 0));
+
+  /* No heading, or a heading this app declined to trust: find the key column by
+     what is IN it. Unlike the type detector below, which has to guess from
+     repetition and can be wrong, this one asks the exact question that decides
+     whether a value is storable at all — so a column it picks is a column whose
+     cells will survive cleanIssueKey, and a column it misses costs nothing but
+     the key. Leftmost wins, since an export leads with the key.
+
+     Deliberately run BEFORE the date and type detectors read taken(): a key
+     column consumed here is one fewer column for them to guess about. */
+  if (map.key < 0) {
+    const shaped = stats.filter(s => s.filled && !taken().has(s.index) && s.keyRate >= 0.8);
+    if (shaped.length) map.key = shaped[0].index;
+  }
 
   /* Columns that hold dates. 0.6 rather than 1.0 because a stray "in progress"
      or "-" in a date column shouldn't disqualify it. */
@@ -2019,12 +2064,42 @@ function detectColumns(rows, header, order) {
    store sensitive words from a work system, and an empty type just means the
    row sits outside the work-type filters. Control characters go regardless.
    Applied at BOTH boundaries — the paste (here) and hydrateRows (a saved copy,
-   the cloud document, a backup, a share link) — so a long text can't enter the
+   a backup file, a share link) — so a long text can't enter the
    saved data from either direction. */
 function cleanWorkType(t) {
   if (typeof t !== 'string') return '';
   const s = t.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim();
   return s.length > 40 ? '' : s;
+}
+
+/* The one identifier this app stores, and the strictest boundary in it.
+
+   Everything else here is guarded by a LENGTH CAP — a short thing is probably a
+   label. This is guarded by SHAPE: a Jira project key, a dash, an issue number,
+   and literally nothing else may pass. That matters because a key is the one
+   field whose column sits next to a summary in every export ever pasted, so the
+   cell that arrives here when a column is mismapped is a sentence out of a work
+   system. A cap would let 17 characters of it through; this lets none, because
+   a sentence does not have this shape.
+
+   Note what the regex forbids as much as what it allows: no spaces, no
+   punctuation beyond the single dash, no angle brackets or quotes — so the
+   value is inert wherever it lands, HTML or CSV. It is still escaped at every
+   render, belt and braces, but it cannot carry markup to escape.
+
+   10 letters and 6 digits are the Jira maxima Charles gave, so the whole value
+   is at most 17 characters and never needs truncating: a cell that does not fit
+   is DROPPED WHOLE, exactly as an over-long work type is. Lower case is
+   accepted and folded up, since a key is uppercase everywhere Jira writes one
+   and "dae-1" and "DAE-1" must not become two different items on a chart.
+
+   Applied at BOTH boundaries — the paste and hydrateRows — like cleanWorkType,
+   so neither door lets a different shape in. */
+const ISSUE_KEY_RE = /^[A-Za-z][A-Za-z0-9]{0,9}-[0-9]{1,6}$/;
+function cleanIssueKey(k) {
+  if (typeof k !== 'string') return '';
+  const s = k.trim();
+  return ISSUE_KEY_RE.test(s) ? s.toUpperCase() : '';
 }
 
 function parsePastedRows(text, order) {
@@ -2078,6 +2153,10 @@ function parsePastedRows(text, order) {
     const started   = parseDate(rawStarted, resolved);
     const created   = parseDate(rawCreated, resolved);
     const type      = cleanWorkType(at(cells, cols.type));
+    /* Empty unless the cell is exactly a key. A mismapped column, a summary, a
+       reporter's name — all of it comes out as '' rather than as a shortened
+       version of itself. See cleanIssueKey. */
+    const key       = cleanIssueKey(at(cells, cols.key));
 
     /* An empty completion date is not an error — it is work in progress, and it
        counts: the "started this week" tally never looks at completion at all.
@@ -2138,7 +2217,7 @@ function parsePastedRows(text, order) {
     if (!completed) unfinished++;
 
     rows.push({ completed: completed || null, started: usableStarted || null,
-                created: usableCreated || null, type });
+                created: usableCreated || null, type, key });
   });
 
   return { rows, badCompleted, badStarted, badCreated, startAfterDone, raisedAfterStart,
@@ -2268,6 +2347,16 @@ const AGE_SPREAD = 0.3;
 const AGE_MAX_COLUMNS = 6;
 const AGE_UNTYPED = 'No type';
 const AGE_OTHER = 'Other types';
+
+/* What a single dot is called, on both scatters, so the two can never drift
+   apart. The issue key if the paste carried one — that is the whole reason the
+   key is stored — and otherwise exactly what these tooltips said before it
+   existed, which is the work type. Nothing here is escaped and nothing needs to
+   be: a key has passed cleanIssueKey and a type has passed cleanWorkType, and
+   Chart.js writes tooltip text as text, never as markup. */
+function dotName(p) {
+  return (p && p.key) || (p && p.type) || AGE_UNTYPED;
+}
 
 /* Ten thousand deals. Enough that the answers stop moving at the resolution
    they are reported in — whole items, whole periods — and cheap enough (a
@@ -2857,7 +2946,12 @@ function derive(rows, settings, view) {
         x: diffDays(r.completed, weekStarts[0]),
         y: ct,
         completed: r.completed,
-        type: r.type
+        type: r.type,
+        /* The dot's name, when the paste carried one. '' when it did not, and
+           every reader of this treats that as "no name" rather than drawing an
+           empty label — a paste without a key column must look exactly as it
+           did before this field existed. */
+        key: r.key || ''
       });
     });
   });
@@ -2903,7 +2997,8 @@ function derive(rows, settings, view) {
     .map(r => ({
       age: Math.max(0, spanDays(endDate, r.started, workingDays)),
       type: r.type || '',
-      started: r.started
+      started: r.started,
+      key: r.key || ''
     }));
 
   /* Columns are work types, because that is the only categorical column this
@@ -2962,6 +3057,7 @@ function derive(rows, settings, view) {
         aged: r.age > agedDays,
         type: r.type,
         started: r.started,
+        key: r.key || '',
         column: col.label
       });
     });
@@ -3315,6 +3411,7 @@ window.TD = {
   weekdayNum, priorSunday, weekNumber, weekKey, edate, workDaysBetween,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
+  cleanIssueKey,
   cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, deriveTeams, utcDate,
   /* The forecast's pure pieces, so a test can deal a sample set it wrote itself
      rather than only reading the answers back off derive(). */
@@ -3330,7 +3427,12 @@ window.TD = {
   /* The CSV writer's pure pieces. A CSV is the one place this app's text goes
      somewhere it can be INTERPRETED rather than displayed, so the guard on it is
      pinned as tightly as the HTML escaper beside it. */
-  csvCell, toCsv, toTsv, cellText, tableToRows, slugify
+  csvCell, toCsv, toTsv, cellText, tableToRows, slugify,
+  /* The issue key's two render-side helpers. Both are function declarations
+     declared far below this line and are hoisted, which is why naming them here
+     is safe where naming a `const` from a later section is a TDZ error that
+     takes the whole app down — see ART_NONE above. */
+  issueSortKey, dotName
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3378,8 +3480,8 @@ const DEFAULT_SETTINGS = {
   ]
 };
 
-/* activeTeamId lives here, not in the synced payload: which team you happen to
-   be looking at is a position on this device, not shared data. Syncing it would
+/* activeTeamId lives here, not in the saved state: which team you happen to
+   be looking at is a position on this device, not data. Carrying it would
    make switching team on the laptop yank the phone to the same team. */
 /* forecastItems and forecastDate live here for the same reason activeTeamId
    does: what you are asking the forecast is a question you are asking on THIS
@@ -3410,17 +3512,39 @@ const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', act
 
 const LS = {
   state: 'td-state', view: 'td-view', theme: 'td-theme',
-  updated: 'td-updated', syncUid: 'td-sync-uid',
   /* v1 keys, read once by migrate() and then removed */
-  oldRows: 'td-rows', oldSettings: 'td-settings'
+  oldRows: 'td-rows', oldSettings: 'td-settings',
+  /* Sync's leftovers. Not read by anything — listed so clearSyncLeftovers() has
+     one place to name them, and so nobody reintroduces the names by accident. */
+  oldUpdated: 'td-updated', oldSyncUid: 'td-sync-uid'
 };
+
+/* Sync was removed on 2026-08-20, and its two keys are actively DELETED rather
+   than left to sit there. `td-sync-uid` is the one that matters: it is a Google
+   account id, which is the only personally identifying thing this app ever
+   wrote down, and leaving it in localStorage after removing the feature that
+   needed it would be keeping an identifier for no reason at all. `td-updated`
+   is only a number, and goes with it because a key nothing reads is a key that
+   confuses the next person to open devtools.
+
+   Runs on every load, not once behind a flag: a flag would be a third key, and
+   two removeItem calls on a key that is already gone cost nothing. Deliberately
+   NOT gated on viewOnly — a visitor's own leftovers are still theirs to be rid
+   of, and this removes rather than writes. */
+function clearSyncLeftovers() {
+  try {
+    localStorage.removeItem(LS.oldUpdated);
+    localStorage.removeItem(LS.oldSyncUid);
+  } catch (e) { /* private mode, or storage disabled: nothing to clean */ }
+}
+clearSyncLeftovers();
 
 /* Stop the app dead, with the saved copy untouched, and say why.
    Called only for data written by a newer build: from the boot check below (it
    sits under SCHEMA's declaration, which this is deliberately hoisted above)
-   and from tdAdopt() when sync hands one over mid-session. It sets viewOnly (the
-   existing no-write chokepoint, which the sync module also reads as
-   window.tdViewOnly), draws the message with textContent because the number
+   and from tdAdopt(). It sets viewOnly (the existing no-write chokepoint, which
+   the service-worker block also reads as window.tdViewOnly, so a halted page
+   installs no worker either), draws the message with textContent because the number
    came out of storage, and THROWS so nothing further initialises. */
 function haltForNewerData(found) {
   viewOnly = true;
@@ -3487,7 +3611,8 @@ function haltForNewerData(found) {
 }
 
 /* state.teams[] each hold their own rows; settings are shared by all of them.
-   Everything in `state` syncs; everything in `view` stays on this device. */
+   Everything in `state` is your data; everything in `view` is where you happen
+   to be standing in it. Only `state` goes into a backup or a share link. */
 let state  = { teams: [], arts: [], settings: Object.assign({}, DEFAULT_SETTINGS) };
 let view   = Object.assign({}, DEFAULT_VIEW);
 let charts = {};
@@ -3506,7 +3631,8 @@ let activeTab = 'dashboard';
 const newId = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
 /* Ids end up in data- attributes and <option value>, so anything arriving from
-   outside this device — the cloud, a hand-edited localStorage — is replaced
+   outside this browser — a backup file, a share link, a hand-edited
+   localStorage — is replaced
    unless it is plainly safe. Same boundary check as the sibling app. */
 const ID_OK = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -3557,7 +3683,7 @@ function hydrateRows(raw) {
     /* The same ordering rules parsePastedRows applies, because this is the
        other door the same data can come through. A copy this app saved already
        satisfies created ≤ started ≤ completed — the paste enforced it — but a
-       hand-edited backup or cloud doc can say anything, and a start after its
+       hand-edited backup or share link can say anything, and a start after its
        completion would otherwise reach cycleTimeOf, floor at 0, and drag the
        average down where nobody can see it. Null the offending date, keep the
        row: it still counts for whatever its remaining dates support. */
@@ -3565,10 +3691,16 @@ function hydrateRows(raw) {
     if (created && (started || completed) && created > (started || completed)) created = null;
     return {
       completed, started, created,
-      /* Same guard as the paste: a hand-edited backup or cloud doc can put
+      /* Same guard as the paste: a hand-edited backup or share link can put
          anything here, and only a short label-shaped string may round-trip back
          out through serializeRows — see cleanWorkType. */
-      type: cleanWorkType(r && r.t)
+      type: cleanWorkType(r && r.t),
+      /* And the same on the other side of the one identifier this app stores.
+         `i` is the wire name; `key` is what the app calls it everywhere else.
+         Anything that is not exactly a key shape is dropped here, so a hostile
+         or hand-edited document cannot use this field as a free-text smuggling
+         route — which is the whole reason the guard is a shape and not a cap. */
+      key: cleanIssueKey(r && r.i)
     };
   })
   /* An item with no completion is work in progress, not a broken row — keep it,
@@ -3577,19 +3709,22 @@ function hydrateRows(raw) {
      "neither of the two flow dates, no row". */
   .filter(r => r.completed || r.started);
 }
-/* `k` is left out when there's no created date, so a team that has never pasted
-   one serialises byte-identically to before and its first save after upgrading
-   doesn't rewrite the whole synced document. */
+/* `k` and `i` are left out when there's no created date and no issue key, so a
+   team that has never pasted either serialises byte-identically to before and
+   its first save after upgrading doesn't rewrite the whole stored document. The
+   same rule ARTs follow, and the reason a browser that never uses a feature
+   doesn't push a whole-document rewrite to every other device. */
 const serializeRows = rows => rows.map(r => {
   const out = { c: isoOf(r.completed), s: isoOf(r.started), t: r.type };
   if (r.created) out.k = isoOf(r.created);
+  if (r.key) out.i = r.key;
   return out;
 });
 
 function normalizeSettings(raw) {
   const s = Object.assign({}, DEFAULT_SETTINGS, raw && typeof raw === 'object' ? raw : {});
-  /* Settings cross the same boundary as teams — a hand-edited backup or cloud
-     doc can hold anything — so filter entries are coerced to the
+  /* Settings cross the same boundary as teams — a hand-edited backup or share
+     link can hold anything — so filter entries are coerced to the
      {display, value} string pair the renderers assume, with the same length cap
      names get. An entry that isn't an object at all is dropped; a list emptied
      that way gets the defaults back, exactly as an empty list does. */
@@ -3614,7 +3749,7 @@ function normalizeSettings(raw) {
     s[k] = s[k].slice(0, 120);
   }
   /* Was a settings field that nothing ever read. Dropped rather than left to
-     ride along in every saved and synced copy for ever. */
+     ride along in every saved copy for ever. */
   delete s.plannedLabel;
   /* Two of the cycle-time wordings were sentence case before the headings went
      Title Case. A saved value that no longer matches any <option> leaves the
@@ -3630,33 +3765,35 @@ function normalizeSettings(raw) {
   s.agedDays = Number.isFinite(a) && a > 0 ? a : DEFAULT_SETTINGS.agedDays;
   /* A checkbox, so only the boolean true means on. A hand-edited backup saying
      "yes" or 1 must not switch the measure every figure is taken in — and it
-     must be a real boolean either way, because localStorage drops an undefined
-     while Firestore rejects the whole document over one. */
+     must be a real boolean either way: JSON.stringify drops an undefined
+     silently, so a setting that became undefined would read as "never set" on
+     the next load rather than announcing itself. */
   s.workingDays = s.workingDays === true;
   /* Only the keys this app knows leave this function — the same whitelist rule
      rows and teams already live by (hydrateRows and sanitizeTeams both build
      fresh objects). Without this, any stray key on a hand-edited backup or
-     cloud document would ride along into every saved and synced copy for ever,
-     which is exactly how text this app never asked for would get stored. */
+     share link would ride along into every saved copy for ever, which is
+     exactly how text this app never asked for would get stored. */
   const out = {};
   for (const k of Object.keys(DEFAULT_SETTINGS)) out[k] = s[k];
   return out;
 }
 
-/* The shape that goes to localStorage and to the cloud. Dates become ISO
+/* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 5 added ARTs — `state.arts` and an `artId` on each team; 4 added the
-   working-days setting; 3 added the per-row created date.
-   The marker rides into localStorage and the synced document, but deliberately
-   NOT into a share link — a share
-   payload's keys are fixed and pinned by a test, and a viewer needs no schema.
+/* SCHEMA 6 added the per-row issue key; 5 added ARTs — `state.arts` and an
+   `artId` on each team; 4 added the working-days setting; 3 added the per-row
+   created date.
+   The marker rides into localStorage and into a backup file, but deliberately
+   NOT into a share link — a share payload's keys are fixed and pinned by a
+   test, and a viewer needs no schema.
 
    It exists to catch one thing: a browser still running an older build will
    hydrate a new document, drop every created date it doesn't know about, and
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 5;
+const SCHEMA = 6;
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
    hydrateState() keeps only the keys it knows, which is right for a hostile
@@ -3688,7 +3825,7 @@ function serializeState() {
     schema: SCHEMA,
     /* `artId` is written only when there is one, so a browser that has never
        used ARTs serialises byte-identically to before and its first save after
-       upgrading doesn't rewrite the whole synced document — the same rule the
+       upgrading doesn't rewrite the whole stored document — the same rule the
        per-row created date follows. */
     teams: state.teams.map(t => {
       const out = { id: t.id, name: t.name, rows: serializeRows(t.rows) };
@@ -3702,6 +3839,11 @@ function serializeState() {
 }
 const countCreated = teams =>
   teams.reduce((n, t) => n + t.rows.filter(r => r.created).length, 0);
+/* The issue key is in exactly the same position as the created date: optional,
+   pasted by hand, and invisible to a build that predates it — so it is guarded
+   by the same prompt rather than a second one. See tdAdopt. */
+const countKeys = teams =>
+  teams.reduce((n, t) => n + t.rows.filter(r => r.key).length, 0);
 function hydrateState(raw) {
   const arts = sanitizeArts(raw && raw.arts);
   const teams = sanitizeTeams(raw && raw.teams);
@@ -3746,20 +3888,22 @@ function loadState() {
   /* If the boundary changed anything — a stray key pruned, an over-long type
      dropped — the cleaned copy is written straight back, so nothing the
      whitelist rejected sits in localStorage waiting for the next edit.
-     Deliberately persist(), not save(): this is a repair of the stored shape,
-     not an edit, so it must not stamp this device's copy as newest and race a
-     genuinely newer cloud document. The cloud copy heals on the next real
-     save, which always serialises from the pruned state. */
+     Deliberately persist(), not save(). The two do the same thing today, and
+     the distinction is kept anyway: persist() means "write the shape down",
+     save() means "the user changed something". Collapsing them would lose the
+     only marker of which is which, and every write path added from here would
+     have to re-decide. */
   if (stored !== null && JSON.stringify(serializeState()) !== stored) persist();
   /* A brand-new browser gets one empty team so there's somewhere to paste into.
-     hasData() below deliberately doesn't count it — see the note there. */
+     loadSample() drops it again if it is still untouched — see there. */
   if (!state.teams.length) state.teams.push({ id: newId(), name: 'My team', rows: [] });
 }
 
 function loadView() {
   /* Same whitelist rule as settings: only the keys DEFAULT_VIEW names are read
      back, so a stray key in a hand-edited copy can't sit in localStorage for
-     ever. This key never syncs, but the rule is the rule everywhere. */
+     ever. This key never leaves the device at all, but the rule is the rule
+     everywhere. */
   let raw = {};
   try { raw = JSON.parse(localStorage.getItem(LS.view) || '{}') || {}; }
   catch (e) { /* defaults */ }
@@ -3784,9 +3928,9 @@ function persist() {
   try { localStorage.setItem(LS.state, JSON.stringify(serializeState())); }
   catch (e) {
     /* A big paste can outgrow the browser's storage quota. The change is live
-       in memory (and still reaches the cloud if signed in) but would be gone on
-       reload — the one honest thing to do is say so, because the load note has
-       already said "Loaded". */
+       in memory but would be gone on reload, and there is no second copy
+       anywhere to fall back on — the one honest thing to do is say so, because
+       the load note has already said "Loaded". */
     console.warn('localStorage save failed', e);
     window.toast('⚠️ Storage is full — this change is on screen but could not be saved in this browser. Remove old items and try again.');
   }
@@ -3800,35 +3944,20 @@ function saveView() {
   catch (e) { console.warn('localStorage view save failed', e); }
 }
 
-/* The one place a change to teams or settings is written down. It stamps the
-   local copy as the newest and asks the cloud module (if any) to push, so no
-   caller can save without the cloud finding out. */
+/* The one place a change to teams or settings is written down. It used to do
+   more — stamp a timestamp and ask the sync module to push — and it is kept as
+   its own function rather than folded into persist() because the DISTINCTION it
+   marks is still load-bearing: persist() is a shape repair, save() is a real
+   edit. loadState() relies on that difference. */
 function save() {
   if (viewOnly) return;   // someone else's data — never write it over your own
   persist();
-  /* The timestamp shares persist()'s quota risk, and persist() has already
-     toasted if storage is full — failing to stamp must not also kill the
-     cloud push below. */
-  try { localStorage.setItem(LS.updated, String(Date.now())); }
-  catch (e) { console.warn('localStorage timestamp save failed', e); }
-  if (window.cloudPush) window.cloudPush();
 }
 
 function activeTeam() {
   return state.teams.find(t => t.id === view.activeTeamId) || state.teams[0] || null;
 }
 const activeRows = () => { const t = activeTeam(); return t ? t.rows : []; };
-
-/* ── Hooks the sync module uses ──────────────────────────────────────────────
-   "Does this copy hold anything worth protecting?" A fresh browser has exactly
-   one empty team, created by loadState() so there's a paste target — that must
-   read as empty, or signing in on a new device would let its nothing overwrite
-   the device that has the data. Teams the user actually made do count, even
-   before any rows are pasted into them: a name is real work. */
-function hasData(d) {
-  if (!d || !Array.isArray(d.teams)) return false;
-  return d.teams.length > 1 || d.teams.some(t => t && Array.isArray(t.rows) && t.rows.length);
-}
 
 /* "Is this file plainly one of ours?" — asked before a restore, never after.
    hydrateState() is deliberately forgiving: hand it {} and it hands back a valid
@@ -3842,71 +3971,73 @@ function isBackup(raw) {
 }
 
 window.tdGet = serializeState;
-window.tdHasData = hasData;
 /* Pinned by tests.html — see the openModal comment above for why the list of
    keyboard-raising types is a decision worth writing down. */
 window.tdRaisesKeyboard = raisesKeyboard;
-/* Pure helpers tests.html pins. Kept beside the sync hooks because they are the
-   same boundary: everything here decides what a copy from outside is allowed to
-   turn into. */
-window.TDState = { sanitizeTeams, sanitizeArts, hydrateState, normalizeSettings, hasData, isBackup, ID_OK,
+/* Pure helpers tests.html pins. Grouped because they are one boundary:
+   everything here decides what a copy arriving from outside this browser — a
+   backup file, a share link — is allowed to turn into. */
+window.TDState = { sanitizeTeams, sanitizeArts, hydrateState, normalizeSettings, isBackup, ID_OK,
   serializeRows, hydrateRows, SCHEMA };
 window.tdCounts = (d) => ({
   teams: (d && d.teams) ? d.teams.length : 0,
   items: (d && d.teams) ? d.teams.reduce((n, t) => n + ((t.rows && t.rows.length) || 0), 0) : 0
 });
 
-/* Replace everything with a copy from the cloud. */
-/* Returns true if the incoming copy was taken, false if this device kept its
-   own. The caller needs to know: the sync module records which cloud version it
-   holds, and it must not record one it declined. */
-window.tdAdopt = (data, updatedAt) => {
-  /* The copy-from-the-future check, live edition. The boot check above only
-     guards the load, but onSnapshot can hand a page running yesterday's cached
-     code a document today's build wrote on another device, mid-session — the
-     case the offline cache makes likely rather than theoretical.
+/* Replace everything in this browser with a copy from outside it.
 
-     Stored VERBATIM first, before hydrateState() can drop what makes it newer:
-     it is the newest copy there is, and the fresh build reads localStorage on
-     its next load. Then the same halt, which THROWS, so nothing below adopts.
-     The restore-from-file path refuses a newer backup before it ever gets here,
-     so this only ever fires for the cloud. */
-  if (Number((data && data.schema) || 1) > SCHEMA) {
-    try {
-      localStorage.setItem(LS.state, JSON.stringify(data));
-      localStorage.setItem(LS.updated, String(updatedAt || Date.now()));
-    } catch (e) { console.warn('localStorage save failed', e); }
-    haltForNewerData(data.schema);
-  }
+   Since sync was removed (2026-08-20) there is exactly ONE caller in the app —
+   restoring a backup file — plus tests.html, which uses it to plant state. It
+   is still its own exported function rather than being folded into the restore
+   handler, because it is the whole "a copy from elsewhere is landing" boundary
+   in one place, and a suite that plants state through the real door is worth
+   more than one that assigns to `state`.
+
+   Returns true if the incoming copy was taken, false if this device kept its
+   own — the restore handler only reports success on a true. */
+window.tdAdopt = (data) => {
+  /* Belt and braces on the copy-from-the-future check. The restore path already
+     refuses a newer backup with a toast before it gets here, and that is the
+     better error because nothing has been touched at that point — this is the
+     backstop for any future caller that forgets, and for the suite. */
+  if (Number((data && data.schema) || 1) > SCHEMA) haltForNewerData(data.schema);
   /* Before the swap, because the comparison is against what this device holds
-     now. Created dates going from "some" to "none" is the same class of event
-     as another device clearing everything: it can be deliberate, so it asks
-     rather than refusing — but it asks, because the alternative is a device
-     quietly throwing away the only copy of a column its owner pasted.
+     now. Created dates or issue keys going from "some" to "none" is the same
+     class of event as a restore that clears everything: it can be deliberate,
+     so it asks rather than refusing — but it ASKS, because the alternative is
+     this browser quietly throwing away the only copy of a column its owner
+     pasted, and since sync was removed there is no second copy to get it back
+     from.
 
-     This is NOT limited to old builds. A current build that has simply never
-     been given a Created column pushes a copy with no created dates and a
-     current schema marker, and that copy would otherwise land here and win on
-     timestamp alone. That is exactly how work and home end up disagreeing. */
+     The case this is really for: a backup file downloaded from a build older
+     than the one that added the field. It looks like a perfectly good backup,
+     it restores without complaint, and the column is simply gone. The boot halt
+     does not cover it — that fires on a NEWER copy, and this one is older. */
   const hadCreated = countCreated(state.teams);
+  const hadKeys = countKeys(state.teams);
   const incoming = hydrateState(data);
-  const losing = hadCreated > 0 && countCreated(incoming.teams) === 0;
+  const losingCreated = hadCreated > 0 && countCreated(incoming.teams) === 0;
+  const losingKeys = hadKeys > 0 && countKeys(incoming.teams) === 0;
 
-  if (losing) {
+  /* ONE prompt covering both fields, not one each. They are lost together in
+     the case this exists for — a build that predates either drops both — and
+     two dialogs in a row for the same event is how somebody learns to dismiss
+     them without reading. */
+  if (losingCreated || losingKeys) {
     const stale = !(data && data.schema >= SCHEMA);
+    const lost = [];
+    if (losingCreated) lost.push(hadCreated + ' Created date' + (hadCreated === 1 ? '' : 's'));
+    if (losingKeys) lost.push(hadKeys + ' issue key' + (hadKeys === 1 ? '' : 's'));
+    const noun = lost.join(' and ');
     const keep = !confirm(
-      'Another device’s copy of your data has no Created dates, and this device has '
-      + hadCreated + '.\n\n'
-      + (stale ? 'That device is running an older version of Flow Metrics, which removes '
-                 + 'them because it does not know about them.\n\n'
-               : 'That device has not been given a Created column.\n\n')
-      + 'Drop the Created dates here too? Cancel keeps them and restores them to your '
-      + 'other devices — lead time will stop working if you drop them.');
+      'The copy you are restoring is missing what this browser has: ' + noun + '.\n\n'
+      + (stale ? 'It was saved by an older version of Flow Metrics, which leaves them out '
+                 + 'because it does not know about them.\n\n'
+               : 'It was saved from data that never had those columns.\n\n')
+      + 'Restore anyway and lose them? Cancel keeps what is here and restores nothing'
+      + (losingCreated ? ' — lead time will stop working if you drop the Created dates.' : '.'));
     if (keep) {
-      /* Stamp this copy as the newest and send it back up, the same move the
-         cleared-everything branch makes. */
-      save();
-      if (typeof toast === 'function') toast('Kept this device’s Created dates ☁️', 6000);
+      if (typeof toast === 'function') toast('Kept this browser’s ' + noun + ' — nothing was restored', 6000);
       return false;
     }
   }
@@ -3918,7 +4049,6 @@ window.tdAdopt = (data, updatedAt) => {
     saveView();
   }
   persist();
-  localStorage.setItem(LS.updated, String(updatedAt || Date.now()));
   renderSettingsForm();
   renderAll();
   return true;
@@ -4480,11 +4610,14 @@ function drawCharts(d) {
       text: l.text, value: l.value,
       colour: l.key === 'median' ? token('--text-muted') : token('--text-secondary')
     })) };
-    /* The same privacy stance as the age chart: the dot cannot carry a ticket
-       key because this app stores none, so it carries what finds the item again
-       in the export it came from. */
+    /* The item's key leads the tooltip when the paste carried one — this is the
+       chart the key was added for, and the point of it is that a dot far above
+       the rest can be named and then looked up. Without a key it reads exactly
+       as it always did: the type and the date, which is what finds the item in
+       the export it came from. Same shape on the age chart below, so the pair
+       still reads together. */
     scatOpts.plugins.tooltip.callbacks = {
-      title: (its) => (its[0].raw.type || AGE_UNTYPED) + ' \u00b7 finished '
+      title: (its) => dotName(its[0].raw) + ' \u00b7 finished '
         + prettyDate(its[0].raw.completed),
       label: (c) => num1(c.raw.y) + ' ' + d.dayNoun + ' from start to finish'
     };
@@ -4612,13 +4745,15 @@ function drawCharts(d) {
       labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
                 font: { size: 11 }, filter: item => item.datasetIndex < dotSets.length }
     };
-    /* The dot cannot be labelled with a ticket key — this app stores none — so
-       the tooltip carries what it does have, which is exactly what finds the
-       item again in the export it came from. */
+    /* Named by its key where the paste carried one, and by its type and start
+       date where it did not — the same rule, and the same wording, as the
+       finished-item scatter above. This is the chart a stand-up acts on, so
+       being able to read the key off the dot that is furthest up the column is
+       most of the value of storing one. */
     ageOpts.plugins.tooltip.callbacks = {
       title: (its) => {
         const p = its[0].raw;
-        return (p.type || AGE_UNTYPED) + ' \u00b7 started ' + prettyDate(p.started);
+        return dotName(p) + ' \u00b7 started ' + prettyDate(p.started);
       },
       label: (c) => int0(c.raw.y) + ' ' + d.dayNoun + ' in progress',
       afterLabel: (c) => c.raw.aged ? 'Past the ' + a.threshold + '-' + d.dayNoun + ' threshold' : ''
@@ -4856,7 +4991,9 @@ const METRIC_HELP = {
       + 'SPREAD rather than the average. A tight band means the next item is predictable; a '
       + 'long tail means it is a lottery however good the typical case looks, and that is what '
       + 'makes a forecast wide. Dots are translucent, so several items finishing on one day at '
-      + 'the same speed show as a darker mark rather than as one.' },
+      + 'the same speed show as a darker mark rather than as one. Point at one and it names '
+      + 'the item \u2014 its issue key if your paste had a Key column, and otherwise its work '
+      + 'type and the date it finished.' },
   itemAge: { title: 'Work Item Age',
     body: 'What do I do today? Every item still in progress, plotted at the age it has '
       + 'reached so far \u2014 not how long it took, because none of these has finished. '
@@ -4869,9 +5006,12 @@ const METRIC_HELP = {
       + '\u201cit looks old\u201d \u2014 it is very unlikely to finish normally now, and it '
       + 'is the one to talk about first. Columns are work types, because a board where the '
       + 'defects age and the stories do not is a different problem from one where '
-      + 'everything ages. The dots carry no ticket number: this app never stores one. '
-      + 'Point at a dot and it gives you the work type and the start date, which is what '
-      + 'finds the item again in the export you pasted.' },
+      + 'everything ages. Point at a dot and it names the item: its issue key if your '
+      + 'paste had a Key column, and otherwise its work type and start date, which is '
+      + 'what finds it again in the export you pasted. The key is the ONLY thing out of '
+      + 'your work system this app keeps \u2014 no summary, no status, no names \u2014 and '
+      + 'it is checked against the shape of a key rather than trimmed to fit, so a '
+      + 'mismapped column stores nothing at all.' },
   forecastWhen: { title: 'Time to Finish',
     body: 'When will a batch of work be done? It deals this team\u2019s own completed '
       + 'periods out again at random ' + FORECAST_TRIALS.toLocaleString() + ' times, and '
@@ -5001,7 +5141,7 @@ function renderTeamRows() {
    all rather than fixed to the order things were added in: teams are listed in
    the header picker and down the All Teams table in this order, and ARTs are the
    order their groups appear in. Reordering permutes an array that was always
-   there, so it stores and syncs with no new field and no schema bump.
+   there, so it stores with no new field and no schema bump.
 
    Ends are disabled rather than hidden — a button that vanishes at the top of
    the list makes the row jump and moves the delete under the pointer. */
@@ -5747,6 +5887,12 @@ function renderDataTable() {
   const body = sorted.map(r => {
     const ct = cycleTimeOf(r, sameDay, workingDays);
     return '<tr>' +
+      /* Escaped like every other value that reaches innerHTML, even though
+         cleanIssueKey has already made markup impossible — the house rule is
+         that nothing is trusted at this boundary because it was trusted at an
+         earlier one, and the day someone loosens that regex this line is what
+         is still standing. */
+      '<td>' + (escapeHtml(r.key) || '<span class="hint">—</span>') + '</td>' +
       '<td>' + (r.completed ? isoOf(r.completed) : '<span class="hint">in progress</span>') + '</td>' +
       '<td>' + (r.started ? isoOf(r.started) : '<span class="hint">—</span>') + '</td>' +
       '<td>' + (r.created ? isoOf(r.created) : '<span class="hint">—</span>') + '</td>' +
@@ -5785,6 +5931,13 @@ function renderDataTable() {
    only happens to sort right because it is written year-first. */
 function dataColumns(bucket, bucketHead) {
   return [
+    /* First, because it is the item's name and a name goes at the front of a
+       row. It sorts ASCENDING on its first press, the one column here that
+       does: every other heading has a most-interesting end (the newest date,
+       the longest cycle time) and this one has none — it is a list you scan for
+       a key you already have in mind. Sorted by issueSortKey, so a mixed-project
+       paste groups by project and then runs in issue-number order. */
+    { key: 'item', label: 'Item', desc: false, get: r => issueSortKey(r.key) },
     { key: 'completed', label: 'Completed', desc: true, get: r => r.completed && r.completed.getTime() },
     { key: 'started', label: 'Started', desc: true, get: r => r.started && r.started.getTime() },
     { key: 'created', label: 'Created', desc: true, get: r => r.created && r.created.getTime() },
@@ -5796,6 +5949,19 @@ function dataColumns(bucket, bucketHead) {
     { key: 'period', label: bucketHead, num: true, desc: true,
       get: r => r.completed && r.completed.getTime() }
   ];
+}
+
+/* What the Item column sorts on. A plain text sort would put DAE-10 between
+   DAE-1 and DAE-9, which is the one thing a column of issue numbers must not
+   do, so the number is zero-padded to the six digits cleanIssueKey caps it at,
+   with the project prefix left in front to group by. Safe to split on the dash
+   without checking for one: a stored key has passed ISSUE_KEY_RE, which allows
+   exactly one. Null for a row with no key, which the sort already puts last
+   whichever way the column runs. */
+function issueSortKey(key) {
+  if (!key) return null;
+  const dash = key.indexOf('-');
+  return key.slice(0, dash) + '-' + key.slice(dash + 1).padStart(6, '0');
 }
 
 function escapeHtml(s) {
@@ -6219,8 +6385,10 @@ function closeOnBackdropClick(dlg) {
     startedOutside = false;
   });
 }
-/* Every dialog except the sync reconciliation one, which deliberately refuses
-   to be dismissed — picking which copy of your data to keep has to be a choice. */
+/* Every dialog in the app. There used to be one exception — the sync
+   reconciliation dialog, which refused to be dismissed because picking which
+   copy of your data to keep had to be a choice — and it went with sync on
+   2026-08-20, so the rule is now simply "every dialog". */
 ['dataDialog', 'clearDialog', 'helpDialog', 'manageDialog'].forEach(id => closeOnBackdropClick($(id)));
 
 /* theme */
@@ -6320,6 +6488,15 @@ function showParseNote(res, mode, team) {
       ? ', <strong>' + colName(res.columns.created) + '</strong> as the created date' : '') +
     ' and <strong>' + colName(res.columns.type) + '</strong> as the work type; ' +
     'dates as <strong>' + (res.dateOrder === 'mdy' ? 'month first' : 'day first') + '</strong>.' +
+    /* Stated every time, both ways round, for the same reason the date columns
+       are: this is the one field that is an identifier out of a work system, so
+       whether it was saved is not something to leave anyone guessing at. */
+    (res.columns.key >= 0
+      ? '<br>Read <strong>' + colName(res.columns.key) + '</strong> as the issue key, and saved it '
+        + 'with each item — it names the dots on the charts. Only that shape is kept: '
+        + 'letters, a dash and digits. Anything else in that column is dropped.'
+      : '<br>No issue key in this paste. Add a <em>Key</em> column to name the items on '
+        + 'the charts; without one they are named by their work type, as before.') +
     /* The two-column case: Created is standing in as the start date, which is
        what this app has always done with it. Lead time then equals cycle time,
        and that needs saying before someone reads it as a finding. */
@@ -6509,7 +6686,7 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
   $(id).addEventListener('input', e => {
     /* The same caps normalizeSettings applies on the way back in, because
        save() serialises this live object straight to localStorage and the
-       cloud: maxlength stops ordinary typing past 120, but not a paste, and
+       outside: maxlength stops ordinary typing past 120, but not a paste, and
        the number inputs' min attributes don't stop a typed minus sign. Aged
        days floors at 1 to match derive(), which treats 0 as "use the default"
        — without the floor the box could say 0 while the charts say 14. */
@@ -6567,10 +6744,10 @@ $('btnResetSettings').addEventListener('click', () => {
 });
 
 /* ── Backup and restore ─────────────────────────────────────────────────────
-   The file is the same shape that goes to localStorage and the cloud, plus a
+   The file is the same shape that goes to localStorage, plus a
    little provenance. Keeping it identical to serializeState() means a restore
-   can go through hydrateState() — the very same sanitising a synced copy gets,
-   so a hand-edited backup can't smuggle in an id that a synced copy couldn't.
+   can go through hydrateState() — the very same sanitising a share link gets,
+   so a hand-edited backup can't smuggle in an id that a link couldn't.
 
    What is deliberately NOT in the file: your theme, and which team you were
    looking at. Both are positions on this device rather than data, for the same
@@ -6837,11 +7014,15 @@ $('importFile').addEventListener('change', (e) => {
       + `This replaces the ${plural(now.teams, 'team')} and ${plural(now.items, 'item')} in this browser. `
       + `There is no undo.`;
     if (!confirm(msg)) { e.target.value = ''; return; }
-    /* tdAdopt is the cloud's path in and deliberately doesn't push — a copy that
-       came from the cloud has no business being sent back. A restore from a file
-       is the opposite case: this device now holds the newest copy, so it has to
-       be stamped and pushed like any other edit. */
-    window.tdAdopt(parsed);
+    /* tdAdopt can DECLINE — it asks before letting a file that has lost its
+       created dates or issue keys overwrite a browser that still has them, and
+       a Cancel there means nothing was restored. Reporting success regardless
+       would be the worst kind of wrong: the reassuring message is the only
+       thing the reader has to go on. It says so itself in that case.
+
+       save() rather than persist() because a restore IS an edit — the user
+       chose this file over what was here. */
+    if (!window.tdAdopt(parsed)) { e.target.value = ''; return; }
     save();
     window.toast(`Backup restored — ${plural(inc.teams, 'team')}, ${plural(inc.items, 'item')}`);
     e.target.value = '';
@@ -6877,12 +7058,9 @@ $('clearBtn').addEventListener('click', () => {
     `This deletes ${plural(c.teams, 'team')} and ${plural(c.items, 'item')}. Your settings and `
     + `your theme are kept. There is no undo — a downloaded backup is the only way to get any `
     + `of it back.`;
-  /* Said plainly, because "clear this browser" and "clear every device I own"
-     are very different acts and the button looks identical either way. */
-  const signedIn = typeof window.tdSignedIn === 'function' && window.tdSignedIn();
-  $('clearSyncWarn').textContent = signedIn
-    ? 'You are signed in, so this also clears the copy in your Google account. Your other devices will ask before clearing themselves.'
-    : '';
+  /* No "…and every device you own" line any more: since sync was removed there
+     is exactly one copy of this data and it is the one in this browser, which
+     is what the sentence above already says. */
   openModal(clearDialog);
 });
 
@@ -6891,12 +7069,8 @@ $('clearCancel').addEventListener('click', () => clearDialog.close());
 $('clearConfirm').addEventListener('click', () => {
   state.teams = [{ id: newId(), name: 'My team', rows: [] }];
   view.activeTeamId = state.teams[0].id;   // the team it pointed at no longer exists
-  save();                 // the one write path, so this pushes to the cloud too
+  save();
   saveView();
-  /* …but save() debounces its push, and a delete must not sit in that window:
-     clearing then closing the tab inside 1.2s would leave the cloud copy intact,
-     to resurrect everything on the next sign-in. */
-  if (window.cloudFlush) window.cloudFlush();
   clearDialog.close();
   $('parseNote').innerHTML = '';
   renderAll();
@@ -6952,7 +7126,7 @@ function outsideWindow(row, cutoff, wip) {
 
    The whole payload rides in the URL fragment. Everything after '#' is never
    sent to a server, so the figures reach the recipient without GitHub Pages,
-   Firebase or anyone else seeing them — no account, no network, no rules.
+   anyone else seeing them — no account, no network, no rules.
 
    Format: '#share=<marker>.<base64url>' where marker 1 is deflate-raw and 0 is
    plain JSON (CompressionStream is missing on older Safari, and an
@@ -7086,7 +7260,7 @@ async function openSharedView() {
     shareMeta = { sharedAt: p.sharedAt, label: p.label, from: p.from };
     /* A link is the least trusted input the app has — it arrives from someone
        else by definition. hydrateState() is the same sanitising boundary a
-       synced copy crosses: hostile ids are replaced, settings normalised. */
+       backup file crosses: hostile ids are replaced, settings normalised. */
     state = hydrateState(p);
     if (!state.teams.length) throw new Error('empty payload');
     view.activeTeamId = state.teams[0].id;
@@ -7486,10 +7660,13 @@ window.TDCleanup = { historyAnchor, outsideWindow, windowCutoff };
                  for reading p85 rather than the average) · nine items in flight
                  with five of them past the ageing threshold · a defect rate
                  twice Kingfisher's.
-     Wagtail     a newer team with FOUR MONTHS of history and NO CREATED DATES,
+     Wagtail     a newer team with FOUR MONTHS of history, NO CREATED DATES and
+                 NO ISSUE KEYS,
                  so the lead-time chart's "this needs a created column" face is
-                 reachable, and so the date window has a team it visibly runs
-                 past. Also proves each team's data stands alone.
+                 reachable, the parse report's "no issue key in this paste" note
+                 is too, the charts' type-named tooltips have a team that shows
+                 them, and the date window has a team it visibly runs past. Also
+                 proves each team's data stands alone.
 
    WORKING DAYS is a setting rather than a team, so what makes it reachable here
    is that the dates cover the WHOLE WEEK: completions land on any day, so
@@ -7516,18 +7693,19 @@ window.TDCleanup = { historyAnchor, outsideWindow, windowCutoff };
 
 /* The teams, as profiles rather than as thousands of literal rows. `weeks` of
    history at `perWeek` completions each; `cycle` days from start to finish, with
-   `tailChance` of the item instead taking `tail` days — that tail is the whole
+   `key` is the project prefix its issue keys carry, or absent for a team whose
+   export has no key column at all. `tailChance` of the item instead taking `tail` days — that tail is the whole
    reason the 85th percentile is the headline figure. `wait` is the days a ticket
    sat before anyone started it, which is what lead time measures over and above
    cycle time. `wip` lists the ages, in days, of the items still in flight: any
    past the 14-day default is aged work. `types` is a weighted bag. */
 const DEMO_TEAMS = [
-  { name: 'Team Kingfisher', seed: 20260819, dated: true, art: true,
+  { name: 'Team Kingfisher', seed: 20260819, dated: true, art: true, key: 'KFR',
     weeks: 40, perWeek: [4, 7], cycle: [2, 6], tailChance: 0.05, tail: [8, 14],
     wait: [1, 4], wip: [3, 5, 8, 11],
     types: ['Story', 'Story', 'Story', 'Story', 'Story', 'Story',
             'Task', 'Task', 'Bug', 'Spike'] },
-  { name: 'Team Heron', seed: 71104, dated: true, art: true,
+  { name: 'Team Heron', seed: 71104, dated: true, art: true, key: 'HRN',
     weeks: 40, perWeek: [3, 6], cycle: [3, 8], tailChance: 0.18, tail: [22, 48],
     wait: [2, 9], wip: [4, 9, 13, 17, 21, 26, 31, 38, 45],
     /* A twenty-slot bag so the defect share can be tuned finer than tenths — the
@@ -7573,14 +7751,31 @@ function demoPaste(profile) {
   const iso = (offset) => new Date(midnight + (offset - (profile.stale || 0)) * DAY_MS)
     .toISOString().slice(0, 10);
 
+  /* Issue keys, where the profile has a project prefix. NOT drawn from rnd():
+     the sequence is seeded and every pinned figure in the demo depends on it,
+     so a new field that consumed a draw would silently move Heron's tail and
+     Kingfisher's aged count. A plain counter also gives the demo what a real
+     board has — numbers that climb with time, since the loops below run oldest
+     first, so the newest item has the highest number exactly as it would in
+     Jira. Wagtail has no prefix and so no Key column at all, the same way it
+     has no Created column: a paste without one has to stay a case the app is
+     shown handling, and it is what makes the "no issue key in this paste" note
+     and the type-named tooltips reachable from the demo. */
+  let nextKey = 1000;
+  const key = () => profile.key + '-' + (nextKey++);
+
   /* Wagtail's paste has no Created column at all, rather than a column of blanks:
      a team that has never exported one is the case lead time has to handle, and
      detectColumns() should be seeing the three-column shape it would really get. */
-  const row = (created, started, completed, type) => (profile.dated
-    ? [created, started, completed, type] : [started, completed, type]).join('\t');
+  const row = (created, started, completed, type) => {
+    const cells = profile.dated ? [created, started, completed, type]
+                                : [started, completed, type];
+    return (profile.key ? [key()].concat(cells) : cells).join('\t');
+  };
 
-  const lines = [profile.dated ? 'Created\tIn Progress\tResolved\tIssue Type'
-                               : 'In Progress\tResolved\tIssue Type'];
+  const lines = [((profile.key ? 'Issue key\t' : '')
+                  + (profile.dated ? 'Created\tIn Progress\tResolved\tIssue Type'
+                                   : 'In Progress\tResolved\tIssue Type'))];
 
   for (let w = profile.weeks; w >= 1; w--) {
     const n = between(profile.perWeek[0], profile.perWeek[1]);
@@ -7668,12 +7863,10 @@ addEventListener('hashchange', () => {
 });
 
 if (viewOnly) {
-  /* Everything that writes, imports, shares or signs in belongs to whoever owns
-     the data, not to a visitor. Theme stays — that's the viewer's own
-     preference, in its own key. syncBtn is hidden from here rather than left to
-     the sync module, which is deferred — a visitor shouldn't see a sign-in
-     button that then vanishes. */
-  ['manageBtn', 'dataBtn', 'shareBtn', 'syncBtn'].forEach(id => { $(id).hidden = true; });
+  /* Everything that writes, imports or shares belongs to whoever owns the data,
+     not to a visitor. Theme stays — that's the viewer's own preference, in its
+     own key. */
+  ['manageBtn', 'dataBtn', 'shareBtn'].forEach(id => { $(id).hidden = true; });
   $('tab-data').hidden = true;
   $('tab-settings').hidden = true;
   $('privacyNote').textContent = 'This is a read-only copy someone shared with you. It was '
@@ -7701,519 +7894,17 @@ if (viewOnly) {
 }
 </script>
 
-<script type="module">
-/* ───────────────────────── Optional cross-device sync ─────────────────────────
-   Google sign-in + one Firestore document per user, ported from Sprint Velocity.
-   The config below is Firebase's *public client config*, not a secret — access is
-   enforced by the Firestore security rules (see firestore.rules), not by this key.
+<!-- ── Cross-device sync: REMOVED 2026-08-20 ─────────────────────────────────
+     A Firebase/Firestore module sat here, with Google sign-in through Google
+     Identity Services, and it is gone on purpose rather than broken: this app
+     holds figures taken from a work system, and the only copy of them is now
+     the one in this browser. Nothing in the page reaches the network any more —
+     the CSP at the top says so in the one place a browser will enforce it.
 
-   While FIREBASE_CONFIG is null the sync button is hidden and the app is 100%
-   local; the README has the five console steps that turn it on. localStorage
-   stays the source of truth either way — the cloud only ever mirrors it.
-
-   The first time a given Google account syncs in a given browser, if both sides
-   already hold data the user is *asked* which to keep rather than the code
-   guessing by timestamp; that guesswork once wiped a browser's data in the
-   sibling app. After that first reconciliation, and for live updates arriving
-   from another device, the newer side by 'td-updated' wins — except that an
-   empty copy never silently beats one with data in it. startSync() has the
-   full rule. */
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDLVKHBFVlCOT6aI-p6CusbJS1ZazG7rFo",
-  authDomain: "teamdashboard-6723f.firebaseapp.com",
-  projectId: "teamdashboard-6723f",
-  storageBucket: "teamdashboard-6723f.firebasestorage.app",
-  messagingSenderId: "158011010857",
-  appId: "1:158011010857:web:df0fca1be501f079c59138"
-};
-
-/* ── Why sign-in doesn't use Firebase's popup ───────────────────────────────
-   authDomain above is still required by the SDK, but nothing in this app loads
-   it any more. Firebase's signInWithPopup opens the popup at
-   <project>.firebaseapp.com/__/auth/handler and only redirects to Google from
-   there, so a proxy that blocks that first hop kills sign-in outright. On one
-   corporate network the handler died at the proxy and signing in was impossible.
-
-   Worth knowing precisely, because the obvious conclusion is wrong: the block is
-   per *hostname*, not on firebaseapp.com as a whole. On the same network on the
-   same day, this project's hostname and a sibling app's were both refused while
-   a third sibling's went through untouched — same code, same SDK, three
-   projects created within days of each other. Whichever way a filter happens to
-   categorise a given hostname is outside our control and can change, so "our
-   other apps are fine" is not evidence that this one will be.
-
-   So sign-in goes through Google Identity Services instead: a popup straight to
-   accounts.google.com returns an OAuth access token, and Firebase exchanges it
-   for a session via signInWithCredential. Same Google account, same Firestore
-   data, same rules — only the doorway changed. accounts.google.com is a
-   mainstream Google domain and isn't blocked in the same way.
-
-   ⚠️ GOOGLE_CLIENT_ID is NOT part of FIREBASE_CONFIG and can't be read from it.
-   Get it from Google Cloud Console → APIs & Services → Credentials → the OAuth
-   2.0 Client ID named "Web client (auto created by Google Service)". The same
-   screen must list this app's origin under "Authorized JavaScript origins"
-   (https://eagleadams86.github.io, plus the exact localhost origin you serve
-   from) or Google refuses the token request with origin_mismatch. Origins match
-   exactly, port included — localhost and localhost:5000 are different origins.
-   README has the full walkthrough. */
-const GOOGLE_CLIENT_ID = "158011010857-epd5u3i177ojj0vjo0qoqbra9mri1oto.apps.googleusercontent.com";
-
-const SDK = 'https://www.gstatic.com/firebasejs/12.17.1/';
-const GIS = 'https://accounts.google.com/gsi/client';
-const btn = document.getElementById('syncBtn');
-const privacyNote = document.getElementById('privacyNote');
-const localTs = () => Number(localStorage.getItem('td-updated') || 0);
-
-/* ── Which copy is newer ──────────────────────────────────────────────────────
-   This used to be decided by comparing two devices' wall clocks: the pushing
-   device wrote its own Date.now() as updatedAt, and the receiving device
-   compared that against its own last-edit stamp. Nothing reconciled the two
-   clocks, so a laptop and a virtual desktop a few minutes apart could each
-   conclude the other's newer change was older — and the "loser" then pushed its
-   staler copy over the newer one on its next sign-in. That is how one device
-   ends up holding Created dates the other has never seen.
-
-   Ordering now comes from the Firestore server's clock, which both devices
-   share. Each device records the serverAt of the version it currently holds and
-   compares incoming writes against that, rather than against anything local.
-
-   The device id exists so a device can recognise its own write coming back:
-   serverTimestamp() only resolves once the server has it, so our own push
-   returns to us as a snapshot that would otherwise look like news. */
-const SERVER_AT_KEY = 'td-server-at';
-const localServerAt = () => Number(localStorage.getItem(SERVER_AT_KEY) || 0);
-const setServerAt = (ms) => { if (ms) localStorage.setItem(SERVER_AT_KEY, String(ms)); };
-
-function deviceId() {
-  let id = localStorage.getItem('td-device-id');
-  if (!id) {
-    id = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    localStorage.setItem('td-device-id', id);
-  }
-  return id;
-}
-
-/* Null while a write is still pending — the server hasn't stamped it yet — and
-   absent entirely on a document written by a build that predates this. */
-const serverMillis = (r) => (r && r.serverAt && typeof r.serverAt.toMillis === 'function')
-  ? r.serverAt.toMillis() : 0;
-
-/* Server time decides whenever both sides know it. Until then — a document
-   written by an older build, or the first run on this device after upgrading —
-   fall back to the old clock rule, which is no worse than what it replaces.
-   One push from each device is enough to leave the fallback behind for good. */
-function remoteIsNewer(r) {
-  const rs = serverMillis(r), ls = localServerAt();
-  if (rs && ls) return rs > ls;
-  return r.updatedAt > localTs();
-}
-
-/* The button ships visible and signed-out in the markup so the header is its
-   final width at first paint. It's taken away only when sync genuinely can't
-   run — no config, no client ID, a failed SDK load, or a shared view. A shared
-   view must not start sync at all: if the visitor happens to be signed in,
-   onAuthStateChanged would fire startSync() and tdAdopt() would replace the
-   shared payload with their own cloud copy — and push it straight back out. */
-
-/* tests.html loads this page in a hidden iframe (marked data-td-tests) to reach
-   the pure functions. The harness must not boot a real session: if this origin
-   had ever signed in, onAuthStateChanged would fire inside the invisible iframe
-   and sync — or a reconciliation dialog nobody can see — would run mid-test. */
-let inTestHarness = false;
-try { inTestHarness = !!(window.frameElement && window.frameElement.hasAttribute('data-td-tests')); }
-catch (e) { /* cross-origin parent — not the harness */ }
-
-if (FIREBASE_CONFIG && GOOGLE_CLIENT_ID && !window.tdViewOnly && !inTestHarness) {
-  init().catch((e) => { console.warn('Sync unavailable:', e); btn.hidden = true; });
-} else {
-  if (!GOOGLE_CLIENT_ID) console.warn('Sync unavailable: GOOGLE_CLIENT_ID is not set.');
-  btn.hidden = true;
-}
-
-let A, Fs, auth, db, user = null, unsub = null, pushTimer = null, tokenClient = null;
-
-/* The classic script above can't see `user` (this is a module), and the
-   delete-all dialog has to tell the truth about whether deleting reaches the
-   user's other devices. Same hook as Golf Handicap's ghSignedIn. */
-window.tdSignedIn = () => !!user;
-
-/* Google's sign-in client is a classic script, not a module — it hangs
-   window.google off the page once it's in. Resolves as soon as that's true. */
-function loadGis() {
-  return new Promise((resolve, reject) => {
-    if (window.google?.accounts?.oauth2) return resolve();
-    const s = document.createElement('script');
-    s.src = GIS; s.async = true; s.defer = true;
-    s.onload = () => window.google?.accounts?.oauth2
-      ? resolve()
-      : reject(new Error('Google sign-in client loaded but exposed no oauth2 API'));
-    s.onerror = () => reject(new Error('Could not load Google sign-in client'));
-    document.head.appendChild(s);
-  });
-}
-
-async function init() {
-  const [{ initializeApp }, authMod, fsMod] = await Promise.all([
-    import(SDK + 'firebase-app.js'),
-    import(SDK + 'firebase-auth.js'),
-    import(SDK + 'firebase-firestore.js'),
-    loadGis(),
-  ]);
-  A = authMod; Fs = fsMod;
-  const app = initializeApp(FIREBASE_CONFIG);
-  /* initializeAuth rather than getAuth, to keep apis.google.com out of the page.
-     getAuth() always wires in browserPopupRedirectResolver, and on Safari, iOS
-     and mobile browsers the SDK initialises that resolver eagerly at startup —
-     which fetches https://apis.google.com/js/api.js to build the gapi iframe
-     that carries popup and redirect results back. Nothing here reads those
-     results: sign-in is signInWithCredential, and signInWithPopup and
-     signInWithRedirect are never called. CSP blocked the script, and the only
-     consequence was a red line in the console on phones and in Safari. Widening
-     script-src would have been the wrong fix — it admits a script no code reads.
-     Token refresh (securetoken.googleapis.com), sign-out and the cross-tab
-     session all run elsewhere in the SDK and never touch the resolver.
-
-     The three persistences are the ones getAuth would have set, in its order, so
-     where the session is stored and how tabs see each other are unchanged.
-
-     ⚠️ signInWithPopup, signInWithRedirect and phone sign-in now fail with
-     auth/argument-error. If one is ever wanted, pass browserPopupRedirectResolver
-     to that call — don't go back to getAuth() and reintroduce this at startup. */
-  auth = A.initializeAuth(app, {
-    persistence: [A.indexedDBLocalPersistence, A.browserLocalPersistence, A.browserSessionPersistence],
-  });
-  db = Fs.getFirestore(app);
-  A.onAuthStateChanged(auth, (u) => {
-    user = u;
-    syncError = null;                 /* a change of who's signed in starts clean */
-    updateUI();
-    if (unsub) { unsub(); unsub = null; }
-    if (u) startSync().catch((e) => setSyncError(e));
-  });
-  /* Built once, reused for every sign-in. requestAccessToken() must be called
-     from inside the click handler or the browser treats the popup as unsolicited
-     and blocks it. */
-  tokenClient = window.google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: 'openid email profile',
-    callback: (resp) => {
-      if (!resp || !resp.access_token) { onSignInFailed(resp); return; }
-      /* null id_token: Firebase accepts an OAuth access token on its own and
-         reads the profile from it. */
-      const cred = A.GoogleAuthProvider.credential(null, resp.access_token);
-      A.signInWithCredential(auth, cred).catch(onSignInFailed);
-    },
-    error_callback: (err) => {
-      /* Closing the popup is a normal thing to do, not a failure worth a toast. */
-      if (err && /popup_closed|user_cancel/.test(String(err.type))) return;
-      onSignInFailed(err);
-    },
-  });
-  btn.addEventListener('click', onClick);
-}
-
-function onSignInFailed(e) {
-  console.warn('sign-in error', e);
-  const s = String((e && (e.type || e.code || e.message)) || e || '');
-  if (s.includes('origin_mismatch') || s.includes('idpiframe') || s.includes('invalid_client')) {
-    window.toast('Sign-in rejected — this site isn’t an authorised origin for the Google client');
-  } else if (s.includes('popup_failed_to_open')) {
-    window.toast('Sign-in popup was blocked — allow popups for this site and try again');
-  } else {
-    window.toast('Sign-in failed — check the Firebase setup');
-  }
-}
-
-/* ── Saying so when sync stops working ──────────────────────────────────────
-   Every failure path here could have ended at console.warn, which nobody has
-   open — the app would go on looking signed in while nothing had left the
-   browser for weeks. Nothing is ever lost when this happens (localStorage is
-   the source of truth), but "your data is safe" and "your data is synced" are
-   different promises and the header should only make the one that's true.
-
-   There is deliberately no retry button: Firestore retries the transient causes
-   itself, and the ones it can't retry aren't fixed by pressing anything. Every
-   save attempts a push, so the state clears itself when sync genuinely works
-   again. */
-let syncError = null;
-
-function describeSyncError(e) {
-  const code = String((e && e.code) || e || '');
-  /* Firestore reports two unrelated things as invalid-argument: a document over the
-     1 MiB cap, and a value it can't store (an `undefined` anywhere in the object).
-     This branch used to assume the first, so an app bug would have told the user to
-     delete a team — the worst advice this app is capable of giving. The size wording
-     is now used only when Firestore's own message says size; anything else says the
-     fault is here, and asks for nothing to be deleted. */
-  if (code.includes('invalid-argument')) {
-    const detail = String((e && e.message) || '');
-    if (/maximum allowed size|exceeds|too large|longer than|bytes/i.test(detail)) return {
-      reason: 'There’s more data here than can be synced in one go.',
-      fix: 'Delete a team you no longer need — sync picks up again on the next change.' };
-    return {
-      reason: 'The cloud refused this copy of your data — that’s a fault in the app, not in what you entered.',
-      fix: 'Nothing is lost: everything is still here and still saved. Reloading the page usually clears it.' };
-  }
-  if (code.includes('permission-denied') || code.includes('unauthenticated')) return {
-    reason: 'Google refused the sign-in for this data.',
-    fix: 'Signing out and back in usually clears it.' };
-  if (code.includes('resource-exhausted')) return {
-    reason: 'This project has hit its daily sync limit.',
-    fix: 'It resets tomorrow; nothing is lost in the meantime.' };
-  if (code.includes('unavailable') || code.includes('deadline-exceeded')) return {
-    reason: 'Couldn’t reach Google just now.',
-    fix: 'It should sort itself out — the next change will try again.' };
-  return { reason: 'Sync has stopped working.',
-    fix: 'The next change will try again. If it keeps up, sign out and back in.' };
-}
-
-function setSyncError(e) {
-  console.warn('sync problem', e);
-  const first = !syncError;
-  syncError = describeSyncError(e);
-  updateUI();
-  /* Announce the change of state, not every retry — each save schedules another
-     push, so a lasting problem calls this repeatedly. */
-  if (first) window.toast('⚠️ Not syncing — see the note at the foot of the page');
-}
-
-function clearSyncError() {
-  if (!syncError) return;
-  syncError = null;
-  updateUI();
-  window.toast('Syncing again ☁️');
-}
-
-function updateUI() {
-  if (user && syncError) {
-    btn.textContent = '⚠️ Not syncing';
-    btn.dataset.state = 'error';
-    btn.title = syncError.reason + ' ' + syncError.fix;
-    privacyNote.textContent = `⚠️ Not syncing — ${syncError.reason} Everything is still saved in `
-      + `this browser, but your other devices aren’t getting it. ${syncError.fix}`;
-  } else if (user) {
-    btn.textContent = `☁️ ${user.displayName ? user.displayName.split(' ')[0] : user.email}`;
-    delete btn.dataset.state;
-    btn.title = 'Syncing across your devices — click to sign out';
-    privacyNote.textContent = `☁️ Signed in as ${user.email} — your teams sync privately to your own account and still work offline.`;
-  } else {
-    btn.textContent = '☁️ Sign in to sync';
-    delete btn.dataset.state;
-    btn.title = 'Sign in with Google to see the same data on all your devices';
-    privacyNote.textContent = '🔒 Private — your data is stored in this browser only. No account needed. Sign in with Google if you want the same teams on your other devices.';
-  }
-}
-
-async function onClick() {
-  if (user) {
-    if (confirm('Sign out? The app keeps working with the local copy on this device.')) A.signOut(auth);
-    return;
-  }
-  /* Everything after this happens in the token client's callbacks — the popup
-     goes to accounts.google.com and comes back with a token, and onAuthStateChanged
-     picks it up from there. No redirect fallback is needed: unlike Firebase's
-     hosted handler, this popup works on mobile Safari. */
-  tokenClient.requestAccessToken();
-}
-
-const docRef = () => Fs.doc(db, 'teamdashboard', user.uid);
-
-/* Resolves true to keep Google's copy, false to keep this device's. The dialog
-   can't be dismissed — Escape is swallowed below and it isn't on the
-   backdrop-close list — because which copy of your data survives has to be an
-   explicit choice, not a default reached by clicking away. */
-function chooseSyncSource(local, remote, remoteUpdatedAt) {
-  return new Promise((resolve) => {
-    const dlg = document.getElementById('syncChoiceDialog');
-    const body = document.getElementById('syncChoiceBody');
-    const when = remoteUpdatedAt ? new Date(remoteUpdatedAt).toLocaleString() : 'an earlier sign-in';
-    const l = window.tdCounts(local), r = window.tdCounts(remote);
-    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-    body.textContent =
-      `This device has ${plural(l.teams, 'team')} and ${plural(l.items, 'item')} saved. `
-      + `Your Google account already has ${plural(r.teams, 'team')} and ${plural(r.items, 'item')} `
-      + `(last updated ${when}). Pick which to keep — the other copy will be replaced.`;
-    const deviceBtn = document.getElementById('syncKeepDeviceBtn');
-    const googleBtn = document.getElementById('syncKeepGoogleBtn');
-    const preventCancel = (e) => e.preventDefault();
-    function finish(keepGoogle) {
-      deviceBtn.removeEventListener('click', onDevice);
-      googleBtn.removeEventListener('click', onGoogle);
-      dlg.removeEventListener('cancel', preventCancel);
-      dlg.close();
-      resolve(keepGoogle);
-    }
-    const onDevice = () => finish(false);
-    const onGoogle = () => finish(true);
-    deviceBtn.addEventListener('click', onDevice);
-    googleBtn.addEventListener('click', onGoogle);
-    dlg.addEventListener('cancel', preventCancel);
-    openModal(dlg);
-  });
-}
-
-/* Stamps this device's copy as the newest. "Keep this device's data" has to
-   actually win everywhere, and pushNow() sends the timestamp the local copy
-   already carries — which, when the cloud is what looked newer, is the older
-   of the two. Without this the choice sticks here and nowhere else. */
-const touchLocal = () => localStorage.setItem('td-updated', String(Date.now()));
-
-/* Reconciling the two copies at sign-in.
-
-   The rule underneath all four branches: an empty copy never beats a copy with
-   data in it, whatever the timestamps say. Timestamp-wins on its own has a hole
-   that costs real data — signing in on a fresh browser pushes that browser's
-   empty state stamped `now`, and the device that actually holds the teams, with
-   an older stamp because it was last edited days ago, would take the empty copy
-   as "newer" and empty itself.
-
-   With that rule the dialog is only needed for the genuine conflict: both sides
-   hold data and neither is obviously right. Once per account per browser. */
-async function startSync() {
-  const snap = await Fs.getDoc(docRef());
-  const remote = snap.exists() ? snap.data() : null;
-  const local = window.tdGet();
-  const remoteHas = !!(remote && window.tdHasData(remote.data));
-  const localHas = window.tdHasData(local);
-  const firstSyncForAccount = localStorage.getItem('td-sync-uid') !== user.uid;
-
-  if (remoteHas && localHas && firstSyncForAccount) {
-    const keepGoogle = await chooseSyncSource(local, remote.data,
-      serverMillis(remote) || remote.updatedAt);
-    if (keepGoogle) {
-      /* tdAdopt can still decline — its Created-dates guard asks separately,
-         and its "kept this device's" answer toasts and pushes for itself. Two
-         toasts announcing opposite outcomes must not race. */
-      if (window.tdAdopt(remote.data, remote.updatedAt)) {
-        setServerAt(serverMillis(remote));
-        window.toast('Loaded your teams from the cloud ☁️');
-      }
-    } else {
-      touchLocal();
-      await pushNow();
-      window.toast('Kept this device’s data');
-    }
-  } else if (remoteHas && !localHas) {
-    window.tdAdopt(remote.data, remote.updatedAt);      /* nothing here to lose */
-    setServerAt(serverMillis(remote));
-    window.toast('Loaded your teams from the cloud ☁️');
-  } else if (localHas && !remoteHas) {
-    await pushNow();     /* the cloud copy is empty; it doesn't get to win */
-  } else if (remoteHas && remoteIsNewer(remote)) {
-    if (window.tdAdopt(remote.data, remote.updatedAt)) {
-      setServerAt(serverMillis(remote));
-      window.toast('Loaded your teams from the cloud ☁️');
-    } else {
-      await pushNow();       /* kept this device's copy — put it back on top */
-    }
-  } else {
-    await pushNow();
-  }
-  localStorage.setItem('td-sync-uid', user.uid);
-
-  unsub = Fs.onSnapshot(docRef(), (s) => {
-    if (s.metadata.hasPendingWrites || !s.exists()) return;
-    const r = s.data();
-    /* Our own push, now stamped by the server. Nothing to adopt — the data is
-       already here — but this is the only place the server's clock is visible,
-       so record it: it's what the next comparison is made against. */
-    if (r.writerId && r.writerId === deviceId()) { setServerAt(serverMillis(r)); return; }
-    if (!remoteIsNewer(r)) return;
-    /* Same rule live. Clearing everything really is something people do, so this
-       asks rather than refusing — but it asks, because the alternative is a
-       device quietly emptying itself while its owner is looking at another tab. */
-    if (!window.tdHasData(r.data) && window.tdHasData(window.tdGet())) {
-      const keep = !confirm('Another device has cleared all its Flow Metrics data.\n\n'
-        + 'Clear this device too? Cancel keeps what\'s on this device and restores it '
-        + 'to your other devices.');
-      if (keep) {
-        touchLocal();
-        pushNow().catch(setSyncError);
-        window.toast('Kept this device’s data');
-        return;
-      }
-    }
-    if (window.tdAdopt(r.data, r.updatedAt)) {
-      setServerAt(serverMillis(r));
-      window.toast('Synced from another device ☁️');
-    } else {
-      /* Declined it — this device kept its own copy, so put that back on top
-         rather than leaving the other device's version as the newest. */
-      pushNow().catch(setSyncError);
-    }
-  }, (e) => {
-    /* A listener that errors is dropped by Firestore and never fires again.
-       Without this second argument, another device's updates would just stop
-       arriving with the header still saying "syncing". */
-    setSyncError(e);
-    unsub = null;
-  });
-}
-
-/* The cloud copy goes through JSON, exactly as save() writes the local one, so the
-   two are the same bytes by construction rather than nearly so.
-
-   Not tidiness: setDoc() walks the LIVE object and Firestore rejects the whole
-   document if it finds a single `undefined` anywhere in it (code invalid-argument),
-   where localStorage would simply drop that key and carry on. Sprint Velocity lost
-   sync to exactly that on 2026-08-12 — one new optional setting, absent from every
-   copy saved before it existed, written back as undefined by its id sanitiser. The
-   local copy looked perfect throughout, which is what made it hard to see. This
-   file's own boundary (sanitizeTeams / hydrateRows / normalizeSettings) rebuilds
-   fresh literals with concrete defaults and reaches no undefined today; the guard is
-   so that the next optional field can't quietly change that. */
-const forCloud = (s) => JSON.parse(JSON.stringify(s));
-
-async function pushNow() {
-  if (!user) return;
-  /* updatedAt stays for a build that predates serverAt and still orders by it;
-     serverAt is what this build compares. writerId lets us tell our own write
-     apart from another device's when it comes back on the listener. */
-  await Fs.setDoc(docRef(), {
-    data: forCloud(window.tdGet()),
-    updatedAt: localTs() || Date.now(),
-    serverAt: Fs.serverTimestamp(),
-    writerId: deviceId()
-  });
-  clearSyncError();
-}
-
-/* Called by save() on every local change; debounced so rapid edits batch up. */
-window.cloudPush = () => {
-  if (!user) return;
-  clearTimeout(pushTimer);
-  pushTimer = setTimeout(() => { pushTimer = null; pushNow().catch(setSyncError); }, 1200);
-};
-
-/* Skips the debounce. "Delete all data" calls this so the cleared state reaches
-   the cloud before the tab can be closed — otherwise the next sign-in would pour
-   everything straight back. */
-window.cloudFlush = () => {
-  if (!user) return;
-  clearTimeout(pushTimer);
-  pushTimer = null;
-  pushNow().catch(setSyncError);
-};
-
-/* The same window, closed for ordinary edits too. The debounce means "edit, then
-   close the tab inside 1.2s" would leave the
-   push scheduled but never sent — localStorage has the change, the cloud
-   doesn't, and the other devices stay stale until the NEXT edit on this one.
-   Flush a pending push the moment the page is hidden; pagehide too, for the
-   paths that skip visibilitychange. Best-effort by nature — a request this late
-   in a page's life can still be cut off — but the next edit or sign-in
-   re-sends regardless, so nothing is ever lost, only late. */
-const flushPush = () => {
-  if (!user || !pushTimer) return;
-  clearTimeout(pushTimer);
-  pushTimer = null;
-  pushNow().catch(() => { /* page is going away — nowhere left to report */ });
-};
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') flushPush();
-});
-addEventListener('pagehide', flushPush);
-</script>
+     Two consequences worth knowing before anyone is tempted to put it back:
+     the Back up dialog is the ONLY way to move data between devices now, and
+     the leftover `td-sync-uid` / `td-updated` keys are cleared at boot rather
+     than left lying about (see clearSyncLeftovers). -->
 
 <!-- ── Offline ────────────────────────────────────────────────────────────────
      Registering sw.js is the whole of the offline feature on this side; the
