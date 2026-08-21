@@ -5041,6 +5041,14 @@ group('ARTs — the grouping, and the boundary it crosses');
          so the one difference that has to survive is this one. */
       ok(bg('.tile') !== win.getComputedStyle(tDoc.body).backgroundColor,
          theme + ': and still stands off the page behind it', bg('.tile'));
+      /* And the left edge is the mark, so it has to outweigh the other three.
+         Pinned as a RELATIONSHIP rather than at 6px: the number is a judgement
+         and may be tuned again, but an edge that stops being heavier than the
+         border it sits in has stopped being an edge. */
+      const edge = win.getComputedStyle(tDoc.querySelector('.tile'));
+      ok(parseFloat(edge.borderLeftWidth) > parseFloat(edge.borderTopWidth) * 2,
+         theme + ': with a left edge that reads as a mark, not as a heavy border',
+         edge.borderLeftWidth + ' against ' + edge.borderTopWidth);
     });
     themeSel.value = was;
     themeSel.dispatchEvent(new win.Event('change', { bubbles: true }));

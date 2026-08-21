@@ -98,9 +98,11 @@ headline row, they go four-across on a wide window and pair into a 2x2 on a narr
 three and a stray fourth; the group rows vary in count and are laid out by `auto-fit` instead.
 
 A tile is drawn on **the same surface as a chart card and a table** — one ground for everything
-on the page, with a border and a 4px left edge to lift it off the background, exactly as a card
-has. It used to sit a shade apart, which in Sepia read as a tan band above cream charts and
-sorted the dashboard into two tones that meant nothing.
+on the page, with a border and a left edge to lift it off the background, exactly as a card has.
+It used to sit a shade apart, which in Sepia read as a tan band above cream charts and sorted the
+dashboard into two tones that meant nothing. That edge went from 4px to **6px** in the same
+change, and for the same reason: the tile used to be told apart by its fill, and now it is told
+apart by the edge, so the edge has to be able to carry it.
 
 ### How Many Items the Window Covers
 

@@ -397,9 +397,18 @@ select { cursor: pointer; }
    charts rather than as the summary of them. It is most obvious in Sepia, where
    the two are a tan and a cream, which is where Charles reported it. What tells
    a tile from the page is what tells a card from the page — its border, plus
-   the 4px left edge this keeps. */
+   the left edge below.
+
+   THAT EDGE IS 6px, not the 4px it shipped with, and the two changes are really
+   one change. The tile used to be told apart from the card beside it by its
+   FILL; now it is told apart by this edge, so the edge has to be able to carry
+   it. 4px was the right weight for a marker on a tile that was already a
+   different colour, and on a row of tiles that are not it reads as a slightly
+   heavy border rather than as a deliberate mark. Not past 6 — beyond that it
+   stops being an edge and starts being a column, and it eats into the 14px of
+   padding the label is set against. */
 .tile { display: grid; grid-row: span 3; grid-template-rows: subgrid; align-content: start;
-  border: 1px solid var(--border); border-left-width: 4px;
+  border: 1px solid var(--border); border-left-width: 6px;
   border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface); }
 .tile .label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase;
   letter-spacing: .04em; font-weight: 600;

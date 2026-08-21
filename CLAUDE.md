@@ -257,6 +257,13 @@ summary of them.
   `.tile`, `.chart-card` and `.card` share a background and that all three still differ from the
   page behind them; it never names a hex, because those belong to the pack. A palette edit lands
   in every theme at once, which is why one theme would not have been enough.
+- **The 4px left edge went to 6px in the same change, and it is the same change.** The tile used
+  to be told apart from the card beside it by its FILL; it is told apart by that edge now, so the
+  edge has to carry it — 4px is the right weight for a marker on a tile that is already a
+  different colour, and on a row of tiles that are not it reads as a slightly heavy border.
+  **Don't go past 6**: beyond that it stops being an edge and starts being a column, and it eats
+  into the 14px of padding the label is set against. Pinned as a RELATIONSHIP (heavier than the
+  other three borders), never at 6px — the number is a judgement and may be tuned again.
 - **`.tile-help:hover` moved the other way**, `--surface` → `--surface-alt`. Every surface that
   button now sits on is `--surface` — a tile, a chart card's name row, an All Teams heading — so
   the old fill was a visible hover on a tile and no fill at all on a chart card. The one place the
