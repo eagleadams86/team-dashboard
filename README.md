@@ -238,10 +238,18 @@ three weeks ago has a trace that falls away for exactly the same reason it has a
 is a reporting problem rather than a delivery one. (The demo shows this on purpose — Wagtail has
 both the steepest fall and the oldest export.)
 
-A reload puts you back on whichever of Dashboard and All Teams you were last using. Settings and
-Your Data deliberately do not stick — those are places you go to do a thing and then leave — and a
-remembered tab that is no longer on offer (All Teams disappears below two teams) falls back to the
-dashboard.
+A reload puts you back on **whichever tab you were last using** — all four of them. A remembered
+tab that is no longer on offer (All Teams disappears below two teams) falls back to the dashboard,
+as does anything unrecognisable in a hand-edited copy.
+
+The page also **holds still while it loads**. This app is one 560KB HTML file that the browser
+paints as it parses, with the script that fills it at the foot — so for about a tenth of a second
+you used to watch an empty skeleton assemble and then everything pop in at once, and a reload on
+Settings or Your Data painted the whole dashboard first and then swapped it out. The header shows
+straight away, because everything in that row carries its final width in the markup; the rest
+appears once, complete, on the tab you left it on. If the script ever fails outright the page
+reveals itself anyway after two seconds, so a broken load is a visibly broken page rather than a
+blank one.
 
 There is deliberately **no line-per-team chart**. This view is written for somebody with eight
 teams, the shared theme pack's categorical ramp stops at five, and eight lines on one card is a

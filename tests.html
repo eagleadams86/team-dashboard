@@ -4721,14 +4721,18 @@ group('ARTs — the grouping, and the boundary it crosses');
     win.selectTab('dashboard');
     is(stored(), 'dashboard', 'and so is moving back');
 
-    /* Settings and Your Data are places you go to do a thing and then leave.
-       Opening the app in Settings would be its own small wrong-footing, so
-       neither overwrites what is remembered. */
-    win.selectTab('allteams');
+    /* ALL FOUR, which is the second half of the same report. Only the two
+       number views were remembered at first, on the reasoning that Settings and
+       Your Data are "places you go to do a thing and then leave" — true of the
+       trip, false of the refresh. Reloading to check something is not leaving,
+       and being thrown onto the dashboard mid-edit of a work-type filter costs
+       you finding your way back to the row you were typing in. */
     win.selectTab('settings');
-    is(stored(), 'allteams', 'a trip to Settings does not become where the app opens');
+    is(stored(), 'settings', 'Settings is where you are, so it is where the app opens');
     win.selectTab('data');
-    is(stored(), 'allteams', 'and neither does Your Data');
+    is(stored(), 'data', 'and so is Your Data');
+    win.selectTab('allteams');
+    is(stored(), 'allteams', 'and moving back is remembered like any other move');
 
     /* The stale-value case, which is real: All Teams is taken away below two
        teams, so a position saved while it was there outlives the team that was
@@ -4771,6 +4775,23 @@ group('ARTs — the grouping, and the boundary it crosses');
     is(doc.getElementById('panel-allteams').hidden, false,
        'the app opens on All Teams when that is where it was left');
     is(doc.getElementById('panel-dashboard').hidden, true, 'and not on the dashboard');
+    /* ── and it does not paint the wrong one on the way there ────────────────
+       This file is 560KB of markup the browser paints as it parses, with the
+       DASHBOARD panel visible in it — so a boot landing anywhere else used to
+       show the dashboard in full and then swap it out. The <head> script holds
+       the shell until the tab is chosen; these pin the flag, its reveal, and
+       the backstop that stops a thrown boot leaving a blank page for ever. */
+    is(doc.documentElement.hasAttribute('data-booting'), false,
+       'the boot hold is lifted by the time the app is ready');
+    is(f.contentWindow.getComputedStyle(doc.querySelector('.shell')).visibility, 'visible',
+       'so the shell is on screen rather than held back');
+    /* visibility, not display — a display:none canvas measures 0x0, and Chart.js
+       reads its size the moment it draws. */
+    ok(/visibility:\s*hidden/.test([...doc.styleSheets]
+         .flatMap(sh => { try { return [...sh.cssRules]; } catch (e) { return []; } })
+         .filter(r => r.selectorText && /data-booting/.test(r.selectorText))
+         .map(r => r.cssText).join(' ')),
+       'and the hold is a visibility rule, so every chart still measures its real size');
     f.remove();
     /* Put the suite's own storage back — everything after this reads it. */
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);

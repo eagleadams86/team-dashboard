@@ -241,6 +241,37 @@ this file was written to keep out. **Read this whole section before changing any
   meaning rather than a parse. Neither is built. The work item age chart's stage axis WAS
   built — off the current stage rather than off these durations; see the section above it.
 
+## The Boot Hold, and All Four Tabs (2026-08-21) — no schema change
+
+Both halves of one report from Charles: a refresh flickered badly, and a refresh on Your Data or
+Settings landed somewhere else.
+
+- **`html[data-booting] .shell { visibility: hidden }`, set in the `<head>` script beside the
+  theme and lifted by `bootDone()`.** The cause is structural rather than slow: this is 560KB of
+  markup a browser paints AS IT PARSES, with the script that fills it at the foot, so ~100ms of
+  empty skeleton assembled and then popped. Worse on the other tabs — `#panel-dashboard` is the
+  one visible in the markup, so a boot landing anywhere else painted the dashboard in full and
+  swapped it out.
+- **`visibility`, NEVER `display`.** A hidden box still has a size; a `display:none` one does not,
+  and Chart.js measures its canvas the moment it draws. Under `display:none` every chart would
+  boot at 0×0 and need re-drawing rather than resizing. Pinned, because `display:none` is the
+  obvious "tidier" edit and it would break silently — the charts would look fine after the first
+  resize.
+- **The header is deliberately NOT held.** Everything in that row already carries its final width
+  in the markup (`#teamSel` has a `—` placeholder and a 140px floor for exactly this reason), so
+  it is correct before the script runs, and hiding it would move the flicker rather than remove it.
+- **THE BACKSTOP IS PART OF THE FEATURE.** The reveal is also on a `setTimeout` set in the head
+  script itself, before anything that can throw — a boot that dies would otherwise leave a blank
+  page for ever. Two seconds: far past a normal boot (~150ms), far short of giving up. Every exit
+  calls `bootDone()` anyway — the ordinary branch after `selectTab`, `openSharedView`'s `finally`
+  (it is async, and both the teams and the error card count as something to show), and
+  `haltForNewerData`, which throws and so would never reach either.
+- **All four tabs are remembered now**, not the two number views. The old reasoning — Settings and
+  Your Data are "places you go to do a thing and then leave" — is true of the trip and false of the
+  refresh: reloading to check something is not leaving, and being thrown to the dashboard mid-edit
+  of a work-type filter costs finding your way back to the row you were typing in. No new guard
+  was needed; `selectTab` already refuses a hidden or unknown tab.
+
 ## Six Bugs Found by Reading (2026-08-21) — no schema change
 
 A read-through of the whole file after the trend column landed. Nothing here needed a stored

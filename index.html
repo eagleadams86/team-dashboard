@@ -77,6 +77,32 @@
        flag on its first pass, whichever way it then decides. */
     if (!localStorage.getItem('td-state'))
       document.documentElement.setAttribute('data-first-run', '');
+
+    /* ── Hold the page still until it has something to show ─────────────────
+       This file is 560KB of markup that the browser paints AS IT PARSES, and
+       the script that fills it runs at the foot of it. So for about a tenth of
+       a second the reader watched an empty skeleton assemble — headings over
+       blank tiles, bordered cards with nothing in them, the Loaded Data table's
+       chrome — and then everything popped in at once and the layout jumped.
+       Refreshing on Your Data or Settings was worse again: the DASHBOARD is the
+       panel that is visible in the markup, so it painted in full and was then
+       swapped out.
+
+       `visibility: hidden`, deliberately, and not `display: none`: a hidden box
+       still has a size, and Chart.js measures its canvas the moment it draws —
+       under display:none it would size every chart to 0x0 and need re-drawing
+       rather than resizing. The header is left showing: everything in that row
+       already carries its final width in the markup, so it is correct before
+       the script runs and moving it would be the flicker in another place.
+
+       THE BACKSTOP MATTERS AS MUCH AS THE FLAG. A page whose boot throws would
+       otherwise stay blank for ever, so the reveal is also on a timer set here,
+       before anything that could throw. Two seconds is far past a normal boot
+       (about 150ms) and far short of giving up on the page. */
+    document.documentElement.setAttribute('data-booting', '');
+    setTimeout(function () {
+      document.documentElement.removeAttribute('data-booting');
+    }, 2000);
   })();
 </script>
 <!-- The palette, LINKED — the same file privacy.html and tests.html already
@@ -126,6 +152,10 @@ code { font-family: var(--font-mono); font-size: 12px; }
 button, select, input, textarea { font: inherit; color: inherit; }
 
 .shell { max-width: 1500px; margin: 0 auto; padding: 0 16px 64px; }
+
+/* Boot, before the script at the foot of the page has filled anything in. See
+   the reasoning in the <head> script that sets the flag. */
+html[data-booting] .shell { visibility: hidden; }
 
 /* header — sticky, the sibling app's shape. Everything in the row carries its
    final width in the markup: the header paints long before the script at the
@@ -4404,21 +4434,25 @@ const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', act
      where a reader expects to find a team before they have asked for anything
      else. Validated at its point of use like every other view field — an
      unknown key just means no sort. */
-  /* Which of the two number views you were last on, so a reload puts you back
-     where you were working. It used to be deliberately NOT saved, on the
-     reasoning that "a reload should open on the dashboard" — but both sibling
-     apps restore theirs (Sprint Predictability keeps `settings.view`, Money Map
-     keeps `ui.activeTab`), and Sprint Predictability is the design lead for the
+  /* Which tab you were last on, so a reload puts you back where you were
+     working. It used to be deliberately NOT saved, on the reasoning that "a
+     reload should open on the dashboard" — but both sibling apps restore theirs
+     (Sprint Predictability keeps `settings.view`, Money Map keeps
+     `ui.activeTab`), and Sprint Predictability is the design lead for the
      chrome this app shares with it, so the odd one out was this. Reported as
      annoying on 2026-08-21, which it is: All Teams is where somebody with
      several teams actually works, and a refresh threw them back every time.
-
-     ONLY the two number views are remembered. Settings and Your Data are places
-     you go to do a thing and then leave, and opening the app in Settings would
-     be its own small wrong-footing. selectTab already refuses a tab that is
-     hidden or unknown and falls back to the dashboard, so nothing extra is
-     needed to make a stale value safe — All Teams disappearing below two teams
-     is exactly that case, and it was already handled. */
+     ALL FOUR TABS ARE REMEMBERED, and that is the second half of the same
+     report (2026-08-21). It shipped restoring only the two number views, on the
+     reasoning that Settings and Your Data are "places you go to do a thing and
+     then leave" — which is true of the trip and false of the refresh. Reloading
+     to check something is not leaving, and being thrown onto the dashboard
+     mid-edit of a work-type filter is the same wrong-footing the number views
+     were fixed for, with the added cost of having to find your way back to the
+     row you were typing in. A tab is where you are; the app opens where you
+     were. selectTab already refuses a tab that is hidden or unknown and falls
+     back to the dashboard, so nothing extra is needed to make a stale value
+     safe — All Teams disappearing below two teams is exactly that case. */
   activeTab: 'dashboard',
   teamSort: null, teamSortDir: 'desc',
   /* How the Loaded Data table is sorted, on the same terms: null is the order it
@@ -4469,9 +4503,20 @@ clearSyncLeftovers();
    the service-worker block also reads as window.tdViewOnly, so a halted page
    installs no worker either), draws the message with textContent because the number
    came out of storage, and THROWS so nothing further initialises. */
+/* The one place the boot hold is lifted — see the <head> script that sets it.
+   Idempotent, and safe to call from a path that has already been through it:
+   removing an attribute that is not there is not an error, and every branch
+   below calls it exactly once so nothing has to reason about which ran. */
+function bootDone() { document.documentElement.removeAttribute('data-booting'); }
+
 function haltForNewerData(found) {
   viewOnly = true;
   window.tdViewOnly = true;
+  /* The halt draws its card over everything and THROWS, so nothing further in
+     this script block runs — including whichever boot branch would otherwise
+     lift the hold. Lifted here, so the page underneath the card is the app as
+     it stands rather than an empty frame waiting on the two-second backstop. */
+  bootDone();
   const wrap = document.createElement('div');
   wrap.setAttribute('style', 'position:fixed;inset:0;z-index:99999;display:flex;'
     + 'align-items:center;justify-content:center;padding:24px;'
@@ -7649,10 +7694,10 @@ function selectTab(name) {
      that was deleted — or the share link that arrived with one team in it. */
   if (!TABS.includes(name) || $('tab-' + name).hidden) name = 'dashboard';
   activeTab = name;
-  /* Remembered for the next load — the two number views only, see DEFAULT_VIEW.
-     saveView() is a no-op in a shared view, so someone else's link can never
-     move where YOUR copy opens. */
-  if (NUMBER_TABS.includes(name) && view && view.activeTab !== name) {
+  /* Remembered for the next load — every tab, see DEFAULT_VIEW. saveView() is a
+     no-op in a shared view, so someone else's link can never move where YOUR
+     copy opens. */
+  if (view && view.activeTab !== name) {
     view.activeTab = name;
     saveView();
   }
@@ -9672,6 +9717,12 @@ async function openSharedView() {
   } catch (e) {
     console.warn('share link could not be read', e);
     renderShareError(e && e.newerVersion ? 'newer' : 'broken');
+  } finally {
+    /* Both ways out show something — the shared teams, or the error card that
+       explains the link — so the hold lifts either way. Decoding is async, which
+       is why this is the one branch where the reveal is not the last line of a
+       straight run of statements. */
+    bootDone();
   }
 }
 
@@ -10416,7 +10467,7 @@ if (viewOnly) {
   $('monthsSel').value = view.months;
   $('bucketSel').value = view.bucket;
   selectTab('dashboard');
-  openSharedView();
+  openSharedView();   /* lifts the boot hold itself — it is async */
 } else {
   loadView();
   loadState();
@@ -10431,6 +10482,9 @@ if (viewOnly) {
   /* No rows at all still wins: there is nothing for either number view to show,
      and Your Data is the one place that can do anything about it. */
   selectTab(activeRows().length ? view.activeTab : 'data');
+  /* Last, after the tab is chosen: the whole point of the hold is that the
+     reader never sees the panel this lands on being swapped for another one. */
+  bootDone();
 }
 </script>
 
