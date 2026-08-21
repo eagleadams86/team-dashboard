@@ -97,6 +97,11 @@ app has no targets, so no tile is ever coloured "good" or "bad". There being exa
 headline row, they go four-across on a wide window and pair into a 2x2 on a narrower one — never
 three and a stray fourth; the group rows vary in count and are laid out by `auto-fit` instead.
 
+A tile is drawn on **the same surface as a chart card and a table** — one ground for everything
+on the page, with a border and a 4px left edge to lift it off the background, exactly as a card
+has. It used to sit a shade apart, which in Sepia read as a tan band above cream charts and
+sorted the dashboard into two tones that meant nothing.
+
 ### How Many Items the Window Covers
 
 The window note under the date range reads **"14 weeks · 67 of 190 items (9 in progress)"** when
@@ -158,10 +163,13 @@ This app shares its look and behaviour with
 sticky header, button tabs (with arrow-key navigation), summary tiles, ⓘ help dialogs,
 read-only share links, theme picker and footer. **Each app's footer carries a button link to
 the other**, at the right-hand end of the row that holds the **Privacy policy** and **How it
-works** links. If a chrome rule changes in one app, it should change in the other too — with one
-noted exception: how many tile columns there are. This app's headline row always has exactly
+works** links. If a chrome rule changes in one app, it should change in the other too — with two
+noted exceptions. **How many tile columns there are**: this app's headline row always has exactly
 four tiles and so states its column counts outright, while the sibling's tile groups vary in
-size and are still laid out by `auto-fit` — as this app's own per-group tile rows are.
+size and are still laid out by `auto-fit` — as this app's own per-group tile rows are. And **what
+a tile is drawn on**: this app puts tiles on the same surface as its cards (see above), where the
+sibling keeps them a shade apart so that its one *hero* tile can stand out from the rest by being
+the card surface. It has a tile this app does not; the difference follows from that.
 
 ## Grouping Teams into ARTs
 

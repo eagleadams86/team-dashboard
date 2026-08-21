@@ -241,6 +241,33 @@ this file was written to keep out. **Read this whole section before changing any
   meaning rather than a parse. Neither is built. The work item age chart's stage axis WAS
   built — off the current stage rather than off these durations; see the section above it.
 
+## One Surface for the Whole Page (2026-08-21) — a divergence from the sibling
+
+`.tile` moved from `--surface-alt` to `--surface`, the ground the chart cards and the tables are
+already on. Reported by Charles looking at Sepia, where the two are a tan and a cream and the four
+headline tiles read as a band of something else sitting above the charts rather than as the
+summary of them.
+
+- **NO PALETTE CHANGE, and that is the point.** This swaps which existing pack token an element
+  reads; it does not invent, tune or override a colour, so `~/claude-theme-pack` is untouched and
+  no contrast gate is involved. That is the same move the a11y contrast fixes take — reuse a
+  token, never add one — and it is the reason this did not need deciding with Charles as a
+  palette question.
+- **Pinned in ALL FOUR THEMES, and pinned as a relationship rather than a value.** The test asserts
+  `.tile`, `.chart-card` and `.card` share a background and that all three still differ from the
+  page behind them; it never names a hex, because those belong to the pack. A palette edit lands
+  in every theme at once, which is why one theme would not have been enough.
+- **`.tile-help:hover` moved the other way**, `--surface` → `--surface-alt`. Every surface that
+  button now sits on is `--surface` — a tile, a chart card's name row, an All Teams heading — so
+  the old fill was a visible hover on a tile and no fill at all on a chart card. The one place the
+  two backgrounds differing was doing any work, and it was doing it backwards.
+- **THIS IS A DELIBERATE DIVERGENCE FROM SPRINT PREDICTABILITY**, which shares this tile and keeps
+  `--bg-card-alt`. It is not drift and it should not be "fixed" by mirroring without thinking: the
+  sibling has a `.tile.hero`, which stands out from its neighbours *by being the card surface*.
+  Make every SV tile the card surface and the hero has nothing left to be. This app has no hero
+  tile, so the same change costs it nothing. Recorded in both READMEs as the second noted
+  exception to the shared-chrome rule, beside the tile column counts.
+
 ## The Boot Hold, and All Four Tabs (2026-08-21) — no schema change
 
 Both halves of one report from Charles: a refresh flickered badly, and a refresh on Your Data or

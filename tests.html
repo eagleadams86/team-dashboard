@@ -5017,6 +5017,36 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and a focus with no press behind it guards nothing — a Tab has no caret to place');
 
   /* ────────────────────────────────────────────────────────── */
+  group('one page, one surface — in all four themes');
+
+  /* Reported by Charles on 2026-08-21, looking at Sepia: the four headline tiles
+     were a tan band sitting above cream charts. A tile and a chart card are the
+     same kind of thing — a figure in a box on the page — and two backgrounds
+     sorted the dashboard into two tones that meant nothing.
+
+     Pinned across every theme rather than on one, because the tokens are the
+     shared theme pack's and a palette edit lands in all four at once. And pinned
+     as "the same as each other" rather than as any particular colour: naming a
+     hex here would be this repo asserting a value the pack owns. */
+  {
+    const tDoc = win.document, themeSel = tDoc.getElementById('themeSel');
+    const was = themeSel.value;
+    const bg = (sel) => win.getComputedStyle(tDoc.querySelector(sel)).backgroundColor;
+    ['midnight', 'dark', 'light', 'sepia'].forEach(theme => {
+      themeSel.value = theme;
+      themeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+      is(bg('.tile'), bg('.chart-card'), theme + ': a tile is on the same ground as a chart card');
+      is(bg('.tile'), bg('.card'), theme + ': and as the cards the tables sit in');
+      /* What tells any of them from the page is the border, not a second fill —
+         so the one difference that has to survive is this one. */
+      ok(bg('.tile') !== win.getComputedStyle(tDoc.body).backgroundColor,
+         theme + ': and still stands off the page behind it', bg('.tile'));
+    });
+    themeSel.value = was;
+    themeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('one chart, filling the window');
 
   /* Charles asked for this on 2026-08-21: a button on each chart that fills the

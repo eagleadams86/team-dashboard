@@ -389,9 +389,18 @@ select { cursor: pointer; }
    the auto-fit case the rule above excludes, and it spans both chart columns. */
 .tiles.group { grid-column: 1 / -1; margin-bottom: 4px;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+/* `--surface`, the same ground the chart cards and the tables are drawn on, and
+   NOT the `--surface-alt` this shipped with. A tile and a chart card are the
+   same kind of thing — a figure in a box on the page — and giving them two
+   different backgrounds sorted the dashboard into two tones that mean nothing:
+   the four headline tiles read as a band of something else sitting above the
+   charts rather than as the summary of them. It is most obvious in Sepia, where
+   the two are a tan and a cream, which is where Charles reported it. What tells
+   a tile from the page is what tells a card from the page — its border, plus
+   the 4px left edge this keeps. */
 .tile { display: grid; grid-row: span 3; grid-template-rows: subgrid; align-content: start;
   border: 1px solid var(--border); border-left-width: 4px;
-  border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface-alt); }
+  border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface); }
 .tile .label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase;
   letter-spacing: .04em; font-weight: 600;
   display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
@@ -410,7 +419,12 @@ select { cursor: pointer; }
   font-family: inherit; text-transform: none; cursor: pointer; }
 .tile-help::after { content: ''; position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%); width: 24px; height: 24px; }
-.tile-help:hover { color: var(--text-primary); background: var(--surface);
+/* `--surface-alt` because every surface this button now sits on is `--surface`:
+   a tile, a chart card's name row, an All Teams heading. It used to fill with
+   `--surface`, which was a visible hover on a tile and no fill at all on a chart
+   card — the one place the two backgrounds differing was doing any work, and it
+   was doing it backwards. */
+.tile-help:hover { color: var(--text-primary); background: var(--surface-alt);
   border-color: var(--text-secondary); }
 /* A tile label is a flex row whose own gap pins the button to the far right,
    so there the margin would only be dead space. */
