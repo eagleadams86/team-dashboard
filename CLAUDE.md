@@ -1528,3 +1528,25 @@ app now holds identifiers out of a work system, and the answer to "where does th
   input meant the column PLUS its padding and border and the box hung over its neighbour.
   See rule 11 in the theme pack's CLAUDE.md; don't re-fix it locally.
 - **`package.json` is a Dependabot manifest, not a build step.** It installs nothing, declares nothing but the vendored `chart.min.js`, is `private: true` with no scripts, and CI passes `--omit=dev` so npm never downloads it. **Dependabot cannot re-vendor a file**, so a version-bump PR would raise the manifest while the app kept serving the old bytes — `tests.html` pins the manifest's pin to the version string inside the bundle, which makes a manifest-only bump fail and turns the PR into the right instruction: update the file too, in all three repos that carry it (lottery, team-dashboard, financial-plan). Never add a `scripts` block, and never let the pin become a `^` range — a range cannot be checked against a file.
+
+## The Privacy Page Carries the Family Footer (2026-08-21)
+
+Every public page in this account carries the same three things at the foot: the privacy
+policy, the repo under the label **How it works**, and the authorship line. The APP's footer
+has had all three for a while. `privacy.html` had **none** of them until now — and it is a
+public page reached by a link in that very footer, so anybody who followed it landed on a
+document with no way back to the thing it documents and no statement of who wrote it. The
+lottery site's privacy page had grown the footer first and was the only one; the other four
+were brought into line together rather than one at a time, because a convention held by one
+page out of five is not a convention.
+
+- **No privacy link in it**, unlike the app's own footer — you are standing on that page. That
+  absence is asserted, not just omitted: the test checks there is no `href="privacy.html"`.
+- **The authorship line is the app's own, verbatim**, which means the two-link form here: *independent personal project* points at **NOTICE**
+  (who owns it) and *MIT licensed* points at **LICENSE** (the terms). Getting those two the
+  wrong way round is the mistake the app's own footer comment records.
+- `.foot` and `.foot a` are copied from the lottery page's stylesheet unchanged, so all five
+  read identically. Muted, inheriting the link colour — provenance at the foot of a document
+  rather than something to click on the way in.
+- **Pinned in `tests.html`**, so the next page added to this repo cannot quietly ship without
+  it.

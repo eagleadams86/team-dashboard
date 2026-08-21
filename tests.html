@@ -2795,6 +2795,28 @@ async function run(TD, win) {
   ok(/startsWith\('td-shell-'\)/.test(KILL),
      'sw-kill.js clears only this app’s caches, never a sibling’s');
 
+  /* ══════════════════════════════════════════════════════════
+     Every public page in this account carries the same footer: the privacy
+     policy, the repo under the label "How it works", and the authorship line.
+     The APP's footer has had all three for a while; this page carried none of
+     them until 2026-08-21, and it is a public page reached by a link in that
+     very footer — so somebody who follows it lands on a document with no way
+     back to what it documents and no statement of who wrote it. The privacy
+     link itself is deliberately absent from it: you are standing on that page.
+     ══════════════════════════════════════════════════════════ */
+  const privRes = await fetch('privacy.html');
+  ok(privRes.ok, 'privacy.html is missing — the app footer links straight at it');
+  const PRIV_SRC = await privRes.text();
+  ok(/>How it works</.test(PRIV_SRC),
+     'privacy.html carries the repo link, labelled "How it works" family-wide');
+  ok(/MIT licensed/.test(PRIV_SRC),
+     'and the authorship line every public page in the family has');
+  ok(/blob\/main\/NOTICE/.test(PRIV_SRC),
+     'with "independent personal project" pointing at NOTICE, as the app\u2019s own does — '
+     + 'a LICENSE is the terms, NOTICE is who owns it');
+  ok(!/href="privacy\.html"/.test(PRIV_SRC),
+     'and NOT a privacy link, which on the privacy page points at itself');
+
   const cspMatch = APP_SRC.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/);
   ok(!!cspMatch, 'no CSP meta tag found');
   ok(/worker-src 'self'/.test(cspMatch[1]),
