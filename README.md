@@ -311,9 +311,9 @@ that has a tail.
 
 | Team | What it's there to show |
 |---|---|
-| **Kingfisher** | The healthy board. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. The baseline the other two read against. |
+| **Kingfisher** | The healthy board. Carries issue keys (`KFR-…`), as Heron does (`HRN-…`), so the charts have something to name their dots with. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. The baseline the other two read against. |
 | **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Kingfisher's. |
-| **Wagtail** | A newer team: four months of history and **no created dates at all**, so the lead-time chart's "add a Created column" face is reachable, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
+| **Wagtail** | A newer team: four months of history, **no created dates and no issue keys at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
 
 The demo also puts **Kingfisher and Heron on one train (Estuary ART) and leaves Wagtail on
 none** — the smallest arrangement where every part of [ARTs](#grouping-teams-into-arts) does
@@ -404,14 +404,23 @@ an error — it's work you've begun, and it counts on the net flow chart as work
 Rows with *no* dates at all — untouched backlog — are ignored, and the count is reported so a
 paste of 260 rows that becomes 170 items explains itself.
 
-**Only dates and a short type label are ever saved.** The paste is read for its dates and its
-work type on the spot and then discarded — ticket keys, summaries and everything else in the
-export are never stored. The work type itself is held to a short category label ("Story",
-"Bug", "Tech Debt"): a cell longer than a label — a summary that landed in the wrong column,
-say — is dropped whole rather than truncated, so no fragment of a work system's text can end
-up in the saved or synced copy. The same guard runs again whenever a saved copy, cloud
-document, backup or share link is read back in. There are deliberately no free-text or
-comment fields anywhere in the app.
+**Only dates, a short type label and the issue key are ever saved.** The paste is read for
+those on the spot and everything else is discarded — summaries, statuses, assignees, comments
+and the rest of the export are never stored. Two guards do that work, and they are different
+on purpose:
+
+- The **work type** is held to a short category label ("Story", "Bug", "Tech Debt"). A cell
+  longer than a label — a summary that landed in the wrong column, say — is dropped whole
+  rather than truncated, so no fragment of a work system's text reaches the saved copy.
+- The **issue key** is checked against the *shape* of a key rather than its length: up to ten
+  letters or digits, a dash, up to six digits, and nothing else. `DAE-1552` passes;
+  `Customer data export breaks on accented names` does not, and neither does anything
+  carrying a space, a quote, an angle bracket or a second dash. There is no input that both
+  passes this check and carries prose — which is exactly why a key could be stored where a
+  summary field never will be.
+
+Both guards run again whenever a saved copy, cloud document, backup or share link is read
+back in. There are deliberately no free-text or comment fields anywhere in the app.
 
 **The few labels you do type are capped at 120 characters where they're written**, not just
 on the next load — team names, the defect and cycle-time words, and both columns of the work
@@ -437,8 +446,10 @@ keys off a completion date.
 | A date that cannot exist (31 Feb, month 13) | Rejected rather than silently rolled over |
 
 **Every problem row is listed back with its line number and only the cells the app reads** —
-the work type and the three dates, never the whole pasted line. The line also carries the
-ticket key and can carry a summary, and neither belongs on screen any more than in storage;
+the work type and the three dates, never the whole pasted line. Not even the issue key, which
+the app *does* store: a row reaches this list precisely because its columns look wrong, so the
+cell the key would be read from is the one cell that cannot be trusted to hold a key. The line
+also carries a summary, and that belongs on screen no more than in storage;
 the line number is how you find the row in your export, which still has every identifying
 detail — where it belongs. Long lists are capped, but the count above each list is always the
 true total.
@@ -561,9 +572,12 @@ re-entered:
 ### Created Dates and Older Versions of the App
 
 Rows gained an optional created date (`k` on the wire, backup `version: 3`, `schema: 3` in the
-saved and synced state; the working-days setting later took both markers to `4`, and ARTs to
-`5`). A row without one is left exactly as it was — no `k` key is written —
-so a team that has never pasted a created date saves byte-identically to before.
+saved and synced state; the working-days setting later took both markers to `4`, ARTs to `5`,
+and the issue key to `6`). A row without one is left exactly as it was — no `k` key is written —
+so a team that has never pasted a created date saves byte-identically to before. **The issue key
+(`i` on the wire) follows exactly the same rule**: absent unless there is one, so a team whose
+export has no key column saves byte-identically to before that field existed, and the first save
+after upgrading doesn't rewrite the whole synced document.
 
 **Created dates are never dropped silently.** If a synced copy arrives with none and this
 device has some, the app asks before taking it — the same treatment as another device clearing
@@ -777,15 +791,20 @@ board with more issue types than fit folds its tail into one **Other types** col
 many went in; items with no work type at all get a column of their own at the end rather than
 disappearing.
 
-### The Dots Have No Ticket Numbers
+### What a Dot Is Called
 
-They can't. This app stores no ticket key, no summary and no name — that is
-[the storage rule](#getting-your-data-in) working as intended, not an oversight, and it is what
-makes it safe to keep work data in a browser tab at all.
+Point at a dot and it names the item: its **issue key**, if your paste had a Key column. That is
+the whole reason the key is stored — "which of these needs looking at" is unanswerable when
+every dot on the chart is called Story, and a key is something you can paste straight into Jira.
 
-What a dot does carry is enough: point at one and it gives you the **work type and the start
-date**, which finds the item again in the export you pasted in seconds. The Your Data tab lists
-every unfinished item at the top for the same reason.
+If your export has no key column, a dot falls back to its **work type and start date**, which
+finds the item in the export you pasted in seconds. Both charts name dots the same way, from one
+piece of code, so the pair can never disagree about what an item is called.
+
+The key is the *only* thing out of your work system the app keeps — no summary, no status, no
+assignee — and it is checked against [the shape of a key](#getting-your-data-in) rather than
+trimmed to fit, so a mismapped column stores nothing at all rather than storing part of a
+sentence. The Your Data tab lists every item with its key, unfinished ones at the top.
 
 ### Reading It
 
@@ -943,6 +962,9 @@ order that answers "what is open right now?" without asking for anything. Pressi
 for a different order rather than replacing that default with whatever was last pressed.
 
 Each column runs the useful way on its first press: dates newest-first, cycle time longest-first.
+**Item** is the one exception and runs A to Z, because a list of keys has no most-interesting
+end — you scan it for one you already have in mind. It groups by project and then runs in
+issue-number order, so `DAE-10` comes after `DAE-9` rather than between `DAE-1` and it.
 **Absences always sort last**, whichever direction the column is running — an item still in
 progress has no completion date and no cycle time, so it has no place in an ordering by either,
 and letting it win the top would be the one result nobody could read past.
@@ -1036,7 +1058,15 @@ read-only — no sign-in, no way to change anything, and (ported from the siblin
 data travels **inside the link itself**: everything after the `#` never leaves the browser,
 so the figures reach the recipient without GitHub Pages, Firebase or anyone else seeing
 them. The payload is a trimmed copy — the chosen teams plus the shared settings, because
-those drive every number on the charts — and never anything identifying.
+those drive every number on the charts.
+
+It carries the same fields the app stores, **issue keys included**. That is deliberate: the keys
+are what names the items on the charts, and a link that dropped them would show the recipient a
+different picture from the one you are looking at. Nothing else out of your work system goes —
+no summaries, no statuses, no names — and a key in a link has passed the same shape check as a
+key in storage, so a link cannot carry anything in that field the app would not have saved. The
+dialog says so above the link. A recipient still on an older cached build simply sees dots named
+by work type, as they were before keys existed.
 
 This dialog carries more than any other, so on a screen 760px or wider it opens **820px wide
 with its two choices side by side**, matched in height, rather than stacked. That is the point of the extra width —
@@ -1300,8 +1330,11 @@ throws — so a suite that only ever ran when someone remembered to open it can'
 CI reaches it at `http://localhost:8013`, so the localhost gate lets it through; if that ever
 changed, the run would time out waiting for a summary and fail loudly rather than skip.
 
-Beyond the metrics it covers `detectColumns()` (a leading key column, the dates either way
-round, header names beating position, a free-text summary not being mistaken for the type),
+Beyond the metrics it covers `detectColumns()` (a leading key column read as the key, the dates
+either way round, header names beating position, a free-text summary mistaken for neither the
+type nor the key, and the real Jira headings a loose pattern would swallow — *Issue id*,
+*Parent key*, *Key changed date*), the issue-key guard from both directions (every rejection
+listed one by one, including a summary, markup and a spreadsheet formula),
 work-in-progress handling — including the net-flow miscount stated as a test, and a WIP row
 whose *empty completed cell comes first*, which a line-trim once shifted into a completed row —
 the week straddling New Year (whose cycle times once vanished from the chart and tile), quoted
@@ -1385,12 +1418,12 @@ hardware, with a personally paid-for Claude subscription, in a personal GitHub a
 syncing (when you turn it on) through a Firebase project he owns. No employer equipment,
 funding or code went into it.
 
-It holds no employer information either, and that is a property of the design rather than a
-promise: there is no free-text field anywhere in the app, and the storage whitelist admits
-only numbers, dates and short fixed labels. Text you paste in is parsed in the browser and
-thrown away — ticket keys, summaries and comments are never stored, transmitted or
-committed. Adding a stored field means adding it to that whitelist, or it is deliberately
-stripped.
+It holds no employer information beyond issue keys, and that is a property of the design
+rather than a promise: there is no free-text field anywhere in the app, and the storage
+whitelist admits only numbers, dates, short fixed labels and the shape-checked key. Text you
+paste in is parsed in the browser and thrown away — summaries, statuses and comments are never
+stored, transmitted or committed, and nothing is ever committed to this repository. Adding a
+stored field means adding it to that whitelist, or it is deliberately stripped.
 
 Share it freely: it is [MIT licensed](LICENSE), so anyone — including a company you work
 for — may use, modify and redistribute it. Running it inside an organisation conveys no

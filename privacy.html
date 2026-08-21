@@ -40,25 +40,32 @@
 <div class="wrap">
   <a class="back" href="index.html">← Back to Flow Metrics</a>
   <h1>Flow Metrics — Privacy Policy</h1>
-  <p class="meta">Effective August 19, 2026</p>
+  <p class="meta">Effective August 20, 2026</p>
 
   <p>Flow Metrics is built to work entirely in your browser. This page explains exactly what
   data exists, where it goes, and who can see it.</p>
 
   <h2>What Flow Metrics Stores</h2>
   <p>The only data the app holds is what you paste or type in: team names, and for each team a
-  list of work items — a completed date, an optional start date, an optional created date, and
-  an optional work type — plus the shared settings (labels, the text that marks unplanned work,
-  the thresholds, whether days are counted Monday to Friday, the work-type filter list) and your
-  preferences (theme, chosen team, date window). No account
+  list of work items — a completed date, an optional start date, an optional created date, an
+  optional work type and an optional issue key — plus the shared settings (labels, the text that
+  marks unplanned work, the thresholds, whether days are counted Monday to Friday, the work-type
+  filter list) and your preferences (theme, chosen team, date window). No account
   is required to use the app, and there is no analytics, tracking or advertising of any kind.</p>
 
-  <p>Note what is <em>not</em> stored: no ticket IDs, no ticket titles, no names of people, and
-  no free-text or comment fields anywhere. The app only ever needs dates and a type, and the
-  work type is held to a short category label — a cell that looks like anything longer (a
-  ticket summary, a description) is discarded rather than saved, at the paste and again
-  whenever a saved copy is read back. The rest of what you paste is read for its dates on the
-  spot and never stored.</p>
+  <p><strong>The issue key is the one identifier the app keeps</strong>, and it is kept so that a
+  dot on a chart can be named and then looked up in your own work system. It is checked against
+  the <em>shape</em> of a key — up to ten letters or digits, a dash, and up to six digits, and
+  nothing else — rather than trimmed to fit, so a cell that is anything other than a key is
+  discarded whole. That check runs at the paste and again whenever a saved copy is read back.
+  Before August 20, 2026 the app stored no key at all; a copy saved before then simply has none.</p>
+
+  <p>Note what is <em>not</em> stored: no ticket titles or summaries, no descriptions, no
+  statuses, no names of people, and no free-text or comment fields anywhere. Apart from the
+  key, the app only ever needs dates and a type, and the work type is held to a short category
+  label — a cell that looks like anything longer (a ticket summary, a description) is discarded
+  rather than saved. The rest of what you paste is read for its dates on the spot and never
+  stored.</p>
 
   <h2>Where That Data Lives</h2>
   <div class="card">
@@ -97,7 +104,10 @@
   send to any server — so creating or opening one involves no upload, no download and no
   account, and nothing the recipient already has saved in their own browser is touched.
   A link is a frozen snapshot: it can't be edited through, and it can't be withdrawn once
-  sent, so share it as deliberately as you would email a spreadsheet.</p>
+  sent, so share it as deliberately as you would email a spreadsheet. It carries the same
+  fields the app stores, <strong>issue keys included</strong> — they are what names the items
+  on the charts, and a link without them would show the recipient a different picture from
+  yours.</p>
 
   <h2>What Google Receives</h2>
   <p>If you sign in, Google handles the sign-in itself and knows you have used this app, in the

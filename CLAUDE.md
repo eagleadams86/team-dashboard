@@ -11,10 +11,24 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, sync, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
-## Only Numbers and Dates Are Ever Saved (2026-08-12/13)
+## Only Numbers, Dates and Two Guarded Labels Are Ever Saved (2026-08-12/13, amended 2026-08-20)
 
-- **A row is three ISO dates plus one short work-type label. Nothing else. There
-  are no free-text or comment fields anywhere in this app — don't add one.**
+- **A row is three ISO dates, one short work-type label and one issue key.
+  Nothing else. There are no free-text or comment fields anywhere in this app —
+  don't add one.**
+- **The issue key was added on 2026-08-20 at Charles's explicit request**, and it
+  reverses the "no ticket keys, ever" line this file used to carry. It is worth
+  knowing why it was allowed where a summary field never would be: a key is
+  **structurally checkable**. `cleanIssueKey` tests it against `ISSUE_KEY_RE`
+  (`^[A-Za-z][A-Za-z0-9]{0,9}-[0-9]{1,6}$`) and drops anything that fails, so
+  the field cannot hold a sentence, markup, a formula or a name — there is no
+  input that both passes and carries prose. That is a stronger boundary than
+  `cleanWorkType`'s 40-char cap, not a weaker one, and it is the reason the
+  request could be honoured without loosening the app's stance.
+  **A second identifier is NOT precedent.** The next field somebody wants will
+  probably be a summary or a status, and neither has a shape — the test to apply
+  is "can a regex tell this from a sentence?", not "is a key stored, so why not
+  this?".
 - `cleanWorkType()` pins the type to a ≤40-char label at BOTH boundaries — the
   paste (`parsePastedRows`) and every read-back (`hydrateRows`). A longer cell (a
   ticket summary in the wrong column) is **dropped whole, never truncated** — 40
@@ -27,6 +41,14 @@ file records what is specific to this repo and what must never regress.
   appearing in the help text was reported by Charles and fixed 2026-08-13. Any
   new diagnostic or preview must not repeat raw pasted cells; point at the source
   export with a line number instead.
+  **`refOf()` was deliberately left alone when the key arrived (2026-08-20).**
+  The temptation is obvious — the key is stored now, so why not name the problem
+  row with it — but the reason the echo was cut was that the *line* is untrusted,
+  and that has not changed: `refOf` reads whatever cells a possibly-mismapped
+  column map points at. Adding the key there means reading a cell the parser has
+  already decided is suspect. A test pins the current behaviour; if it is ever
+  wanted, put `cleanIssueKey(at(cells, cols.key))` in and change that test
+  deliberately rather than by accident.
 - **Whitelists at every boundary**: `sanitizeTeams()` and `hydrateRows()` rebuild
   teams/rows from known keys. `hydrateRows()` also applies the paste boundary's
   date-ordering rules (started ≤ completed, created ≤ start) so a hand-edited
@@ -78,9 +100,44 @@ file records what is specific to this repo and what must never regress.
   `save()`** — a shape repair must not stamp this device's copy newest and race a
   genuinely newer cloud document. (`save()` = persist + timestamp + cloud push;
   reserve it for real edits.)
-- Settings labels and team names are short and capped (120); rows carry no ids,
-  keys, titles or names of people — `privacy.html` promises this, keep it true
-  and update its effective date in the same commit as any storage change.
+- Settings labels and team names are short and capped (120); rows carry **one
+  identifier and no other** — the issue key, shape-checked — and no titles,
+  summaries, statuses or names of people. `privacy.html` promises exactly that,
+  keep it true and update its effective date in the same commit as any storage
+  change (it went to 2026-08-20 with the key).
+
+## The Issue Key (2026-08-20) — SCHEMA 5 → 6
+
+`r.key` on each row, `i` on the wire. Asked for so the scatter plots can name the item behind a
+dot: "which of these needs reviewing" is unanswerable when every dot is called Story.
+
+- **The guard is a SHAPE, not a cap** — `ISSUE_KEY_RE` in `cleanIssueKey`, applied at both
+  boundaries (`parsePastedRows` and `hydrateRows`) exactly as `cleanWorkType` is. A value that
+  fails is dropped WHOLE. This is the point of the whole feature: the cell that arrives here
+  when somebody's column map is off is a ticket summary, and seventeen characters of a summary
+  is still a summary. **Never relax this to a length cap**, and never "just trim it to fit".
+- **`i` is omitted when empty**, so a team that has never pasted a key serialises
+  byte-identically to before — the rule the created date and `artId` already follow, and what
+  keeps the first save after this build from rewriting the whole synced document.
+- **`SHARE_PAYLOAD_V` was NOT bumped**, matching ARTs. Keys DO travel in a link, deliberately:
+  they name the dots, and a link that dropped them would show the recipient a different picture
+  from the sender's. An older cached build drops the field and names dots by type — graceful
+  degradation. The share dialog and `privacy.html` both say keys travel; keep that true.
+- **Detection is deliberately narrow at BOTH ends.** `HEADER_PATTERNS.key` is the only anchored
+  pattern in that table (`^\s*(issue\s*)?key\s*$`), because a loose `/key/` eats "Issue id",
+  "Parent key" and "Key changed date" — all real Jira headings, all pinned by tests. The
+  headerless fallback asks `keyRate >= 0.8` on `columnStats`, i.e. it asks the same question
+  `cleanIssueKey` will ask, so a column it picks is a column whose cells will actually store.
+  A date can never score, and neither can a summary — which is what tells the key column from
+  the all-distinct column beside it.
+- **The key is a LABEL, never a level of maths** — the same rule ARTs follow. Nothing counts,
+  groups or filters by it. `dotName()` is the one place a dot's name is decided, shared by both
+  scatters so they can never drift; `issueSortKey()` is the one place the Item column's order is
+  decided (zero-pads the number so DAE-10 doesn't land between DAE-1 and DAE-9).
+- **Two demo teams carry keys and Wagtail deliberately carries none**, so both faces are
+  reachable from Load sample data — named dots, and the type-named fallback. The generator's key
+  counter must never draw from `rnd()`: the sequence is seeded and every pinned demo figure
+  depends on it.
 
 ## ARTs (2026-08-20) — the first schema bump since working days
 

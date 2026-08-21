@@ -552,6 +552,127 @@ async function run(TD, win) {
      && pe.raisedAfterStart[0].text.includes('created 6/1/2026 9:32'), true,
      'what it does echo is the type and the dates, labelled');
 
+  /* ══════════════════════════════════════════════════════════
+     The issue key — the ONE identifier this app stores, and the strictest
+     boundary in it. Everything else here is guarded by a length cap; this is
+     guarded by SHAPE, because the cell that arrives when a column is mismapped
+     is a sentence out of a work system and 17 characters of one is still a
+     sentence. These tests are the pin on "nothing but a key gets in".
+     ══════════════════════════════════════════════════════════ */
+  group('Issue key guard — a shape, not a length cap');
+
+  const K = TD.cleanIssueKey;
+
+  is(K('DAE-1552'), 'DAE-1552', 'a plain key passes');
+  is(K('A-1'), 'A-1', 'a one-letter project and a one-digit number pass');
+  is(K('ABCDEFGHIJ-123456'), 'ABCDEFGHIJ-123456', 'the stated maxima — 10 letters, 6 digits');
+  is(K('PROJ2-17'), 'PROJ2-17', 'a digit inside the project key is allowed, as Jira allows');
+  is(K('  DAE-1552  '), 'DAE-1552', 'whitespace is trimmed');
+  is(K('dae-1552'), 'DAE-1552', 'lower case is folded up, so one item cannot become two');
+
+  is(K('ABCDEFGHIJK-1'), '', 'an eleventh letter is dropped WHOLE, never truncated to fit');
+  is(K('DAE-1234567'), '', 'and so is a seventh digit');
+  is(K('1DAE-15'), '', 'a project key must start with a letter');
+  is(K('DAE-'), '', 'a key with no number is not a key');
+  is(K('-1552'), '', 'nor is a number with no project');
+  is(K('DAE1552'), '', 'the dash is required');
+  is(K('DAE-15-2'), '', 'and there is exactly one of them');
+  is(K('DAE 1552'), '', 'a space is not a dash');
+  is(K('DAE-15A'), '', 'the number part is digits only');
+  is(K('Customer data export breaks on accented names'), '',
+     'a summary is dropped, which is the whole reason this is a shape and not a cap');
+  is(K('Fix login'), '', 'and so is a short one — nothing is kept by being brief');
+  is(K('<img src=x onerror=alert(1)>'), '', 'markup cannot pass the shape at all');
+  is(K('=cmd|calc'), '', 'nor can a spreadsheet formula');
+  is(K(123), '', 'a non-string is dropped');
+  is(K(null), '', 'and so is null');
+  is(K(''), '', 'and an empty cell is simply no key');
+
+  /* Both doors, the same guard — the rule cleanWorkType already follows. */
+  const kp = TD.parsePastedRows([
+    'Issue key\tIn Progress\tResolved\tIssue Type',
+    'DAE-1552\t2015-01-14\t2015-01-21\tStory',
+    'Customer reported the export breaks\t2015-01-15\t2015-01-22\tBug'
+  ].join('\n'), 'auto');
+  is(kp.rows[0].key, 'DAE-1552', 'a key column is read at the paste boundary');
+  is(kp.rows[1].key, '', 'and a cell in it that is not a key stores nothing at all');
+  is(kp.rows[1].type, 'Bug', 'while the rest of that row is untouched — one bad cell, one loss');
+
+  const kh = win.TDState.sanitizeTeams([{ id: 't1', name: 'A', rows: [
+    { c: '2015-01-21', s: '2015-01-14', t: 'Story', i: 'DAE-1552' },
+    { c: '2015-01-22', s: '2015-01-15', t: 'Bug', i: 'Customer reported the export breaks' },
+    { c: '2015-01-23', s: '2015-01-16', t: 'Bug', i: { toString: () => 'DAE-9' } }
+  ] }])[0].rows;
+  is(kh[0].key, 'DAE-1552', 'a key survives hydration from a saved or synced copy');
+  is(kh[1].key, '', 'and free text in that field is dropped there too — the other door');
+  is(kh[2].key, '', 'an object that stringifies to a key is still not a string, so it is dropped');
+
+  /* i is omitted when there is nothing to write, so a team that has never
+     pasted a key serialises byte-identically to before and its first save
+     after upgrading does not rewrite the whole synced document. */
+  const StK = win.TDState;
+  const noKeyWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story' };
+  is(StK.serializeRows(StK.hydrateRows([noKeyWire])), [noKeyWire],
+     'a row with no key round-trips byte-identically — no stray i');
+  const keyWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', i: 'DAE-1552' };
+  is(StK.serializeRows(StK.hydrateRows([keyWire])), [keyWire], 'and one with a key round-trips whole');
+  is(StK.serializeRows(StK.hydrateRows([{ c: '2015-01-21', s: '2015-01-14', t: 'Story',
+                                          i: 'a summary that is not a key' }])),
+     [noKeyWire], 'a hostile i is not merely hidden — it never reaches the wire again');
+
+  /* ── Finding the column ── */
+  const kcols = str => TD.parsePastedRows(str, 'auto').columns;
+  is(kcols(['Issue key\tResolved\tIn Progress\tIssue Type',
+            'DAE-1\t5/11/2026\t4/27/2026\tStory'].join('\n')).key, 0,
+     'the Jira heading "Issue key" is recognised');
+  is(kcols(['Key\tResolved\tIn Progress\tType',
+            'DAE-1\t5/11/2026\t4/27/2026\tStory'].join('\n')).key, 0, 'and a bare "Key"');
+  /* The neighbours a loose /key/ would swallow. Each is a real Jira export
+     heading, and the anchored pattern is the only thing keeping them out. */
+  is(kcols(['Issue id\tParent key\tResolved\tIn Progress\tIssue Type',
+            '10432\tDAE-1\t5/11/2026\t4/27/2026\tStory',
+            '10433\tDAE-2\t6/22/2026\t4/28/2026\tBug'].join('\n')).key, 1,
+     '"Parent key" is not matched by name — the column is found by its SHAPE instead');
+  is(kcols(['Key changed date\tResolved\tIn Progress\tIssue Type',
+            '5/1/2026\t5/11/2026\t4/27/2026\tStory'].join('\n')).key, -1,
+     'and a date column called "Key changed date" is never read as the key');
+
+  /* No key column at all must look exactly as it did before the field existed. */
+  const bare = TD.parsePastedRows(['Resolved\tIn Progress\tIssue Type',
+                                   '5/11/2026\t4/27/2026\tStory'].join('\n'), 'auto');
+  is(bare.columns.key, -1, 'a paste with no key column reports none');
+  is(bare.rows[0].key, '', 'and its rows carry an empty key rather than a made-up one');
+
+  /* A summary column is all-distinct too, and must never be read as the key —
+     the shape test is what tells them apart. */
+  is(kcols(['AAA-1\tFix the login page\t5/11/2026\t4/27/2026\tStory',
+            'AAA-2\tAdd export button\t6/22/2026\t4/28/2026\tStory',
+            'AAA-3\tTidy the footer\t5/11/2026\t4/27/2026\tBug'].join('\n')).key, 0,
+     'the key column is found and the summary beside it is not mistaken for it');
+  is(TD.parsePastedRows(['AAA-1\tFix the login page\t5/11/2026\t4/27/2026\tStory'].join('\n'),
+                        'auto').rows[0].key, 'AAA-1', 'and it is the key that gets stored');
+
+  /* A key column can never steal a date role, and a date can never score as a
+     key — every date format this app reads starts with a digit or holds a
+     separator the key shape forbids. */
+  ok(['2015-01-21', '21/01/2015', '1/21/2015', '21 Jan 2015', '2015-01-21T09:32:00']
+       .every(v => K(v) === ''), 'no date this app parses can pass as an issue key');
+
+  /* The Item column's sort. DAE-10 must not land between DAE-1 and DAE-9. */
+  const sorted = ['DAE-10', 'DAE-9', 'DAE-1', 'ABC-5']
+    .map(k => ({ k, s: TD.issueSortKey(k) }))
+    .sort((a, b) => a.s < b.s ? -1 : a.s > b.s ? 1 : 0).map(x => x.k);
+  is(sorted, ['ABC-5', 'DAE-1', 'DAE-9', 'DAE-10'],
+     'the Item column groups by project and then runs in issue-number order');
+  is(TD.issueSortKey(''), null, 'a row with no key sorts as an absence, which the table puts last');
+
+  /* What a dot on either scatter is called. One helper for both charts, so the
+     pair can never drift into naming the same item two different ways. */
+  is(TD.dotName({ key: 'DAE-1552', type: 'Story' }), 'DAE-1552', 'a dot is named by its key');
+  is(TD.dotName({ key: '', type: 'Story' }), 'Story',
+     'and by its work type when the paste had no key — exactly as before the field existed');
+  is(TD.dotName({ key: '', type: '' }), TD.AGE_UNTYPED, 'with the same last resort as before');
+
   /* ────────────────────────────────────────────────────────── */
   group('Cycle time');
 
@@ -1255,33 +1376,33 @@ async function run(TD, win) {
            '2015-01-21\t2015-01-14\t',
            '2015-01-26\t2015-01-14\tBug',
            '2015-01-26\t2015-01-21\tBug'].join('\n')),
-     { completed: 0, started: 1, created: -1, type: 2 },
+     { completed: 0, started: 1, created: -1, type: 2, key: -1 },
      'the plain three-column layout still works, and invents no created column');
 
   is(cols(['Key\tResolved\tIn Progress\tIssue Type',
            'DAE-1\t5/11/2026\t4/27/2026\tStory',
            'DAE-2\t6/22/2026\t4/28/2026\tStory'].join('\n')),
-     { completed: 1, started: 2, created: -1, type: 3 },
-     'a leading issue-key column is skipped (header names)');
+     { completed: 1, started: 2, created: -1, type: 3, key: 0 },
+     'a leading issue-key column is READ as the key now, not merely skipped (header names)');
 
   is(cols(['DAE-1064\t5/11/2026\t4/27/2026\tStory',
            'DAE-1062\t6/22/2026\t4/28/2026\tStory',
            'DAE-1060\t5/11/2026\t4/27/2026\tBug',
            'DAE-1054\t5/19/2026\t4/29/2026\tStory'].join('\n')),
-     { completed: 1, started: 2, created: -1, type: 3 },
-     'a leading issue-key column is skipped with no header at all');
+     { completed: 1, started: 2, created: -1, type: 3, key: 0 },
+     'and is found by its SHAPE with no header at all');
 
   is(cols(['DAE-1\t4/27/2026\t5/11/2026\tStory',
            'DAE-2\t4/28/2026\t6/22/2026\tStory',
            'DAE-3\t4/27/2026\t5/11/2026\tBug',
            'DAE-4\t4/29/2026\t5/19/2026\tStory'].join('\n')),
-     { completed: 2, started: 1, created: -1, type: 3 },
+     { completed: 2, started: 1, created: -1, type: 3, key: 0 },
      'start-before-completed is detected by which date is later, not by position');
 
   is(cols(['Issue Type\tKey\tResolved\tIn Progress',
            'Story\tDAE-1\t5/11/2026\t4/27/2026',
            'Bug\tDAE-2\t6/22/2026\t4/28/2026'].join('\n')),
-     { completed: 2, started: 3, created: -1, type: 0 }, 'header names win over position');
+     { completed: 2, started: 3, created: -1, type: 0, key: 1 }, 'header names win over position');
 
   is(cols(['AAA-1\t5/11/2026\t4/27/2026\tStory',
            'AAA-2\t6/22/2026\t4/28/2026\tStory',
@@ -1293,8 +1414,8 @@ async function run(TD, win) {
            'AAA-2\tAdd export button\t6/22/2026\t4/28/2026\tStory',
            'AAA-3\tTidy the footer\t5/11/2026\t4/27/2026\tStory',
            'AAA-4\tCache the results\t5/19/2026\t4/29/2026\tBug'].join('\n')),
-     { completed: 2, started: 3, created: -1, type: 4 },
-     'a free-text summary column is not mistaken for the type');
+     { completed: 2, started: 3, created: -1, type: 4, key: 0 },
+     'a free-text summary column is mistaken for neither the type nor the key');
 
   /* ══════════════════════════════════════════════════════════
      Finding a created column — without breaking the pastes that came before it.
@@ -1309,7 +1430,7 @@ async function run(TD, win) {
                        'A-1\t2015-01-14\t2015-01-21\tStory',
                        'A-2\t2015-01-14\t2015-01-26\tBug',
                        'A-3\t2015-01-21\t2015-01-26\tStory'].join('\n');
-  is(cols(legacyPaste), { completed: 2, started: 1, created: 1, type: 3 },
+  is(cols(legacyPaste), { completed: 2, started: 1, created: 1, type: 3, key: 0 },
      'with no In Progress column, Created is still read as the start — and as created');
   const legacyRows = TD.parsePastedRows(legacyPaste, 'auto').rows;
   ok(legacyRows.every(r => TD.cycleTimeOf(r, 0.5) != null),
@@ -1322,7 +1443,7 @@ async function run(TD, win) {
            'A-1\t2015-01-02\t2015-01-14\t2015-01-21\tStory',
            'A-2\t2015-01-09\t2015-01-14\t2015-01-26\tBug',
            'A-3\t2015-01-11\t2015-01-21\t2015-01-26\tStory'].join('\n')),
-     { completed: 3, started: 2, created: 1, type: 4 },
+     { completed: 3, started: 2, created: 1, type: 4, key: 0 },
      'Created, In Progress and Resolved are told apart by their header names');
 
   /* And without a header, by content — created ≤ started ≤ completed. Column
@@ -1331,7 +1452,7 @@ async function run(TD, win) {
            'A-2\t2015-01-26\t2015-01-09\t2015-01-14\tBug',
            'A-3\t2015-01-26\t2015-01-11\t2015-01-21\tStory',
            'A-4\t2015-02-02\t2015-01-12\t2015-01-28\tStory'].join('\n')),
-     { completed: 1, started: 3, created: 2, type: 4 },
+     { completed: 1, started: 3, created: 2, type: 4, key: 0 },
      'three unlabelled date columns are ranked by which date is later, not by position');
 
   /* Four or more free date columns: one of them is probably a due or updated
@@ -1425,7 +1546,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 5, 'the schema marker is 5 — the version that added ARTs');
+  is(St.SCHEMA, 6, 'the schema marker is 6 — the version that added the issue key');
 
   /* ────────────────────────────────────────────────────────── */
   group('Work in progress — started but not finished');
@@ -1762,6 +1883,28 @@ async function run(TD, win) {
   is(Sh.buildSharePayload(['team-c']).teams[0].artId, undefined,
      'and a team on no train has no artId on the wire');
 
+  /* Issue keys DO travel in a link, and deliberately: they are what names the
+     items on the charts, so a link that dropped them would show the recipient a
+     different picture from the one the sender is looking at. They ride through
+     serializeRows like every other stored field, which also means the same
+     shape guard applies — a link cannot carry anything in that field that the
+     app would not have stored. SHARE_PAYLOAD_V is NOT bumped for it: an older
+     cached build drops the key and names the dots by type, which is graceful
+     degradation rather than a wrong number, exactly as ARTs decided. */
+  plant({
+    teams: [{ id: 'team-a', name: 'Alpha', rows: [
+      { c: '2015-01-21', s: '2015-01-14', t: 'Bug', i: 'DAE-1552' },
+      { c: '2015-01-22', s: '2015-01-15', t: 'Bug', i: 'a summary that is not a key' },
+      { c: '2015-01-23', s: '2015-01-16', t: 'Bug' }
+    ] }],
+    settings: {}
+  });
+  const spKey = Sh.buildSharePayload(['team-a']);
+  is(spKey.teams[0].rows.map(r => r.i), ['DAE-1552', undefined, undefined],
+     'a real key travels; free text planted in that field never reaches the link');
+  is(Sh.SHARE_PAYLOAD_V, 1,
+     'and the payload version is unchanged — an older build drops the key and names dots by type');
+
   /* ────────────────────────────────────────────────────────── */
   group('Share links — how much history rides along');
 
@@ -2075,7 +2218,12 @@ async function run(TD, win) {
   /* The two paths that cannot be run live — one halts inside a sync callback,
      the other is FileReader UI — are pinned as source instead. */
   const adoptAt = APP_SRC.indexOf('window.tdAdopt =');   // read once, by the group above
-  const adopt = APP_SRC.slice(adoptAt, adoptAt + 2000);
+  /* Long enough to reach the hydrateState() call the ordering below is about.
+     It was 2000 until the issue key's guard added prose above it and pushed
+     that call out of the window — which read as "hydrateState is not called at
+     all", i.e. a test that went quiet rather than failing loudly for the right
+     reason. The `hydrate > -1` assertion is what caught it; keep it. */
+  const adopt = APP_SRC.slice(adoptAt, adoptAt + 3200);
   const guard = adopt.search(/\(\(data && data\.schema\) \|\| 1\) > SCHEMA/);
   const store = adopt.indexOf('JSON.stringify(data)');
   const halt = adopt.indexOf('haltForNewerData(data.schema)');
@@ -2098,6 +2246,74 @@ async function run(TD, win) {
      'viewOnly must stay assignable — the halt reuses it as the no-write flag');
   ok(/!window\.tdViewOnly && !inTestHarness/.test(APP_SRC),
      'the sync module must still refuse to start under tdViewOnly');
+
+  /* ══════════════════════════════════════════════════════════
+     An older build strips the fields it does not know and pushes the stripped
+     copy back. The boot halt cannot catch that — it fires on a NEWER document,
+     and this one arrives looking older — so tdAdopt asks before letting a
+     device throw away the only copy of a column its owner pasted.
+     ══════════════════════════════════════════════════════════ */
+  group('a copy that has lost the optional fields is not adopted silently');
+
+  /* confirm() answered explicitly rather than through plant(), because WHICH
+     way it is answered is the thing under test. Cancel means keep. */
+  const adoptWith = (answer, data) => {
+    const real = win.confirm;
+    let asked = null;
+    win.confirm = (msg) => { asked = msg; return answer; };
+    try { return { took: win.tdAdopt(data), asked }; } finally { win.confirm = real; }
+  };
+  const withBoth = { schema: win.TDState.SCHEMA, teams: [{ id: 'l1', name: 'Loss', rows: [
+    { c: '2015-01-21', s: '2015-01-14', k: '2015-01-02', t: 'Story', i: 'DAE-1' },
+    { c: '2015-01-22', s: '2015-01-15', k: '2015-01-03', t: 'Bug', i: 'DAE-2' }
+  ] }], settings: {} };
+  /* What a build older than SCHEMA 6 pushes back: same rows, no k and no i. */
+  const oldPush = { schema: 5, teams: [{ id: 'l1', name: 'Loss', rows: [
+    { c: '2015-01-21', s: '2015-01-14', t: 'Story' },
+    { c: '2015-01-22', s: '2015-01-15', t: 'Bug' }
+  ] }], settings: {} };
+
+  plant(withBoth);
+  const refused = adoptWith(false, oldPush);
+  is(refused.took, false, 'a stripped copy is not adopted when the answer is Cancel');
+  ok(/issue key/i.test(refused.asked), 'and the question names the issue keys at stake',
+     String(refused.asked));
+  ok(/Created date/i.test(refused.asked), 'alongside the Created dates');
+  ok((refused.asked.match(/\n\n/g) || []).length >= 2,
+     'in ONE prompt covering both, not one dialog each');
+  is(win.tdGet().teams[0].rows.map(r => r.i), ['DAE-1', 'DAE-2'],
+     'so this device still holds its keys');
+  is(win.tdGet().teams[0].rows.map(r => r.k), ['2015-01-02', '2015-01-03'],
+     'and its created dates');
+
+  /* Keys alone. The question must not mention Created dates when none are
+     going, or it sends the reader looking for a loss that has not happened. */
+  plant({ schema: win.TDState.SCHEMA, teams: [{ id: 'l1', name: 'Loss', rows: [
+    { c: '2015-01-21', s: '2015-01-14', t: 'Story', i: 'DAE-1' }
+  ] }], settings: {} });
+  const keysOnly = adoptWith(false, { schema: 5, teams: [{ id: 'l1', name: 'Loss', rows: [
+    { c: '2015-01-21', s: '2015-01-14', t: 'Story' }
+  ] }], settings: {} });
+  is(keysOnly.took, false, 'losing only the keys still asks');
+  ok(/1 issue key\b/.test(keysOnly.asked), 'and counts them, singular when there is one',
+     String(keysOnly.asked));
+  ok(!/Created date/i.test(keysOnly.asked),
+     'without naming a loss that is not happening');
+
+  /* Answering "drop them" has to work: the prompt is a check, not a refusal. */
+  plant(withBoth);
+  is(adoptWith(true, oldPush).took, true, 'and answering Drop them adopts the stripped copy');
+  is(win.tdGet().teams[0].rows.every(r => r.i === undefined), true, 'keys and all');
+
+  /* A copy that keeps both fields must not ask at all — a prompt on an ordinary
+     sync is how somebody learns to dismiss this one without reading it. */
+  plant(withBoth);
+  const quiet = adoptWith(false, { schema: win.TDState.SCHEMA,
+    teams: [{ id: 'l1', name: 'Loss', rows: [
+      { c: '2015-01-25', s: '2015-01-18', k: '2015-01-05', t: 'Story', i: 'DAE-3' }
+    ] }], settings: {} });
+  is(quiet.asked, null, 'a copy that still has both is adopted without a question');
+  is(quiet.took, true, 'and taken');
 
   /* ────────────────────────────────────────────────────────── */
   group('a share link from a newer build');
@@ -2800,6 +3016,31 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and drops an item out of Heron\u2019s aged count, so the ageing rule follows too',
      heronWork.summary.agedNow + ' vs ' + heron.summary.agedNow);
 
+  /* Issue keys. Two teams carry them and one deliberately does not, so BOTH
+     faces of the feature are reachable from the demo: the charts named by key,
+     and the charts named by work type as they were before it existed. The keys
+     also have to survive the trip through sanitizeTeams that loadDemo() makes,
+     which is the same door a saved or synced copy comes in by. */
+  const wagKeys = demoOf(demo, 'Team Wagtail');
+  ok(demoOf(demo, 'Team Kingfisher').rows.every(r => /^KFR-\d+$/.test(r.key)),
+     'every Kingfisher item has a key, so the charts have something to name dots with');
+  ok(demoOf(demo, 'Team Heron').rows.every(r => /^HRN-\d+$/.test(r.key)),
+     'and so does every Heron item, under its own project prefix');
+  ok(wagKeys.rows.every(r => r.key === ''),
+     'while Wagtail has none at all — the no-key paste has to stay demonstrable');
+  const wagDot = settle(wagKeys.rows).cycleScatter.points[0];
+  is(TD.dotName(wagDot), wagDot.type,
+     'so its dots fall back to the work type, which is what they said before keys existed');
+  const kingDot = settle(demoOf(demo, 'Team Kingfisher').rows).cycleScatter.points[0];
+  is(TD.dotName(kingDot), kingDot.key, 'while Kingfisher\u2019s are named by their key');
+  ok(/^KFR-\d+$/.test(kingDot.key), 'and the key reached the chart layer, not just storage');
+
+  /* A key names an ITEM, so two items must never share one. Pinned across the
+     whole demo rather than per team: a generator that reset its counter would
+     put the same name on a Kingfisher dot and a Heron dot. */
+  const allKeys = demo.flatMap(t => t.rows.map(r => r.key)).filter(Boolean);
+  is(new Set(allKeys).size, allKeys.length, 'no two demo items share a key');
+
   /* Wagtail's export stops nine days before everybody else's, which is what
      makes the All teams view's Data to column demonstrable: without a team like
      it that column is a row of matching dates that looks like it does nothing.
@@ -3127,15 +3368,20 @@ group('ARTs — the grouping, and the boundary it crosses');
     /* Deliberately mixed: two finished with different spans, one still in
        progress, one finished with no start date — the two kinds of absence this
        table has to place. */
-    { c: '2026-03-10', s: '2026-03-01', t: 'Story' },   /* 9 days  */
-    { c: '2026-01-20', s: '2026-01-18', t: 'Bug' },     /* 2 days  */
-    { c: null,         s: '2026-04-01', t: 'Task' },    /* open    */
-    { c: '2026-02-05', s: null,         t: 'Alpha' }    /* no span */
+    { c: '2026-03-10', s: '2026-03-01', t: 'Story', i: 'DAE-10' },   /* 9 days  */
+    { c: '2026-01-20', s: '2026-01-18', t: 'Bug',   i: 'DAE-9'  },   /* 2 days  */
+    { c: null,         s: '2026-04-01', t: 'Task',  i: 'ABC-2'  },   /* open    */
+    { c: '2026-02-05', s: null,         t: 'Alpha' }                 /* no span, no key */
   ] }], settings: {} });
   win.selectTab('data');
 
-  const dCells = (i) => [...win.document.querySelectorAll('#dataItemsTable tbody tr')]
-    .map(tr => tr.cells[i].innerText.trim());
+  /* Columns are addressed by their sort key rather than by a literal index, so
+     inserting one — the Item column did exactly that — moves no test but the
+     ones that are actually about it. */
+  const dCol = (k) => [...win.document.querySelectorAll('#dataItemsTable th')]
+    .findIndex(th => th.querySelector('[data-datasort="' + k + '"]'));
+  const dCells = (k) => [...win.document.querySelectorAll('#dataItemsTable tbody tr')]
+    .map(tr => tr.cells[dCol(k)].innerText.trim());
   const dPress = (k) => win.document.querySelector('[data-datasort="' + k + '"]').click();
   const sortedCol = () => [...win.document.querySelectorAll('#dataItemsTable th')]
     .findIndex(th => th.getAttribute('aria-sort'));
@@ -3152,34 +3398,47 @@ group('ARTs — the grouping, and the boundary it crosses');
   /* The order it opens in, and the one it returns to: still in play first, then
      newest. Pressing a heading asks for a different order rather than replacing
      the default with whatever was last pressed. */
-  is(dCells(0), ['in progress', '2026-03-10', '2026-02-05', '2026-01-20'],
+  is(dCells('completed'), ['in progress', '2026-03-10', '2026-02-05', '2026-01-20'],
      'unfinished first, then newest — the order the table opens in');
 
   dPress('cycle');
-  is(dCells(4), ['9.0', '2.0', '—', '—'], 'cycle time runs longest-first on the first press');
+  is(dCells('cycle'), ['9.0', '2.0', '—', '—'], 'cycle time runs longest-first on the first press');
   dPress('cycle');
-  is(dCells(4), ['2.0', '9.0', '—', '—'],
+  is(dCells('cycle'), ['2.0', '9.0', '—', '—'],
      'and reverses — but the two with no cycle time stay LAST either way');
 
   dPress('completed');
-  is(dCells(0), ['2026-03-10', '2026-02-05', '2026-01-20', 'in progress'],
+  is(dCells('completed'), ['2026-03-10', '2026-02-05', '2026-01-20', 'in progress'],
      'a date column runs newest-first, with the unfinished item last');
   dPress('completed');
-  is(dCells(0), ['2026-01-20', '2026-02-05', '2026-03-10', 'in progress'],
+  is(dCells('completed'), ['2026-01-20', '2026-02-05', '2026-03-10', 'in progress'],
      'reversed it runs oldest-first, and the unfinished item is STILL last');
 
   dPress('type');
-  is(dCells(3), ['Alpha', 'Bug', 'Story', 'Task'], 'the type column runs A to Z on the first press');
+  is(dCells('type'), ['Alpha', 'Bug', 'Story', 'Task'], 'the type column runs A to Z on the first press');
 
   /* THREE states, not two. Both tables have a default order worth getting back
      to; with a two-state toggle it was reachable exactly once, on the first
      render, and a reload was the only way back. */
   dPress('type');
-  is(dCells(3), ['Task', 'Story', 'Bug', 'Alpha'], 'a second press reverses it');
+  is(dCells('type'), ['Task', 'Story', 'Bug', 'Alpha'], 'a second press reverses it');
   dPress('type');
   is(sortedCol(), -1, 'and a third turns the sort off — no column is marked as sorted');
-  is(dCells(0), ['in progress', '2026-03-10', '2026-02-05', '2026-01-20'],
+  is(dCells('completed'), ['in progress', '2026-03-10', '2026-02-05', '2026-01-20'],
      'which puts the table back in the order it opened in');
+
+  /* The Item column. It is the one heading here that runs ASCENDING on its
+     first press — every other column has a most-interesting end and this one
+     has none — and it sorts by issueSortKey, so DAE-10 comes after DAE-9
+     rather than between DAE-1 and it. The row with no key is an absence like
+     any other and goes last whichever way the column runs. */
+  dPress('item');
+  is(dCells('item'), ['ABC-2', 'DAE-9', 'DAE-10', '—'],
+     'the Item column runs A to Z and in issue-number order, with the keyless row last');
+  dPress('item');
+  is(dCells('item'), ['DAE-10', 'DAE-9', 'ABC-2', '—'],
+     'reversed it runs the other way, and the keyless row is STILL last');
+  dPress('item');
 
   /* The period column sorts by the completion date behind it, never by its own
      label: "Aug 2026" and "Sep 2026" sort backwards as text, and a week key only
@@ -3188,7 +3447,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   bucketSel.value = 'month'; bucketSel.dispatchEvent(new win.Event('change'));
   win.selectTab('data');
   dPress('period');
-  is(dCells(5), ['Mar 2026', 'Feb 2026', 'Jan 2026', '—'],
+  is(dCells('period'), ['Mar 2026', 'Feb 2026', 'Jan 2026', '—'],
      'the period column sorts chronologically, not alphabetically');
   bucketSel.value = 'week'; bucketSel.dispatchEvent(new win.Event('change'));
   win.selectTab('data');
@@ -3199,7 +3458,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   const sortedHeads = [...win.document.querySelectorAll('#dataItemsTable th')]
     .map(th => th.getAttribute('aria-sort'));
   is(sortedHeads.filter(Boolean), ['descending'], 'exactly one column is marked as sorted');
-  is(sortedHeads[1], 'descending', 'and it is the one that was pressed');
+  is(sortedHeads[dCol('started')], 'descending', 'and it is the one that was pressed');
 
   /* What you export is what you are looking at, so a sort has to travel with it
      — and the arrow on the heading is CSS, so it must not land in the file. */
