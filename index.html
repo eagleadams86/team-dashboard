@@ -505,16 +505,36 @@ table.data td.num { font-family: var(--font-mono); font-size: 12px; color: var(-
    the left edge of a column of right-aligned figures reads as belonging to the
    column before it. */
 table.data th.sortable { padding: 0; }
-table.data th.sortable button { display: block; width: 100%; font: inherit; color: inherit;
+/* `:not(.tile-help)` rather than a class of its own, so the Loaded Data table's
+   headings — which carry no ⓘ — need no markup change to keep this styling. */
+table.data th.sortable button:not(.tile-help) { display: block; width: 100%;
+  flex: 1 1 auto; min-width: 0; font: inherit; color: inherit;
   text-transform: inherit; letter-spacing: inherit; background: none; border: 0;
   padding: 8px 12px; text-align: inherit; cursor: pointer; }
-table.data th.sortable button:hover { color: var(--text-primary); background: var(--surface-alt); }
+table.data th.sortable button:not(.tile-help):hover { color: var(--text-primary); background: var(--surface-alt); }
+/* ── A heading that is two controls ──────────────────────────────────────────
+   The sort button and the ⓘ that opens the figure's note. The flex row is a
+   wrapper INSIDE the cell and not the cell itself: `display: flex` on a <th>
+   stops it generating a table-cell box, and the header row then sizes its
+   columns independently of the body underneath it.
+
+   The sort button still takes the whole width it can, so the word and its arrow
+   stay one target. Every column that carries an ⓘ is a right-aligned figure
+   column, so the label ends at the button's right edge and the circle sits
+   immediately after it — the same side of the word it is on everywhere else in
+   the app. `align-items: center`, not baseline: the circle is sized to the
+   label's own line, and baselining it against an 11px uppercase heading sits it
+   visibly low. */
+table.data th.sortable .th-head { display: flex; align-items: center; }
+/* The gap on the left is the sort button's own right padding; the one on the
+   right is what keeps the circle off the cell border. */
+table.data th.sortable .th-head .tile-help { margin-left: 0; margin-right: 12px; }
 table.data th.num, table.data td.figure { text-align: right; }
 table.data td.figure { font-variant-numeric: tabular-nums; }
 /* The arrow is drawn in the header text, so it needs no width of its own and
    cannot be lost to a narrow column. */
-table.data th[aria-sort] button::after { content: ' \2193'; }
-table.data th[aria-sort="ascending"] button::after { content: ' \2191'; }
+table.data th[aria-sort] button:not(.tile-help)::after { content: ' \2193'; }
+table.data th[aria-sort="ascending"] button:not(.tile-help)::after { content: ' \2191'; }
 
 /* The team you have selected in the header picker, so the row you are in the
    middle of investigating is findable in a table of eight. A left border in the
@@ -2654,43 +2674,6 @@ function parsePastedRows(text, order, stages) {
        the way back in, its keys are stage ids, and an id arriving from a
        hand-edited backup could be spelled `__proto__`. With no prototype there
        is nothing for that to reach; hydrateRows builds it the same way. */
-    /* Where the item is now, as a stage id and never as the word itself. Empty
-       when the export has no status column, when the cell is blank, or when
-       nothing the reader set up answers to it — three different situations that
-       all mean the same thing to the dashboard: this item has no stage. The
-       count of the third is reported, since a whole export matching nothing is
-       a set-up problem rather than a quiet one. */
-    const rawStatus = at(cells, cols.status);
-    /* ONLY for work still in flight, and that is not an optimisation. Every
-       export says "Done" or "Closed" against everything it has finished, which
-       is most of the file — reading those would file the whole history under a
-       stage nobody has, store a useless id on every completed row, and make the
-       unmatched-status count read "800 items" on a perfectly healthy set-up.
-       A finished item's current status says nothing about flow. The one figure
-       this field feeds is the work item age chart, which looks at work in
-       progress and nothing else. */
-    const readStatus = !completed && rawStatus;
-    const stageId = readStatus ? stageIdForStatus(rawStatus, stages) : '';
-    if (readStatus && !stageId) unmatchedStatus++;
-
-    const stageDays = Object.create(null);
-    let anyStage = false;
-    cols.stages.forEach(sc => {
-      const rawDays = at(cells, sc.index);
-      if (rawDays === '') return;
-      const days = cleanStageDays(rawDays);
-      if (days == null) {
-        badStageCells.set(sc.index, (badStageCells.get(sc.index) || 0) + 1);
-        return;
-      }
-      stageDays[sc.stageId] = (stageDays[sc.stageId] || 0) + days;
-      anyStage = true;
-    });
-    /* Capped again AFTER the summing, or two aliases at the ceiling would make
-       one stage twice it. */
-    if (anyStage) for (const id of Object.keys(stageDays))
-      stageDays[id] = Math.min(Math.round(stageDays[id] * 100) / 100, STAGE_DAYS_MAX);
-
     /* An empty completion date is not an error — it is work in progress, and it
        counts: the "started this week" tally never looks at completion at all.
        Dropping these rows made net flow read systematically too positive. Text
@@ -2748,6 +2731,60 @@ function parsePastedRows(text, order, stages) {
        you get a dashboard nobody trusts. */
     if (!completed && !started) { undated++; return; }
     if (!completed) unfinished++;
+
+    /* ── The stage columns, read only once the row is a KEEPER ───────────────
+       Everything below this line runs after the three `return`s above, and that
+       position is the whole point: both figures it produces are reports about
+       what was LOADED, and a row that was dropped loaded nothing.
+
+       It used to sit further up, and the count it produced was wrong in the
+       ordinary case rather than an exotic one. Every export carries a backlog —
+       raised, never started — and those rows have a status ("To Do", "Backlog")
+       and no dates at all, so they are dropped by the `undated` return above.
+       Counted before that return, they made the unmatched-status note read
+       "400 items had a status no stage answers to" on a set-up whose spellings
+       were perfect, and sent the reader to check a dialog that was right. It is
+       the same failure the in-flight-only rule below was written to prevent —
+       that rule just did not reach as far as the rows dropped down here. The
+       bad-cell tally moved with it for the same reason: "left out" is a claim
+       about a row that was kept.
+
+       Where the item is now, as a stage id and never as the word itself. Empty
+       when the export has no status column, when the cell is blank, or when
+       nothing the reader set up answers to it — three different situations that
+       all mean the same thing to the dashboard: this item has no stage. The
+       count of the third is reported, since a whole export matching nothing is
+       a set-up problem rather than a quiet one. */
+    const rawStatus = at(cells, cols.status);
+    /* ONLY for work still in flight, and that is not an optimisation. Every
+       export says "Done" or "Closed" against everything it has finished, which
+       is most of the file — reading those would file the whole history under a
+       stage nobody has, store a useless id on every completed row, and make the
+       unmatched-status count read "800 items" on a perfectly healthy set-up.
+       A finished item's current status says nothing about flow. The one figure
+       this field feeds is the work item age chart, which looks at work in
+       progress and nothing else. */
+    const readStatus = !completed && rawStatus;
+    const stageId = readStatus ? stageIdForStatus(rawStatus, stages) : '';
+    if (readStatus && !stageId) unmatchedStatus++;
+
+    const stageDays = Object.create(null);
+    let anyStage = false;
+    cols.stages.forEach(sc => {
+      const rawDays = at(cells, sc.index);
+      if (rawDays === '') return;
+      const days = cleanStageDays(rawDays);
+      if (days == null) {
+        badStageCells.set(sc.index, (badStageCells.get(sc.index) || 0) + 1);
+        return;
+      }
+      stageDays[sc.stageId] = (stageDays[sc.stageId] || 0) + days;
+      anyStage = true;
+    });
+    /* Capped again AFTER the summing, or two aliases at the ceiling would make
+       one stage twice it. */
+    if (anyStage) for (const id of Object.keys(stageDays))
+      stageDays[id] = Math.min(Math.round(stageDays[id] * 100) / 100, STAGE_DAYS_MAX);
 
     const out = { completed: completed || null, started: usableStarted || null,
                   created: usableCreated || null, type, key };
@@ -3551,6 +3588,10 @@ function derive(rows, settings, view, stages) {
      averages these rather than the per-bucket means, so an empty bucket (stored
      as 0 in the series to keep the line unbroken) can't drag it down. */
   const windowCycles = [], windowLeads = [];
+  /* The ITEMS the window covers, as against the durations pooled beside them.
+     Collected here rather than re-derived, so anything reading it describes
+     exactly the set the charts above are drawn from. */
+  const windowItems = [];
   let unplannedTotal = 0;
 
   for (const ws of weekStarts) {
@@ -3559,6 +3600,7 @@ function derive(rows, settings, view, stages) {
     bucketLabels.push(bucketLabel(ws, bucket));
 
     const done = byCompletedWeek.get(key) || [];
+    windowItems.push(...done);
 
     throughput.push(done.length);
 
@@ -3989,8 +4031,28 @@ function derive(rows, settings, view, stages) {
   const completedTotal = throughput.reduce((a, b) => a + b, 0);
   const unplannedShare = completedTotal > 0 ? unplannedTotal / completedTotal : null;
 
-  /* Computed before the wording below, which states how many items it covers. */
-  const stageTimes = stageTimesOf(items);
+  /* Everything the window covers: what finished inside it, plus what is open
+     now — the same population `windowItemCount` states in the note above the
+     charts, so the card's "over N items" and the note cannot disagree. An open
+     item has no completion and so no bucket, which is why it is added here
+     rather than falling out of the walk above. */
+  const stageWindow = windowItems.concat(items.filter(r => !r.completed));
+
+  /* Computed before the wording below, which states how many items it covers.
+
+     OVER THE WINDOW, like every other figure on this screen. It shipped reading
+     `items` — every row the team holds — which made it the one card on the
+     dashboard that did not move when the "show data for most recent" picker
+     did: one month, three months and all data gave identical medians on a
+     nine-month export, under a note that had just said which three months were
+     being shown. Nothing else here is read that way, and the comment on the
+     returned field claimed it already was.
+
+     What the window does NOT do is turn these into partial measurements: an
+     item still in flight contributes the days it has spent so far, exactly as
+     it did before, and it is in scope here because it is in scope everywhere
+     else on the screen. The card's own title says how many items it covers. */
+  const stageTimes = stageTimesOf(stageWindow);
 
   return {
     empty: weeks.length === 0,
@@ -4003,8 +4065,9 @@ function derive(rows, settings, view, stages) {
     throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
     wip, agedCount, agedDays, ageing, cycleScatter, forecast,
     /* Keyed by stage id and carrying no names — see stageTimesOf. Read over the
-       same filtered `items` every figure above it is read over, so the work-type
-       filter reaches it exactly as it reaches everything else on the screen. */
+       same window AND the same work-type filter every figure above it is read
+       over, so the two controls at the top of the page reach it exactly as they
+       reach everything else on the screen. */
     stageTimes,
     /* `endDate` is what every figure was read as of; `dataEnd` is what this
        team's own export runs to. Equal unless a caller imposed a shared date. */
@@ -4053,6 +4116,16 @@ function derive(rows, settings, view, stages) {
         ? (wip.length ? wip[wip.length - 1] : 0) / monthlyThroughput : null
     },
     itemCount: items.length,
+    /* How many of those the WINDOW covers: what finished inside it, plus what is
+       open now. `itemCount` beside it is every item this team holds — the window
+       trims weeks, not rows, which is deliberate and pinned — and the two are
+       different numbers whenever somebody narrows the picker.
+       The window note used to state `itemCount` directly under the sentence
+       naming the dates, so a Heron reading three months of a nine-month export
+       said "14 weeks · 190 items" about a window holding 67 of them. The note
+       states both now; this is the half that answers the question the sentence
+       above it asked. */
+    windowItemCount: completedTotal + (items.length - finished.length),
     inProgressCount: items.length - finished.length,
     startDate, endDate,
     /* What each chart IS, as against what it plots. Short enough to head a card
@@ -5390,11 +5463,24 @@ function sparkSvg(values) {
    direction in text. Both halves are built from numbers this app computed, so
    nothing here needs escaping — but the figure still goes through it, because
    "everything that reaches innerHTML is escaped" is cheaper to keep true than
-   to keep checking. */
+   to keep checking.
+
+   IT IS AN ORDINARY SIGNED NUMBER, and it has to be. The tables in this app are
+   read off the rendered page, so what is written here is what lands in the CSV —
+   and this column shipped writing U+2212 MINUS, the typographic character, plus
+   a "±" for a flat run. Both are text to a spreadsheet, which made the one
+   column whose whole point is its sign the one column nobody could sort or
+   average. That is the same reasoning csvCell states for leaving `-3` alone:
+   people export a CSV to do arithmetic in it.
+
+   So: ASCII `-`, an explicit `+` on a rise (csvCell now leaves a leading plus on
+   a plain number alone, see FORMULA_LEAD), and a flat run reads `0.0` rather
+   than `±0.0` — which says the same thing and says it as a number. The trace
+   beside it is what makes the direction readable at a glance either way. */
 function sparkCell(d) {
   const t = throughputTrend(d);
   if (!t) return '<td class="figure">—</td>';
-  const sign = t.change > 0.05 ? '+' : (t.change < -0.05 ? '−' : '±');
+  const sign = t.change > 0.05 ? '+' : (t.change < -0.05 ? '-' : '');
   const mag = num1(Math.abs(t.change));
   return '<td class="figure spark-cell">' + sparkSvg(t.series)
     + '<span class="spark-val">' + escapeHtml(sign + mag) + '</span></td>';
@@ -6056,6 +6142,26 @@ function drawCharts(d) {
 
 const $ = id => document.getElementById(id);
 
+/* "67 of 190 items", or just "190 items" when the window covers the lot.
+   ONE helper for both notes — the dashboard's and All Teams' — because they are
+   the same sentence about a different scope, and a pair that drifted on how they
+   count would be two answers to one question.
+
+   The "of" form is what makes the rest of the screen add up: a reader whose
+   Completed tile says 58 and whose note said "190 items" has been handed two
+   figures that cannot both describe the window, and no way to tell which one
+   does. Stating both says plainly that the picker above is hiding history rather
+   than that a figure is wrong.
+
+   Pluralised on the TOTAL in the "of" form, the same rule the team count beside
+   it follows — "1 of 3 team" reads as a bug in everything else on the page. */
+function itemsInWindow(d) {
+  const inWindow = d.windowItemCount == null ? d.itemCount : d.windowItemCount;
+  const all = d.itemCount;
+  return (inWindow < all ? inWindow + ' of ' + all : String(all))
+    + ' item' + (all === 1 ? '' : 's');
+}
+
 function currentFilterValue() {
   const chosen = state.settings.filters.find(f => f.display === view.filterDisplay);
   /* "All" or nothing means no filter at all. */
@@ -6600,7 +6706,7 @@ function renderDashboard() {
      whichever of the two is actually on screen. */
   if (activeTab === 'dashboard') $('windowNote').innerHTML = span + '<br>' +
     d.buckets.length + ' ' + (d.buckets.length === 1 ? d.bucketNoun : d.bucketNounPlural) +
-    ' &middot; ' + d.itemCount + ' item' + (d.itemCount === 1 ? '' : 's') +
+    ' &middot; ' + itemsInWindow(d) +
     (d.inProgressCount ? ' (' + d.inProgressCount + ' in progress)' : '') +
     (d.partial ? '<br>Last ' + d.bucketNoun + ' covers ' + d.partial.daysCovered
       + ' of ' + d.partial.daysInBucket + ' days' : '');
@@ -6775,8 +6881,9 @@ function renderStageTime(d) {
         + 'want to measure — Build, Review, Test — and list the Jira statuses that feed each '
         + 'one. Then paste an export with a Status column, or a Time in Status one.'
       : teamHasStages
-        ? 'No item under the ' + view.filterDisplay + ' work type filter has stage times. '
-          + 'Pick another type — or All — above.'
+        ? 'No item in this window carries stage times under the ' + view.filterDisplay
+          + ' work type filter — this team has some, just not here. Widen '
+          + '\u201cShow data for most recent\u201d, or pick another type — or All — above.'
         : teamHasCurrent
           ? 'Your export says where each item IS, but not how long it has been there — so this '
             + 'table has nothing to measure. Your stages are still working: the work item age '
@@ -6949,12 +7056,24 @@ function teamColumns(train) {
   const defect = (state.settings.unplannedLabel || 'Unplanned');
   const dash = '—';
   const or = (v, f) => (v == null ? dash : f(v));
+  /* ── Which columns carry an ⓘ, and why it is not all of them ───────────────
+     ONLY the two whose note cannot be read anywhere else. Seven of the columns
+     below are the dashboard's own tiles laid side by side, and each of those
+     tiles already carries the ⓘ that opens the same note; the throughput trend
+     and Data to exist only in this table, so until this was wired up their notes
+     — written when the view was built — could not be opened at all.
+
+     Every column used to name a `help` key and the header render never read one,
+     which is how that happened. Putting one on all nine put the table over the
+     width of a 1265px window and into a sideways scroll it had always fitted
+     inside: nine circles at 28px apiece is 250px of a comparison table, spent
+     mostly on notes a reader can already open one tab to the left. */
   return [
     { key: 'name', label: 'Team', text: true, desc: false,
       get: (r) => r.name.toLowerCase() },
-    { key: 'completed', label: 'Completed', desc: true, help: 'throughput',
+    { key: 'completed', label: 'Completed', desc: true,
       get: (d) => d.summary.completedTotal, fmt: (v) => or(v, String) },
-    { key: 'rate', label: 'Per ' + n, desc: true, help: 'throughput',
+    { key: 'rate', label: 'Per ' + n, desc: true,
       get: (d) => d.summary.avgThroughput, fmt: (v) => or(v, num1) },
     /* Beside Per week, because it is that number's history. Ascending on the
        first press, like Data to and for the same reason: every other column's
@@ -6969,15 +7088,14 @@ function teamColumns(train) {
       get: (d) => { const t = throughputTrend(d); return t ? t.change : null; },
       fmt: (v) => or(v, num1) },
     { key: 'p85', label: train.cyclePercentile + 'th ' + cycle.toLowerCase(), desc: true,
-      help: 'cycleTimePercentile',
       get: (d) => d.summary.p85CycleTime, fmt: (v) => or(v, num1) },
-    { key: 'wip', label: 'In progress', desc: true, help: 'wip',
+    { key: 'wip', label: 'In progress', desc: true,
       get: (d) => d.summary.currentWip, fmt: (v) => or(v, String) },
-    { key: 'ratio', label: 'WIP vs month', desc: true, help: 'wip',
+    { key: 'ratio', label: 'WIP vs month', desc: true,
       get: (d) => d.summary.wipRatio, fmt: (v) => or(v, (x) => num1(x) + '×') },
-    { key: 'aged', label: 'Aged', desc: true, help: 'agedWork',
+    { key: 'aged', label: 'Aged', desc: true,
       get: (d) => d.summary.agedNow, fmt: (v) => or(v, String) },
-    { key: 'defects', label: defect + ' rate', desc: true, help: 'defectRate',
+    { key: 'defects', label: defect + ' rate', desc: true,
       get: (d) => d.summary.unplannedShare, fmt: (v) => or(v, pct1) },
     /* Ascending on the first press: the interesting end is the OLDEST export,
        which is the earliest date, which is the opposite of every column beside
@@ -7171,7 +7289,7 @@ function renderAllTeams() {
       + prettyDate(train.endDate) + '</strong>'
     : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(train.endDate) + '</strong>';
   $('windowNote').innerHTML = span + '<br>' + 'every team, as of the same date' +
-    '<br>' + train.itemCount + ' item' + (train.itemCount === 1 ? '' : 's') + ' across ' +
+    '<br>' + itemsInWindow(train) + ' across ' +
     inScope.length + ' team' + (inScope.length === 1 ? '' : 's') +
     (scope ? ' ' + escapeHtml(scopePhrase) : '');
 
@@ -7225,12 +7343,20 @@ function renderAllTeams() {
     });
   }
 
+  /* The ⓘ, on the two columns that carry one — see teamColumns for which and
+     why. It is a SIBLING of the sort button, not a child: a button inside a button is
+     invalid, and the sort listener reads `closest('[data-sort],[data-open]')`,
+     which the ⓘ is not inside — so a press on it falls through to the global
+     [data-help] handler and does not re-sort the table underneath the dialog.
+     cellText already strips `.tile-help`, so nothing new reaches the export. */
   const head = '<thead><tr>' + cols.map(c => {
     const aria = sortCol === c
       ? ' aria-sort="' + (view.teamSortDir === 'asc' ? 'ascending' : 'descending') + '"' : '';
     return '<th scope="col" class="sortable' + (c.text ? '' : ' num') + '"' + aria + '>'
+      + '<span class="th-head">'
       + '<button type="button" data-sort="' + c.key + '" data-desc="' + (c.desc ? '1' : '')
-      + '">' + escapeHtml(c.label) + '</button></th>';
+      + '">' + escapeHtml(c.label) + '</button>' + helpBtn(c.help, c.label)
+      + '</span></th>';
   }).join('') + '</tr></thead>';
 
   const figure = (html) => '<td class="figure">' + html + '</td>';
@@ -9069,15 +9195,25 @@ function tableToRows(table) {
    A leading apostrophe is the standard defence — Excel, Numbers and Sheets all
    read it as "this is text", and it is visible enough in a plain file that
    nobody is misled. It goes only on a cell starting with one of the four
-   characters, so an ordinary figure is untouched, and a NEGATIVE NUMBER is
+   characters, so an ordinary figure is untouched, and a SIGNED NUMBER is
    deliberately left alone: `-3` is a number everywhere, and quoting it would
    break the arithmetic people export a CSV to do. Net flow is negative for half
-   the weeks on a busy board, so this is not hypothetical. */
-const FORMULA_LEAD = /^[=+@]|^-(?![0-9.])/;
+   the weeks on a busy board, so this is not hypothetical.
+
+   THE CARVE-OUT IS "IS THE WHOLE CELL A NUMBER?", not "does the lead look
+   numeric", and the rewrite is stricter than what it replaced in both
+   directions. `+4.3` — the throughput trend column's rising figure — now goes
+   through unquoted, where the old rule sent every leading plus to the escape
+   and made that column text. And `-1+1`, `+A1` and `-alpha` are now all quoted,
+   where the old lookahead let `-3abc` past: it only asked whether the character
+   after the sign was a digit. A DDE payload leading with a plus is still
+   defused, because `+cmd|'/c calc'!A0` is not a number. */
+const FORMULA_LEAD = /^[=+@-]/;
+const PLAIN_NUMBER = /^[+-]?[0-9]+(\.[0-9]+)?$/;
 
 function csvCell(v) {
   let s = String(v == null ? '' : v);
-  if (FORMULA_LEAD.test(s)) s = "'" + s;
+  if (FORMULA_LEAD.test(s) && !PLAIN_NUMBER.test(s)) s = "'" + s;
   /* Quoted whenever the delimiter, a quote or a newline is in play. Dates reach
      here as "Aug 19, 2026" straight off the page, so the comma case is the
      common one rather than the exotic one. */
@@ -9100,7 +9236,7 @@ function toCsv(rows) { return rows.map(r => r.map(csvCell).join(',')).join('\r\n
 function toTsv(rows) {
   return rows.map(r => r.map(v => {
     const s = String(v == null ? '' : v);
-    return FORMULA_LEAD.test(s) ? "'" + s : s;
+    return (FORMULA_LEAD.test(s) && !PLAIN_NUMBER.test(s)) ? "'" + s : s;
   }).join('\t')).join('\r\n');
 }
 
@@ -9923,8 +10059,11 @@ window.TDCleanup = { historyAnchor, outsideWindow, windowCutoff };
      Heron       the board the metrics exist to catch: a long tail, so the 85th
                  percentile lands far above the median (the app's whole argument
                  for reading p85 rather than the average) · nine items in flight
-                 with five of them past the ageing threshold · a defect rate
-                 twice Kingfisher's.
+                 with SIX of them past the 14-day ageing threshold · a defect
+                 rate twice Kingfisher's. The six is counted rather than written
+                 out below — see DEMO_AGED — because the prose said five for a day
+                 after the `wip` list gained an item, and a demo that misdescribes
+                 itself is the one piece of copy nobody thinks to re-check.
      Wagtail     a newer team with FOUR MONTHS of history, NO CREATED DATES and
                  NO ISSUE KEYS,
                  so the lead-time chart's "this needs a created column" face is
@@ -10153,11 +10292,28 @@ function demoPaste(profile) {
   return lines.join('\n');
 }
 
+/* How many of Heron's in-flight items are past the DEFAULT ageing threshold.
+   Counted off the profile rather than written into the sentence below, because
+   the sentence said "five" for a day after the `wip` list gained a sixth aged
+   item — the README was updated and this was not, and a demo that misdescribes
+   itself is the one piece of copy nobody thinks to re-check.
+
+   DEFAULT_SETTINGS.agedDays, not this browser's own: the number is stated
+   alongside it, so the sentence is true on its own terms whatever threshold the
+   reader has set, and it stays true in working-days mode — where the ages below
+   are calendar days and re-counting them against the setting would be a figure
+   that disagrees with the tile it is describing. */
+const DEMO_AGED = (() => {
+  const heron = DEMO_TEAMS.find(p => p.name === 'Team Heron');
+  return heron ? heron.wip.filter(a => a > DEFAULT_SETTINGS.agedDays).length : 0;
+})();
+
 function loadSample() {
   if (!confirm(
       'Load the demo? Three teams and about nine months of work items, ending today.\n\n'
     + 'Kingfisher is a healthy board. Heron is the one the metrics exist to catch — a long '
-    + 'tail on cycle time, and five items aged past the threshold. Wagtail is newer and has '
+    + 'tail on cycle time, and ' + DEMO_AGED + ' items aged past the '
+    + DEFAULT_SETTINGS.agedDays + '-day threshold. Wagtail is newer and has '
     + 'no created dates, so you can see what lead time does without them.\n\n'
     + 'Kingfisher and Heron are grouped onto one Agile Release Train and Wagtail is on '
     + 'none, so the All Teams view has something to group.\n\n'

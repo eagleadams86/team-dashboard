@@ -951,6 +951,36 @@ async function run(TD, win) {
   ok(!/Code Review|Compliance Review|Done/i.test(JSON.stringify(statusRes.rows)),
      'and NO status name survives the parse — the rows carry a stage id or nothing');
 
+  /* A row that is DROPPED loaded nothing, so it cannot have loaded an unmatched
+     status. The backlog is the ordinary case and it is most of a real export:
+     raised, never started, a status of "To Do" and no dates at all — dropped by
+     the undated rule. Counted before that rule, they made this note read "400
+     items had a status no stage answers to" on a set-up whose spellings were
+     perfect, and sent the reader to check a dialog that was right. */
+  const backlogPaste = [
+    'Issue key\tIn Progress\tResolved\tIssue Type\tStatus',
+    'DAE-1\t2026-08-02\t\tStory\tCode Review',
+    'DAE-2\t\t\tStory\tTo Do',
+    'DAE-3\t\t\tStory\tBacklog',
+    'DAE-4\tnot a date\tnot a date\tStory\tTriage'
+  ].join('\n');
+  const backlogRes = TD.parsePastedRows(backlogPaste, 'auto', STG);
+  is(backlogRes.rows.length, 1, 'one row of the four is loadable');
+  is(backlogRes.undated, 2, 'two carried a status and no dates at all');
+  is(backlogRes.unmatchedStatus, 0,
+     'and NONE of the three dropped rows is counted as an unmatched status');
+
+  /* The bad-cell tally moved with it, and for the same reason: "left out" is a
+     claim about a row that was kept. */
+  const droppedStagePaste = [
+    'In Progress\tResolved\tDevelopment',
+    '\t\t3d 4h',
+    '2026-08-02\t\t2d'
+  ].join('\n');
+  const droppedStage = TD.parsePastedRows(droppedStagePaste, 'auto', STG);
+  is(droppedStage.badStageCells.reduce((n, c) => n + c.count, 0), 1,
+     'an unreadable day count on a DROPPED row is not reported as left out');
+
   is(TD.parsePastedRows(statusPaste, 'auto', []).rows.every(r => !r.stage), true,
      'with no stages set up the same paste stores no stage at all');
 
@@ -1150,6 +1180,37 @@ async function run(TD, win) {
   is(allZero.byStage[0].share, 0, 'a share of nothing is nothing, not a division by zero');
   is(TD.stageTimesOf([]).byStage, [], 'and no items is an empty answer rather than an error');
 
+  /* ── and derive() reads them over THE WINDOW ────────────────────────────────
+     It shipped reading every row the team held, which made Time in Stage the
+     one card on the dashboard that did not move when the window picker did:
+     one month, three months and all data gave identical medians under a note
+     that had just said which three months were being shown. */
+  const stageWindowRows = [
+    /* Old: finished well before any short window, and slow. */
+    { completed: D(2015, 1, 20), started: D(2015, 1, 10), created: null, type: 'Story',
+      key: '', stages: { sb: 40 }, stage: '' },
+    { completed: D(2015, 1, 21), started: D(2015, 1, 11), created: null, type: 'Story',
+      key: '', stages: { sb: 40 }, stage: '' },
+    /* Recent: inside a one-month window, and quick. */
+    { completed: D(2015, 6, 20), started: D(2015, 6, 18), created: null, type: 'Story',
+      key: '', stages: { sb: 2 }, stage: '' }
+  ];
+  const stWin = TD.derive(stageWindowRows, SAMPLE_SETTINGS, { filterValue: '', months: 1 });
+  const stAll = TD.derive(stageWindowRows, SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+  is(stWin.stageTimes.measured, 1, 'a one-month window measures only what finished inside it');
+  is(stAll.stageTimes.measured, 3, 'and "all data" measures the lot');
+  is(stWin.stageTimes.byStage[0].median, 2, 'so the median follows the picker above it');
+  is(stAll.stageTimes.byStage[0].median, 40, 'rather than answering the same on every setting');
+
+  /* Work still in flight has no completion and so no bucket. It is in scope
+     everywhere else on the screen — the WIP tile counts it, the age chart plots
+     it — so it is in scope here, and it has to be added rather than walked to. */
+  const stFlight = TD.derive(stageWindowRows.concat([
+    { completed: null, started: D(2015, 6, 19), created: null, type: 'Story',
+      key: '', stages: { sb: 1 }, stage: '' }
+  ]), SAMPLE_SETTINGS, { filterValue: '', months: 1 });
+  is(stFlight.stageTimes.measured, 2, 'an open item is measured whatever window is set');
+
   /* ────────────────────────────────────────────────────────── */
   group('Cycle time');
 
@@ -1320,6 +1381,18 @@ async function run(TD, win) {
   ok(dAll.weeks.length > d.weeks.length, '"All" shows more weeks than a 3-month window',
      dAll.weeks.length + ' vs ' + d.weeks.length);
   is(dAll.itemCount, 141, 'item count is the same either way');
+  /* The window trims weeks and not rows — which is why `itemCount` is the same
+     either way above, and why the note beside the dates needs a second figure.
+     It used to state `itemCount` directly under the sentence naming them, so
+     three months of a nine-month export read "14 weeks · 190 items" about a
+     window holding 67 of them. */
+  is(dAll.windowItemCount, dAll.itemCount,
+     'with no window every loaded item is in it');
+  ok(d.windowItemCount < d.itemCount,
+     'a 3-month window covers fewer than the team holds',
+     d.windowItemCount + ' of ' + d.itemCount);
+  is(d.windowItemCount, d.summary.completedTotal + d.inProgressCount,
+     'and it is exactly what finished in the window plus what is open now');
 
   const d1 = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: '', months: 1 });
   is(iso(d1.startDate), '2015-04-13', 'a 1-month window starts 1 month back from the end date');
@@ -3857,9 +3930,11 @@ group('ARTs — the grouping, and the boundary it crosses');
      loadSample() confirms, saves, renders and toasts. confirm and the two view
      calls are stubbed for the length of it — save() is left alone, since this
      suite already writes this origin's td-* keys and says so at the top. */
+  let demoConfirmText = '';
   function loadDemo() {
     const real = { confirm: win.confirm, renderAll: win.renderAll, toast: win.toast };
-    win.confirm = () => true; win.renderAll = () => {}; win.toast = () => {};
+    win.confirm = (msg) => { demoConfirmText = String(msg); return true; };
+    win.renderAll = () => {}; win.toast = () => {};
     try { win.loadSample(); } finally { Object.assign(win, real); }
     /* tdGet() serialises; derive() needs live rows. Back through sanitizeTeams,
        which is the same door a saved or synced copy comes in by — so what these
@@ -3891,6 +3966,18 @@ group('ARTs — the grouping, and the boundary it crosses');
 
   is([king.summary.agedNow, heron.summary.agedNow], [0, 6],
      'and only Heron has aged work, so the Aged work tile has both faces');
+
+  /* THE DIALOG THAT OFFERS THE DEMO HAS TO DESCRIBE IT. It said "five items aged
+     past the threshold" for as long as Heron's `wip` list had six of them past
+     it — the README was corrected and this sentence was not, and a demo that
+     misdescribes itself is the one piece of copy nobody thinks to re-check. It
+     is counted from the profile now rather than written out, and this is what
+     keeps the count honest if the profile ever changes again. */
+  ok(demoConfirmText.includes(heron.summary.agedNow + ' items aged past the'),
+     'the Load sample data dialog states Heron\u2019s real aged count',
+     demoConfirmText.split('\n')[2] || demoConfirmText.slice(0, 120));
+  ok(demoConfirmText.includes(heron.agedDays + '-day threshold'),
+     'and names the threshold it counted against, so the sentence stands on its own terms');
   is(demo.map(t => t.rows.filter(r => !r.completed).length), [4, 9, 3],
      'every team has work in progress, so WIP and net flow are never empty');
 
@@ -4269,6 +4356,44 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(sortedTeamCol(), -1, 'a third press turns the sort off');
   is(cellsOf(0), ['Petrel', 'Osprey', 'Avocet'], 'and the picker’s order comes back');
 
+  /* ── The ⓘ on a column heading ────────────────────────────────────────────
+     Every column here carried a `help` key from the day the view was built and
+     the header render never read one, so the two notes describing columns that
+     exist ONLY in this table — the throughput trend, and Data to — could not be
+     opened at all. Those two are wired up now and the other seven deliberately
+     are not: their notes open from the dashboard tiles one tab to the left, and
+     nine circles at 28px apiece put this table over the width of an ordinary
+     window and into a sideways scroll it had always fitted inside. */
+  const helpOn = (key) => win.document.querySelectorAll('#allTeamsTable thead th')[colIndexEarly(key)]
+    .querySelector('[data-help]');
+  const colIndexEarly = (key) => [...win.document.querySelectorAll('#allTeamsTable thead th')]
+    .findIndex(th => th.querySelector('[data-sort="' + key + '"]'));
+  ok(helpOn('trend'), 'the throughput trend column carries its ⓘ');
+  ok(helpOn('dataEnd'), 'and so does Data to — the other column unique to this view');
+  is(helpOn('name'), null, 'the team name is not a metric, so it has none');
+  is(helpOn('wip'), null,
+     'and neither does In progress — its note opens from the tile of the same name');
+  is(win.document.querySelectorAll('#allTeamsTable thead [data-help]').length, 2,
+     'exactly two, so the table keeps the width it has always fitted inside');
+
+  const helpDlg = win.document.getElementById('helpDialog');
+  const sortBefore = win.document.querySelectorAll('#allTeamsTable thead th')[colIndexEarly('trend')]
+    .getAttribute('aria-sort');
+  helpOn('trend').click();
+  is(win.document.getElementById('helpTitle').textContent, 'Throughput Trend',
+     'pressing it opens that column\u2019s own note');
+  ok(win.document.getElementById('helpBody').textContent.length > 40,
+     'with something in it — a key with no entry renders no button at all');
+  is(win.document.querySelectorAll('#allTeamsTable thead th')[colIndexEarly('trend')]
+       .getAttribute('aria-sort'), sortBefore,
+     'and does NOT re-sort the table underneath the dialog');
+  helpDlg.close();
+
+  /* Furniture, not a value: the export reads the rendered page, and a column of
+     "Throughput trend i" headings would be in every file. */
+  const headings = TD.tableToRows(win.document.getElementById('allTeamsTable'))[0];
+  ok(!headings.some(h => /\bi$/.test(h)), 'and it is stripped from the export', headings.join(' | '));
+
   /* An empty team keeps its row and still says the two things it can. */
   win.document.querySelector('[data-sort="name"]').click();   /* Z to A, so Petrel leads */
   const petrel = [...win.document.querySelectorAll('#allTeamsTable tbody tr')]
@@ -4489,6 +4614,18 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(TD.csvCell('-5'), '-5', 'a real negative number is left alone');
   is(TD.csvCell('-0.5'), '-0.5', 'including a fractional one');
   is(TD.csvCell('-alpha'), "'-alpha", 'but a dash followed by text is not a number');
+  /* The throughput trend column writes an explicit + on a rise, and the whole
+     point of that column is its sign — quoting it made it the one column in the
+     file nobody could sort or average. The test is "is the whole cell a
+     number?", so the DDE payload above still goes through the escape. */
+  is(TD.csvCell('+4.3'), '+4.3', 'and a signed POSITIVE number goes through too');
+  is(TD.csvCell('+1'), '+1', 'sign, digits, nothing else');
+  is(TD.csvCell("+cmd|' /c calc'!A1"), "'+cmd|' /c calc'!A1",
+     'a payload leading with a plus is still defused — it is not a number');
+  is(TD.csvCell('-1+1'), "'-1+1", 'nor is a sum that merely starts with a digit');
+  is(TD.csvCell('-3abc'), "'-3abc", 'which the old lookahead let straight past');
+  is(TD.toTsv([['+4.3', '-1+1']]), '+4.3\t\'-1+1',
+     'and the clipboard flavour draws the line in the same place');
   /* Net flow is negative for half the weeks on a busy board, so quoting a
      negative would break the arithmetic people export a CSV to do. */
   is(TD.toCsv([['Net flow'], ['-4']]), 'Net flow\r\n-4', 'and it survives a whole file untouched');
@@ -4693,6 +4830,26 @@ group('ARTs — the grouping, and the boundary it crosses');
        it is what separates them. */
     is(win.sparkSvg([1, 2, 3]), win.sparkSvg([100, 200, 300]),
        'the trace is normalised to its own range');
+
+    /* ── The figure beside it has to be a NUMBER ────────────────────────────
+       These tables are read off the rendered page, so what is written into the
+       cell is what lands in the CSV. This column shipped writing U+2212 MINUS
+       and a "±" for a flat run, both of which a spreadsheet reads as text —
+       which made the one column whose whole point is its sign the one column
+       nobody could sort or average. */
+    const valOf = (vals) => {
+      const box = win.document.createElement('table');
+      box.innerHTML = '<tr>' + win.sparkCell({ throughput: vals }) + '</tr>';
+      return TD.cellText(box.rows[0].cells[0]);
+    };
+    is(valOf(falling), '-8.0', 'a falling trend writes an ASCII minus, not a typographic one');
+    is(valOf(rising), '+5.0', 'a rising one carries its sign explicitly');
+    is(valOf(flat), '0.0', 'and a flat run is a plain zero rather than a ± nothing can parse');
+    ok(!/[\u2212\u00b1]/.test(valOf(falling) + valOf(rising) + valOf(flat)),
+       'no character a spreadsheet would refuse to read as a number');
+    /* End to end: the whole point is that the exported column is arithmetic. */
+    is(TD.toCsv([['Trend'], [valOf(falling)], [valOf(rising)]]), 'Trend\r\n-8.0\r\n+5.0',
+       'so the CSV guard lets both signs straight through');
   }
 
   group('package.json — the manifest Dependabot scans');

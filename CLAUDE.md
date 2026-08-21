@@ -241,6 +241,57 @@ this file was written to keep out. **Read this whole section before changing any
   meaning rather than a parse. Neither is built. The work item age chart's stage axis WAS
   built — off the current stage rather than off these durations; see the section above it.
 
+## Six Bugs Found by Reading (2026-08-21) — no schema change
+
+A read-through of the whole file after the trend column landed. Nothing here needed a stored
+field, and all six were the same shape: a figure or a sentence that described something other
+than what it was next to.
+
+- **Time in stage read every row the team held, not the window.** `stageTimesOf(items)` where
+  every other figure on that screen is built from the bucket walk — so one month, three months
+  and all data gave identical medians under a note that had just said which three months were
+  being shown, and the comment on the returned field asserted the opposite of what the code did.
+  It now takes `windowItems.concat(items.filter(r => !r.completed))`: what finished inside the
+  window, plus what is open now. **The open half has to be added rather than walked to** — an
+  open item has no completion and so no bucket — and it belongs in scope because it is in scope
+  everywhere else on that screen. The card's empty face gained the window as a possible cause,
+  or a team whose stage times all sit outside the picker is told to change the work-type filter.
+- **The window note stated `itemCount`, which is deliberately not windowed.** "14 weeks · 190
+  items" about a window holding 67. `itemCount` is right as it stands and pinned as such — the
+  window trims weeks, not rows — so the fix is the sentence: `windowItemCount` is a second field
+  and `itemsInWindow()` writes "67 of 190 items", dropping the "of" form when the window covers
+  the lot. **One helper for both notes**, the dashboard's and All Teams', because they are the
+  same sentence about a different scope.
+- **`unmatchedStatus` counted rows the parser then threw away.** The in-flight-only rule exists
+  so a file full of "Done" cannot make that count read 800; it did not reach the rows dropped
+  further down the loop, and an untouched backlog item — a status, no dates at all — is dropped
+  by the `undated` return. So an ordinary export made the note say "400 items had a status no
+  stage answers to" and sent the reader to check spellings that were right. **The whole stage
+  block moved below the three `return`s**, bad-cell tally included: "left out" is a claim about a
+  row that was kept.
+- **The trend column exported as text.** It wrote U+2212 MINUS and a "±" for a flat run, both of
+  which a spreadsheet refuses as numbers — in the one column whose entire point is its sign, in
+  tables the README describes as arithmetic you can do. Now ASCII, with an explicit `+` on a rise
+  and a plain `0.0` when flat. **`FORMULA_LEAD` was rewritten to match**: the test is now "is the
+  whole cell a number?" (`PLAIN_NUMBER`) rather than "does the character after the sign look
+  numeric", which lets `+4.3` through and newly catches `-3abc`, `-1+1` and `+A1` — stricter in
+  both directions, and the DDE payloads are still defused because none of them is a number.
+- **Every All Teams column named a `help` key and the header render never read one.** Dead since
+  the view was built, and two of the notes behind it — the throughput trend and Data to —
+  describe columns that exist ONLY in that table, so they could not be opened anywhere. Wired up
+  **for those two and deliberately not for the other seven**: those are dashboard tiles laid on
+  their side and the tile already carries the note, and nine circles at 28px apiece measured the
+  table over the width of an ordinary window and into a sideways scroll it had always fitted
+  inside (1373px against 1265). The ⓘ is a SIBLING of the sort button inside a `.th-head` flex
+  wrapper — a button inside a button is invalid, and `display: flex` on a `<th>` stops it
+  generating a table-cell box and unpicks the column alignment. The sort arrow's selector needed
+  `:not(.tile-help)` or it landed on both buttons.
+- **"five items aged past the threshold" — it was six.** Heron's `wip` list gained an item, the
+  README was corrected and the Load-sample dialog was not. Counted from the profile now
+  (`DEMO_AGED`) rather than written out, against `DEFAULT_SETTINGS.agedDays` with the threshold
+  named in the same sentence — the live setting would be wrong in working-days mode, where these
+  ages are calendar days. A test asserts the dialog's own text against the derived figure.
+
 ## The Current Stage (2026-08-21) — SCHEMA 8 → 9
 
 `r.stage` on each row (`w` on the wire), read from an ordinary **Status** column. It exists

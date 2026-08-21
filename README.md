@@ -97,6 +97,15 @@ app has no targets, so no tile is ever coloured "good" or "bad". There being exa
 headline row, they go four-across on a wide window and pair into a 2x2 on a narrower one — never
 three and a stray fourth; the group rows vary in count and are laid out by `auto-fit` instead.
 
+### How Many Items the Window Covers
+
+The window note under the date range reads **"14 weeks · 67 of 190 items (9 in progress)"** when
+the picker is hiding history, and just "190 items" when it is not. Both numbers are worth having:
+the first is what every figure on the screen is computed from, and the second is what the team
+holds. Narrowing the window trims *weeks*, not rows — nothing is deleted — so without the pair the
+note stated a count nearly three times what the charts under it were drawn from, directly beneath
+the sentence naming the three months being shown.
+
 ### Whole Periods, and Which Figures Use Them
 
 Your data usually stops part-way through a period — the export runs to a Tuesday, the month it
@@ -203,6 +212,11 @@ people actually scan for:
 | **Defect rate** | Who has a quality problem? |
 | **Data to** | …and whose figures are worth trusting at all |
 
+**Throughput trend** and **Data to** carry an ⓘ of their own, because they are the two columns
+that exist only here — every other column is a dashboard tile laid on its side, and the tile
+carries the note. Nine circles across one header row costs 250px of a table already tight for
+width, which is the whole reason it is two and not nine.
+
 **Throughput trend** deserves its own paragraph, because it answers something none of the other
 columns can.
 Every other figure here is a snapshot, so a team halfway down a decline reads exactly like a team
@@ -210,6 +224,12 @@ that was always that slow — and the chart above hides it, because one team's s
 gain. The sparkline is that team's throughput across the window on screen, drawn from the same
 fitted line the chart uses, with the signed figure beside it showing what the line rises or falls
 by end to end. Sort by it to put the steepest fallers on top.
+
+The signed figure is a **plain number** — `-1.1`, `+4.3`, `0.0` — so the column survives the trip
+into a spreadsheet as something you can sort and average. It is written with an ordinary hyphen
+rather than a typographic minus for exactly that reason: these tables are read off the rendered
+page, so what is on screen is what lands in the CSV, and the one column whose whole point is its
+sign is the last one that should arrive as text.
 
 The trace is **scale-free** — normalised to its own range — so what it shows is the *shape*. Two
 teams with identical traces can be delivering at very different rates; Per week beside it is the
@@ -857,6 +877,12 @@ for someone to review it. **Time in stage** does, and it is the one card on the 
 is a table rather than a chart — five stages is five numbers, and a bar chart of five numbers
 says less than the numbers do.
 
+It reads **the window and the filter**, like everything else on the screen: what finished inside
+the dates you picked, plus what is open now. The card's own title says how many items that is, and
+it is the same figure the window note above states. (It shipped reading every row the team held,
+which made it the one card that did not move when the picker did — one month, three months and all
+data gave the same medians under a note that had just said which three months were being shown.)
+
 ### Two Exports, One Set-Up
 
 Stages read **two different kinds of export**, and you set them up once for both:
@@ -948,7 +974,9 @@ echoed a pasted cell.
 
 If items had a status **no stage answers to**, it says how many. It does not say what they were:
 that is work-system text, and the count is what tells you your aliases are wrong rather than one
-row being odd. If nothing matched, it says so and points you at the Teams
+row being odd. It counts only rows that were actually **loaded** — an untouched backlog item has a
+status and no dates at all, so it is dropped before it gets here, and counting those made the note
+read "400 items had a status no stage answers to" on a set-up whose spellings were perfect. If nothing matched, it says so and points you at the Teams
 window. If a stage's alias named a column the dashboard already needs — aliasing `Created`, say
 — the date wins and the report tells you which stage lost, rather than leaving you with a stage
 that silently reports nothing.
