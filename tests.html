@@ -905,7 +905,126 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 8, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 9, 'SCHEMA was bumped in the same commit as the whitelist widening');
+
+  /* ══════════════════════════════════════════════════════════
+     THE CURRENT STAGE — the half a plain Jira export can feed.
+
+     A Status column says where an item IS. The untrusted text is now in a cell
+     on EVERY ROW rather than in one header, which makes the storage claim
+     matter more, not less: what is stored is the stage id, never the word.
+     ══════════════════════════════════════════════════════════ */
+  group('current stage — reading an ordinary Status column');
+
+  const SIS = TD.stageIdForStatus;
+  is(SIS('Code Review', STG), 'sr', 'a status finds the stage that lists it');
+  is(SIS('ready for code-review', STG), 'sr',
+     'case and punctuation are ignored, exactly as they are for a column heading');
+  is(SIS('Compliance Review', STG), '', 'a status nobody has listed matches nothing');
+  is(SIS('Review', STG), '', 'and the stage NAME is not a status — only the aliases match');
+  is(SIS('', STG), '', 'an empty cell is no stage');
+  is(SIS('Code Review', []), '', 'and with no stages set up, nothing matches at all');
+
+  const statusPaste = [
+    'Issue key\tIn Progress\tResolved\tIssue Type\tStatus',
+    'DAE-1\t2026-08-02\t\tStory\tCode Review',
+    'DAE-2\t2026-08-03\t\tBug\tCompliance Review',
+    'DAE-3\t2026-08-03\t\tBug\t',
+    'DAE-4\t2026-08-01\t2026-08-09\tStory\tDone'
+  ].join('\n');
+  const statusRes = TD.parsePastedRows(statusPaste, 'auto', STG);
+  is(statusRes.columns.status, 4, 'the Status column is found by its anchored heading');
+  is(statusRes.columns.type, 3, 'and is NOT mistaken for the work type, which it looks exactly like');
+  is(statusRes.rows.map(r => r.stage || ''), ['sr', '', '', ''],
+     'only the matched in-flight row carries a stage');
+  is(statusRes.unmatchedStatus, 1,
+     'the unmatched one is COUNTED — a whole export matching nothing is a set-up problem');
+
+  /* The reason the finished row above scores nothing. Every export says Done
+     against everything it has ever closed, which is most of the file. */
+  ok(!statusRes.rows[3].stage, 'a FINISHED item takes no stage, whatever its status column says');
+  const allDone = TD.parsePastedRows(
+    ['Resolved\tIn Progress\tStatus', '2026-08-09\t2026-08-02\tDone'].join('\n'), 'auto', STG);
+  is(allDone.unmatchedStatus, 0,
+     'so a healthy export full of Done rows reports no unmatched statuses at all');
+
+  ok(!/Code Review|Compliance Review|Done/i.test(JSON.stringify(statusRes.rows)),
+     'and NO status name survives the parse — the rows carry a stage id or nothing');
+
+  is(TD.parsePastedRows(statusPaste, 'auto', []).rows.every(r => !r.stage), true,
+     'with no stages set up the same paste stores no stage at all');
+
+  /* The anchored heading, and the real Jira neighbours a loose /status/ eats. */
+  const headOnly = (h) => TD.parsePastedRows(
+    [h.join('\t'), '2026-08-09\t2026-08-02\tStory\tx'].join('\n'), 'auto', STG).columns.status;
+  is(headOnly(['Resolved', 'In Progress', 'Type', 'Current status']), 3, '"Current status" counts');
+  is(headOnly(['Resolved', 'In Progress', 'Type', 'Status Category']), -1,
+     'but "Status Category" does not — a loose pattern would have eaten it');
+  is(headOnly(['Resolved', 'In Progress', 'Type', 'Status changed date']), -1,
+     'nor "Status changed date", which is a DATE and would put a timestamp in a stage');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('current stage — storage, and the age chart axis');
+
+  const curRound = win.TDState.hydrateState({
+    schema: win.TDState.SCHEMA,
+    stages: [{ id: 'sb', name: 'Build', match: [] }],
+    teams: [{ id: 't1', name: 'T', rows: [
+      { s: '2026-08-02', t: 'Story', w: 'sb' },
+      { s: '2026-08-02', t: 'Story', w: 'ghost' },
+      { s: '2026-08-02', t: 'Story', w: 'bad id!' },
+      { s: '2026-08-02', t: 'Story', w: 42 }
+    ] }]
+  });
+  is(curRound.teams[0].rows.map(r => r.stage), ['sb', '', '', ''],
+     'a dangling, unsafe or non-string stage pointer is dropped, like a dangling artId');
+
+  const curWire = win.TDState.serializeRows([
+    { completed: null, started: D(2026, 8, 2), created: null, type: 'Story', key: '',
+      stages: null, stage: 'sb' },
+    { completed: null, started: D(2026, 8, 2), created: null, type: 'Story', key: '',
+      stages: null, stage: '' }
+  ]);
+  is(curWire[0].w, 'sb', 'the current stage rides as `w`');
+  ok(!('w' in curWire[1]), 'and is absent when there is none, like every optional field here');
+
+  /* The axis. This is the compromise the README carried for as long as the app
+     held no categorical column but work type, and the whole reason a Status
+     column was worth reading. */
+  const ageStages = [
+    { id: 'sb', name: 'Build', match: [] },
+    { id: 'sr', name: 'Review', match: [] },
+    { id: 'st', name: 'Test', match: [] }
+  ];
+  const curAgeRows = [
+    { started: D(2026, 8, 1), completed: null, type: 'Story', stage: 'st' },
+    { started: D(2026, 8, 2), completed: null, type: 'Story', stage: 'st' },
+    { started: D(2026, 8, 3), completed: null, type: 'Bug',   stage: 'sb' },
+    { started: D(2026, 8, 4), completed: null, type: 'Task',  stage: '' },
+    { started: D(2026, 7, 1), completed: D(2026, 8, 9), type: 'Story', stage: '' }
+  ];
+  const curAgeView = { filterValue: '', months: 'all', bucket: 'week', asOf: D(2026, 8, 10) };
+  const curByStage = TD.derive(curAgeRows, SAMPLE_SETTINGS, curAgeView, ageStages);
+  is(curByStage.ageing.byStage, true, 'items carrying a stage put the chart on the stage axis');
+  is(curByStage.ageing.columnNames, ['Build', 'Test', 'No stage'],
+     'columns follow the READER\u2019s stage order, not the busiest-first order types use');
+  ok(curByStage.ageing.columnNames.indexOf('Review') < 0,
+     'and a stage with nothing in flight gets no column — an empty one is a gap in the axis');
+  is(curByStage.ageing.columns, ['Build (1)', 'Test (2)', 'No stage (1)'],
+     'the tick carries the count, which is what makes this answer "how many are here" too');
+  is(curByStage.axisTitles.itemAgeX, 'Workflow stage', 'and the axis says so');
+
+  const curByType = TD.derive(curAgeRows, SAMPLE_SETTINGS, curAgeView);
+  is(curByType.ageing.byStage, false,
+     'a caller that passes no stages gets the work-type axis, exactly as before');
+  is(curByType.ageing.columns, ['Story', 'Bug', 'Task'],
+     'ranked busiest-first (two Stories) with the name as a tie-break, as it always was');
+  is(curByType.axisTitles.itemAgeX, 'Work type', 'and its axis says that instead');
+
+  const noneInStage = TD.derive(
+    curAgeRows.map(r => Object.assign({}, r, { stage: '' })), SAMPLE_SETTINGS, curAgeView, ageStages);
+  is(noneInStage.ageing.byStage, false,
+     'stages that exist but reach no item in flight leave the type axis alone');
 
   /* ────────────────────────────────────────────────────────── */
   group('workflow stages — the figures');
@@ -1815,7 +1934,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 8, 'the schema marker is 8 — the version that added workflow stages');
+  is(St.SCHEMA, 9, 'the schema marker is 9 — the version that added the per-row current stage');
 
   /* ────────────────────────────────────────────────────────── */
   group('Work in progress — started but not finished');
@@ -3758,9 +3877,40 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and Deploy is a stage almost nothing sits in, so the table is not four equal numbers');
 
   /* The demo comes in through parsePastedRows like a real export, so this is
-     the storage claim asserted against the one dataset everybody sees. */
-  ok(!/Development|Code Review|Testing|Deployment/i.test(JSON.stringify(win.tdGet().teams)),
-     'and no status name from the demo\u2019s own columns is anywhere in what it stored');
+     the storage claim asserted against the one dataset everybody sees — and it
+     covers the Status COLUMN's values as well as the day-count headings, which
+     is the half where the untrusted text sits on every row. */
+  ok(!/Development|Code Review|Testing|Deployment|Compliance|Done/i
+       .test(JSON.stringify(win.tdGet().teams)),
+     'and no status name from the demo\u2019s own export is anywhere in what it stored');
+
+  /* ── The current stage, which is what a plain Jira export can feed ──────── */
+  const heronRows = demoOf(demo, 'Team Heron').rows;
+  ok(heronRows.filter(r => r.completed).every(r => !r.stage),
+     'no FINISHED demo item carries a stage — every export says Done, and it means nothing');
+  const heronAge = TD.derive(heronRows, win.TDState.normalizeSettings({}),
+    { filterValue: null, months: 'all', bucket: 'week' }, win.tdGet().stages);
+  is(heronAge.ageing.byStage, true,
+     'so Heron\u2019s work item age chart is on the STAGE axis, not the work-type one');
+  /* The finding the axis exists for. Heron's queue piles up downstream, and the
+     chart names where — which no reading of a cycle time figure can do. */
+  const heronCols = heronAge.ageing.columnNames;
+  ok(heronCols.indexOf('Test') >= 0 && heronCols.indexOf('No stage') >= 0,
+     'its columns include the stage it is stuck in and the one it has not set up');
+  const agedCols = heronAge.ageing.points.filter(p => p.aged).map(p => p.column);
+  ok(agedCols.filter(c => c === 'Test').length >= 3,
+     'and three of its aged items sit in Test, so the bottleneck is a column you can point at',
+     agedCols.join(','));
+  /* One demo status is deliberately unlisted, so the "No stage" column and the
+     parse report's unmatched note are both reachable from Load sample data. */
+  ok(agedCols.indexOf('No stage') >= 0,
+     'with an old item under No stage — the demo shows you a stage you have not set up yet');
+  ok(demoOf(demo, 'Team Wagtail').rows.every(r => !r.stage),
+     'while Wagtail has no Status column at all, so the type axis stays reachable too');
+  const wagAge = TD.derive(demoOf(demo, 'Team Wagtail').rows,
+    win.TDState.normalizeSettings({}), { filterValue: null, months: 'all', bucket: 'week' },
+    win.tdGet().stages);
+  is(wagAge.ageing.byStage, false, 'and its chart still reads by work type');
 
   /* Project ids, on the same reasoning as the keys above: the multi-team paste
      is unreachable until some team has one, so the demo arrives with them set

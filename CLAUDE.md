@@ -235,8 +235,69 @@ this file was written to keep out. **Read this whole section before changing any
   because whole days on a four-day board report that every item spent zero time in review.
 - What this unblocks and what it does not: blocked time and flow efficiency now have their
   export, but both still need a per-stage **waiting or working** flag, which is a decision about
-  meaning rather than a parse. The work item age chart could now put stage on its x axis. None
-  of that is built.
+  meaning rather than a parse. Neither is built. The work item age chart's stage axis WAS
+  built — off the current stage rather than off these durations; see the section above it.
+
+## The Current Stage (2026-08-21) — SCHEMA 8 → 9
+
+`r.stage` on each row (`w` on the wire), read from an ordinary **Status** column. It exists
+because Charles's own export has statuses and no durations, which is the ordinary Jira case —
+the day counts above need a marketplace add-on, and this needs nothing. It reuses the stage
+machinery whole: same stages, same aliases, same argument.
+
+- **The untrusted text is now in a CELL ON EVERY ROW rather than in one header**, which makes
+  the storage claim matter more, not less. The status is matched against the aliases the reader
+  typed, the STAGE ID is stored, and the word is discarded with the paste. A cell matching
+  nothing stores nothing — it is not kept as a label, shortened to fit, or echoed on screen.
+- **The SAME aliases serve both halves**, deliberately. A stage listing "Ready for Code Review"
+  and "Code Review" reads a time-in-status export's HEADINGS and a plain export's CELLS off one
+  setup, so a board that later gains durations needs nothing re-typed.
+- **Only read for work still IN FLIGHT.** Every export says "Done" or "Closed" against
+  everything it has ever finished, which is most of the file: reading those would file the whole
+  history under a stage nobody has, store a useless id on every completed row, and make the
+  unmatched-status count read "800 items" on a healthy set-up. A finished item's current status
+  says nothing about flow, and the one figure this field feeds looks only at work in progress.
+  Pinned both ways.
+- **`HEADER_PATTERNS.status` is ANCHORED**, the second anchored pattern after the key and for
+  the same reason: "Status Category", "Status Category Changed" and "Status changed date" are
+  all real Jira headings a loose `/status/` would swallow, and the last is a DATE. Only `Status`
+  or `Current status` counts. **There is no headerless fallback** — a status column looks
+  exactly like a work-type column from the values alone.
+- **The column is claimed even when no stage will match a value in it**, and that is a fix as
+  much as a feature: a Status column is a short repeated label, which is precisely what the
+  work-type detector hunts for, and "Ready for Code Review" is inside `cleanWorkType`'s 40-char
+  cap. Before this role existed a headerless-type export could file its statuses as work types.
+- **THE WORK ITEM AGE CHART NOW GROUPS BY STAGE**, which ends the compromise the README has
+  carried since that chart was built. It **switches rather than offering a picker**: a picker
+  is a control set once and never touched, and nothing is lost without one — the work-type
+  reading is a filter away, and scoping the strip to Bugs makes this chart answer "where do
+  defects get stuck", which is strictly more than the type axis ever said. Falls back to work
+  type when no item in flight carries a stage, so a team like Wagtail is unchanged.
+- **Stage columns keep the READER's order, where type columns rank busiest-first.** A workflow
+  has a direction and that order is the one thing the reader already knows how to scan. Only
+  stages holding something in flight get a column: an empty one is a gap in the axis that costs
+  width and reads as a chart that failed to draw. `AGE_NO_STAGE` and `AGE_OTHER_STAGES` are
+  pushed right like their type counterparts, which is what keeps the right-hand edge the quiet
+  corner the reference-line labels are drawn in.
+- **The tick carries the count — "Review (4)"** — because "how many are sitting in each stage"
+  is the other half of what this axis was asked for, and putting it on the tick answers it
+  without a second card. NOT done on the type axis, where the columns are already ordered by
+  size and the number would restate the ordering. `ageing.columnNames` carries the bare labels
+  so nothing has to parse a count back out of a string.
+- **`derive()` gained a fourth argument, `stages`**, and it is the one piece of naming that
+  function takes — for the one figure that puts names on an axis. Optional: a caller passing
+  three arguments gets the work-type columns, which is every test written before stages existed
+  and is why this landed without test churn. `stageTimesOf` stays nameless; do not "tidy" the
+  two into one convention.
+- **The Time in Stage card knows the status-only case and says so.** A team with current stages
+  and no durations gets a message saying its stages ARE working and pointing at the age chart —
+  not "you have no stage data", which would send somebody to check a set-up that is right.
+- **The demo's Heron carries one status no stage lists** — "Compliance Review", straight off
+  Charles's own workflow — holding its second-oldest item, so the "No stage" column and the
+  unmatched-status note are both reachable AND both worth acting on. Its in-flight statuses are
+  matched POSITIONALLY to the `wip` ages, so three of the four oldest sit in Test and the
+  bottleneck is a column you can point at. `statusOf` never draws from `rnd()`, like every other
+  demo field added since the issue key.
 
 ## The Project Id and the Multi-Team Paste (2026-08-20) — SCHEMA 6 → 7
 
@@ -665,10 +726,11 @@ type. What must not regress:
   one part of a line that is a drawing decision. Those labels drop a trailing `.0` where `num1`
   would keep it: a tile wants figures lining up on the decimal point, a chart label wants every
   character it can give back to the chart under the chip.
-- **Columns are work types, and that is a compromise the README states.** The canonical chart puts
-  workflow STAGE on the x axis. The export that needs arrived on 2026-08-21 — see the workflow
-  stages section — so this is now a chart that COULD be built rather than one that is waiting on
-  data; it has not been. `AGE_UNTYPED` and `AGE_OTHER` are pushed to the right-hand end
+- **Columns are workflow STAGE when the items in flight carry one, and work type otherwise.**
+  The stage axis is the canonical version and landed 2026-08-21 — see the current stage section,
+  which carries the reasoning for the switch, the ordering and the counts on the ticks. The work
+  type axis is not legacy: it is what a board with no status column still gets, and it is what
+  the whole ranking-and-folding machinery below was written for. `AGE_UNTYPED` and `AGE_OTHER` are pushed to the right-hand end
   regardless of count — neither is a work type, and keeping both there is what preserves the quiet
   corner above. `AGE_MAX_COLUMNS` counts REAL types only, so an untyped item can never push a real
   one off the chart.

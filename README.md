@@ -21,7 +21,7 @@ measures that move together are read together:
 |---|---|---|
 | **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); **every finished item, as a dot**; lead time |
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started) |
-| **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **work item age**; defect rate — defects resolved and defects raised; **[time in stage](#where-the-time-goes-time-in-stage)**, where the wait actually goes |
+| **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **[work item age](#work-item-age-what-to-do-this-morning)**, by workflow stage where your export says one; defect rate — defects resolved and defects raised; **[time in stage](#where-the-time-goes-time-in-stage)**, where the wait actually goes |
 | **Forecast** — what that implies | When will this batch be done, and how much by a date? | Two distributions from ten thousand simulated runs, one per question |
 
 The first three describe what already happened. **Forecast** is the only one that looks
@@ -321,7 +321,7 @@ that has a tail.
 |---|---|
 | **Kingfisher** | The healthy board. Carries issue keys (`KFR-…`), as Heron does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. The baseline the other two read against. |
 | **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Kingfisher's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. |
-| **Wagtail** | A newer team: four months of history, **no created dates, no issue keys and no stage times at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
+| **Wagtail** | A newer team: four months of history, **no created dates, no issue keys, no Status column and no stage times at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
 
 Kingfisher and Heron also arrive with the **project ids their own keys are built from** (`KFR`
 and `HRN`), so [pasting several teams at once](#pasting-several-teams-at-once) works straight
@@ -329,11 +329,19 @@ off the demo rather than only after three ids are typed in — and Wagtail, with
 team the split's *takes nothing* line is about.
 
 The demo also arrives with **four workflow stages set up** — Build, Review, Test and Deploy —
-because a stage column is only ever read when a stage already lists that status, so the demo has
+because a status is only ever read when a stage already lists it, so the demo has
 to set them up before it pastes, exactly as you would. Kingfisher and Heron carry the columns and
 Wagtail carries none, so both faces of the [Time in stage](#where-the-time-goes-time-in-stage)
-card are reachable. Deploy is deliberately a stage almost nothing sits in: a table where every
-row is a big number teaches nobody where to look.
+card are reachable, and both axes of the work item age chart are too. Deploy is deliberately a
+stage almost nothing sits in: a table where every row is a big number teaches nobody where to
+look.
+
+Kingfisher and Heron also carry a **Status column**, so their age charts group by stage. Heron's
+is the one to look at: three of its four oldest items sit in **Test**, which names the
+bottleneck in a way no cycle time figure can. One of its items is in *Compliance Review* — a
+status the demo's stages deliberately **don't** list — so it lands in the **No stage** column
+and the parse report says one item's status matched nothing. That is the demo showing you a real
+part of a workflow you haven't set up yet, which is exactly what it will do on your own board.
 
 The demo also puts **Kingfisher and Heron on one train (Estuary ART) and leaves Wagtail on
 none** — the smallest arrangement where every part of [ARTs](#grouping-teams-into-arts) does
@@ -403,9 +411,12 @@ DAE-1491   7/28/2026   8/5/2026                  Story
 The **Created** column is optional and unlocks lead time. Without it everything else works
 exactly as before, and that chart says so on its face rather than disappearing.
 
-Extra columns holding a **number of days per Jira status** are read too, once you have set up
-the [workflow stages](#where-the-time-goes-time-in-stage) that name those statuses — a column
-whose heading matches nothing you've set up is simply ignored, and always was.
+A **Status** column is read too, once you have set up the
+[workflow stages](#where-the-time-goes-time-in-stage) that name your statuses: each in-flight
+item is filed under the stage it's sitting in, which is what puts stage on the work item age
+chart's axis. Extra columns holding a **number of days per status** are read on the same
+set-up. A column whose heading — or a cell whose value — matches nothing you've set up is
+simply ignored, and always was.
 
 **The columns are worked out from the data, not assumed by position.** Header names win when
 they're there (`Resolved`/`Completed`, `In Progress`/`Start`, `Created`, `Issue Type`);
@@ -649,7 +660,8 @@ re-entered:
 
 Rows gained an optional created date (`k` on the wire, backup `version: 3`, `schema: 3` in the
 saved state; the working-days setting later took both markers to `4`, ARTs to `5`,
-the issue key to `6`, the per-team project id to `7` and workflow stages to `8`). A row without one is left exactly as it was — no `k` key is written —
+the issue key to `6`, the per-team project id to `7`, workflow stages to `8` and the per-row
+current stage to `9`). A row without one is left exactly as it was — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before. **The issue key
 (`i` on the wire) follows exactly the same rule**: absent unless there is one, so a team whose
 export has no key column saves byte-identically to before that field existed, and the first save
@@ -816,6 +828,18 @@ for someone to review it. **Time in stage** does, and it is the one card on the 
 is a table rather than a chart — five stages is five numbers, and a bar chart of five numbers
 says less than the numbers do.
 
+### Two Exports, One Set-Up
+
+Stages read **two different kinds of export**, and you set them up once for both:
+
+| What your export has | What you get |
+|---|---|
+| **A Status column** (where each item is now) — an ordinary Jira export | The work item age chart grouped by **stage**: what is sitting in each part of the workflow, and how long it has been there |
+| **A Time in Status export** (a column per status, holding days) — usually a marketplace add-on | The **Time in Stage** table below: how long work typically waits in each stage |
+
+Most people have the first and not the second. That is fine — the first is the one that answers
+*where is the work stuck*, and it needs nothing installed.
+
 ### You Name the Stages. Your Export's Status Names Are Never Stored
 
 This is the part worth reading even if you skip the rest.
@@ -824,13 +848,17 @@ A **stage** is a part of your workflow you want to measure the wait in — *Buil
 *Test*. You create and name them under **Teams & Stages** in the header, and against each one you type
 the **Jira statuses that feed it**, separated by commas. Several statuses can feed one stage:
 a workflow with both *Ready for Code Review* and *Code Review* is one Review stage as far as
-the flow is concerned, and their days are added together.
+the flow is concerned. Those same statuses are matched against a **Status column's values** and
+against a **Time in Status export's headings**, so one set-up serves both — and a board that
+later gains durations needs nothing re-typed.
 
-Then you paste a **Time in Status** export — one row per issue, one column per status, each
-cell a number of days — and the days land in the stage each status is matched to.
+Paste an export with a **Status** column and each in-flight item is filed under the stage its
+status matches. Paste a **Time in Status** export — one row per issue, one column per status,
+each cell a number of days — and the days land in the stage each status is matched to, several
+columns adding together where several statuses feed one stage.
 
-**The status names in your export's headings are matched while the paste is being read, and
-then thrown away with the rest of it.** What is saved is the stage name *you* chose and a
+**The status names — in your headings and in your Status column's cells — are matched while the
+paste is being read, and then thrown away with the rest of it.** What is saved is the stage name *you* chose and a
 number. Every other field this app stores is guarded by asking whether a regex can tell it
 from a sentence — a key can, a project id can. **A status cannot**: "Fix the login bug on
 prod" is twenty-five characters of letters and spaces, which is every shape a status label
@@ -870,11 +898,28 @@ direction, and that order is the one thing you already know how to scan. Only st
 actually carry figures get a row. The table copies and downloads like [every other table of
 figures](#taking-a-table-off-the-page).
 
+### One More Thing the Status Column Fixes
+
+A Status column is a short repeated label — which is exactly what the app's work-type detector
+hunts for, and *Ready for Code Review* is short enough to pass as a work type. Before the app
+knew what a Status column was, an export without clear headings could quietly file its statuses
+as work types. Naming the column takes it out of that guess, whether or not any stage matches
+what's in it.
+
+Only work **still in flight** gets a stage. Every export says *Done* against everything it has
+ever closed, and a finished item's current status says nothing about flow — so those are
+skipped rather than filed under a stage you don't have.
+
 ### What the Parse Report Tells You
 
-After a paste it names which columns were read as which stage — **by position and by your stage
-name**, never by the heading out of your export, because this report has never echoed a pasted
-cell and a heading is a pasted cell. If nothing matched, it says so and points you at the Teams
+After a paste it says which column it read as the current status and how many items were filed
+under a stage, and it names which columns were read as which stage — **by position and by your
+stage name**, never by the heading or the cell out of your export, because this report has never
+echoed a pasted cell.
+
+If items had a status **no stage answers to**, it says how many. It does not say what they were:
+that is work-system text, and the count is what tells you your aliases are wrong rather than one
+row being odd. If nothing matched, it says so and points you at the Teams
 window. If a stage's alias named a column the dashboard already needs — aliasing `Created`, say
 — the date wins and the report tells you which stage lost, rather than leaving you with a stage
 that silently reports nothing.
@@ -918,19 +963,36 @@ from running through the words, and what separates two labels when the lines are
 an ageing threshold of 14 against an 85th percentile of 13 is an ordinary board, and without the
 panels those two labels landed on top of each other.
 
-### Columns Are Work Types
+### Columns Are Workflow Stages — or Work Types
 
-The canonical version of this chart puts *workflow stage* on the horizontal axis. That needs a
-status-history export this app doesn't take — the same thing [blocked time and flow
-efficiency](#what-isnt-here-and-why) are waiting on. Work type still earns the axis: a board
-where the defects age and the stories don't is a completely different problem from one where
-everything ages, and one glance separates them.
+**If your export has a Status column, the columns are the stages you set up.** That is the
+canonical version of this chart, and the question people actually walk up to a board with:
+*what is sitting in each part of the workflow, and how long has it been there?* A cycle time
+figure can tell you work is slow. This tells you it is slow **in test**.
 
-Columns are ordered by how many items are in them, busiest first. Items within a column are
-spread across it and sorted by age, so two items the same age never land on the same pixel. A
-board with more issue types than fit folds its tail into one **Other types** column and says how
-many went in; items with no work type at all get a column of their own at the end rather than
-disappearing.
+Stages appear in **the order you arranged them**, left to right, so the axis reads the way your
+workflow does — not busiest-first, because a workflow has a direction and that order is the one
+thing you already know how to scan. Only stages holding something in flight get a column; an
+empty one is a gap in the axis rather than information. Each tick carries its count —
+**Review (4)** — so the chart also answers "how many are sitting there".
+
+Items whose status matches none of your stages land in a **No stage** column at the right-hand
+end. That is worth looking at rather than ignoring: it usually means a real part of your
+workflow you haven't set up yet.
+
+**Without a Status column the columns are work types**, exactly as they always were, and that
+is not a legacy fallback — a board where the defects age and the stories don't is a completely
+different problem from one where everything ages, and one glance separates them. Those columns
+are ordered by how many items are in them, busiest first, and a board with more issue types
+than fit folds its tail into one **Other types** column.
+
+There is deliberately **no picker** to switch between the two. It would be a control you set
+once and never touched, and nothing is lost without it: the work-type reading is a filter away.
+Scope the strip to **Defects** and this chart answers *where do defects get stuck* — which is
+strictly more than the work-type axis ever said.
+
+Items within a column are spread across it and sorted by age, so two items the same age never
+land on the same pixel.
 
 ### What a Dot Is Called
 
@@ -1403,7 +1465,7 @@ same-day value being coerced rather than trusted), `hasData()`, the predicate th
 "empty never beats data" rule rests on, and `isBackup()`, the guard that stops the wrong JSON
 file being restored over real data.
 
-**Workflow stages get the longest guard group in the suite**, because they are the one field
+**Workflow stages get the longest guard group in the suite**, in both their halves — because they are the one field
 whose source is a Jira status and the safety does not come from a check on the value. Both
 halves are pinned: the *guards* (a day count is a plain number — `3d 4h`, `12:30`, a negative
 and a six-digit value all refused; an alias is capped and dropped whole past it; a hostile or
@@ -1414,6 +1476,14 @@ status is reported rather than resolved, and a status nobody has listed is simpl
 so a paste can never add the rule that reads it). The claim underneath the whole design is
 asserted directly: the parsed rows are stringified and checked to contain **no status name at
 all**, on hand-written fixtures and again on the demo's own data.
+
+The **current stage** gets its own group, since that is where the untrusted text sits in a cell
+on every row rather than in one heading: the anchored heading against the real Jira columns a
+loose pattern would eat (*Status Category*, *Status changed date*), a Status column not being
+mistaken for the work type, a finished item taking no stage however its status reads, a
+dangling or unsafe stage pointer being dropped, and the age chart switching axes — stage
+columns in the reader's order with counts on the ticks, work type ranked busiest-first when no
+item in flight carries a stage.
 
 Two promises get pinned end to end rather than function by function:
 `buildSharePayload()` — a share link holds **only the chosen teams** plus the shared settings,

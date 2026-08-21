@@ -2038,7 +2038,14 @@ const HEADER_PATTERNS = {
      /key/ would swallow. Only a heading that is exactly Key or Issue key counts.
      A column missed here is not lost: the shape test in detectColumns finds it
      from the values, which is what a headerless paste relies on anyway. */
-  key:       [/^\s*(issue\s*)?key\s*$/i]
+  key:       [/^\s*(issue\s*)?key\s*$/i],
+  /* ANCHORED for the same reason the key is, and with the same neighbours in
+     mind: "Status Category", "Status Category Changed" and "Status changed
+     date" are all real Jira headings a loose /status/ would swallow, and the
+     last of those is a DATE — reading it as the current status would put a
+     timestamp where a stage name belongs. Only a heading that is exactly
+     Status, or Current status, counts. */
+  status:    [/^\s*(current\s*)?status\s*$/i]
 };
 
 function matchHeader(header, field) {
@@ -2099,6 +2106,13 @@ function detectColumns(rows, header, order, stages) {
     created:   -1,
     type:      matchHeader(header, 'type'),
     key:       matchHeader(header, 'key'),
+    /* Found whether or not any stage will claim a value in it, and that is
+       deliberate: a Status column is a short repeated label, which is exactly
+       what the work-type detector below hunts for, and "Ready for Code Review"
+       is under cleanWorkType's 40-character cap. Before this role existed a
+       headerless-type export could have its statuses filed as work types.
+       Naming the column takes it out of taken()'s reach. */
+    status:    matchHeader(header, 'status'),
     /* Stage columns are found by HEADING ONLY, and there is no headerless
        fallback for them — deliberately. Every other role here can be found from
        the values when a heading is missing, because a date looks like a date and
@@ -2122,6 +2136,10 @@ function detectColumns(rows, header, order, stages) {
      key is the one role this app can do entirely without, so if it is ever
      ambiguous it is the one that yields. */
   if (map.key >= 0 && [map.completed, map.started, map.created, map.type].includes(map.key)) map.key = -1;
+  /* And the status yields on the same terms, for the same reason: it is a role
+     the dashboard can do entirely without. */
+  if (map.status >= 0 && [map.completed, map.started, map.created, map.type, map.key]
+      .includes(map.status)) map.status = -1;
 
   /* A date, type or key role wins a contested column outright, and the stage
      that wanted it is set aside rather than dropped quietly. It happens when an
@@ -2129,7 +2147,8 @@ function detectColumns(rows, header, order, stages) {
      the obvious one — and the reader needs to be told, because from their side
      a stage they set up is simply reporting nothing. columnsReadHtml says which
      column and which stage. */
-  const roleCols = [map.completed, map.started, map.created, map.type, map.key].filter(i => i >= 0);
+  const roleCols = [map.completed, map.started, map.created, map.type, map.key, map.status]
+    .filter(i => i >= 0);
   map.stageClash = map.stages.filter(sc => roleCols.includes(sc.index));
   map.stages = map.stages.filter(sc => !roleCols.includes(sc.index));
 
@@ -2137,8 +2156,8 @@ function detectColumns(rows, header, order, stages) {
      make the type detector below think one more column was consumed than is.
      The key belongs in it too — with two rows of two distinct types the type
      detector would otherwise be free to pick the key column. */
-  const taken = () => new Set([map.completed, map.started, map.created, map.type, map.key]
-    .filter(i => i >= 0).concat(map.stages.map(sc => sc.index)));
+  const taken = () => new Set([map.completed, map.started, map.created, map.type, map.key,
+    map.status].filter(i => i >= 0).concat(map.stages.map(sc => sc.index)));
 
   /* No heading, or a heading this app declined to trust: find the key column by
      what is IN it. Unlike the type detector below, which has to guess from
@@ -2430,6 +2449,38 @@ function stageColumnsFor(header, stages) {
    rather than left for a paste to discover, the way two teams answering to one
    project id already are — and reported as the ALIAS, which is the reader's own
    text, never as anything out of an export. */
+/* The stage a CURRENT STATUS belongs to — the other half of the stage feature,
+   and the half a plain Jira export can actually feed.
+
+   A "Status" column says where an item is RIGHT NOW: "In Progress", "Code
+   Review", "SIT". That is not a duration and never becomes one, so it answers a
+   different question from the day counts above — not *how long* work waits in a
+   stage, but *what is sitting in each one this morning*, which is the canonical
+   x axis for the work item age chart and the thing that chart has always
+   compromised on.
+
+   The storage argument is identical and worth restating, because this is the
+   version where the untrusted text is in a CELL ON EVERY ROW rather than in one
+   header: the status name is matched against the aliases the reader typed, the
+   STAGE ID is what gets stored, and the name itself is discarded with the rest
+   of the paste. A cell that matches nothing stores nothing — it does not get
+   kept as a label, shortened to fit, or reported back on screen.
+
+   Deliberately the SAME aliases as the column matcher above. A stage called
+   Review that lists "Ready for Code Review" and "Code Review" reads both a
+   time-in-status export's headings and a plain export's cells with one setup,
+   so a board that later gains durations needs nothing re-typed. */
+function stageIdForStatus(value, stages) {
+  const n = normalizeAlias(value);
+  if (!n || !Array.isArray(stages)) return '';
+  for (const st of stages) {
+    if (!st || typeof st.id !== 'string') continue;
+    const match = Array.isArray(st.match) ? st.match : [];
+    if (match.some(a => normalizeAlias(a) === n)) return st.id;
+  }
+  return '';
+}
+
 function duplicateStageAliases(stages) {
   const seen = new Map(), dupes = new Map();
   (Array.isArray(stages) ? stages : []).forEach(st => {
@@ -2486,6 +2537,11 @@ function parsePastedRows(text, order, stages) {
      report naming four hundred rows is a report nobody reads. The column is
      named by its position, like every other column in the parse report. */
   const badStageCells = new Map();
+  /* Rows whose status column held something no stage answers to. A COUNT, not a
+     list: the values are work-system text, and this report has never echoed a
+     pasted cell. The number is what says "your aliases are wrong" as against
+     "one odd row". */
+  let unmatchedStatus = 0;
   /* Two different orderings, two different meanings — see the checks below. */
   const startAfterDone = [], raisedAfterStart = [];
   let unfinished = 0, undated = 0;
@@ -2512,6 +2568,25 @@ function parsePastedRows(text, order, stages) {
        the way back in, its keys are stage ids, and an id arriving from a
        hand-edited backup could be spelled `__proto__`. With no prototype there
        is nothing for that to reach; hydrateRows builds it the same way. */
+    /* Where the item is now, as a stage id and never as the word itself. Empty
+       when the export has no status column, when the cell is blank, or when
+       nothing the reader set up answers to it — three different situations that
+       all mean the same thing to the dashboard: this item has no stage. The
+       count of the third is reported, since a whole export matching nothing is
+       a set-up problem rather than a quiet one. */
+    const rawStatus = at(cells, cols.status);
+    /* ONLY for work still in flight, and that is not an optimisation. Every
+       export says "Done" or "Closed" against everything it has finished, which
+       is most of the file — reading those would file the whole history under a
+       stage nobody has, store a useless id on every completed row, and make the
+       unmatched-status count read "800 items" on a perfectly healthy set-up.
+       A finished item's current status says nothing about flow. The one figure
+       this field feeds is the work item age chart, which looks at work in
+       progress and nothing else. */
+    const readStatus = !completed && rawStatus;
+    const stageId = readStatus ? stageIdForStatus(rawStatus, stages) : '';
+    if (readStatus && !stageId) unmatchedStatus++;
+
     const stageDays = Object.create(null);
     let anyStage = false;
     cols.stages.forEach(sc => {
@@ -2595,11 +2670,14 @@ function parsePastedRows(text, order, stages) {
        before the feature existed — the rule the created date, the issue key and
        the project id all follow. */
     if (anyStage) out.stages = stageDays;
+    /* Same omit-when-empty rule as every optional field here. */
+    if (stageId) out.stage = stageId;
     rows.push(out);
   });
 
   return { rows, badCompleted, badStarted, badCreated, startAfterDone, raisedAfterStart,
            unfinished, undated, skippedHeader, dateOrder: resolved, columns: cols,
+           unmatchedStatus,
            badStageCells: [...badStageCells.entries()]
              .map(([index, count]) => ({ index, count })).sort((a, b) => a.index - b.index) };
 }
@@ -2888,6 +2966,11 @@ const AGE_SPREAD = 0.3;
 const AGE_MAX_COLUMNS = 6;
 const AGE_UNTYPED = 'No type';
 const AGE_OTHER = 'Other types';
+/* The stage-axis counterparts. "No stage" is the absence of one — an item whose
+   status matched nothing the reader set up, or an export with no status column
+   — and it is pushed to the right-hand end exactly as "No type" is. */
+const AGE_NO_STAGE = 'No stage';
+const AGE_OTHER_STAGES = 'Other stages';
 
 /* What a single dot is called, on both scatters, so the two can never drift
    apart. The issue key if the paste carried one — that is the whole reason the
@@ -3167,7 +3250,13 @@ function agedCounts(items, evalPoints, thresholdDays, wip, workingDays) {
  * @param view      {filterValue: string ('' = no filter), months: number|'all',
  *                   bucket: 'week'|'fortnight'|'month' (default 'week')}
  */
-function derive(rows, settings, view) {
+/* `stages` is the reader's stage list — names and order — and it is the ONE
+   piece of naming this function takes, for the one figure that puts names on an
+   axis. Optional, and everything works without it: a caller that passes three
+   arguments (every test written before stages existed, and deriveTeams before
+   it was widened) gets the work-type columns this chart has always drawn. */
+function derive(rows, settings, view, stages) {
+  const stageList = Array.isArray(stages) ? stages : [];
   const sameDay   = Number(settings.sameDayValue);
   const unplannedStr = String(settings.unplannedType || '').trim().toLowerCase();
   const filterVal = String(view.filterValue || '').trim().toLowerCase();
@@ -3539,43 +3628,84 @@ function derive(rows, settings, view) {
       age: Math.max(0, spanDays(endDate, r.started, workingDays)),
       type: r.type || '',
       started: r.started,
-      key: r.key || ''
+      key: r.key || '',
+      stage: r.stage || ''
     }));
 
-  /* Columns are work types, because that is the only categorical column this
-     app holds — the canonical version of this chart puts workflow STAGE on the
-     x axis, which would need the status history that blocked time and flow
-     efficiency are both waiting on. Type still earns the axis: a board whose
-     defects age and whose stories don't is a different problem from one where
-     everything ages, and one glance separates them.
+  /* ── What the columns ARE ──────────────────────────────────────────────────
+     WORKFLOW STAGE when the items in flight carry one, and work type otherwise.
 
-     Ordered by how many are in flight, so the busiest column is leftmost, with
-     the name as a tie-break so the order never depends on row order. */
+     Stage is the canonical x axis for this chart and always has been; work type
+     was the compromise this app drew for as long as it held no categorical
+     column but that one, and the README said so. A status column (2026-08-21)
+     ends the compromise: "where is each thing sitting right now, and how long
+     has it been there" is the question somebody actually walks up to a board
+     with, and it is the one reading a cycle time figure cannot give.
+
+     It SWITCHES rather than offering a picker, deliberately. A picker would be
+     a control most people set once and never touch, and nothing is lost by not
+     having one: the work-type reading is still a filter away — scope the strip
+     to Bugs and this chart answers "where do defects get stuck", which is
+     strictly more than the old type-column chart ever said. */
+  const anyStage = inFlight.some(r => r.stage);
+  const byStage = anyStage && stageList.length > 0;
+
   const ageBuckets = new Map();
-  for (const r of inFlight) {
-    const key = r.type || AGE_UNTYPED;
-    if (!ageBuckets.has(key)) ageBuckets.set(key, []);
-    ageBuckets.get(key).push(r);
+  /* In stage mode the buckets are SEEDED in the reader's own stage order, so
+     the axis reads left to right the way their workflow does. That is the whole
+     difference from the type axis below, which is ranked by size: a workflow
+     has a direction, and re-ordering it by how busy each stage is would throw
+     away the one thing the reader already knows how to scan. Only stages that
+     actually hold something in flight get a column — an empty one is a gap in
+     the axis that costs width and reads as a chart that failed to draw. */
+  const stageNameOf = new Map(stageList.map(st => [st.id, st.name]));
+  if (byStage) {
+    stageList.forEach(st => ageBuckets.set(st.name, []));
+    for (const r of inFlight) {
+      const label = (r.stage && stageNameOf.get(r.stage)) || AGE_NO_STAGE;
+      if (!ageBuckets.has(label)) ageBuckets.set(label, []);
+      ageBuckets.get(label).push(r);
+    }
+    /* Seeded above, so the empties have to go now rather than never having been
+       added — seeding is what fixes the order, and filtering is what keeps it
+       honest. */
+    [...ageBuckets.entries()].forEach(([label, rows]) => {
+      if (!rows.length) ageBuckets.delete(label);
+    });
+  } else {
+    for (const r of inFlight) {
+      const key = r.type || AGE_UNTYPED;
+      if (!ageBuckets.has(key)) ageBuckets.set(key, []);
+      ageBuckets.get(key).push(r);
+    }
   }
-  const ranked = [...ageBuckets.entries()]
-    .sort((a, b) => b[1].length - a[1].length || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  /* "No type" is not a work type, it is the absence of one, so it goes to the
-     end with the fold column rather than sorting into the middle of the real
-     ones on its count. That also keeps both synthetic columns on the right,
-     which is what makes the right-hand edge the reliably quiet corner the
-     reference-line labels are drawn in. */
-  const untyped = ranked.filter(([label]) => label === AGE_UNTYPED);
-  const typed = ranked.filter(([label]) => label !== AGE_UNTYPED);
-  /* A board with a dozen issue types would draw a dozen columns two dots wide
-     on a card this size. The long tail folds into one column, and the count of
-     what went in is stated rather than silently dropped. The cap counts real
-     types only — "No type" must not push a real one out of the chart. */
+
+  /* Work types rank by how many are in flight, busiest leftmost, with the name
+     as a tie-break so the order never depends on row order. Stages keep the
+     order they were seeded in. */
+  const entries = [...ageBuckets.entries()];
+  const ranked = byStage ? entries
+    : entries.sort((a, b) => b[1].length - a[1].length || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  /* "No type" / "No stage" is not one of the things being counted, it is the
+     absence of one, so it goes to the end with the fold column rather than
+     sorting into the middle of the real ones on its count. That also keeps both
+     synthetic columns on the right, which is what makes the right-hand edge the
+     reliably quiet corner the reference-line labels are drawn in. */
+  const absentLabel = byStage ? AGE_NO_STAGE : AGE_UNTYPED;
+  const foldLabel = byStage ? AGE_OTHER_STAGES : AGE_OTHER;
+  const untyped = ranked.filter(([label]) => label === absentLabel);
+  const typed = ranked.filter(([label]) => label !== absentLabel);
+  /* A board with a dozen issue types — or a workflow mapped to a dozen stages —
+     would draw a dozen columns two dots wide on a card this size. The long tail
+     folds into one column, and the count of what went in is stated rather than
+     silently dropped. The cap counts real columns only — the absence column
+     must not push a real one out of the chart. */
   const kept = typed.slice(0, AGE_MAX_COLUMNS);
   const folded = typed.slice(AGE_MAX_COLUMNS);
   const ageColumns = kept.concat(untyped).map(([label, rows]) => ({ label, rows }));
   if (folded.length) {
     ageColumns.push({
-      label: AGE_OTHER,
+      label: foldLabel,
       rows: folded.reduce((all, [, rows]) => all.concat(rows), [])
     });
   }
@@ -3599,6 +3729,7 @@ function derive(rows, settings, view) {
         type: r.type,
         started: r.started,
         key: r.key || '',
+        stage: r.stage || '',
         column: col.label
       });
     });
@@ -3619,7 +3750,17 @@ function derive(rows, settings, view) {
 
   const ageing = {
     points: agePoints,
-    columns: ageColumns.map(c => c.label),
+    /* The label carries the COUNT in stage mode — "Review (4)" — because "how
+       many are sitting in each stage" is the other half of the question this
+       axis was asked for, and putting it on the tick answers it without a
+       second card. Not done on the type axis, where the columns are already
+       ordered by size and the number would restate the ordering. */
+    columns: ageColumns.map(c => byStage ? c.label + ' (' + c.rows.length + ')' : c.label),
+    /* The bare labels too, so a caller that needs the stage rather than the
+       tick text — a test, or anything drawn beside this — is not parsing a
+       count back out of a string. */
+    columnNames: ageColumns.map(c => c.label),
+    byStage,
     foldedTypes: folded.length,
     count: inFlight.length,
     agedCount: inFlight.filter(r => r.age > agedDays).length,
@@ -3836,7 +3977,7 @@ function derive(rows, settings, view) {
       wip: 'Work in Progress at the End of Each ' + Noun,
       agedWork: 'Items in Progress Longer Than ' + agedDays + ' ' + DayNoun,
       itemAge: 'Age of Every Item Still in Progress on ' + prettyDate(endDate)
-        + ', by Work Type',
+        + (ageing.byStage ? ', by Workflow Stage' : ', by Work Type'),
       cycleScatter: cycleLabel + ' of Each Item, on the ' + Noun + ' It Finished',
       /* Both name the question's own input, so a card read on its own — in a
          screenshot, over someone's shoulder — still says what was asked. */
@@ -3865,7 +4006,7 @@ function derive(rows, settings, view) {
       wip: 'Items open at period end',
       agedWork: 'Items older than ' + agedDays + ' ' + dayNoun,
       itemAge: 'Age so far (' + dayNoun + ')',
-      itemAgeX: 'Work type',
+      itemAgeX: ageing.byStage ? 'Workflow stage' : 'Work type',
       cycleScatter: cycleLabel + ' (' + dayNoun + ')',
       /* Both forecast charts count RUNS up the y axis — the x axis is the
          outcome, which is the other way round from every chart above, where x
@@ -3908,11 +4049,11 @@ function derive(rows, settings, view) {
      eight percentiles, and a "total" row built that way would be quietly wrong
      in its most-read column. Deriving over the concatenated rows gives the
      train the same treatment a team gets, from the same code. */
-function deriveTeams(teams, settings, view) {
+function deriveTeams(teams, settings, view, stages) {
   const list = Array.isArray(teams) ? teams : [];
   const everything = [];
   for (const t of list) everything.push(...(t.rows || []));
-  const train = derive(everything, settings, view);
+  const train = derive(everything, settings, view, stages);
   /* Nothing anywhere has finished, so there is no window to compare within and
      no date to share. The rows would all be empty; say so once instead. */
   if (train.empty) return { train, rows: [], asOf: null };
@@ -3924,7 +4065,7 @@ function deriveTeams(teams, settings, view) {
     /* In the picker's order, deliberately. Sorting is a thing the reader asks
        for by pressing a column; until they do, a team should be where they
        expect to find it rather than wherever its throughput put it today. */
-    rows: list.map(t => ({ id: t.id, name: t.name, d: derive(t.rows || [], settings, shared) }))
+    rows: list.map(t => ({ id: t.id, name: t.name, d: derive(t.rows || [], settings, shared, stages) }))
   };
 }
 
@@ -3999,7 +4140,10 @@ window.TD = {
   /* Stages: the guards, the pure column matcher and the pure figures, so the
      whole feature can be pinned without a dialog or a paste box on screen. */
   normalizeAlias, cleanStageAlias, cleanStageDays, stageColumnsFor, duplicateStageAliases,
-  stageTimesOf, STAGE_DAYS_MAX, STAGE_ALIAS_MAX, STAGE_ALIAS_MAX_LEN
+  stageTimesOf, STAGE_DAYS_MAX, STAGE_ALIAS_MAX, STAGE_ALIAS_MAX_LEN,
+  /* The current-stage half: the value matcher and the two synthetic column
+     labels the stage axis uses. */
+  stageIdForStatus, AGE_NO_STAGE, AGE_OTHER_STAGES
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -4345,7 +4489,13 @@ function hydrateRows(raw) {
          hydrateState, where the stage list is known — the same treatment a
          dangling artId gets, and for the same reason: once, at the boundary,
          rather than guarded at every read. */
-      stages: hydrateStageDays(r && r.g)
+      stages: hydrateStageDays(r && r.g),
+      /* `w` on the wire — where the item is. A stage id and nothing else; an id
+         that is not plainly safe is dropped, and hydrateState drops one that
+         points at a stage no longer in the list, exactly as it does for a
+         dangling artId. Unlike the day counts beside it this is a VALUE rather
+         than an object key, so PROTO_KEY is not a hazard here. */
+      stage: (r && typeof r.w === 'string' && ID_OK.test(r.w)) ? r.w : ''
     };
   })
   /* An item with no completion is work in progress, not a broken row — keep it,
@@ -4382,6 +4532,7 @@ const serializeRows = rows => rows.map(r => {
     }
     if (Object.keys(g).length) out.g = g;
   }
+  if (r.stage) out.w = r.stage;
   return out;
 });
 
@@ -4445,7 +4596,8 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 8 added workflow stages — `state.stages` and a `g` of day counts on
+/* SCHEMA 9 added the per-row CURRENT stage (`w`), read from an ordinary Status
+   column; 8 added workflow stages — `state.stages` and a `g` of day counts on
    each row; 7 added the per-team project id — the address a multi-team paste is
    split by; 6 added the per-row issue key; 5 added ARTs — `state.arts` and an
    `artId` on each team; 4 added the working-days setting; 3 added the per-row
@@ -4459,7 +4611,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 8;
+const SCHEMA = 9;
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
    hydrateState() keeps only the keys it knows, which is right for a hostile
@@ -4524,8 +4676,11 @@ const countKeys = teams =>
    seconds, which is why the prompt was not extended to them. A stage's day
    counts are not re-typeable; they come back only by finding the export again
    and pasting it. So they join the prompt. */
+/* Either kind of stage data — the day counts OR the current stage. Counted
+   together because they are lost together: a build that predates stages drops
+   both, and the prompt exists to catch exactly that file. */
 const countStageDays = teams =>
-  teams.reduce((n, t) => n + t.rows.filter(r => r.stages).length, 0);
+  teams.reduce((n, t) => n + t.rows.filter(r => r.stages || r.stage).length, 0);
 function hydrateState(raw) {
   const arts = sanitizeArts(raw && raw.arts);
   const stages = sanitizeStages(raw && raw.stages);
@@ -4545,6 +4700,9 @@ function hydrateState(raw) {
      back to serialising byte-identically to a row that never had one. */
   const stageIds = new Set(stages.map(st => st.id));
   teams.forEach(t => t.rows.forEach(r => {
+    /* Where the item is, on the same terms as the counts below: a pointer at a
+       stage that does not exist is no stage, not a ghost one. */
+    if (r.stage && !stageIds.has(r.stage)) r.stage = '';
     if (!r.stages) return;
     const kept = Object.create(null);
     let any = false;
@@ -5875,10 +6033,20 @@ function renderTeamRows() {
 function renderStageRows() {
   const tb = $('stageRows');
   if (!tb) return;
+  /* Items that reference the stage in EITHER way — time spent in it, or sitting
+     in it right now. One number, because the question the reader is asking of
+     this cell is "is this stage set up right?", and a stage with a current
+     count of nine and a duration count of zero is set up perfectly well: it is
+     a board whose export carries statuses and not durations, which is the
+     ordinary case. Two numbers would need two headings this table has no room
+     for, on a question that only has one answer. */
   const counts = new Map();
+  const bump = (id) => counts.set(id, (counts.get(id) || 0) + 1);
   state.teams.forEach(t => t.rows.forEach(r => {
-    if (!r.stages) return;
-    Object.keys(r.stages).forEach(id => counts.set(id, (counts.get(id) || 0) + 1));
+    const seen = new Set();
+    if (r.stages) Object.keys(r.stages).forEach(id => seen.add(id));
+    if (r.stage) seen.add(r.stage);
+    seen.forEach(bump);
   }));
   tb.innerHTML = '';
   state.stages.forEach((st, i) => {
@@ -6037,7 +6205,8 @@ function renderDashboard() {
      lets renderForecast write the accepted values back into the boxes. */
   const d = derive(rows, state.settings,
     { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket,
-      forecastItems: view.forecastItems, forecastDate: view.forecastDate });
+      forecastItems: view.forecastItems, forecastDate: view.forecastDate },
+    state.stages);
   const plottable = !d.empty && d.weeks.length > 0;
 
   /* Three states, three surfaces: the charts when something plots; the paste
@@ -6237,16 +6406,29 @@ function renderStageTime(d) {
        their export never carried stage times at all. */
     const team = activeTeam();
     const teamHasStages = !!(team && team.rows.some(r => r.stages));
+    /* The case this app was actually built for, and the one worth telling apart
+       from "no stage data at all": an ordinary Jira export has a Status column
+       saying where each item IS, and no durations anywhere. That team's stages
+       are working — they are grouping the age chart — so a card saying it has
+       none would be simply wrong, and would send somebody to check a set-up
+       that is already right. Point them at what they DO have instead. */
+    const teamHasCurrent = !!(team && team.rows.some(r => r.stage));
     none.textContent = !state.stages.length
       ? 'No workflow stages yet. Open Teams & Stages in the header, add the parts of your workflow you '
         + 'want to measure — Build, Review, Test — and list the Jira statuses that feed each '
-        + 'one. Then paste a Time in Status export with a column per status.'
+        + 'one. Then paste an export with a Status column, or a Time in Status one.'
       : teamHasStages
-        ? 'No item under the ' + view.filterDisplay + ' work type filter has stage data. '
+        ? 'No item under the ' + view.filterDisplay + ' work type filter has stage times. '
           + 'Pick another type — or All — above.'
-        : 'None of this team\u2019s items carry stage times yet. Paste a Time in Status export '
-          + '— one row per issue, one column per status — and the days land in the stage each '
-          + 'status is matched to.';
+        : teamHasCurrent
+          ? 'Your export says where each item IS, but not how long it has been there — so this '
+            + 'table has nothing to measure. Your stages are still working: the work item age '
+            + 'chart above groups by them, which answers what is sitting in each stage right '
+            + 'now. Filling this in needs a Time in Status export, with a column per status '
+            + 'holding a number of days.'
+          : 'None of this team\u2019s items carry stage times yet. Paste a Time in Status export '
+            + '— one row per issue, one column per status — and the days land in the stage each '
+            + 'status is matched to.';
     return;
   }
 
@@ -6549,7 +6731,8 @@ function renderAllTeams() {
      estate's total with some rows hidden under it. */
   const inScope = teamsInArt(state.teams, scope);
   const all = deriveTeams(inScope, state.settings,
-    { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket });
+    { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket },
+    state.stages);
   const train = all.train;
   const table = $('allTeamsTable');
   const none = $('allTeamsNone');
@@ -7463,6 +7646,27 @@ function stagesReadHtml(res) {
     return st ? escapeHtml(st.name) : 'a stage that has since been deleted';
   };
   let html = '';
+  /* The status column first: it is the one most exports actually have, so it is
+     the line most readers will be looking for. */
+  if (res.columns && res.columns.status >= 0) {
+    const seen = res.rows.filter(r => r.stage).length;
+    html += '<br>Read <strong>column ' + (res.columns.status + 1) + '</strong> as the current '
+      + 'status. ' + (seen
+        ? seen + ' item' + (seen === 1 ? ' was' : 's were') + ' filed under the stage it '
+          + 'matches — the work item age chart now groups by stage rather than by work type. '
+          + 'Only the stage is saved; the status names themselves are not.'
+        : 'Nothing in it matches a status you have listed against a stage, so no item has a '
+          + 'stage yet.')
+      + (state.stages.length ? '' : ' Set your stages up under Teams & Stages in the header '
+          + 'first — a status is only read when a stage lists it.');
+    if (res.unmatchedStatus) {
+      html += '<br><strong>' + res.unmatchedStatus + ' item'
+        + (res.unmatchedStatus === 1 ? '' : 's') + ' had a status no stage answers to</strong>, '
+        + 'and ' + (res.unmatchedStatus === 1 ? 'it counts' : 'they count') + ' as having no '
+        + 'stage. Check the spellings in Teams & Stages against this export\u2019s own status '
+        + 'column — this report does not repeat what was in it.';
+    }
+  }
   if (cols.length) {
     /* Several columns can feed one stage, so this reads as "these columns → this
        stage" rather than one line per column: it is the sum that becomes the
@@ -7477,10 +7681,18 @@ function stagesReadHtml(res) {
       '</strong> as days in ' + nameOf(id) +
       (list.length > 1 ? ' (added together)' : '')).join(', ') +
       '. Only the day counts are saved — the status names in your headings are not.';
-  } else if (state.stages.length) {
+  } else if (state.stages.length && res.columns.status < 0) {
     html += '<br>No stage columns in this paste: none of the headings match a status you have '
       + 'listed against a stage. Open <strong>Teams &amp; Stages</strong> in the header and check the '
       + 'spellings against this export\u2019s own column headings.';
+  } else if (state.stages.length) {
+    /* A status column was read, so the reader is not missing anything — this
+       export is simply not the kind that carries durations. Said as a fact
+       rather than as the miss above, which would read as a problem with a
+       set-up that is working. */
+    html += '<br>No day counts in this paste, so <em>Time in stage</em> stays empty — that '
+      + 'needs a <strong>Time in Status</strong> export, with a column per status holding a '
+      + 'number of days.';
   }
   if (clash.length) {
     html += '<br><strong>Column ' + clash.map(sc => sc.index + 1).join(', ') + '</strong> matches '
@@ -8636,6 +8848,7 @@ function buildSharePayload(teamIds, win) {
   const usedStages = new Set();
   teams.forEach(t => t.rows.forEach(r => {
     if (r.g) Object.keys(r.g).forEach(id => usedStages.add(id));
+    if (r.w) usedStages.add(r.w);
   }));
   const stages = state.stages.filter(st => usedStages.has(st.id))
     .map(st => ({ id: st.id, name: st.name }));
@@ -9152,6 +9365,9 @@ const DEMO_TEAMS = [
        compared against for either to mean anything. The headings are the Jira
        statuses; DEMO_STAGES matches them to the four stages the demo sets up. */
     stageCols: [['Development', 0.62], ['Code Review', 0.14], ['Testing', 0.18], ['Deployment', 0.06]],
+    /* Where each in-flight item is sitting, cycled deterministically — see
+       statusOf. Kingfisher's queue is short and mostly still being built. */
+    wipStatus: ['Development', 'Development', 'Code Review', 'Testing'],
     types: ['Story', 'Story', 'Story', 'Story', 'Story', 'Story',
             'Task', 'Task', 'Bug', 'Spike'] },
   { name: 'Team Heron', seed: 71104, dated: true, art: true, key: 'HRN',
@@ -9166,6 +9382,20 @@ const DEMO_TEAMS = [
        stage rather than only the one-to-one case. */
     stageCols: [['Development', 0.30], ['Ready for Code Review', 0.19], ['Code Review', 0.16],
                 ['Testing', 0.27], ['Deployment', 0.08]],
+    /* Heron's nine in flight, positionally matched to the `wip` ages above, and
+       the same story the day counts tell told the way a PLAIN export tells it:
+       the two youngest are still being built, and the pile-up is downstream.
+       THREE OF THE FOUR OLDEST SIT IN TESTING — so the stage axis puts the aged
+       dots in one column and names the bottleneck, which is the thing the
+       work-type axis could never do however long you looked at it.
+
+       One status is deliberately NOT one the demo's stages list — "Compliance
+       Review", straight off Charles's own workflow — and it holds a 38-day
+       item, so the "No stage" column and the unmatched-status note in the parse
+       report are both reachable AND both worth acting on: the demo shows you a
+       stage you have not set up yet, with your oldest-but-one item in it. */
+    wipStatus: ['Development', 'Development', 'Deployment', 'Ready for Code Review',
+                'Code Review', 'Testing', 'Testing', 'Compliance Review', 'Testing'],
     /* A twenty-slot bag so the defect share can be tuned finer than tenths — the
        bag's LENGTH doesn't move the seeded sequence, only which type each draw
        lands on, so the dates stay identical however this is retuned. Three in
@@ -9260,16 +9490,32 @@ function demoPaste(profile) {
     return parts.map(t => (t / 10).toFixed(1));
   };
 
-  const row = (created, started, completed, type, span) => {
+  /* A Status column, the way an ordinary Jira export carries one: the state the
+     item is in right now. Finished work is Done — every export says so, and it
+     is what makes the app's "only items in flight have a stage worth reading"
+     handling reachable. Work in progress takes its status from the profile's
+     own list, cycled by position rather than drawn from rnd(): the sequence is
+     seeded and every pinned demo figure hangs off it, exactly as with the issue
+     key counter and the stage-day split. */
+  const statusOf = (wipIndex) => {
+    if (!profile.wipStatus) return null;
+    return wipIndex == null ? 'Done'
+      : profile.wipStatus[wipIndex % profile.wipStatus.length];
+  };
+
+  const row = (created, started, completed, type, span, wipIndex) => {
     const cells = profile.dated ? [created, started, completed, type]
                                 : [started, completed, type];
+    const status = statusOf(wipIndex);
     return (profile.key ? [key()].concat(cells) : cells)
+      .concat(status == null ? [] : [status])
       .concat(stageCells(span)).join('\t');
   };
 
   const lines = [((profile.key ? 'Issue key\t' : '')
                   + (profile.dated ? 'Created\tIn Progress\tResolved\tIssue Type'
                                    : 'In Progress\tResolved\tIssue Type')
+                  + (profile.wipStatus ? '\tStatus' : '')
                   + (profile.stageCols
                       ? '\t' + profile.stageCols.map(([h]) => h).join('\t') : ''))];
 
@@ -9287,12 +9533,13 @@ function demoPaste(profile) {
   }
   /* Started, never completed — work in progress. It contributes nothing to
      throughput or cycle time and everything to the WIP and aged-work tiles. */
-  profile.wip.forEach(age => {
+  profile.wip.forEach((age, i) => {
     /* An item still in flight has spent its time somewhere too, and a Time in
        Status export says so — which is what makes the table's item count larger
-       than the completed count, and what will let a future stage-by-stage age
-       chart read off the same field. */
-    lines.push(row(iso(-age - between(1, 5)), iso(-age), '', pick(profile.types), age));
+       than the completed count. Its INDEX is what picks its current status, so
+       the ages and the stages line up: the oldest items land in the stage the
+       board is actually stuck in. */
+    lines.push(row(iso(-age - between(1, 5)), iso(-age), '', pick(profile.types), age, i));
   });
 
   return lines.join('\n');
