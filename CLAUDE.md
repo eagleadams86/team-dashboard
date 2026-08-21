@@ -551,6 +551,47 @@ than what it was next to.
   where these ages are calendar days. A test asserts the dialog's own text against the derived
   figure.
 
+## Four More Found by Reading (2026-08-21) — no schema change
+
+A second read-through, after the stage axis landed. Same shape as the six above: three of the
+four are something on screen describing what was true before the last change rather than what
+is true now.
+
+- **Deleting a stage left the "sitting in it" pointers behind.** A row references a stage two
+  ways — `g`, the days it spent there, and `w`, the stage it is in RIGHT NOW — and the delete
+  handler only knew about the first. Two consequences, and the second is the one that made it a
+  bug rather than an untidiness. The confirm counted `g` alone, so on **the ordinary-export case
+  this app was built for** — a Status column and no durations anywhere — the row's own count
+  column said "4 items" and the confirm directly under it said nothing was going. And the `w`
+  pointers survived into `persist()`, so localStorage held a pointer at a deleted stage until
+  something reloaded the page and `hydrateState` pruned it. **The ART delete a section above has
+  always nulled its dangling `artId` on the spot**; this is the same call, and the fix is to make
+  both halves of the stage delete do what that one does. Pinned by a group of its own, driving
+  the real button with a stubbed `confirm` and reading the message back.
+- **The work item age ⓘ still said "Columns are work types."** It has been the stage axis since
+  the Status column landed the same day, and the demo's own default team draws it that way — so
+  the first note a reader opens off the first board they are shown described the chart in front
+  of them incorrectly. The README's *Columns Are Workflow Stages — or Work Types* had been
+  written and the ⓘ had not. It now says both readings, in the README's own order, and says why
+  there is no picker.
+- **`#helpBody` had no `white-space` rule, so a note written as paragraphs arrived as one
+  block.** The body is written with `textContent` — never markup, which is what lets a note
+  quote a reader's own label safely — so its only paragraph break is a newline, and at `normal`
+  a blank line collapses to a space. The throughput trend note is three paragraphs and read as a
+  wall. `pre-line` honours the breaks and still collapses ordinary wrapping whitespace, so
+  nothing else moved; the age note above now uses it too.
+- **Two `Math.min/max.apply(null, …)` calls over a team's own items.** `minOf`/`maxOf` exist a
+  few hundred lines above them, with a comment explaining why the forecast does not spread ten
+  thousand trials across a call's arguments — and past an engine limit (65,536 in WebKit) that
+  is not slow, it throws. The two here walk a list whose length is the reader's export rather
+  than a constant this app picks, which is the weaker case for the same rule. Both now go
+  through the helpers, and the comment on them says why every min/max over a list does.
+
+Also tidied: the `.skip` CSS block had picked up a blank line between every line of it, and is
+now byte-identical to the sibling apps' copy again; and the comment over `let activeTab` still
+read "not saved — a reload should open on the dashboard", which stopped being true when
+`view.activeTab` landed.
+
 ## The Current Stage (2026-08-21) — SCHEMA 8 → 9
 
 `r.stage` on each row (`w` on the wire), read from an ordinary **Status** column. It exists

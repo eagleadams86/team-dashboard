@@ -908,6 +908,14 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
 @media (max-width: 620px) { .spark { display: none; } .spark-val { margin-left: 0; } }
 dialog h2 { font-size: 16px; margin-bottom: 12px; }
 dialog p { color: var(--text-secondary); font-size: 14px; }
+/* The help sheet's body is written into #helpBody with textContent — never
+   markup, which is the whole reason a note can quote a reader's own label safely
+   — so the only paragraph break available to it is a newline. Left at
+   `normal`, a blank line between paragraphs collapses to one space and a note
+   written as three paragraphs arrives as one wall of text, which is what the
+   throughput trend note did. `pre-line` honours the breaks and still collapses
+   the ordinary wrapping whitespace, so nothing else here changes. */
+#helpBody { white-space: pre-line; }
 
 /* The toast is a POPOVER, so that it can be seen over an open modal dialog —
    the reasoning is on window.toast itself. Half of what follows undoes the UA's
@@ -924,47 +932,26 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 #toast.show { opacity: 1; }
 
 /* The skip link — visually gone until it takes focus, then the first thing on
-
    the page. Without it a keyboard or screen-reader user tabs through the whole
-
    header on every load before reaching any content, and these are long
-
    single-page apps where that header is always there. Added across the family
-
    2026-08-20; no app had one. Uses the pack's own tokens, so it follows the
-
    theme like everything else. */
-
 .skip { position: absolute; left: -9999px; top: 0; z-index: 100; }
-
 .skip:focus {
-
   /* FIXED, not absolute: absolute positions against the document, so a reader
-
      who shift-tabs back from halfway down the page would send the link to the
-
      top of the document and the browser would scroll the whole page to follow
-
      it. Fixed puts it at the top of the VIEWPORT, where it was aimed. */
-
   position: fixed;
-
   left: 8px; top: 8px; padding: 8px 14px;
-
   background: var(--surface); color: var(--text-primary);
-
   border: 2px solid var(--focus-border); border-radius: var(--radius-sm);
-
   text-decoration: none; font-weight: 600;
-
 }
-
 /* Focus lands on <main id="maincontent" tabindex="-1">, which must not then
-
    draw a focus ring around the entire page — the link itself already showed
-
    where focus went. */
-
 main:focus { outline: none; }
 
 
@@ -3500,7 +3487,12 @@ const DEFAULT_FORECAST_ITEMS = 10;
 const FORECAST_SEED = 0x5EED1;
 
 /* Min and max without apply(): the trial arrays are ten thousand long, and
-   spreading one across a call's arguments is a stack the engine need not have. */
+   spreading one across a call's arguments is a stack the engine need not have —
+   past an engine-specific limit (65,536 arguments in WebKit) it is not slow, it
+   THROWS. Every min/max over a list in this file goes through these two for that
+   reason, including the two in derive() that walk a team's items rather than a
+   trial array: an export nobody would call unreasonable is still a list whose
+   length this app does not choose. */
 function minOf(a) { let m = a[0]; for (const v of a) if (v < m) m = v; return m; }
 function maxOf(a) { let m = a[0]; for (const v of a) if (v > m) m = v; return m; }
 
@@ -3855,7 +3847,7 @@ function derive(rows, settings, view, stages) {
      tile claimed. A trailing zero-throughput bar is true — nothing finished —
      where the front padding the floor below prevents would not be. */
   const completedSundays = finished.map(r => bucketStart(r.completed, bucket));
-  const minCompletedPS = new Date(Math.min.apply(null, completedSundays.map(d => d.getTime())));
+  const minCompletedPS = new Date(minOf(completedSundays.map(d => d.getTime())));
   const limit = endPS;
 
   /* A window longer than the data must not pad empty buckets in front of the
@@ -4262,7 +4254,7 @@ function derive(rows, settings, view, stages) {
     foldedTypes: folded.length,
     count: inFlight.length,
     agedCount: inFlight.filter(r => r.age > agedDays).length,
-    oldest: inFlight.length ? Math.max.apply(null, inFlight.map(r => r.age)) : null,
+    oldest: inFlight.length ? maxOf(inFlight.map(r => r.age)) : null,
     median: ageMedian,
     p85: ageP85,
     threshold: agedDays,
@@ -4921,10 +4913,14 @@ let charts = {};
    train, and would have wiped this chart out from under a reader looking at a
    perfectly healthy roll-up. */
 let trainChart = null;
-/* Which top-level view is on screen. Not in `view` and not saved: which tab you
-   left the app on is not a position worth restoring — a reload should open on
-   the dashboard — and two renderers need to know which of them owns the shared
-   window note right now. */
+/* Which top-level view is on screen, for the two renderers that need to know
+   which of them owns the shared window note right now.
+
+   It is NOT the saved position — `view.activeTab` is, and has been since
+   2026-08-21, for all four tabs; selectTab() writes one and reads the other.
+   This comment said the opposite ("not saved... a reload should open on the
+   dashboard") for as long as that was true, which it stopped being when the
+   reload-throws-you-back complaint was fixed. See DEFAULT_VIEW.activeTab. */
 let activeTab = 'dashboard';
 
 const newId = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -6743,9 +6739,18 @@ const METRIC_HELP = {
       + 'item above the ' + CYCLE_PERCENTILE + '% line has already outlasted almost '
       + 'everything this team has ever delivered, which is a much stronger signal than '
       + '\u201cit looks old\u201d \u2014 it is very unlikely to finish normally now, and it '
-      + 'is the one to talk about first. Columns are work types, because a board where the '
-      + 'defects age and the stories do not is a different problem from one where '
-      + 'everything ages. Point at a dot and it names the item: its issue key if your '
+      + 'is the one to talk about first.\n\n'
+      + 'Columns are your WORKFLOW STAGES when your export has a Status column \u2014 what is '
+      + 'sitting in each part of the workflow and how long it has been there, which is the '
+      + 'question a cycle time figure cannot answer. They run in the order you arranged them '
+      + 'under Teams & Stages, because a workflow has a direction, and each tick carries its '
+      + 'count. An item whose status matches none of your stages goes into a No stage column '
+      + 'at the right-hand end, which is usually a part of your workflow you have not set up '
+      + 'yet. Without a Status column the columns are WORK TYPES instead, busiest first \u2014 '
+      + 'a board where the defects age and the stories do not is a different problem from one '
+      + 'where everything ages. There is no picker: the work-type reading is a filter away, '
+      + 'and scoping the strip to Defects asks where defects get stuck.\n\n'
+      + 'Point at a dot and it names the item: its issue key if your '
       + 'paste had a Key column, and otherwise its work type and start date, which is '
       + 'what finds it again in the export you pasted. The key is the ONLY thing out of '
       + 'your work system this app keeps \u2014 no summary, no status, no names \u2014 and '
@@ -9408,15 +9413,36 @@ $('stageRows').addEventListener('click', e => {
      the open, and the confirm counts them first. Re-pasting the same export
      brings them back — the export still has the column — which is what makes
      this a recoverable delete and worth doing plainly. */
-  let items = 0;
-  state.teams.forEach(t => t.rows.forEach(r => { if (r.stages && r.stages[id] != null) items++; }));
-  if (!confirm(items
-      ? 'Delete ' + stage.name + '?\n\nThe time ' + items + ' item'
-        + (items === 1 ? '' : 's') + ' spent in it will be removed with it. No work item is '
-        + 'deleted, and re-pasting an export with that column brings the figures back.'
+  /* BOTH ways a row can reference a stage, because both go with it — and the
+     row above this one already counts them together, so a confirm that named
+     only the day counts contradicted the number the reader had just read. The
+     ordinary-export case is the one that made it wrong rather than merely
+     incomplete: a team whose paste carries a Status column and no durations has
+     items sitting in this stage and no time in it at all, so the count column
+     said "4 items" and the confirm said nothing was going. */
+  let timed = 0, sitting = 0;
+  state.teams.forEach(t => t.rows.forEach(r => {
+    if (r.stages && r.stages[id] != null) timed++;
+    if (r.stage === id) sitting++;
+  }));
+  const goes = [];
+  if (timed) goes.push('the time ' + timed + ' item' + (timed === 1 ? '' : 's') + ' spent in it');
+  if (sitting) goes.push(sitting + ' item' + (sitting === 1 ? ' that is' : 's that are')
+    + ' sitting in it now');
+  if (!confirm(goes.length
+      ? 'Delete ' + stage.name + '?\n\nThis removes ' + goes.join(' and ')
+        + '. No work item is deleted, and re-pasting an export with that column brings the '
+        + 'figures back.'
       : 'Delete ' + stage.name + '?')) return;
   state.stages.splice(i, 1);
   state.teams.forEach(t => t.rows.forEach(r => {
+    /* Where the item IS goes too, and it has to go HERE rather than being left
+       to hydrateState's pruning on the next load — the same call sanitizeArts'
+       dangling `artId` gets from the ART delete a section above. persist()
+       writes this object out immediately, so a pointer left behind is a pointer
+       at a deleted stage sitting in localStorage until something reloads the
+       page. */
+    if (r.stage === id) r.stage = '';
     if (!r.stages || r.stages[id] == null) return;
     delete r.stages[id];
     if (!Object.keys(r.stages).length) r.stages = null;

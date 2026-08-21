@@ -5370,6 +5370,58 @@ group('a delete looks like a delete, everywhere');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('deleting a stage takes BOTH kinds of reference with it');
+
+  /* A row points at a stage two ways — the days it SPENT there (`g`) and the
+     stage it is sitting in NOW (`w`) — and only the first went with a delete.
+     The ordinary-export case is where that showed: a team whose paste carries a
+     Status column and no durations has items in the stage and no time in it at
+     all, so the row's own count column said "2 items" and the confirm directly
+     under it said nothing was going. The pointers were then written straight
+     back to localStorage, to be pruned by hydrateState on some later load. The
+     ART delete a section above has always nulled its dangling artId on the
+     spot; this is the same call, and these are both halves of it. */
+  {
+    plant({
+      schema: win.TDState.SCHEMA,
+      stages: [{ id: 'sx1', name: 'Review', match: ['Code Review'] },
+               { id: 'sx2', name: 'Test', match: ['Testing'] }],
+      teams: [{ id: 'sxt', name: 'A', rows: [
+        /* In flight, sitting in Review, with no day counts anywhere — which is
+           every row of an ordinary Jira export. */
+        { s: '2026-08-03', t: 'Story', w: 'sx1' },
+        { s: '2026-08-04', t: 'Story', w: 'sx1' },
+        /* And one finished item carrying time in both stages. */
+        { c: '2026-08-05', s: '2026-08-01', t: 'Story', g: { sx1: 2, sx2: 1 } }
+      ] }],
+      settings: {}
+    });
+    win.renderAll();
+
+    const firstRow = win.document.querySelector('#stageRows tr');
+    is(firstRow.querySelector('td.count').textContent, '3 items',
+       'the dialog counts a row that references the stage EITHER way');
+
+    let said = '';
+    const realConfirm = win.confirm;
+    win.confirm = (msg) => { said = msg; return true; };
+    try { win.document.querySelector('[data-delstage="sx1"]').click(); }
+    finally { win.confirm = realConfirm; }
+
+    ok(/the time 1 item spent in it/.test(said),
+       'the confirm names the day counts it is about to remove', said);
+    ok(/2 items that are sitting in it now/.test(said),
+       'AND the items sitting in it — all a Status-only export ever has', said);
+
+    const afterStage = win.tdGet();
+    is(afterStage.stages.map(s => s.id), ['sx2'], 'the stage itself is gone');
+    is(afterStage.teams[0].rows.filter(r => 'w' in r).length, 0,
+       'and no row is left pointing at it, in the copy just written to storage');
+    is(afterStage.teams[0].rows.filter(r => r.g).map(r => r.g), [{ sx2: 1 }],
+       'its day counts go, and the other stage\u2019s stay');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('one page, one surface — in all four themes');
 
   /* Reported by Charles on 2026-08-21, looking at Sepia: the four headline tiles

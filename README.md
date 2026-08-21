@@ -990,6 +990,11 @@ status — but it is **exact, never a partial match**. An alias of `Testing` wil
 swallow a *Waiting on Testing Env* column and add somebody's environment queue to your test
 time. If two stages list the same status, the app says so as you type rather than picking one.
 
+**Deleting a stage takes its figures with it, and the confirm counts them both ways** — the
+time items spent in it, and the items sitting in it right now, which on an ordinary Status-only
+export is all there is. No work item is deleted, and re-pasting the same export brings the
+figures back.
+
 ### Reading the Table
 
 | Column | What it says |
