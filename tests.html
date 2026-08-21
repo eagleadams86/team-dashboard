@@ -4632,12 +4632,20 @@ group('ARTs — the grouping, and the boundary it crosses');
      first press — every other column has a most-interesting end and this one
      has none — and it sorts by issueSortKey, so DAE-10 comes after DAE-9
      rather than between DAE-1 and it. The row with no key is an absence like
-     any other and goes last whichever way the column runs. */
+     any other and goes last whichever way the column runs.
+
+     It shows the WORK TYPE where a paste had no key column, where it used to
+     show a dash. That cell is a control now — it opens the item's editor — and
+     a control with no name is one nobody can find or announce. It is the same
+     fallback `dotName()` has always used to name a dot on the charts, so an
+     item is called the same thing wherever the app has to call it something.
+     The SORT is unchanged: issueSortKey still reads the key, so a keyless row
+     is still an absence and still goes last, whatever the cell now reads. */
   dPress('item');
-  is(dCells('item'), ['ABC-2', 'DAE-9', 'DAE-10', '—'],
+  is(dCells('item'), ['ABC-2', 'DAE-9', 'DAE-10', 'Alpha'],
      'the Item column runs A to Z and in issue-number order, with the keyless row last');
   dPress('item');
-  is(dCells('item'), ['DAE-10', 'DAE-9', 'ABC-2', '—'],
+  is(dCells('item'), ['DAE-10', 'DAE-9', 'ABC-2', 'Alpha'],
      'reversed it runs the other way, and the keyless row is STILL last');
   dPress('item');
 
@@ -5088,6 +5096,114 @@ group('ARTs — the grouping, and the boundary it crosses');
 
   is(spinProbe((box) => { focusIn(box); }), false,
      'and a focus with no press behind it guards nothing — a Tab has no caret to place');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('one work item, typed in by hand');
+
+  /* Asked for by Charles on 2026-08-21: "should we add an easy way to type data
+     manually? not everyone is going to be using Jira or know how to get the
+     report out of it." The app was paste-only, which assumed a Jira and the
+     knowledge to export from it — and it left a second gap the paste box could
+     never close: there was no way to correct or delete ONE row.
+
+     buildManualRow is PURE and produces the same shape parsePastedRows does,
+     because a typed row and a pasted row have to be the same thing once saved. */
+  {
+    const B = (f) => TD.buildManualRow(f, []);
+
+    const ok1 = B({ started: '2026-01-19', completed: '2026-01-21', type: 'Story', key: 'DAE-9' });
+    is(ok1.error, undefined, 'a good item builds without complaint');
+    is(iso(ok1.row.started), '2026-01-19', 'the start date lands');
+    is(iso(ok1.row.completed), '2026-01-21', 'and the completion');
+    is(ok1.row.type, 'Story', 'the type goes through cleanWorkType');
+    is(ok1.row.key, 'DAE-9', 'and the key through cleanIssueKey');
+
+    /* The same guards a paste crosses, at a second door. */
+    is(B({ started: '2026-01-19', type: 'x'.repeat(41) }).row.type, '',
+       'an over-long type is dropped WHOLE, exactly as a pasted one is');
+    is(B({ started: '2026-01-19', key: 'not a key at all' }).row.key, '',
+       'and a key that is not a key shape is dropped whole too');
+
+    /* An item still in flight is the ordinary case for a hand-kept board — you
+       add it when it starts, and fill in the completion when it finishes. */
+    const wip = B({ started: '2026-01-19', type: 'Story' });
+    is(wip.error, undefined, 'no completion date is fine — that is work in progress');
+    is(wip.row.completed, null, 'and it is stored as an absence, not a guess');
+
+    /* WHERE IT DELIBERATELY DIFFERS FROM THE PASTE: it refuses rather than
+       quietly dropping the offending date. A paste is hundreds of rows from a
+       system nobody here controls; a form is one row with the person who typed
+       it looking straight at it. */
+    ok(B({}).error, 'an item with neither date is refused');
+    ok(B({ started: '2026-01-21', completed: '2026-01-19' }).error,
+       'so is one that finished before it started');
+    ok(B({ started: '2026-01-19', completed: '2026-01-21', created: '2026-01-20' }).error,
+       'and one created after the work on it began');
+    ok(B({ started: 'the 19th' }).error, 'and a date that is not a date');
+    /* The paste's answer to the same two orderings is to null the offending
+       date and keep the row — pinned elsewhere. Both are right for their door. */
+    is(TD.parsePastedRows('2026-01-21\t2026-01-19\tStory', 'auto', []).rows.length, 1,
+       'where the PASTE keeps such a row and drops the date instead');
+
+    /* A stage says where an item IS, so it belongs only to work in flight — the
+       same rule the parser applies to a Status column, at a second door. */
+    const stages = [{ id: 'sr', name: 'Review', match: [] }];
+    is(TD.buildManualRow({ started: '2026-01-19', stage: 'sr' }, stages).row.stage, 'sr',
+       'an item in flight can be put in a stage');
+    is(TD.buildManualRow({ started: '2026-01-19', completed: '2026-01-21', stage: 'sr' }, stages)
+         .row.stage, undefined, 'a FINISHED item takes no stage, whatever the picker said');
+    is(TD.buildManualRow({ started: '2026-01-19', stage: 'nope' }, stages).row.stage, undefined,
+       'and a stage nothing answers to is dropped rather than stored');
+
+    /* Day counts have no control on the form, and a field with no control is a
+       field the next save silently drops unless it is carried through. */
+    const carried = TD.buildManualRow(
+      { started: '2026-01-19', keepStages: { sr: 3 } }, stages);
+    is(carried.row.stages, { sr: 3 }, 'an edit keeps the stage times it cannot show');
+  }
+
+  /* ── and the same thing through the real dialog ──────────────────────────── */
+  {
+    plant({ teams: [{ id: 'mi1', name: 'By Hand', rows: [] }], settings: {} });
+    win.renderAll();
+    const mDoc = win.document;
+
+    /* The first-run door. The Loaded Data card is hidden until rows exist, so
+       without this a reader with no Jira met a paste box and nothing else. */
+    is(mDoc.getElementById('btnAddItem').hidden, false,
+       'with no rows, "Add an item" is on offer beside the paste box');
+
+    mDoc.getElementById('btnAddItem').click();
+    mDoc.getElementById('itemStarted').value = '2026-01-19';
+    mDoc.getElementById('itemCompleted').value = '2026-01-21';
+    mDoc.getElementById('itemType').value = 'Story';
+    mDoc.getElementById('itemSave').click();
+    is(win.tdGet().teams[0].rows.length, 1, 'saving adds the item to the active team');
+    is(win.tdGet().teams[0].rows[0].c, '2026-01-21', 'with the date it was given');
+
+    /* A refused save says why and changes nothing — the dialog stays open on the
+       values that were typed, so nothing has to be re-entered. */
+    mDoc.getElementById('btnAddItem2').click();
+    mDoc.getElementById('itemStarted').value = '';
+    mDoc.getElementById('itemCompleted').value = '';
+    mDoc.getElementById('itemSave').click();
+    ok(mDoc.getElementById('itemWarn').textContent.length > 10, 'a bad item is refused out loud');
+    is(win.tdGet().teams[0].rows.length, 1, 'and nothing is written');
+    ok(mDoc.getElementById('itemDialog').open, 'with the dialog still open on what was typed');
+    mDoc.getElementById('itemCancel').click();
+
+    /* Editing. The row the button names is the row the editor writes back to,
+       which is what the index on it is carrying — the table SORTS, so the order
+       on screen is a permutation of the array being written to. */
+    const rowBtn = mDoc.querySelector('#dataItemsTable [data-item]');
+    ok(rowBtn, 'every row in Loaded Data is a control that opens its editor');
+    rowBtn.click();
+    is(mDoc.getElementById('itemStarted').value, '2026-01-19', 'which opens on that row');
+    mDoc.getElementById('itemType').value = 'Bug';
+    mDoc.getElementById('itemSave').click();
+    is(win.tdGet().teams[0].rows.length, 1, 'an edit replaces the row rather than adding one');
+    is(win.tdGet().teams[0].rows[0].t, 'Bug', 'with the change in it');
+  }
 
   /* ────────────────────────────────────────────────────────── */
   group('delete all data takes the ARTs and the stages with it');

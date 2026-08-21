@@ -242,6 +242,50 @@ this file was written to keep out. **Read this whole section before changing any
   meaning rather than a parse. Neither is built. The work item age chart's stage axis WAS
   built — off the current stage rather than off these durations; see the section above it.
 
+## Typing an Item In (2026-08-21) — no schema change
+
+Asked for by Charles: "should we add an easy way to type data manually? not everyone is going to
+be using Jira or know how to get the report out of it." The app was paste-only, which assumed both
+a Jira and the knowledge to export from it.
+
+- **IT CLOSES A SECOND GAP THE REQUEST DID NOT NAME.** There was no way to correct or delete ONE
+  row: a typo meant re-pasting the export or clearing the team, and the Loaded Data card said so in
+  as many words ("read-only — to correct a row, fix it in your source and paste again"). That is no
+  answer when the source is somebody's own memory, and it is why this landed as an editable table
+  rather than only an add form.
+- **A DIALOG, NOT INPUTS IN THE TABLE.** That table sorts and is rebuilt on nearly every render, so
+  a half-typed cell would be taken away by the next re-render along with the caret — the lesson
+  this app has already learnt twice (the settings redraw debounce, and why `wireForecast` redraws
+  only its own result region). It is also read straight off the page by the CSV writer, and an
+  `<input>` has no textContent for `cellText`. Both reasons sit above the markup.
+- **`buildManualRow` is PURE and returns the same shape `parsePastedRows` does**, through the same
+  guards — a typed row and a pasted row have to be the same thing once saved.
+- **It REFUSES a bad ordering where the paste drops the date.** Deliberate, and the reason is the
+  door rather than the rule: a paste is hundreds of rows arriving from a system nobody here
+  controls, so dropping one date and reporting it is the only workable answer; a form is one row
+  with the person who typed it looking straight at it. Both behaviours are pinned side by side, so
+  neither gets "made consistent" with the other.
+- **Dates are `type="date"`, and that is half the point.** A picker has no d/m/y to guess at, so
+  the ambiguous-order problem that produced a 59-day cycle time the same afternoon cannot arise
+  for a typed row.
+- **The stage picker follows the parser's rule** — a stage says where an item IS, so it is offered
+  and stored only for work in flight, and an id nothing answers to is dropped. Day counts have NO
+  control on the form (there is no honest way to type five per row) and are **carried through an
+  edit** by `keepStages`: a field with no input is a field the next save silently drops, which is
+  the trap the sibling app records under `capacityScale`.
+- **The Item cell now shows the WORK TYPE where there is no key**, where it showed a dash. It is a
+  control now, and a control with no name is one nobody can find or announce; it is also the same
+  fallback `dotName()` uses, so an item is called the same thing wherever the app must call it
+  something. The SORT is unchanged — `issueSortKey` still reads the key, so a keyless row is still
+  an absence and still goes last. Two existing tests moved with it, deliberately.
+- **The first-run door is on the PASTE CARD, not only on Loaded Data**, because that card is hidden
+  until rows exist — so the reader this was built for met a paste box explaining a Jira export and
+  nothing else. It hides once this team has rows, the same reasoning the demo button beside it
+  follows: the Loaded Data card then carries "+ Add item" where you would look for it.
+- **The row's index is carried on the button, not its position on screen.** The table sorts, so
+  what is drawn is a permutation of the array being written back to; a Map is built once per render
+  rather than an `indexOf` per row.
+
 ## Three Reports From One Paste (2026-08-21) — no schema change
 
 Charles pasted four hand-typed rows, got "Nothing to load — paste some rows first" under rows he

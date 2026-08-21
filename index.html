@@ -608,6 +608,17 @@ button.team-open { font: inherit; font-weight: var(--fw-semibold); color: var(--
   text-decoration: underline; text-decoration-color: var(--border-strong);
   text-underline-offset: 3px; }
 button.team-open:hover { text-decoration-color: var(--accent); color: var(--accent); }
+/* The Item cell is a control that opens that row's editor. Styled as a link
+   rather than as a button, the same call `button.team-open` above makes and for
+   the same reason: a column of two hundred buttons reads as two hundred things
+   to press, where what is wanted is a column of names that happen to be
+   clickable. It carries the item's key, or its work type where a paste had no
+   key column — never an empty cell, which would be a control nobody could find. */
+button.rowbtn { font: inherit; color: inherit; background: none; border: 0; padding: 0;
+  cursor: pointer; text-align: left; text-decoration: underline;
+  text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+button.rowbtn:hover { text-decoration-color: var(--accent); color: var(--accent); }
+
 /* A team with no data in this window still gets a row — it is a finding, not an
    omission — but its figures are dashes and should read as such. */
 table.data tr.no-data td.figure { color: var(--text-muted); }
@@ -820,6 +831,15 @@ dialog { background: var(--surface); color: var(--text-primary);
    name box, a picker, a count and a delete and at 560 they were shouldered into
    each other. Outside the media query below, because `width: calc(100% - 32px)`
    already shrinks it to fit a phone. */
+/* Wider than the 560px base by just enough for the field PAIRS to sit two-up:
+   `.grid.two` needs 260px a track plus the gap, and 560 leaves 520 of content
+   after the padding, which is four pixels short — so every pair stacked and the
+   form ran six fields deep. It is not one of the 1100px working dialogs either;
+   this is six short fields, and a wide box around them would be mostly air.
+   Nothing is orphaned at this width: `auto-fit` collapses the empty track, so
+   the row holding Item alone (no stages set up) spans rather than leaving a
+   gap where a control should be. */
+#itemDialog { max-width: 640px; }
 #manageDialog { max-width: 1100px; }
 /* The multi-team paste needs the same room, and for the same reason: it holds a
    paste box, a plan listing every team the export names and a list of the
@@ -1153,6 +1173,13 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              The button was on the dashboard card alone to begin with — i.e. on
              the one tab a first run never lands on, which is exactly the way a
              feature goes unfound. -->
+        <!-- The other way in, and it is deliberately HERE rather than only on the
+             Loaded Data card below: that card is hidden until rows exist, so on a
+             first run the only door on screen was a paste box explaining a Jira
+             export. Somebody keeping a small board by hand — no Jira, or no idea
+             how to get a report out of it — would find nothing they could use.
+             Asked for by Charles on 2026-08-21 for exactly that reader. -->
+        <button class="btn" id="btnAddItem" type="button">Add an item&hellip;</button>
         <button class="btn" id="btnSampleData" type="button">Load sample data</button>
         <button class="btn danger" id="btnClear" hidden>Clear this team's data</button>
       </div>
@@ -1168,9 +1195,14 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <div class="card" id="loadedCard" hidden>
       <div class="row spread">
         <h2>Loaded Data <span class="hint" id="rowCount"></span></h2>
-        <span id="dataExport"></span>
+        <span class="row" style="gap:6px">
+          <button class="btn small" id="btnAddItem2" type="button">+ Add item</button>
+          <span id="dataExport"></span>
+        </span>
       </div>
-      <p class="hint">Read-only — to correct a row, fix it in your source and paste again.</p>
+      <p class="hint">Press an item to edit it, or add one by hand. A row pasted from an export
+        and a row typed in here are the same thing once they are saved — both go through the
+        same checks, and both are yours to correct.</p>
       <div id="dataTable" style="margin-top:var(--sp-5)"></div>
     </div>
 
@@ -1694,6 +1726,78 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
      back, so it gets room to say exactly how much is going and to offer the
      backup that is the only route back — and since sync was removed, the only
      copy there is. -->
+<!-- ── One work item, by hand ─────────────────────────────────────────────────
+     The app was paste-only until 2026-08-21, which assumed every reader has a
+     Jira they can get a report out of. This is the other door, and it answers a
+     second complaint the paste box never could: there was no way to correct or
+     remove ONE row. A typo meant re-pasting the export or deleting the team's
+     data, and the Loaded Data card said so in as many words.
+
+     DATES ARE `type="date"`, and that is not only convenience: a date picker has
+     no d/m/y to guess at, so the whole ambiguous-order problem a pasted
+     `1/3/26` carries simply does not arise for a row typed in here.
+
+     Deliberately a DIALOG rather than inputs in the table itself. That table
+     sorts, and it is rebuilt on every render — a half-typed value in a cell
+     would be taken away by the next re-render along with the caret, which this
+     app has already learnt twice (the settings debounce, and why wireForecast
+     redraws only its own result). It is also read straight off the page by the
+     CSV writer, and an <input> has no textContent for cellText to export. -->
+<dialog id="itemDialog" aria-labelledby="itemTitle">
+  <h2 id="itemTitle">Add a Work Item</h2>
+  <p class="hint" id="itemIntro"></p>
+
+  <div class="grid two" style="margin-top:var(--sp-5)">
+    <div>
+      <label for="itemStarted">Started</label>
+      <input type="date" id="itemStarted">
+    </div>
+    <div>
+      <label for="itemCompleted">Completed</label>
+      <input type="date" id="itemCompleted">
+    </div>
+  </div>
+  <p class="hint" style="margin-top:var(--sp-4)">An item needs at least one of those two.
+    Leave <strong>Completed</strong> empty for work still in progress — it still counts as
+    work started.</p>
+
+  <div class="grid two" style="margin-top:var(--sp-5)">
+    <div>
+      <label for="itemType">Work type</label>
+      <input type="text" id="itemType" maxlength="40" spellcheck="false" autocomplete="off"
+             placeholder="e.g. Story" list="itemTypeList">
+      <datalist id="itemTypeList"></datalist>
+    </div>
+    <div>
+      <label for="itemCreated">Created <span class="hint">(optional)</span></label>
+      <input type="date" id="itemCreated">
+    </div>
+  </div>
+
+  <div class="grid two" style="margin-top:var(--sp-5)">
+    <div>
+      <label for="itemKey">Item <span class="hint">(optional)</span></label>
+      <input type="text" id="itemKey" maxlength="17" spellcheck="false" autocomplete="off"
+             placeholder="e.g. DAE-1552">
+    </div>
+    <div id="itemStageWrap" hidden>
+      <label for="itemStage">Sitting in <span class="hint">(optional)</span></label>
+      <select id="itemStage"></select>
+    </div>
+  </div>
+
+  <!-- role="status" so a rejected save is announced rather than only shown. -->
+  <div id="itemWarn" class="warn" role="status" style="margin-top:var(--sp-5)"></div>
+
+  <div class="row spread" style="margin-top:18px">
+    <button class="btn danger" id="itemDelete" type="button" hidden>Delete this item</button>
+    <span class="row" style="margin-left:auto">
+      <button class="btn" id="itemCancel" type="button">Cancel</button>
+      <button class="btn primary" id="itemSave" type="button">Save item</button>
+    </span>
+  </div>
+</dialog>
+
 <dialog id="clearDialog" aria-labelledby="clearTitle">
   <h2 id="clearTitle">Delete All Data?</h2>
   <p id="clearBody"></p>
@@ -2945,6 +3049,67 @@ function parsePastedRows(text, order, stages) {
    them changed, and a row with no key at all wants a Key column in the export.
    Nothing is ever routed to "the first team" or to the active one — a row in
    the wrong team's throughput is worse than a row plainly reported as homeless. */
+/* ── One work item, built from a form ───────────────────────────────────────
+   PURE, and the same shape parsePastedRows produces, because a row typed in by
+   hand and a row out of an export have to be the same thing once they are
+   saved. It goes through the same guards — cleanWorkType, cleanIssueKey — and
+   enforces the same ordering, so nothing here can make a row the parser never
+   would.
+
+   WHERE IT DELIBERATELY DIFFERS FROM THE PASTE: it REFUSES a bad ordering
+   rather than quietly dropping the offending date. A paste is hundreds of rows
+   arriving at once from a system nobody here controls, so dropping one date and
+   reporting it is the only workable answer. A form is one row, with the person
+   who typed it looking straight at it — telling them what is wrong is strictly
+   better than silently keeping three-quarters of what they meant.
+
+   Dates arrive as `YYYY-MM-DD` from a date input, which is why this parses them
+   with the ISO reader rather than through parseDate's ambiguity rules: there is
+   no d/m/y to guess at, and that is half the reason this door exists. */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function buildManualRow(f, stages) {
+  const iso = (v) => {
+    const t = String(v == null ? '' : v).trim();
+    if (!t) return null;
+    if (!ISO_DATE_RE.test(t)) return undefined;          /* typed nonsense, not "empty" */
+    const d = new Date(t + 'T00:00:00Z');
+    return isNaN(d) ? undefined : d;
+  };
+  const completed = iso(f.completed), started = iso(f.started), created = iso(f.created);
+  if (completed === undefined || started === undefined || created === undefined) {
+    return { error: 'One of those dates could not be read. Use the date picker, or type it as '
+      + 'YYYY-MM-DD.' };
+  }
+  /* The parser's own rule: a row with neither date says nothing about flow. */
+  if (!completed && !started) {
+    return { error: 'An item needs a start date, a completed date, or both — every figure on '
+      + 'the dashboard keys off one of them.' };
+  }
+  if (started && completed && started > completed) {
+    return { error: 'That item finished before it started. Check the two dates — work cannot '
+      + 'take less than no time.' };
+  }
+  const startRef = started || completed;
+  if (created && startRef && created > startRef) {
+    return { error: 'That item was created after the work on it began. Lead time is measured '
+      + 'from the created date, so it cannot come last.' };
+  }
+  const row = { completed: completed || null, started: started || null,
+                created: created || null,
+                type: cleanWorkType(f.type), key: cleanIssueKey(f.key) };
+  /* A stage says where an item IS, so it belongs only to work in flight — the
+     same rule the parser applies to a Status column, stated once more here
+     because this is a second door onto the same field. An id nothing answers to
+     is dropped rather than stored, as everywhere else. */
+  const stageId = String(f.stage || '');
+  if (!completed && stageId && (stages || []).some(st => st.id === stageId)) row.stage = stageId;
+  /* Day counts are not offered by this form: they come per item out of a Time in
+     Status export and there is no honest way to type five of them per row. An
+     item being EDITED keeps whatever it already had. */
+  if (f.keepStages) row.stages = f.keepStages;
+  return { row };
+}
+
 function projectIdIndex(teams) {
   const index = new Map();
   (Array.isArray(teams) ? teams : []).forEach(t => {
@@ -4428,7 +4593,7 @@ window.TD = {
   cleanIssueKey,
   /* The project id and the routing it drives — pure, so the split can be pinned
      without a paste box or a team list on screen. */
-  dateEvidence, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
+  dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
   soleProjectId, PROJECT_ID_ADOPT_MIN,
   cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, deriveTeams, utcDate,
   /* The forecast's pure pieces, so a test can deal a sample set it wrote itself
@@ -7637,15 +7802,28 @@ function renderDataTable() {
     });
   }
 
+  /* Which row of the team's own list each drawn row is. The table sorts, so the
+     order on screen is a permutation of `rows` — the editor has to be handed the
+     index into the array it will write back to, not the one it is looking at.
+     A Map rather than indexOf per row: 200 items is 40,000 comparisons for a
+     number that can be looked up. */
+  const at = new Map(rows.map((r, i) => [r, i]));
+
   const body = sorted.map(r => {
     const ct = cycleTimeOf(r, sameDay, workingDays);
     return '<tr>' +
+      /* The first cell is the control, the way the sibling app's tables do it: a
+         <tr> cannot take focus, and giving it a button role would break the grid
+         semantics that make seven numeric columns readable. `cellText` strips
+         nothing here — the button's own text is the item's name, which is
+         exactly what the export wants in that column. */
       /* Escaped like every other value that reaches innerHTML, even though
          cleanIssueKey has already made markup impossible — the house rule is
          that nothing is trusted at this boundary because it was trusted at an
          earlier one, and the day someone loosens that regex this line is what
          is still standing. */
-      '<td>' + (escapeHtml(r.key) || '<span class="hint">—</span>') + '</td>' +
+      '<td><button type="button" class="rowbtn" data-item="' + at.get(r) + '">'
+        + (escapeHtml(r.key) || (escapeHtml(r.type) || 'Item')) + '</button></td>' +
       '<td>' + (r.completed ? isoOf(r.completed) : '<span class="hint">in progress</span>') + '</td>' +
       '<td>' + (r.started ? isoOf(r.started) : '<span class="hint">—</span>') + '</td>' +
       '<td>' + (r.created ? isoOf(r.created) : '<span class="hint">—</span>') + '</td>' +
@@ -7777,6 +7955,11 @@ function renderEmptyState() {
      up with no tab selected. */
   $('tab-allteams').hidden = state.teams.length < 2;
   if (activeTab === 'allteams' && $('tab-allteams').hidden) selectTab('dashboard');
+  /* The same reasoning as the demo button beside it: this is the first-run door
+     into typing an item, and once this team HAS rows the Loaded Data card below
+     carries its own "+ Add item" in the place you would look for it. Two live
+     buttons doing one thing is clutter on a working app. */
+  $('btnAddItem').hidden = !!rows;
   $('btnAppend').hidden  = !rows;
   $('btnClear').hidden   = !rows;
   $('loadedCard').hidden = !rows;
@@ -8404,7 +8587,7 @@ function closeOnBackdropClick(dlg) {
    reconciliation dialog, which refused to be dismissed because picking which
    copy of your data to keep had to be a choice — and it went with sync on
    2026-08-20, so the rule is now simply "every dialog". */
-['dataDialog', 'clearDialog', 'helpDialog', 'manageDialog', 'multiDialog']
+['dataDialog', 'clearDialog', 'helpDialog', 'manageDialog', 'multiDialog', 'itemDialog']
   .forEach(id => closeOnBackdropClick($(id)));
 
 /* theme */
@@ -9660,6 +9843,111 @@ $('clearBtn').addEventListener('click', () => {
      is exactly one copy of this data and it is the one in this browser, which
      is what the sentence above already says. */
   openModal(clearDialog);
+});
+
+/* ── Adding and editing one item ───────────────────────────────────────────
+   `editing` is the index into the ACTIVE TEAM's rows, or null for a new item.
+   Held in a module variable rather than on the dialog, because the dialog is
+   markup and this is a position in an array that a render can renumber. It is
+   cleared on every open, so it can never outlive the row it points at. */
+let editingItem = null;
+
+function openItemDialog(index) {
+  const team = activeTeam();
+  if (!team) return;
+  editingItem = (typeof index === 'number' && team.rows[index]) ? index : null;
+  const r = editingItem === null ? null : team.rows[editingItem];
+
+  $('itemTitle').textContent = r ? 'Edit This Work Item' : 'Add a Work Item';
+  $('itemIntro').textContent = r
+    ? 'Changing this item changes every figure it feeds.'
+    : 'One item, typed in. It lands in ' + team.name + ' alongside anything you have pasted.';
+
+  $('itemStarted').value = r && r.started ? isoOf(r.started) : '';
+  $('itemCompleted').value = r && r.completed ? isoOf(r.completed) : '';
+  $('itemCreated').value = r && r.created ? isoOf(r.created) : '';
+  $('itemType').value = r ? r.type : '';
+  $('itemKey').value = r ? r.key : '';
+
+  /* The types already in use, offered rather than imposed: a work type is free
+     text within its 40-char cap, and the whole point of the filter list in
+     Settings is that a team names its own. A datalist suggests without
+     restricting, so the second Bug is one keystroke and a new type is still
+     just typed. */
+  $('itemTypeList').innerHTML = [...new Set(state.teams
+      .flatMap(t => t.rows.map(x => x.type)).filter(Boolean))]
+    .sort().slice(0, 40)
+    .map(t => '<option value="' + escapeHtml(t) + '"></option>').join('');
+
+  /* Only where stages exist, and only ever for work in flight — see
+     buildManualRow. The picker is drawn every open because a stage can be added
+     or renamed in the dialog next door between one item and the next. */
+  const wrap = $('itemStageWrap');
+  wrap.hidden = !state.stages.length;
+  if (state.stages.length) {
+    $('itemStage').innerHTML = '<option value="">Not set</option>' + state.stages
+      .map(st => '<option value="' + escapeHtml(st.id) + '">' + escapeHtml(st.name) + '</option>')
+      .join('');
+    $('itemStage').value = (r && r.stage) || '';
+  }
+
+  $('itemDelete').hidden = !r;
+  $('itemWarn').textContent = '';
+  openModal($('itemDialog'));
+}
+
+$('itemSave').addEventListener('click', () => {
+  const team = activeTeam();
+  if (!team) return;
+  const built = buildManualRow({
+    started: $('itemStarted').value,
+    completed: $('itemCompleted').value,
+    created: $('itemCreated').value,
+    type: $('itemType').value,
+    key: $('itemKey').value,
+    stage: state.stages.length ? $('itemStage').value : '',
+    /* Day counts have no input here and must survive an edit — a field with no
+       control on the form is a field the next save silently drops, which is the
+       trap the sibling app records under `capacityScale`. */
+    keepStages: (editingItem !== null && team.rows[editingItem])
+      ? team.rows[editingItem].stages : null
+  }, state.stages);
+
+  if (built.error) { $('itemWarn').textContent = built.error; return; }
+
+  if (editingItem !== null && team.rows[editingItem]) team.rows[editingItem] = built.row;
+  else team.rows.push(built.row);
+  save();
+  $('itemDialog').close();
+  $('parseNote').innerHTML = '';
+  renderAll();
+  window.toast(editingItem === null ? 'Item added' : 'Item updated');
+});
+
+$('itemDelete').addEventListener('click', () => {
+  const team = activeTeam();
+  if (!team || editingItem === null || !team.rows[editingItem]) return;
+  /* The only single-row delete in the app, and it takes one item out of every
+     figure on the dashboard — so it asks, like every other delete here. */
+  if (!confirm('Delete this work item?\n\nIt comes out of every figure it feeds. '
+      + 'There is no undo.')) return;
+  team.rows.splice(editingItem, 1);
+  save();
+  $('itemDialog').close();
+  renderAll();
+  window.toast('Item deleted');
+});
+
+$('itemCancel').addEventListener('click', () => $('itemDialog').close());
+$('btnAddItem').addEventListener('click', () => openItemDialog(null));
+$('btnAddItem2').addEventListener('click', () => openItemDialog(null));
+
+/* Delegated on the card, not the table: the table is rebuilt on nearly every
+   keystroke elsewhere in the app, so per-element listeners would have to be
+   re-attached each time. Same reason the sort headings are delegated here. */
+$('loadedCard').addEventListener('click', (e) => {
+  const btn = e.target.closest ? e.target.closest('[data-item]') : null;
+  if (btn) openItemDialog(Number(btn.dataset.item));
 });
 
 $('clearBackupBtn').addEventListener('click', downloadBackup);

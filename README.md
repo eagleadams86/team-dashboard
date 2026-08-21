@@ -111,13 +111,26 @@ dashboard into two tones that meant nothing. That edge went from 4px to **6px** 
 change, and for the same reason: the tile used to be told apart by its fill, and now it is told
 apart by the edge, so the edge has to be able to carry it.
 
-### Starting Again
+### Typing Items In by Hand
 
-**Back up → Start again** deletes every team and work item, **and the ARTs and workflow stages
-with them** — the dialog lists what it is about to take. Your settings are kept: the labels, the
-thresholds, the work type filters and your theme. A stage carries status names you typed off an
-export and an ART is a grouping of teams, so both are data; settings are the configuration the
-dialog promises to leave alone, and that is the line the delete draws.
+Not everyone has a Jira, or knows how to get a report out of one. **Add an item** sits beside the
+paste box on a first run, and **+ Add item** on the Loaded Data card once you have rows: one short
+form — started, completed, work type, and optionally a created date, an item name and the stage it
+is sitting in.
+
+It also closes a gap the paste box never could: **press any row in Loaded Data to edit it, or
+delete it.** Before this the card said "read-only — to correct a row, fix it in your source and
+paste again", which is no answer at all when the source is your own memory.
+
+Two things worth knowing:
+
+- **The dates are date pickers, so there is nothing to guess at.** The ambiguous
+  day-first/month-first question a pasted `1/3/26` raises does not arise here at all.
+- **A typed row and a pasted row are the same thing once saved.** Both cross the same guards — the
+  work type capped and dropped whole if it is really a sentence, the item name kept only if it is
+  the shape of an issue key. The one difference is that the form **refuses** a bad ordering rather
+  than dropping the offending date: a paste is hundreds of rows from a system nobody here
+  controls, and a form is one row with you looking straight at it.
 
 ### How Many Items the Window Covers
 
@@ -1419,9 +1432,12 @@ Folded away at the foot of the same dialog, under **Start again**, is **Delete a
 the whole-board version of Clean up old data. It's behind a fold on purpose: the one
 irreversible action in the app shouldn't sit a mis-click away from Download backup.
 
-Pressing it opens a confirmation of its own that says exactly how much is going ("This
-deletes 2 teams and 3 items") and offers the same JSON download as a last chance to keep any
-of it. There is no "…and every device you own" line any more: since sync was removed there is
+Pressing it opens a confirmation of its own that **lists exactly what is going** — "This deletes
+2 teams and 3 items, along with 1 ART and 4 workflow stages" — and offers the same JSON download
+as a last chance to keep any of it. The ARTs and the stages go with the teams: a stage carries
+status names you typed off an export and an ART is a grouping of teams, so both are data. **Your
+settings are kept**, which is the line the delete draws — the labels, the thresholds, the work
+type filters and your theme are configuration, and the dialog says so. There is no "…and every device you own" line any more: since sync was removed there is
 exactly one copy, and it is the one in this browser.
 
 **Your settings and your theme survive.** Starting fresh isn't asking to lose the type
