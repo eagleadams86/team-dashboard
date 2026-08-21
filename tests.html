@@ -2193,7 +2193,21 @@ async function run(TD, win) {
      explanation rather than on nothing. A comment cannot open a socket, and the
      CSP check above is what actually guarantees that; this is the tripwire that
      makes a paste-back loud. */
-  const APP_CODE = stripComments(APP_SRC).replace(/<!--[\s\S]*?-->/g, '');
+  /* Stripped to a FIXED POINT, not in a single pass. CodeQL flags the one-pass
+     form as an incomplete multi-character sanitizer, and it is right about the
+     shape even though nothing here reaches a DOM: `<!--<!-- x -->` leaves a
+     bare `<!--` behind, so one pass is not "comments removed". Repeating until
+     the string stops changing is: each pass strictly shortens it, so it
+     terminates. Kept honest rather than suppressed — a stripper that only
+     half-strips would quietly let a word through and take this tripwire with
+     it. */
+  const stripAll = (src, re) => {
+    let prev;
+    do { prev = src; src = src.replace(re, ''); } while (src !== prev);
+    return src;
+  };
+  const APP_CODE = stripAll(stripAll(APP_SRC, /<!--[\s\S]*?-->/g), /\/\*[\s\S]*?\*\//g)
+    .replace(/^\s*\/\/.*$/gm, '');
   const SYNC_WORDS = [/firebase/i, /firestore/i, /gstatic/i, /googleapis/i,
                       /accounts\.google/i, /gsi\/client/i, /signInWith/i,
                       /apiKey/i, /GOOGLE_CLIENT_ID/, /onSnapshot/, /setDoc/];
