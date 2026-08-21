@@ -229,12 +229,13 @@ this file was written to keep out. **Read this whole section before changing any
   window was renamed with it. Pinned, because "Teams" is the tidier-looking label and exactly
   what a later edit would shorten it back to.
 - **The demo sets the stages up BEFORE it parses**, because a stage column is only ever found
-  by an alias that already exists. Kingfisher spends most of its time building, **Heron spends
-  more of its time queueing than building** — the finding the whole feature exists to produce,
-  and the reason the demo lands on Heron — and Wagtail carries none, so the card's empty face is
-  reachable. Review is fed by two of Heron's columns. The demo's split is **deterministic and
-  never drawn from `rnd()`**, exactly like the issue key counter: a draw consumed here would
-  silently move Heron's tail and Kingfisher's aged count. It is written in **tenths of a day**,
+  by an alias that already exists. Team Healthy Flow spends most of its time building, **Team
+  Long Tail spends more of its time queueing than building** — the finding the whole feature
+  exists to produce, and the reason the demo lands on Team Long Tail — and Team Bare Export
+  carries none, so the card's empty face is reachable. Review is fed by two of Team Long Tail's
+  columns. The demo's split is **deterministic and never drawn from `rnd()`**, exactly like the
+  issue key counter: a draw consumed here would silently move Team Long Tail's tail and Team
+  Healthy Flow's aged count. It is written in **tenths of a day**,
   because whole days on a four-day board report that every item spent zero time in review.
 - What this unblocks and what it does not: blocked time and flow efficiency now have their
   export, but both still need a per-stage **waiting or working** flag, which is a decision about
@@ -384,11 +385,12 @@ than what it was next to.
   wrapper — a button inside a button is invalid, and `display: flex` on a `<th>` stops it
   generating a table-cell box and unpicks the column alignment. The sort arrow's selector needed
   `:not(.tile-help)` or it landed on both buttons.
-- **"five items aged past the threshold" — it was six.** Heron's `wip` list gained an item, the
-  README was corrected and the Load-sample dialog was not. Counted from the profile now
-  (`DEMO_AGED`) rather than written out, against `DEFAULT_SETTINGS.agedDays` with the threshold
-  named in the same sentence — the live setting would be wrong in working-days mode, where these
-  ages are calendar days. A test asserts the dialog's own text against the derived figure.
+- **"five items aged past the threshold" — it was six.** Team Long Tail's `wip` list gained an
+  item, the README was corrected and the Load-sample dialog was not. Counted from the profile
+  now (`DEMO_AGED`) rather than written out, against `DEFAULT_SETTINGS.agedDays` with the
+  threshold named in the same sentence — the live setting would be wrong in working-days mode,
+  where these ages are calendar days. A test asserts the dialog's own text against the derived
+  figure.
 
 ## The Current Stage (2026-08-21) — SCHEMA 8 → 9
 
@@ -424,7 +426,7 @@ machinery whole: same stages, same aliases, same argument.
   is a control set once and never touched, and nothing is lost without one — the work-type
   reading is a filter away, and scoping the strip to Bugs makes this chart answer "where do
   defects get stuck", which is strictly more than the type axis ever said. Falls back to work
-  type when no item in flight carries a stage, so a team like Wagtail is unchanged.
+  type when no item in flight carries a stage, so a team like Team Bare Export is unchanged.
 - **Stage columns keep the READER's order, where type columns rank busiest-first.** A workflow
   has a direction and that order is the one thing the reader already knows how to scan. Only
   stages holding something in flight get a column: an empty one is a gap in the axis that costs
@@ -444,12 +446,12 @@ machinery whole: same stages, same aliases, same argument.
 - **The Time in Stage card knows the status-only case and says so.** A team with current stages
   and no durations gets a message saying its stages ARE working and pointing at the age chart —
   not "you have no stage data", which would send somebody to check a set-up that is right.
-- **The demo's Heron carries one status no stage lists** — "Compliance Review", straight off
-  Charles's own workflow — holding its second-oldest item, so the "No stage" column and the
-  unmatched-status note are both reachable AND both worth acting on. Its in-flight statuses are
-  matched POSITIONALLY to the `wip` ages, so three of the four oldest sit in Test and the
-  bottleneck is a column you can point at. `statusOf` never draws from `rnd()`, like every other
-  demo field added since the issue key.
+- **The demo's Team Long Tail carries one status no stage lists** — "Compliance Review",
+  straight off Charles's own workflow — holding its second-oldest item, so the "No stage" column
+  and the unmatched-status note are both reachable AND both worth acting on. Its in-flight
+  statuses are matched POSITIONALLY to the `wip` ages, so three of the four oldest sit in Test
+  and the bottleneck is a column you can point at. `statusOf` never draws from `rnd()`, like
+  every other demo field added since the issue key.
 
 ## The Project Id and the Multi-Team Paste (2026-08-20) — SCHEMA 6 → 7
 
@@ -503,9 +505,9 @@ thing the key made possible that is not a label on a chart.
 - `parseProblemsHtml` and `columnsReadHtml` were split out of `showParseNote` so both paste
   surfaces explain one export the same way. Two reports drifting apart on what a column was read
   as is the failure this app has always spent the most words preventing.
-- The demo's two keyed teams carry the ids their keys are built from and Wagtail carries none,
-  so both faces are reachable from Load sample data — and the demo is itself a multi-team export
-  that splits back into the teams it came from, which a test pins.
+- The demo's two keyed teams carry the ids their keys are built from and Team Bare Export
+  carries none, so both faces are reachable from Load sample data — and the demo is itself a
+  multi-team export that splits back into the teams it came from, which a test pins.
 - `table.manage input.projid` has to sit AFTER the 320px `input[type="text"]` cap it shares its
   specificity with, or it loses. `text-transform: uppercase` shows what is actually stored as it
   is typed; the placeholder is exempted, or "e.g. DAE" shouts.
@@ -538,7 +540,7 @@ dot: "which of these needs reviewing" is unanswerable when every dot is called S
   groups or filters by it. `dotName()` is the one place a dot's name is decided, shared by both
   scatters so they can never drift; `issueSortKey()` is the one place the Item column's order is
   decided (zero-pads the number so DAE-10 doesn't land between DAE-1 and DAE-9).
-- **Two demo teams carry keys and Wagtail deliberately carries none**, so both faces are
+- **Two demo teams carry keys and Team Bare Export deliberately carries none**, so both faces are
   reachable from Load sample data — named dots, and the type-named fallback. The generator's key
   counter must never draw from `rnd()`: the sequence is seeded and every pinned demo figure
   depends on it.
@@ -587,7 +589,7 @@ the two are read side by side; the divergences below are deliberate.
   close the dialog) and neither of the other two messages fits: there is no filter to blame and
   nothing to paste, because the train has no teams rather than no data.
 - The team-name column has a `min-width` so the ART picker beside it cannot truncate
-  "Team Kingfisher" to "Team Ki" on a phone; the row simply outgrows the dialog and
+  "Team Healthy Flow" to "Team He" on a phone; the row simply outgrows the dialog and
   `.table-scroll` does its job.
 - **The demo puts two teams on one train and leaves one on none.** A train per team makes
   grouping look pointless; all three on one leaves the No ART option absent. Pinned, including
@@ -764,11 +766,11 @@ Rules it must keep:
   is the oldest export. **Nulls sort last in both directions**, or a team with no data wins the
   top of "shortest cycle time". Which way a column runs on a first press travels on the header
   button as `data-desc` rather than being re-derived in the handler.
-- **The demo's Wagtail carries `stale: 9`**, shifting its whole history back nine days. Its own
-  dashboard is untouched (every window hangs off the latest date in the data, so the picture moves
-  with it); on All Teams it is the team with nine silent days dragging its rate down. Without a
-  team like it the Data to column is a row of matching dates that looks like it does nothing —
-  which is exactly what the demo rule exists to prevent.
+- **The demo's Team Bare Export carries `stale: 9`**, shifting its whole history back nine days.
+  Its own dashboard is untouched (every window hangs off the latest date in the data, so the
+  picture moves with it); on All Teams it is the team with nine silent days dragging its rate
+  down. Without a team like it the Data to column is a row of matching dates that looks like it
+  does nothing — which is exactly what the demo rule exists to prevent.
 - **One chart, and the reasoning behind that.** A line PER TEAM would need a categorical palette
   the theme pack does not have — only `--accent` and `--serious`, which every chart here uses as
   its two-series pair — and inventing colours locally is the drift the pack exists to stop. That
@@ -907,7 +909,7 @@ thing to read before changing any of it.
   screen reader the opposite.
 - **The demo needed no new data**, and that is not a hole in the sample-data rule: the button is
   on every chart the demo already draws, and the one state worth seeing — a card with no chart
-  under it and so no button — is Wagtail's lead time, which the demo already carries.
+  under it and so no button — is Team Bare Export's lead time, which the demo already carries.
 
 ## The Cycle Time Scatter (2026-08-20)
 
@@ -1223,10 +1225,17 @@ app now holds identifiers out of a work system, and the answer to "where does th
   figures a later edit would tidy without noticing. The same rule runs in Sprint
   Velocity; it was added to both on 2026-08-19 after Charles loaded a sample and
   couldn't find the feature it was meant to show.
-  - Every figure in `DEMO_TEAMS` is load-bearing: **Heron's tail is the app's
-    central argument** (p85 ≈ 23 days against a median of 5 — tidy that away and
-    nothing on screen justifies reading p85 rather than the average); Wagtail has
-    **no created dates**, which is the only way the lead-time chart's own
+  - **Each demo team is NAMED FOR THE ONE THING IT SHOWS** — Team Healthy Flow,
+    Team Long Tail, Team Bare Export — so the picker reads as a contents page and
+    a reader who lands on a board already knows which finding it is meant to
+    teach. Sprint Velocity's demo is named the same way. A new demo team gets a
+    name of the same kind; renaming one back to a bird or a place would leave the
+    demo teaching nothing until you had read all of its numbers.
+  - Every figure in `DEMO_TEAMS` is load-bearing: **Team Long Tail's tail is the
+    app's central argument** (p85 ≈ 23 days against a median of 5 — tidy that away
+    and nothing on screen justifies reading p85 rather than the average); Team
+    Bare Export has **no created dates**, which is the only way the lead-time
+    chart's own
     explanation is reachable; the span stays around nine months so Clean up old
     data and the 6/9/12-month windows all have answers.
   - **The dates cover the WHOLE WEEK, weekends included**, which is the only

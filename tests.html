@@ -3064,7 +3064,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(P('DAE-1552'), '', 'a whole key is not a project id — this field holds the front of one');
   is(P('1DAE'), '', 'it must start with a letter, exactly as a key must');
   is(P('DA E'), '', 'a space is not part of one');
-  is(P('Team Kingfisher'), '', 'and neither is a team name');
+  is(P('Team Healthy Flow'), '', 'and neither is a team name');
   is(P('<img src=x onerror=alert(1)>'), '', 'markup cannot pass the shape at all');
   is(P(''), '', 'an empty box is simply no project id');
   is(P(null), '', 'and so is a non-string');
@@ -3402,7 +3402,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   ok(teamRow.querySelector('input.projid'),
      'while the project id box is there from the first team — it is typed in, not chosen');
 
-  plant({ arts: [{ id: 'ax', name: 'Estuary' }],
+  plant({ arts: [{ id: 'ax', name: 'Delivery' }],
           teams: [{ id: 'z1', name: 'Zephyr', artId: 'ax', rows: [] },
                   { id: 'z2', name: 'Zither', rows: [] }], settings: {} });
   is(win.document.querySelector('#teamRows tr').cells.length, 5,
@@ -3949,78 +3949,78 @@ group('ARTs — the grouping, and the boundary it crosses');
   plant({ teams: [], settings: {} });
   const demo = loadDemo();
 
-  is(demo.map(t => t.name), ['Team Kingfisher', 'Team Heron', 'Team Wagtail'],
+  is(demo.map(t => t.name), ['Team Healthy Flow', 'Team Long Tail', 'Team Bare Export'],
      'three teams, so the team picker itself is visible — it hides below two');
 
-  /* Heron is the reason this app reads the 85th percentile rather than the
+  /* Team Long Tail is the reason this app reads the 85th percentile rather than the
      average. If its tail is ever tidied away, the app's central argument stops
      being demonstrable on the one screen anybody is shown. */
-  const heron = settle(demoOf(demo, 'Team Heron').rows);
-  const king  = settle(demoOf(demo, 'Team Kingfisher').rows);
-  ok(heron.summary.p85CycleTime >= heron.summary.medianCycleTime * 3,
-     'Heron has a long tail — p85 is at least 3x its median',
-     heron.summary.p85CycleTime + ' vs ' + heron.summary.medianCycleTime);
-  ok(king.summary.p85CycleTime <= king.summary.medianCycleTime * 2,
-     'Kingfisher does not — the two teams have to read differently',
-     king.summary.p85CycleTime + ' vs ' + king.summary.medianCycleTime);
+  const longTail = settle(demoOf(demo, 'Team Long Tail').rows);
+  const healthy  = settle(demoOf(demo, 'Team Healthy Flow').rows);
+  ok(longTail.summary.p85CycleTime >= longTail.summary.medianCycleTime * 3,
+     'Team Long Tail has a long tail — p85 is at least 3x its median',
+     longTail.summary.p85CycleTime + ' vs ' + longTail.summary.medianCycleTime);
+  ok(healthy.summary.p85CycleTime <= healthy.summary.medianCycleTime * 2,
+     'Team Healthy Flow does not — the two teams have to read differently',
+     healthy.summary.p85CycleTime + ' vs ' + healthy.summary.medianCycleTime);
 
-  is([king.summary.agedNow, heron.summary.agedNow], [0, 6],
-     'and only Heron has aged work, so the Aged work tile has both faces');
+  is([healthy.summary.agedNow, longTail.summary.agedNow], [0, 6],
+     'and only Team Long Tail has aged work, so the Aged work tile has both faces');
 
   /* THE DIALOG THAT OFFERS THE DEMO HAS TO DESCRIBE IT. It said "five items aged
-     past the threshold" for as long as Heron's `wip` list had six of them past
+     past the threshold" for as long as Team Long Tail's `wip` list had six of them past
      it — the README was corrected and this sentence was not, and a demo that
      misdescribes itself is the one piece of copy nobody thinks to re-check. It
      is counted from the profile now rather than written out, and this is what
      keeps the count honest if the profile ever changes again. */
-  ok(demoConfirmText.includes(heron.summary.agedNow + ' items aged past the'),
-     'the Load sample data dialog states Heron\u2019s real aged count',
+  ok(demoConfirmText.includes(longTail.summary.agedNow + ' items aged past the'),
+     'the Load sample data dialog states Team Long Tail\u2019s real aged count',
      demoConfirmText.split('\n')[2] || demoConfirmText.slice(0, 120));
-  ok(demoConfirmText.includes(heron.agedDays + '-day threshold'),
+  ok(demoConfirmText.includes(longTail.agedDays + '-day threshold'),
      'and names the threshold it counted against, so the sentence stands on its own terms');
   is(demo.map(t => t.rows.filter(r => !r.completed).length), [4, 9, 3],
      'every team has work in progress, so WIP and net flow are never empty');
 
-  ok(heron.summary.unplannedShare >= king.summary.unplannedShare * 2,
-     'Heron\u2019s defect rate is at least double Kingfisher\u2019s',
-     heron.summary.unplannedShare + ' vs ' + king.summary.unplannedShare);
+  ok(longTail.summary.unplannedShare >= healthy.summary.unplannedShare * 2,
+     'Team Long Tail\u2019s defect rate is at least double Team Healthy Flow\u2019s',
+     longTail.summary.unplannedShare + ' vs ' + healthy.summary.unplannedShare);
 
-  /* Working days is a setting rather than a team, so the demo can only reach it
+  /* Worhealthy days is a setting rather than a team, so the demo can only reach it
      by covering weekends. Were the generator ever changed to land completions on
      weekdays only, the toggle would be a control that does nothing on the one
      dataset anybody is shown. */
-  const heronWork = TD.derive(demoOf(demo, 'Team Heron').rows,
+  const longTailWork = TD.derive(demoOf(demo, 'Team Long Tail').rows,
     win.TDState.normalizeSettings({ workingDays: true }),
     { filterValue: null, months: 'all', bucket: 'week' });
-  ok(heronWork.summary.p85CycleTime < heron.summary.p85CycleTime,
-     'the demo spans weekends, so working days visibly shortens its cycle times',
-     heronWork.summary.p85CycleTime + ' vs ' + heron.summary.p85CycleTime);
-  ok(heronWork.summary.agedNow < heron.summary.agedNow,
-     'and drops an item out of Heron\u2019s aged count, so the ageing rule follows too',
-     heronWork.summary.agedNow + ' vs ' + heron.summary.agedNow);
+  ok(longTailWork.summary.p85CycleTime < longTail.summary.p85CycleTime,
+     'the demo spans weekends, so worhealthy days visibly shortens its cycle times',
+     longTailWork.summary.p85CycleTime + ' vs ' + longTail.summary.p85CycleTime);
+  ok(longTailWork.summary.agedNow < longTail.summary.agedNow,
+     'and drops an item out of Team Long Tail\u2019s aged count, so the ageing rule follows too',
+     longTailWork.summary.agedNow + ' vs ' + longTail.summary.agedNow);
 
   /* Issue keys. Two teams carry them and one deliberately does not, so BOTH
      faces of the feature are reachable from the demo: the charts named by key,
      and the charts named by work type as they were before it existed. The keys
      also have to survive the trip through sanitizeTeams that loadDemo() makes,
      which is the same door a saved or synced copy comes in by. */
-  const wagKeys = demoOf(demo, 'Team Wagtail');
-  ok(demoOf(demo, 'Team Kingfisher').rows.every(r => /^KFR-\d+$/.test(r.key)),
-     'every Kingfisher item has a key, so the charts have something to name dots with');
-  ok(demoOf(demo, 'Team Heron').rows.every(r => /^HRN-\d+$/.test(r.key)),
-     'and so does every Heron item, under its own project prefix');
-  ok(wagKeys.rows.every(r => r.key === ''),
-     'while Wagtail has none at all — the no-key paste has to stay demonstrable');
-  const wagDot = settle(wagKeys.rows).cycleScatter.points[0];
+  const bareKeys = demoOf(demo, 'Team Bare Export');
+  ok(demoOf(demo, 'Team Healthy Flow').rows.every(r => /^KFR-\d+$/.test(r.key)),
+     'every Team Healthy Flow item has a key, so the charts have something to name dots with');
+  ok(demoOf(demo, 'Team Long Tail').rows.every(r => /^HRN-\d+$/.test(r.key)),
+     'and so does every Team Long Tail item, under its own project prefix');
+  ok(bareKeys.rows.every(r => r.key === ''),
+     'while Team Bare Export has none at all — the no-key paste has to stay demonstrable');
+  const wagDot = settle(bareKeys.rows).cycleScatter.points[0];
   is(TD.dotName(wagDot), wagDot.type,
      'so its dots fall back to the work type, which is what they said before keys existed');
-  const kingDot = settle(demoOf(demo, 'Team Kingfisher').rows).cycleScatter.points[0];
-  is(TD.dotName(kingDot), kingDot.key, 'while Kingfisher\u2019s are named by their key');
-  ok(/^KFR-\d+$/.test(kingDot.key), 'and the key reached the chart layer, not just storage');
+  const healthyDot = settle(demoOf(demo, 'Team Healthy Flow').rows).cycleScatter.points[0];
+  is(TD.dotName(healthyDot), healthyDot.key, 'while Team Healthy Flow\u2019s are named by their key');
+  ok(/^KFR-\d+$/.test(healthyDot.key), 'and the key reached the chart layer, not just storage');
 
   /* A key names an ITEM, so two items must never share one. Pinned across the
      whole demo rather than per team: a generator that reset its counter would
-     put the same name on a Kingfisher dot and a Heron dot. */
+     put the same name on a Team Healthy Flow dot and a Team Long Tail dot. */
   const allKeys = demo.flatMap(t => t.rows.map(r => r.key)).filter(Boolean);
   is(new Set(allKeys).size, allKeys.length, 'no two demo items share a key');
 
@@ -4037,28 +4037,28 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and Review carries TWO aliases, so several statuses feeding one stage is demonstrable');
 
   const stageDaysOf = (team) => TD.stageTimesOf(demoOf(demo, team).rows);
-  const kingStage = stageDaysOf('Team Kingfisher');
-  const heronStage = stageDaysOf('Team Heron');
-  const wagStage = stageDaysOf('Team Wagtail');
-  ok(kingStage.measured === demoOf(demo, 'Team Kingfisher').rows.length,
-     'every Kingfisher item carries stage times, in-flight ones included');
-  is(wagStage.measured, 0,
-     'while Wagtail carries none — the empty face of the card has to stay reachable');
+  const healthyStage = stageDaysOf('Team Healthy Flow');
+  const longTailStage = stageDaysOf('Team Long Tail');
+  const bareStage = stageDaysOf('Team Bare Export');
+  ok(healthyStage.measured === demoOf(demo, 'Team Healthy Flow').rows.length,
+     'every Team Healthy Flow item carries stage times, in-flight ones included');
+  is(bareStage.measured, 0,
+     'while Team Bare Export carries none — the empty face of the card has to stay reachable');
 
   const shareOf = (fig, name) => {
     const st = demoStages.find(x => x.name === name);
     const row = fig.byStage.find(x => x.id === st.id);
     return row ? row.share : 0;
   };
-  /* The finding the feature exists to produce, and the reason Heron is the team
+  /* The finding the feature exists to produce, and the reason Team Long Tail is the team
      the demo lands on: its cycle time looks like slow work until this says most
-     of it is queue. Tidy these shares and the card stops making its own case. */
-  ok(shareOf(heronStage, 'Review') + shareOf(heronStage, 'Test')
-       > shareOf(heronStage, 'Build') * 1.5,
-     'Heron spends far more of its time waiting to be reviewed and tested than building');
-  ok(shareOf(kingStage, 'Build') > 0.5,
-     'while Kingfisher spends most of its time building — the healthy reading to compare against');
-  ok(shareOf(kingStage, 'Deploy') < 0.1,
+     of it is queue. Tidy these shares and the card stops mahealthy its own case. */
+  ok(shareOf(longTailStage, 'Review') + shareOf(longTailStage, 'Test')
+       > shareOf(longTailStage, 'Build') * 1.5,
+     'Team Long Tail spends far more of its time waiting to be reviewed and tested than building');
+  ok(shareOf(healthyStage, 'Build') > 0.5,
+     'while Team Healthy Flow spends most of its time building — the healthy reading to compare against');
+  ok(shareOf(healthyStage, 'Deploy') < 0.1,
      'and Deploy is a stage almost nothing sits in, so the table is not four equal numbers');
 
   /* The demo comes in through parsePastedRows like a real export, so this is
@@ -4070,19 +4070,19 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and no status name from the demo\u2019s own export is anywhere in what it stored');
 
   /* ── The current stage, which is what a plain Jira export can feed ──────── */
-  const heronRows = demoOf(demo, 'Team Heron').rows;
-  ok(heronRows.filter(r => r.completed).every(r => !r.stage),
+  const longTailRows = demoOf(demo, 'Team Long Tail').rows;
+  ok(longTailRows.filter(r => r.completed).every(r => !r.stage),
      'no FINISHED demo item carries a stage — every export says Done, and it means nothing');
-  const heronAge = TD.derive(heronRows, win.TDState.normalizeSettings({}),
+  const longTailAge = TD.derive(longTailRows, win.TDState.normalizeSettings({}),
     { filterValue: null, months: 'all', bucket: 'week' }, win.tdGet().stages);
-  is(heronAge.ageing.byStage, true,
-     'so Heron\u2019s work item age chart is on the STAGE axis, not the work-type one');
-  /* The finding the axis exists for. Heron's queue piles up downstream, and the
+  is(longTailAge.ageing.byStage, true,
+     'so Team Long Tail\u2019s work item age chart is on the STAGE axis, not the work-type one');
+  /* The finding the axis exists for. Team Long Tail's queue piles up downstream, and the
      chart names where — which no reading of a cycle time figure can do. */
-  const heronCols = heronAge.ageing.columnNames;
-  ok(heronCols.indexOf('Test') >= 0 && heronCols.indexOf('No stage') >= 0,
+  const longTailCols = longTailAge.ageing.columnNames;
+  ok(longTailCols.indexOf('Test') >= 0 && longTailCols.indexOf('No stage') >= 0,
      'its columns include the stage it is stuck in and the one it has not set up');
-  const agedCols = heronAge.ageing.points.filter(p => p.aged).map(p => p.column);
+  const agedCols = longTailAge.ageing.points.filter(p => p.aged).map(p => p.column);
   ok(agedCols.filter(c => c === 'Test').length >= 3,
      'and three of its aged items sit in Test, so the bottleneck is a column you can point at',
      agedCols.join(','));
@@ -4090,16 +4090,16 @@ group('ARTs — the grouping, and the boundary it crosses');
      parse report's unmatched note are both reachable from Load sample data. */
   ok(agedCols.indexOf('No stage') >= 0,
      'with an old item under No stage — the demo shows you a stage you have not set up yet');
-  ok(demoOf(demo, 'Team Wagtail').rows.every(r => !r.stage),
-     'while Wagtail has no Status column at all, so the type axis stays reachable too');
-  const wagAge = TD.derive(demoOf(demo, 'Team Wagtail').rows,
+  ok(demoOf(demo, 'Team Bare Export').rows.every(r => !r.stage),
+     'while Team Bare Export has no Status column at all, so the type axis stays reachable too');
+  const bareAge = TD.derive(demoOf(demo, 'Team Bare Export').rows,
     win.TDState.normalizeSettings({}), { filterValue: null, months: 'all', bucket: 'week' },
     win.tdGet().stages);
-  is(wagAge.ageing.byStage, false, 'and its chart still reads by work type');
+  is(bareAge.ageing.byStage, false, 'and its chart still reads by work type');
 
   /* Project ids, on the same reasoning as the keys above: the multi-team paste
      is unreachable until some team has one, so the demo arrives with them set
-     and matching the keys its own rows carry. Wagtail has neither, which is
+     and matching the keys its own rows carry. Team Bare Export has neither, which is
      also the "takes nothing from a split" line the dialog has to be able to
      show. */
   is(demo.map(t => t.projectId), ['KFR', 'HRN', ''],
@@ -4113,54 +4113,54 @@ group('ARTs — the grouping, and the boundary it crosses');
      feature, reachable from Load sample data with nothing else set up. */
   const demoSplit = TD.routeRowsToTeams(
     demo.flatMap(t => t.rows), demo);
-  is(demoSplit.assigned.map(a => a.name), ['Team Kingfisher', 'Team Heron'],
+  is(demoSplit.assigned.map(a => a.name), ['Team Healthy Flow', 'Team Long Tail'],
      'a paste holding the whole demo splits back into the teams it came from');
   is(demoSplit.assigned.map(a => a.rows.length),
-     [demoOf(demo, 'Team Kingfisher').rows.length, demoOf(demo, 'Team Heron').rows.length],
+     [demoOf(demo, 'Team Healthy Flow').rows.length, demoOf(demo, 'Team Long Tail').rows.length],
      'every one of their rows finding its way home');
-  is(demoSplit.noKey, demoOf(demo, 'Team Wagtail').rows.length,
-     'while Wagtail\u2019s keyless rows are reported as unplaceable rather than guessed at');
+  is(demoSplit.noKey, demoOf(demo, 'Team Bare Export').rows.length,
+     'while Team Bare Export\u2019s keyless rows are reported as unplaceable rather than guessed at');
 
-  /* Wagtail's export stops nine days before everybody else's, which is what
+  /* Team Bare Export's export stops nine days before everybody else's, which is what
      makes the All teams view's Data to column demonstrable: without a team like
      it that column is a row of matching dates that looks like it does nothing.
      Its OWN dashboard has to be untouched by the shift, or the demo would be
      paying for the column with a team that reads wrong everywhere else. */
-  const wagRoll = TD.deriveTeams(demo, win.TDState.normalizeSettings({}),
+  const bareRoll = TD.deriveTeams(demo, win.TDState.normalizeSettings({}),
     { filterValue: null, months: '3', bucket: 'week' });
-  const wagRow = wagRoll.rows.find(r => /Wagtail/.test(r.name));
-  const others = wagRoll.rows.filter(r => !/Wagtail/.test(r.name));
-  ok(others.every(r => r.d.dataEnd > wagRow.d.dataEnd),
-     'Wagtail’s export stops before every other team’s, so Data to has something to show',
-     wagRoll.rows.map(r => r.name + '=' + iso(r.d.dataEnd)).join(' '));
-  const wagAlone = settle(demoOf(demo, 'Team Wagtail').rows, '3');
+  const bareRow = bareRoll.rows.find(r => /Team Bare Export/.test(r.name));
+  const others = bareRoll.rows.filter(r => !/Team Bare Export/.test(r.name));
+  ok(others.every(r => r.d.dataEnd > bareRow.d.dataEnd),
+     'Team Bare Export’s export stops before every other team’s, so Data to has something to show',
+     bareRoll.rows.map(r => r.name + '=' + iso(r.d.dataEnd)).join(' '));
+  const bareAlone = settle(demoOf(demo, 'Team Bare Export').rows, '3');
   /* The shared date moves the whole WINDOW forward, not just the periods inside
-     it, so the roll-up's three months start nine days later than Wagtail's own
+     it, so the roll-up's three months start nine days later than Team Bare Export's own
      and a little of its oldest history falls out of the back. That is right —
      every team is being asked about the same three months — and it is why the
      count can differ as well as the rate. */
-  ok(wagRow.d.summary.completedTotal <= wagAlone.summary.completedTotal,
-     'the shared window starts later, so it can only ever hold less of Wagtail’s history',
-     wagRow.d.summary.completedTotal + ' vs ' + wagAlone.summary.completedTotal);
-  ok(wagRow.d.summary.avgThroughput < wagAlone.summary.avgThroughput,
+  ok(bareRow.d.summary.completedTotal <= bareAlone.summary.completedTotal,
+     'the shared window starts later, so it can only ever hold less of Team Bare Export’s history',
+     bareRow.d.summary.completedTotal + ' vs ' + bareAlone.summary.completedTotal);
+  ok(bareRow.d.summary.avgThroughput < bareAlone.summary.avgThroughput,
      'and it reads slower in the roll-up, because the shared window holds its silent days',
-     wagRow.d.summary.avgThroughput + ' vs ' + wagAlone.summary.avgThroughput);
-  ok(wagAlone.summary.agedNow === 1,
+     bareRow.d.summary.avgThroughput + ' vs ' + bareAlone.summary.avgThroughput);
+  ok(bareAlone.summary.agedNow === 1,
      'while its own dashboard is exactly as it was before the shift',
-     String(wagAlone.summary.agedNow));
+     String(bareAlone.summary.agedNow));
 
-  /* The demo groups Kingfisher and Heron onto one train and leaves Wagtail on
-     none. That is the smallest arrangement where every part of ARTs does
-     something: the picker gets All trains / the train / No ART, the No ART
-     group is populated, and scoping to the train visibly changes the figures at
-     the foot of the All Teams table. A train per team would make grouping look
+  /* The demo groups Team Healthy Flow and Team Long Tail onto one train and
+     leaves Team Bare Export on none. That is the smallest arrangement where
+     every part of ARTs does something: the picker gets All trains / the train /
+     No ART, the No ART group is populated, and scoping to the train visibly
+     changes the figures at the foot of the All Teams table. A train per team would make grouping look
      pointless; all three on one would leave the No ART option absent. */
   const demoArts = win.tdGet().arts || [];
   is(demoArts.length, 1, 'the demo has exactly one train');
   const onArt = demo.filter(t => t.artId);
   const offArt = demo.filter(t => !t.artId);
-  is(onArt.map(t => t.name), ['Team Kingfisher', 'Team Heron'], 'two teams on it');
-  is(offArt.map(t => t.name), ['Team Wagtail'], 'and one on none, so both groups do something');
+  is(onArt.map(t => t.name), ['Team Healthy Flow', 'Team Long Tail'], 'two teams on it');
+  is(offArt.map(t => t.name), ['Team Bare Export'], 'and one on none, so both groups do something');
   ok(onArt.every(t => t.artId === demoArts[0].id), 'both point at the train that exists');
   /* Scoping has to change a figure, or the picker is a control that appears to
      do nothing on the one dataset anybody is shown. */
@@ -4172,73 +4172,73 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and scoping to it visibly changes what the train row says',
      trainOnly.train.summary.completedTotal + ' vs ' + everyone.train.summary.completedTotal);
 
-  /* The scatter is where Heron's tail stops being a statistic and becomes a
+  /* The scatter is where Team Long Tail's tail stops being a statistic and becomes a
      picture. If it is ever tidied away, the app's central argument is no longer
      visible on the one dataset anybody is shown. */
-  const heronDots = heron.cycleScatter.points.map(p => p.y);
-  const kingDots = king.cycleScatter.points.map(p => p.y);
-  ok(Math.max.apply(null, heronDots) > heron.cycleScatter.p85 * 1.8,
-     'Heron has dots far above its own 85% line — the tail, drawn',
-     Math.max.apply(null, heronDots) + ' vs ' + heron.cycleScatter.p85);
-  ok(Math.max.apply(null, kingDots) < king.cycleScatter.p85 * 3,
-     'Kingfisher does not, so the two boards read differently on this chart too',
-     Math.max.apply(null, kingDots) + ' vs ' + king.cycleScatter.p85);
-  ok(heronDots.length > 40, 'and there are enough dots for a distribution to be visible',
-     String(heronDots.length));
+  const longTailDots = longTail.cycleScatter.points.map(p => p.y);
+  const healthyDots = healthy.cycleScatter.points.map(p => p.y);
+  ok(Math.max.apply(null, longTailDots) > longTail.cycleScatter.p85 * 1.8,
+     'Team Long Tail has dots far above its own 85% line — the tail, drawn',
+     Math.max.apply(null, longTailDots) + ' vs ' + longTail.cycleScatter.p85);
+  ok(Math.max.apply(null, healthyDots) < healthy.cycleScatter.p85 * 3,
+     'Team Healthy Flow does not, so the two boards read differently on this chart too',
+     Math.max.apply(null, healthyDots) + ' vs ' + healthy.cycleScatter.p85);
+  ok(longTailDots.length > 40, 'and there are enough dots for a distribution to be visible',
+     String(longTailDots.length));
 
   /* The work item age chart's argument is that a dot above the 85% line has
-     outlasted almost everything the team has delivered. Heron is the only team
+     outlasted almost everything the team has delivered. Team Long Tail is the only team
      that demonstrates it, and only while its tail survives. */
-  ok(heron.ageing.oldest > heron.ageing.p85 * 1.5,
-     'Heron has an item well past the 85% line, which is what the chart exists to show',
-     heron.ageing.oldest + ' vs ' + heron.ageing.p85);
-  ok(king.ageing.oldest < king.ageing.threshold,
-     'and Kingfisher has none past the threshold, so the chart has both faces',
-     king.ageing.oldest + ' vs ' + king.ageing.threshold);
-  ok(heron.ageing.columns.length >= 3,
+  ok(longTail.ageing.oldest > longTail.ageing.p85 * 1.5,
+     'Team Long Tail has an item well past the 85% line, which is what the chart exists to show',
+     longTail.ageing.oldest + ' vs ' + longTail.ageing.p85);
+  ok(healthy.ageing.oldest < healthy.ageing.threshold,
+     'and Team Healthy Flow has none past the threshold, so the chart has both faces',
+     healthy.ageing.oldest + ' vs ' + healthy.ageing.threshold);
+  ok(longTail.ageing.columns.length >= 3,
      'with enough work types in flight for the columns to mean something',
-     heron.ageing.columns.join(', '));
-  ok([king, heron].every(t => t.ageing.count === t.summary.currentWip),
+     longTail.ageing.columns.join(', '));
+  ok([healthy, longTail].every(t => t.ageing.count === t.summary.currentWip),
      'and every demo team’s dots still match its work in progress tile');
 
   /* The forecast is only reachable if the demo's default view clears the
-     floor — three months of weekly data on every team. Wagtail is the short
+     floor — three months of weekly data on every team. Team Bare Export is the short
      one at four months of history, so it is the one that decides this. */
   const fcDemo = t => TD.derive(demoOf(demo, t).rows, win.TDState.normalizeSettings({}),
     { filterValue: null, months: '3', bucket: 'week' }).forecast;
-  ['Team Kingfisher', 'Team Heron', 'Team Wagtail'].forEach(t => {
+  ['Team Healthy Flow', 'Team Long Tail', 'Team Bare Export'].forEach(t => {
     const f = fcDemo(t);
     ok(f.reason === null && f.when && f.howMany,
        t + ' forecasts on the default 3-month window', 'reason: ' + f.reason);
   });
   /* Three answers a coach can actually tell apart. A demo whose 50% and 95%
-     dates were the same day would show the feature working and teach nothing
+     dates were the same day would show the feature worhealthy and teach nothing
      about why anyone would read a distribution rather than a single date. */
-  const fcHeron = fcDemo('Team Heron');
-  ok(fcHeron.when.rows[2].days > fcHeron.when.rows[0].days,
+  const fcLongTail = fcDemo('Team Long Tail');
+  ok(fcLongTail.when.rows[2].days > fcLongTail.when.rows[0].days,
      'and its 95% date really is later than its 50% one, so the spread is visible',
-     fcHeron.when.rows.map(r => r.days).join(' / '));
-  ok(fcHeron.howMany.rows[0].count > fcHeron.howMany.rows[2].count,
+     fcLongTail.when.rows.map(r => r.days).join(' / '));
+  ok(fcLongTail.howMany.rows[0].count > fcLongTail.howMany.rows[2].count,
      'with the counts running the other way, which is the trap the labels exist to avoid',
-     fcHeron.howMany.rows.map(r => r.count).join(' / '));
+     fcLongTail.howMany.rows.map(r => r.count).join(' / '));
   /* Grouping the demo by month over the same window drops below the floor, so
      the refusal has a face reachable from the demo too. */
-  is(TD.derive(demoOf(demo, 'Team Heron').rows, win.TDState.normalizeSettings({}),
+  is(TD.derive(demoOf(demo, 'Team Long Tail').rows, win.TDState.normalizeSettings({}),
      { filterValue: null, months: '3', bucket: 'month' }).forecast.reason, 'few-periods',
      'and grouping by month over 3 months reaches the "not enough history" card');
 
   /* Lead time is the one chart that can be genuinely unavailable, and the app
      says so on its face rather than hiding. That face needs a team without
      created dates to be reachable at all. */
-  const wag = demoOf(demo, 'Team Wagtail');
-  is(wag.rows.filter(r => r.created).length, 0,
-     'Wagtail has no created dates, so the lead-time chart shows its own explanation');
-  is(settle(wag.rows).summary.avgLeadTime, null, 'and its lead time reads as unavailable');
-  ok(demoOf(demo, 'Team Kingfisher').rows.every(r => r.created),
-     'while Kingfisher has one on every row, so lead time plots for it');
+  const bareTeam = demoOf(demo, 'Team Bare Export');
+  is(bareTeam.rows.filter(r => r.created).length, 0,
+     'Team Bare Export has no created dates, so the lead-time chart shows its own explanation');
+  is(settle(bareTeam.rows).summary.avgLeadTime, null, 'and its lead time reads as unavailable');
+  ok(demoOf(demo, 'Team Healthy Flow').rows.every(r => r.created),
+     'while Team Healthy Flow has one on every row, so lead time plots for it');
 
   /* All four work types on every team, or the dashboard filter is a control that
-     does nothing on whichever team you happen to be looking at. */
+     does nothing on whichever team you happen to be loohealthy at. */
   demo.forEach(t => {
     const types = new Set(t.rows.map(r => r.type));
     is(['Bug', 'Spike', 'Story', 'Task'].filter(x => types.has(x)),
@@ -4269,15 +4269,15 @@ group('ARTs — the grouping, and the boundary it crosses');
   const again = loadDemo();
   is(again.map(t => t.rows.length), demo.map(t => t.rows.length),
      'the seeded generator produces an identical dataset every time');
-  is(settle(demoOf(again, 'Team Heron').rows).summary.p85CycleTime,
-     heron.summary.p85CycleTime, 'down to the figures on the tiles');
+  is(settle(demoOf(again, 'Team Long Tail').rows).summary.p85CycleTime,
+     longTail.summary.p85CycleTime, 'down to the figures on the tiles');
 
   /* `view` is a module binding rather than a window one, so the landing team is
      read where saveView() put it — which is also the copy that survives a
      reload, and therefore the one that actually decides what you see. */
   const savedView = JSON.parse(win.localStorage.getItem('td-view') || '{}');
-  is(savedView.activeTeamId, demoOf(again, 'Team Heron').id,
-     'and it lands on Heron, the team whose numbers have the most to say');
+  is(savedView.activeTeamId, demoOf(again, 'Team Long Tail').id,
+     'and it lands on Team Long Tail, the team whose numbers have the most to say');
 
   /* Both empty surfaces offer it, because either can be the first one seen: boot
      opens on Your Data when there are no rows, and #dashEmpty is what pressing
@@ -4637,7 +4637,7 @@ group('ARTs — the grouping, and the boundary it crosses');
      'or the row silently gains a column');
   is(TD.csvCell('He said "hi"'), '"He said ""hi"""', 'quotes are doubled');
   is(TD.csvCell('two\nlines'), '"two\nlines"', 'a newline forces quoting');
-  is(TD.csvCell('Team Heron'), 'Team Heron', 'and plain text is untouched');
+  is(TD.csvCell('Team Long Tail'), 'Team Long Tail', 'and plain text is untouched');
   is(TD.csvCell(null), '', 'as is nothing at all');
 
   /* Tabs for the clipboard, because that is what a spreadsheet, a Word table and
@@ -4677,7 +4677,7 @@ group('ARTs — the grouping, and the boundary it crosses');
      not data. The ART printed under a team name is the named case: a grouping
      the screen shows, not a figure in that cell. */
   const cellOf = (html) => TD.cellText(mkTable('<tr>' + html + '</tr>').rows[0].cells[0]);
-  is(cellOf('<td>Team Heron<span class="team-art">Estuary ART</span></td>'), 'Team Heron',
+  is(cellOf('<td>Team Long Tail<span class="team-art">Delivery ART</span></td>'), 'Team Long Tail',
      'the ART under a team name is display furniture, not a value');
   is(cellOf('<td>6<span aria-hidden="true">!</span></td>'), '6',
      'an aria-hidden marker never turns a count into text');

@@ -250,10 +250,10 @@ sign is the last one that should arrive as text.
 
 The trace is **scale-free** — normalised to its own range — so what it shows is the *shape*. Two
 teams with identical traces can be delivering at very different rates; Per week beside it is the
-magnitude. And check **Data to** before reading a fall as a slowdown: a team whose export stopped
-three weeks ago has a trace that falls away for exactly the same reason it has a stale date, which
-is a reporting problem rather than a delivery one. (The demo shows this on purpose — Wagtail has
-both the steepest fall and the oldest export.)
+magnitude. And check **Data to** before reading a fall as a slowdown: a team whose export
+stopped three weeks ago has a trace that falls away for exactly the same reason it has a stale
+date, which is a reporting problem rather than a delivery one. (The demo shows this on purpose —
+Team Bare Export has both the steepest fall and the oldest export.)
 
 A reload puts you back on **whichever tab you were last using** — all four of them. A remembered
 tab that is no longer on offer (All Teams disappears below two teams) falls back to the dashboard,
@@ -317,10 +317,10 @@ September one.
 
 That is also why **Data to** earns a column. A team three weeks behind everyone else has three
 weeks of zero throughput dragging its rate down and three weeks of extra ageing on everything it
-has open — and none of that is visible in the numbers themselves. Wagtail in the demo is nine
-days behind for exactly this reason: it reads slower on this page than on its own dashboard, and
-the date column is the only thing that explains why. **Before drawing any conclusion about a
-team, check its export is current.**
+has open — and none of that is visible in the numbers themselves. Team Bare Export in the demo
+is nine days behind for exactly this reason: it reads slower on this page than on its own
+dashboard, and the date column is the only thing that explains why. **Before drawing any
+conclusion about a team, check its export is current.**
 
 Freshness is a property of the export, not of a work type: filter to defects and *Data to* still
 shows when the team last sent anything, not when it last had a bug. A healthy team with no recent
@@ -336,10 +336,10 @@ every item any team completed, exactly as if the teams were one team.
 
 That has a consequence worth knowing. Because it pools *items* rather than *teams*, the train
 figure is weighted by how much each team delivers — so a large fast team holds it down while a
-small team with a long tail sits well above it. On the demo the train reads 7 days while Heron
-reads 23. Both are true. **Read the tile for a promise about work you haven't assigned yet; read
-the column to find who needs help.** The tile cannot tell you a team is struggling, and it isn't
-meant to.
+small team with a long tail sits well above it. On the demo the train reads 7 days while Team
+Long Tail reads 23. Both are true. **Read the tile for a promise about work you haven't assigned
+yet; read the column to find who needs help.** The tile cannot tell you a team is struggling,
+and it isn't meant to.
 
 ### Teams With Nothing to Say
 
@@ -387,66 +387,72 @@ which is where a first run opens, and on the empty dashboard, which is what you 
 press Dashboard before pasting. Pressing it switches you to the dashboard, and it disappears
 once anything holds data.
 
-It lands on **Heron**, because Kingfisher's board is the prettier one and says less — the
-reason this app reads the 85th percentile rather than the average is only visible on a team
-that has a tail.
+It lands on **Team Long Tail**, because Team Healthy Flow's board is the prettier one and says
+less — the reason this app reads the 85th percentile rather than the average is only visible
+on a team that has a tail.
+
+Each team is **named for the one thing it's there to show**, so the picker reads as a contents
+page rather than a list of names you'd have to open one by one:
 
 | Team | What it's there to show |
 |---|---|
-| **Kingfisher** | The healthy board. Carries issue keys (`KFR-…`), as Heron does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. The baseline the other two read against. |
-| **Heron** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Kingfisher's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. |
-| **Wagtail** | A newer team: four months of history, **no created dates, no issue keys, no Status column and no stage times at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
+| **Team Healthy Flow** | The healthy board. Carries issue keys (`KFR-…`), as Team Long Tail does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. The baseline the other two read against. |
+| **Team Long Tail** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Team Healthy Flow's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. |
+| **Team Bare Export** | A newer team: four months of history, **no created dates, no issue keys, no Status column and no stage times at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
 
-Kingfisher and Heron also arrive with the **project ids their own keys are built from** (`KFR`
-and `HRN`), so [pasting several teams at once](#pasting-several-teams-at-once) works straight
-off the demo rather than only after three ids are typed in — and Wagtail, with no keys, is the
-team the split's *takes nothing* line is about.
+Team Healthy Flow and Team Long Tail also arrive with the **project ids their own keys are
+built from** (`KFR` and `HRN`), so [pasting several teams at once](#pasting-several-teams-at-once)
+works straight off the demo rather than only after three ids are typed in — and Team Bare
+Export, with no keys, is the team the split's *takes nothing* line is about.
 
 The demo also arrives with **four workflow stages set up** — Build, Review, Test and Deploy —
 because a status is only ever read when a stage already lists it, so the demo has
-to set them up before it pastes, exactly as you would. Kingfisher and Heron carry the columns and
-Wagtail carries none, so both faces of the [Time in stage](#where-the-time-goes-time-in-stage)
-card are reachable, and both axes of the work item age chart are too. Deploy is deliberately a
+to set them up before it pastes, exactly as you would. Team Healthy Flow and Team Long Tail
+carry the columns and Team Bare Export carries none, so both faces of the
+[Time in stage](#where-the-time-goes-time-in-stage) card are reachable, and both axes of the
+work item age chart are too. Deploy is deliberately a
 stage almost nothing sits in: a table where every row is a big number teaches nobody where to
 look.
 
-Kingfisher and Heron also carry a **Status column**, so their age charts group by stage. Heron's
-is the one to look at: three of its four oldest items sit in **Test**, which names the
+Team Healthy Flow and Team Long Tail also carry a **Status column**, so their age charts group
+by stage. Team Long Tail's is the one to look at: three of its four oldest items sit in
+**Test**, which names the
 bottleneck in a way no cycle time figure can. One of its items is in *Compliance Review* — a
 status the demo's stages deliberately **don't** list — so it lands in the **No stage** column
 and the parse report says one item's status matched nothing. That is the demo showing you a real
 part of a workflow you haven't set up yet, which is exactly what it will do on your own board.
 
-The demo also puts **Kingfisher and Heron on one train (Estuary ART) and leaves Wagtail on
-none** — the smallest arrangement where every part of [ARTs](#grouping-teams-into-arts) does
-something. The picker gets *All trains*, *Estuary ART* and *No ART*; both groups have somebody in
-them; and scoping to the train visibly changes the figures at the foot of the table. A train per
+The demo also puts **Team Healthy Flow and Team Long Tail on one train (Delivery ART) and
+leaves Team Bare Export on none** — the smallest arrangement where every part of
+[ARTs](#grouping-teams-into-arts) does something. The picker gets *All trains*, *Delivery ART*
+and *No ART*; both groups have somebody in them; and scoping to the train visibly changes the
+figures at the foot of the table. A train per
 team would make grouping look pointless, and putting all three on one would leave *No ART* absent.
 
-On **All Teams** the three read as a train with one obvious problem: Heron's 85th percentile is
-three or four times the other two, it holds most of the aged work, and its defect rate is the
-highest — while Wagtail's *Data to* column quietly explains why its delivery rate looks worse
-there than on its own page.
+On **All Teams** the three read as a train with one obvious problem: Team Long Tail's 85th
+percentile is three or four times the other two, it holds most of the aged work, and its defect
+rate is the highest — while Team Bare Export's *Data to* column quietly explains why its
+delivery rate looks worse there than on its own page.
 
 The **work item age** chart reads differently on each of the three, which is what makes it worth
-looking at from the demo: Kingfisher has nothing past the threshold and every dot below its own
-85% line; Heron's oldest item has been in flight longer than its own 85th percentile by a wide
-margin, which is the whole argument for drawing that line; and all three carry enough work types
-in flight for the columns to say something.
+looking at from the demo: Team Healthy Flow has nothing past the threshold and every dot below
+its own 85% line; Team Long Tail's oldest item has been in flight longer than its own 85th
+percentile by a wide margin, which is the whole argument for drawing that line; and all three
+carry enough work types in flight for the columns to say something.
 
-All three teams have enough weekly history to **forecast** on the default 3-month window —
-Wagtail, at four months, is the one that decides that — and Heron's spread is wide enough that
-its 50%, 85% and 95% answers are days apart rather than all the same date, which is the whole
-argument for reading a distribution instead of a single number. Switching **Group by** to Month
-on that same window drops below the eight-period floor, so the forecast's "not enough history"
-card is reachable from the demo too.
+All three teams have enough weekly history to **forecast** on the default 3-month window — Team
+Bare Export, at four months, is the one that decides that — and Team Long Tail's spread is wide
+enough that its 50%, 85% and 95% answers are days apart rather than all the same date, which is
+the whole argument for reading a distribution instead of a single number. Switching **Group by**
+to Month on that same window drops below the eight-period floor, so the forecast's "not enough
+history" card is reachable from the demo too.
 
 Every team carries all four work types, so the **work type filter** does something whichever
 team you're on. The dates cover the **whole week**, not just weekdays, which is what makes the
-**working days** setting reachable from the demo: turning it on visibly shortens Heron's tail
-and drops two items out of its aged count. The span is long enough that **Clean up old data**
-has real answers — a 3-month cutoff would drop items from all three teams, a 12-month one from
-none — and that the 6, 9 and 12-month **date windows** each change the picture.
+**working days** setting reachable from the demo: turning it on visibly shortens Team Long
+Tail's tail and drops two items out of its aged count. The span is long enough that **Clean up
+old data** has real answers — a 3-month cutoff would drop items from all three teams, a 12-month
+one from none — and that the 6, 9 and 12-month **date windows** each change the picture.
 
 **The dates are counted from the day you load it**, so the demo is live whenever it's opened
 rather than stale from the day it was written, and the work in progress is genuinely in
@@ -694,7 +700,7 @@ the team this was built for does, its start date set by automation on the Ready 
 transition — the figure pins at ~95% and never moves, while the waiting that actually matters
 happens *inside* the in-progress span: in review, blocked, waiting on an environment.
 [Time in stage](#where-the-time-goes-time-in-stage) now shows that waiting directly — it is
-exactly what Heron's row in the demo is for — but turning it back into a single efficiency
+exactly what Team Long Tail's row in the demo is for — but turning it back into a single efficiency
 percentage needs each stage marked as **working or waiting**, and that flag doesn't exist. The
 table is arguably the better answer anyway: it says *where* the wait is, where a percentage only
 says how much. Half a metric that always reads 95% is worse than no metric at all.
@@ -883,9 +889,9 @@ landed, that shows where open work has got to.
 
 **What you are looking for is the spread, not the average.** A tight band means the next item is
 predictable. A long tail means it is a lottery however good the typical case looks — and it is
-exactly what makes the [forecast](#forecasting-what-the-pace-youve-had-implies) wide. On the demo,
-Kingfisher's dots sit in a band under 14 days while Heron's run to 48: the same argument the 85th
-percentile tile makes, in a picture.
+exactly what makes the [forecast](#forecasting-what-the-pace-youve-had-implies) wide. On the
+demo, Team Healthy Flow's dots sit in a band under 14 days while Team Long Tail's run to 48: the
+same argument the 85th percentile tile makes, in a picture.
 
 Dots are drawn translucent, so several items finishing on one day at the same speed show as a
 darker mark rather than as one. The alternative — nudging dots sideways to separate them — would
@@ -1122,7 +1128,7 @@ sentence. The Your Data tab lists every item with its key, unfinished ones at th
 ### Reading It
 
 - **Nothing above the threshold line** — the board is healthy, and the aged work tile reads 0.
-  Kingfisher in the demo looks like this.
+  Team Healthy Flow in the demo looks like this.
 - **A few dots high above everything else** — the usual picture, and the useful one: those are
   the items to talk about, in that order, starting with the highest.
 - **Everything drifting upward together** — not an ageing problem but a work-in-progress problem.
