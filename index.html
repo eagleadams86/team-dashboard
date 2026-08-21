@@ -4196,6 +4196,21 @@ const newId = () => 't' + Date.now().toString(36) + Math.random().toString(36).s
    unless it is plainly safe. Same boundary check as the sibling app. */
 const ID_OK = /^[A-Za-z0-9_-]{1,64}$/;
 
+/* `__proto__` passes ID_OK — underscores and letters — and it is the one id that
+   is not just a name. A stage id is used as an OBJECT KEY on a row's day counts,
+   which no other id in this app is, and that makes the difference: hydrateRows
+   builds those with Object.create(null), where an own `__proto__` reaches
+   nothing, but serializeRows has to hand JSON.stringify a plain object, and
+   Object.assign copying that key onto one goes through the prototype SETTER.
+   So it is refused at both stage doors — as an id, and as a key in a stored `g`
+   — rather than relied on being pruned later by hydrateState, which only prunes
+   ids no stage answers to and would happily keep this one if a hand-edited
+   backup named a stage after it.
+
+   Named rather than written inline so the reason is in one place, and so the
+   next id that turns out to be a key rather than a name has somewhere to go. */
+const PROTO_KEY = '__proto__';
+
 /* sanitizeArts is the ARTs' boundary; the grouping helpers themselves live with
    the rest of the pure domain code in section 4, above the window.TD export
    that hands them to the tests. */
@@ -4225,8 +4240,8 @@ function sanitizeArts(arts) {
 function sanitizeStages(stages) {
   const seen = new Set();
   return (Array.isArray(stages) ? stages : []).map(st => {
-    let id = (st && typeof st.id === 'string' && ID_OK.test(st.id) && !seen.has(st.id))
-      ? st.id : newId();
+    let id = (st && typeof st.id === 'string' && ID_OK.test(st.id) && st.id !== PROTO_KEY
+      && !seen.has(st.id)) ? st.id : newId();
     seen.add(id);
     const aliases = [], byNorm = new Set();
     (st && Array.isArray(st.match) ? st.match : []).forEach(a => {
@@ -4274,7 +4289,7 @@ function hydrateStageDays(raw) {
   const out = Object.create(null);
   let any = false;
   for (const id of Object.keys(raw)) {
-    if (!ID_OK.test(id)) continue;
+    if (!ID_OK.test(id) || id === PROTO_KEY) continue;
     const days = cleanStageDays(raw[id]);
     if (days == null) continue;
     out[id] = days;
@@ -4343,9 +4358,23 @@ const serializeRows = rows => rows.map(r => {
   if (r.key) out.i = r.key;
   /* Same rule again: no `g` key at all unless this row has stage data, so a
      browser that never pastes a Time in Status export stores exactly what it
-     stored before stages existed. Object.assign copies the null-prototype
-     object's own keys into a plain one, which is what JSON.stringify wants. */
-  if (r.stages && Object.keys(r.stages).length) out.g = Object.assign({}, r.stages);
+     stored before stages existed.
+
+     Copied key by key into a plain object — which is what JSON.stringify wants —
+     rather than with Object.assign, and skipping PROTO_KEY on the way. Both
+     Object.assign and a plain `out[k] = v` go through [[Set]], and on a plain
+     object `__proto__` has a SETTER: copying that key would move the new
+     object's prototype rather than store a day count. Nothing upstream can
+     produce that key any more (see PROTO_KEY), and this is the door it would
+     have to come through, so it is closed here too. */
+  if (r.stages && Object.keys(r.stages).length) {
+    const g = {};
+    for (const id of Object.keys(r.stages)) {
+      if (id === PROTO_KEY) continue;
+      g[id] = r.stages[id];
+    }
+    if (Object.keys(g).length) out.g = g;
+  }
   return out;
 });
 
@@ -4643,7 +4672,7 @@ window.tdRaisesKeyboard = raisesKeyboard;
    everything here decides what a copy arriving from outside this browser — a
    backup file, a share link — is allowed to turn into. */
 window.TDState = { sanitizeTeams, sanitizeArts, sanitizeStages, hydrateState, normalizeSettings,
-  isBackup, ID_OK, serializeRows, hydrateRows, hydrateStageDays, SCHEMA };
+  isBackup, ID_OK, PROTO_KEY, serializeRows, hydrateRows, hydrateStageDays, SCHEMA };
 window.tdCounts = (d) => ({
   teams: (d && d.teams) ? d.teams.length : 0,
   items: (d && d.teams) ? d.teams.reduce((n, t) => n + ((t.rows && t.rows.length) || 0), 0) : 0

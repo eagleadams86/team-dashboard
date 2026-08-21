@@ -827,13 +827,49 @@ async function run(TD, win) {
   is(orphan.teams[0].rows[0].stages, null,
      'and a row left with none loses the object, so it serialises as it did before stages existed');
 
-  const nasty = roundTrip([{ c: '2026-08-09', s: '2026-08-02', t: 'Story',
-    g: { sb: 3, '__proto__': 9, 'bad id!': 1, sb2: 'nope', sb3: -5 } }],
+  /* Built with JSON.parse, NOT an object literal, and that is load-bearing.
+     `{ '__proto__': 9 }` in source does not create a property called
+     `__proto__` at all — it goes to the prototype setter and, for a number,
+     does nothing — so a literal fixture would have quietly tested an object
+     that never had the key. JSON.parse creates a real own property, which is
+     also exactly how this data arrives: out of localStorage, a backup file or a
+     share link. (CodeQL flagged the literal version of this fixture as
+     js/invalid-prototype-value on 2026-08-21, which is how the difference was
+     found — the alert was right and the test was wrong.) */
+  const nastyG = JSON.parse('{"sb":3,"__proto__":9,"bad id!":1,"sb2":"nope","sb3":-5}');
+  ok(Object.prototype.hasOwnProperty.call(nastyG, '__proto__'),
+     'the fixture really does carry an own __proto__ key, the way JSON.parse makes one');
+  const nasty = roundTrip([{ c: '2026-08-09', s: '2026-08-02', t: 'Story', g: nastyG }],
     [{ id: 'sb', name: 'Build', match: [] }]);
   is(nasty.teams[0].rows[0].stages, { sb: 3 },
      'a hostile id, a bad id, a non-number and a negative are all dropped');
-  ok(({}).toString !== 9 && Object.prototype[9] === undefined,
-     'and nothing reached Object.prototype — the day counts object has none');
+  ok(!Object.prototype.hasOwnProperty.call(nasty.teams[0].rows[0].stages, '__proto__'),
+     'and __proto__ is refused outright rather than carried as a key');
+
+  /* The case the prune would NOT have caught: a hand-edited copy that names a
+     STAGE __proto__, so the key on the row points at a stage that really
+     exists. A stage id is the only id in this app used as an object key, and
+     serializeRows has to copy those keys onto a plain object for
+     JSON.stringify — where __proto__ goes through the prototype setter. */
+  const protoStage = StS.sanitizeStages([{ id: '__proto__', name: 'Sneaky', match: [] }]);
+  ok(protoStage[0].id !== '__proto__',
+     'a stage cannot be called __proto__ either — it gets a fresh id, like any unsafe one');
+  const protoRow = roundTrip(
+    [{ c: '2026-08-09', s: '2026-08-02', t: 'Story', g: JSON.parse('{"__proto__":9}') }],
+    [{ id: '__proto__', name: 'Sneaky', match: [] }]);
+  is(protoRow.teams[0].rows[0].stages, null, 'so the day count against it has nowhere to land');
+  /* An OBJECT value, not a number: a number handed to the __proto__ setter is a
+     silent no-op, so a fixture using one would pass whatever serializeRows did.
+     This is the value that actually moves a prototype. */
+  const out = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
+    created: null, type: 'Story', key: '',
+    stages: JSON.parse('{"sb":3,"__proto__":{"polluted":true}}') }]);
+  is(out[0].g, { sb: 3 }, 'serialising drops the key rather than copying it');
+  /* win.Object.prototype, not this page's: the object was built inside the app's
+     iframe, so it inherits that realm's prototype and a same-page comparison is
+     false however healthy the object is. */
+  ok(Object.getPrototypeOf(out[0].g) === win.Object.prototype && out[0].g.polluted === undefined,
+     'so writing a row can never move the written object\u2019s prototype');
 
   is(StS.hydrateStageDays('not an object'), null, 'a `g` that is not an object is nothing');
   is(StS.hydrateStageDays([1, 2]), null, 'and neither is an array');
