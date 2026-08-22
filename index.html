@@ -983,6 +983,10 @@ dialog { background: var(--surface); color: var(--text-primary);
    the row holding Item alone (no stages set up) spans rather than leaving a
    gap where a control should be. */
 #itemDialog { max-width: 640px; }
+/* THE SAME WIDTH AS MONEY MAP'S BACK UP WINDOW: 700px, its --dialog-w-narrow.
+   Asked for on 2026-08-22, alongside the share windows — these were all 560px,
+   so the same dialog opened narrower here than in the app beside it. */
+#dataDialog { max-width: 700px; }
 #manageDialog { max-width: 1100px; }
 /* The same width as the window above, because it is laid out as that window's
    twin — one section per thing you set, the Add button in its heading row. It
@@ -1000,7 +1004,11 @@ dialog { background: var(--surface); color: var(--text-primary);
 #multiDialog textarea { min-height: 240px; }
 
 @media (min-width: 760px) {
-  #shareDialog { max-width: 820px; }
+  /* THE SAME WIDTH AS MONEY MAP'S, which is the family's share window: 1100px,
+   its --dialog-w-wide. Asked for on 2026-08-22 — these were 880, 820, 820 and
+   560 across five pages, so the same action opened a different-sized window in
+   every app. */
+#shareDialog { max-width: 1100px; }
   /* No align-items: start — the two panels stretch to the taller of them, so
      the pair reads as one row rather than as two boxes of unrelated height.
      Which one is taller changes with the team count and the chosen history, so
@@ -2068,6 +2076,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <button class="btn" id="btnImport" type="button"><span aria-hidden="true">⬆</span> Restore from backup…</button>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
   </div>
+  <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
   <div class="note info" style="margin-top:16px">
     Restoring <strong>replaces every team in this browser</strong>. You'll see what the file
     holds and be asked to confirm first. A backup file is also how you move your data to
@@ -2077,7 +2086,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <summary>Start Again</summary>
     <p style="margin-top:10px">Deletes every team and every work item in this browser. Your
       settings and your theme are kept.</p>
-    <div class="row">
+    <div class="row" style="margin-top:10px">
       <button class="btn danger" id="clearBtn" type="button">Delete all data</button>
     </div>
   </details>
