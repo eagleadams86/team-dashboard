@@ -1791,7 +1791,44 @@ app now holds identifiers out of a work system, and the answer to "where does th
   tests.html, commit, push, verify the Pages deploy and CI, spot-check live —
   then stop the preview server.
 
-## Fields, Dialogs and Scroll Boxes (2026-08-20)
+## Fields, Dialogs and Scroll Boxes (2026-08-20, layout rule added 2026-08-22)
+
+### No Field Is Ever Stranded on a Short Row — `.grid.two.pairs`
+
+Charles has reported dead space in a dialog more times than anything else, across two apps
+(`[[no-orphaned-form-fields]]` in memory records three reports in one day on Money Map, the third
+caused by the fix for the second). On 2026-08-22 it arrived here twice in one change: a long hint
+inflated its grid row and left a void beside the two fields next to it, and an odd number of
+workflow stages left the last day-count box alone in half a fieldset.
+
+**Fix it in the layout. A field-by-field fix has never once held** — the next innocent addition
+strands a different field, and whoever adds it has no reason to know there was ever a rule.
+
+- **`.grid.two` is `auto-fit`, which does NOT solve this.** It collapses a track only when the
+  whole grid has nothing to put in it — that saves the one-field grid (the multi-team paste's date
+  picker) and does nothing for *n* fields into a column count that does not divide *n*.
+- **`.grid.two.pairs` fixes the count at two, which is what makes the arithmetic decidable in CSS
+  alone**: `> :last-child:nth-child(odd) { grid-column: 1 / -1 }`. An odd number of fields means
+  the last one starts a row by itself, so it spans. No opt-in flag, no JS measuring pass, nothing
+  for the next person to remember. Two columns is also right on its own merits where the labels are
+  sentences — a sentence in a 260px auto-fit track wraps to three lines.
+- **IF A SETTING NEEDS MORE THAN A LABEL, IT GOES OUTSIDE THE GRID.** A multi-line hint inside a
+  bottom-aligned grid cell inflates its whole row; that is what happened to the ageing threshold.
+  It now sits under the grid, paired two-up with its own explanation — which also avoids the
+  opposite fault of a box for a two-digit number stretched across 1100px. The working-days
+  checkbox has always followed this rule; it is now the general one.
+- **The regression test walks every `.grid.two` in every dialog at seven widths** and fails on any
+  row whose last cell stops short of the grid's right edge. Two things about it matter:
+  - **Rows are found by LEFT resetting, never by grouping on `top`.** The grid is
+    `align-items: end`, so two cells on one row routinely have different tops — grouping by top
+    splits a full row into two short ones and reports failures where the layout is fine. This cost
+    a false alarm while it was being written.
+  - **It counts the grids it reached and asserts it saw at least five**, because a sweep that found
+    nothing passes every "no bad rows" assertion it makes — the trap `[[negative-assertions-pass-on-empty]]`
+    records. The fixture plants an ODD number of stages for the same reason: an even count passes
+    without the span rule doing anything.
+  - Proven to fail with the rule removed before being committed, rather than assumed to work.
+
 
 - **Every modal opens through `openModal(dlg)`, never `showModal()` directly.**
   `showModal()` runs the spec's dialog focusing steps — the `autofocus` element, or failing

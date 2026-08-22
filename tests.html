@@ -288,8 +288,8 @@ function near(actual, expected, name, eps) {
 }
 function ok(cond, name, msg) { record(!!cond, name, msg); }
 /* The floor the run is measured against — see the check at the foot of run().
-   1643 checks as of 2026-08-22 (typed stage times took 1623 to 1636; telling the target
-   and the ageing threshold apart took it to 1643).
+   1655 checks as of 2026-08-22 (typed stage times took 1623 to 1636; telling the target
+   and the ageing threshold apart took it to 1643; the dialog grid sweep to 1655).
 
    Deliberately LOOSER than the eight sibling suites, which pin their floor at
    the exact number they register. They count TESTS, and registration there is
@@ -298,7 +298,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 1610;
+const EXPECTED = 1620;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3932,7 +3932,10 @@ group('ARTs — the grouping, and the boundary it crosses');
 
   /* The other end of the same pair, where the threshold is typed. */
   uiDoc.getElementById('settingsBtn').click();
-  const agedHint = uiDoc.getElementById('setAgedDaysLabel').parentElement.querySelector('.hint');
+  /* Its own cell in the grid, NOT a child of the field's div — a hint long
+     enough to be worth reading is exactly what inflates a grid row and strands
+     the field beside it, so it sits alongside the box rather than under it. */
+  const agedHint = uiDoc.getElementById('setAgedDays').closest('.grid').querySelector('p.hint');
   ok(agedHint && /Unfinished work only/.test(agedHint.textContent),
      'the ageing threshold says, right where it is typed, that it counts unfinished work only');
   ok(agedHint && /85%/.test(agedHint.textContent) && /lower/.test(agedHint.textContent),
@@ -6634,6 +6637,122 @@ group('a card with no chart matches the one beside it');
       ok(note && note.getBoundingClientRect().height < 260,
          'with the note inside it not stretched either');
     });
+
+    f.remove();
+    if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
+    if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('no dialog leaves a field stranded on a short row');
+
+  /* ── THE ORPHANED-FIELD COMPLAINT, GUARDED IN THE LAYOUT ───────────────────
+     Charles has reported dead space in a dialog more times than any other
+     single thing, across two apps, and every previous fix was to the FIELD that
+     happened to be stranded — which is why it kept coming back: the next
+     innocent addition strands a different one. On 2026-08-22 it arrived by a
+     new route (a long hint inflating its row and leaving a void beside the two
+     fields next to it) and by an old one (an odd number of workflow stages
+     leaving the last box alone).
+
+     `.grid.two.pairs` is the structural answer — two fixed columns, and a last
+     child in an odd position spans the row — and THIS is what stops it being
+     quietly undone. It walks every `.grid.two` in every dialog at several
+     widths and fails on any row whose last cell stops short of the grid's right
+     edge. A new field, a new dialog or a changed width is covered without
+     anybody remembering to add a case. */
+  {
+    const keep = { state: localStorage.getItem('td-state'),
+                   view: localStorage.getItem('td-view') };
+    /* THREE stages, deliberately odd: an even count passes this test without
+       the span rule doing anything, which is the run that would look green
+       while the bug was live. */
+    localStorage.setItem('td-state', JSON.stringify({
+      schema: TD.SCHEMA,
+      stages: [{ id: 'sb', name: 'Build', match: [] },
+               { id: 'sr', name: 'Review', match: [] },
+               { id: 'st', name: 'Test', match: [] }],
+      teams: [{ id: 'g1', name: 'Grid', rows: [
+        { c: '2026-01-02', s: '2025-12-29', t: 'Story' }] }],
+      settings: {}
+    }));
+    localStorage.setItem('td-view', JSON.stringify({ activeTab: 'data', months: 'all' }));
+
+    const f = document.createElement('iframe');
+    f.setAttribute('data-td-tests', '');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;left:-9999px;width:1240px;height:900px;border:0';
+    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html' + BUST; document.body.appendChild(f); });
+    const gw = f.contentWindow, gd = gw.document;
+
+    /* Rows are found by LEFT resetting, never by top: the grid is
+       `align-items: end`, so two cells on one row routinely have different tops
+       and grouping by top splits a full row into two short ones — a measuring
+       bug that reports failures where the layout is fine. */
+    const shortRows = () => {
+      const bad = [];
+      let gridsSeen = 0, rowsSeen = 0;
+      gd.querySelectorAll('dialog').forEach(dlg => {
+        const wasOpen = dlg.open;
+        /* The item dialog builds its stage boxes in its opener, so it is opened
+           the way a reader opens it; the rest hold their markup already. */
+        if (!wasOpen) {
+          if (dlg.id === 'itemDialog') gd.getElementById('btnAddItem').click();
+          else { try { dlg.showModal(); } catch (_) { return; } }
+        }
+        dlg.querySelectorAll('.grid.two').forEach((g, gi) => {
+          const gr = g.getBoundingClientRect();
+          if (gr.width < 10) return;
+          const cells = [...g.children].filter(c => c.offsetParent !== null);
+          if (!cells.length) return;
+          gridsSeen++;
+          const rows = []; let cur = null, prevLeft = Infinity;
+          cells.forEach(c => {
+            const r = c.getBoundingClientRect();
+            if (Math.round(r.left) <= Math.round(prevLeft)) { cur = []; rows.push(cur); }
+            cur.push(r); prevLeft = r.left;
+          });
+          rowsSeen += rows.length;
+          rows.forEach(cs => {
+            const shortBy = Math.round(gr.right - cs[cs.length - 1].right);
+            if (shortBy > 2) bad.push(dlg.id + ' grid ' + gi + ': a row of ' + cs.length
+              + ' stops ' + shortBy + 'px short of the edge');
+          });
+        });
+        if (!wasOpen) dlg.close();
+      });
+      return { bad, gridsSeen, rowsSeen };
+    };
+
+    /* The guard that stops every assertion below passing on an empty sweep —
+       a walk that found no grids proves nothing at all. */
+    const wide = shortRows();
+    ok(wide.gridsSeen >= 5, 'the sweep actually reached the dialog grids',
+       wide.gridsSeen + ' grids, ' + wide.rowsSeen + ' rows');
+    ok(gd.documentElement.clientWidth > 1100,
+       'and the frame is wide enough for the widest dialog, or this measures nothing',
+       gd.documentElement.clientWidth);
+    is(wide.bad, [], 'no row in any dialog leaves dead space beside its last field');
+
+    /* Every width the column count changes at, because which field lands last
+       moves with it — the reason field-by-field fixes never held. */
+    [1060, 900, 760, 640, 520, 400].forEach(w => {
+      f.style.width = w + 'px';
+      is(shortRows().bad, [], 'and none at ' + w + 'px either');
+    });
+
+    /* The span rule is doing the work, not luck: with three stages the last box
+       must be as wide as the whole grid. */
+    f.style.width = '1240px';
+    gd.getElementById('btnAddItem').click();
+    const boxes = [...gd.querySelectorAll('#itemStageDays > div')];
+    is(boxes.length, 3, 'three stages, three boxes — an odd count, which is the case that bit');
+    const gridW = gd.getElementById('itemStageDays').getBoundingClientRect().width;
+    ok(Math.abs(boxes[2].getBoundingClientRect().width - gridW) < 2,
+       'and the last one spans the full row rather than sitting alone in half of it');
+    ok(boxes[1].getBoundingClientRect().width < gridW - 2,
+       'while the two above it stay in their own columns');
+    gd.getElementById('itemDialog').close();
 
     f.remove();
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);

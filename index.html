@@ -340,6 +340,26 @@ select { cursor: pointer; }
    row still line up. */
 .grid.two > div { display: flex; flex-direction: column; justify-content: flex-end; }
 .grid.two > div > label { flex: 0 0 auto; }
+/* ── A SHORT LAST ROW CLOSES ITS OWN GAP ─────────────────────────────────────
+   `auto-fit` collapses a track only when the WHOLE grid has nothing to put in
+   it, which saves the one-field row and does nothing for the case every
+   orphaned field in this app has actually come from: n fields into a column
+   count that does not divide n, leaving the last one in a part-row with dead
+   space beside it. How many columns there are moves with the window, so which
+   field lands last is not knowable from the markup.
+
+   `.pairs` fixes the count at two, which makes the arithmetic decidable in CSS
+   alone: an odd number of fields means the last one is alone on its row, and it
+   spans. Nothing for whoever adds the next field to remember, and no measuring
+   pass — the layout closes the gap itself, which is the only version of this
+   fix that has ever held.
+
+   Two columns rather than three is right for these fields on its own merits:
+   every label in the Settings window is a sentence, and a sentence in a 260px
+   auto-fit track wraps to three lines. */
+.grid.two.pairs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.two.pairs > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+@media (max-width: 640px) { .grid.two.pairs { grid-template-columns: 1fr; } }
 /* Charts sit in a fixed two-column grid so the metrics stay paired, whatever the
    window width; collapse to one column when 2 no longer fit. */
 .grid.charts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
@@ -1973,7 +1993,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <strong class="manage-head">Labels &amp; Work Types</strong>
   </div>
   <p class="manage-note">The words on the charts, and what counts as a defect.</p>
-  <div class="grid two" style="margin-top:var(--sp-5)">
+  <div class="grid two pairs" style="margin-top:var(--sp-5)">
     <div>
       <label for="setCycleLabel">Word to use for cycle time on charts</label>
       <select id="setCycleLabel">
@@ -1995,21 +2015,36 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <label for="setUnplannedLabel">Word to use for defects on charts</label>
       <input type="text" id="setUnplannedLabel" maxlength="120" placeholder="Defect">
     </div>
+  </div>
+
+  <!-- ── THE TWO MEASURES, EACH WITH A CAVEAT ─────────────────────────────────
+       Both sit UNDER the grid rather than in it, which is the rule the
+       working-days checkbox has always followed here and is now the general one:
+       a multi-line explanation inside a bottom-aligned grid cell inflates its
+       whole row and strands whatever short field sits beside it. That is the
+       orphaned-field complaint this app has had before, arriving by a new route
+       — reported by Charles on 2026-08-22, when this hint left a void beside the
+       two fields next to it. IF A SETTING NEEDS MORE THAN A LABEL, IT BELONGS ON
+       ITS OWN LINE DOWN HERE, not in the grid above.
+
+       The threshold is paired with its own explanation two-up rather than given
+       the full width: a box for a two-digit number stretched across 1100px is
+       its own kind of dead space, and the hint is exactly the thing to put in
+       the space beside it. -->
+  <div class="grid two pairs" style="margin-top:var(--sp-6)">
     <div>
       <label for="setAgedDays" id="setAgedDaysLabel">Count an in-progress item as aged after (days)</label>
       <input type="number" id="setAgedDays" step="1" min="1" placeholder="14">
-      <!-- Its own hint because this box is routinely mistaken for a team's
-           85% target, which sits in Teams & Stages and reads almost the same.
-           The distinction is which work each one looks at. -->
-      <p class="hint" style="margin-top:var(--sp-3)">Unfinished work only &mdash; nothing that
-        has completed is ever counted here. Not the same as a team&rsquo;s
-        <strong>85% &le;</strong> target, which is checked against work that has finished; set
-        this <strong>lower</strong> than that target so something is flagged while there is
-        still time to act on it.</p>
     </div>
+    <!-- Not a <div>, so `.grid.two > div`'s flex rule leaves it alone; the
+         grid's own `align-items: end` sits it on the same baseline as the box. -->
+    <p class="hint" style="margin:0">Unfinished work only &mdash; nothing that
+      has completed is ever counted here. Not the same as a team&rsquo;s
+      <strong>85% &le;</strong> target, which is checked against work that has finished; set
+      this <strong>lower</strong> than that target so something is flagged while there is
+      still time to act on it.</p>
   </div>
-  <!-- A measure rather than a label, so it gets its own line under the grid
-   with room for the caveat: the holidays this app cannot know about. -->
+
   <div style="margin-top:var(--sp-6)">
     <label class="checkline" for="setWorkingDays">
       <input type="checkbox" id="setWorkingDays"><span>Count working days only (Monday to Friday)</span>
@@ -2227,7 +2262,11 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         Leave a box <strong>empty</strong> if you do not have that figure; an empty box is
         left out altogether, where a <strong>0</strong> says the item crossed that stage
         inside a day.</p>
-      <div class="grid two" id="itemStageDays"></div>
+      <!-- `pairs`, because a workflow with an ODD number of stages left the last
+           box alone on its row with half the fieldset empty beside it — the
+           orphaned-field complaint, in the grid this feature added. Two fixed
+           columns and the span rule mean the last box fills the row instead. -->
+      <div class="grid two pairs" id="itemStageDays"></div>
     </fieldset>
   </div>
 

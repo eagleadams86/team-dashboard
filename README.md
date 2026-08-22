@@ -848,6 +848,13 @@ Both **travel in a share link**, so the person you send it to sees the same line
 **per team**, so the All Teams table — which compares teams against each other rather than against
 their own promises — deliberately doesn't carry them.
 
+### Where the Ageing Threshold Lives
+
+It is in **Settings**, on its own line under the labels — not in the grid with them, because its
+explanation runs to four lines and a paragraph that long inside a grid cell pushes the fields
+beside it into empty space. Settings that need more than a label sit on their own line for that
+reason, with the explanation in the space next to the box rather than under it.
+
 ### The Target Is Not the Ageing Threshold
 
 These two read almost the same on screen — **85% ≤ 10 d** on a team's row, and **count an
