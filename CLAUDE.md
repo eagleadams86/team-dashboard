@@ -269,6 +269,32 @@ Dashboard tab whose entire content was a card explaining that there was no data 
   card is from a working app, where a button that quietly adds three teams is the same mis-click
   the one beside *Load pasted rows* is already taken away to prevent.
 
+### Settings Moved Into the Header — no schema change
+
+Asked for the same day as the tab rule above, and it is the other half of the same thought: the
+tab strip is for ways of READING your numbers, and Settings is a thing you GO to. Teams, backups
+and sharing were already buttons; this is the fourth of that kind, not a third view.
+
+- **`TABS` is three now**, and nothing else had to move: `selectTab` already refuses a name that
+  is not in the list, so a browser that saved `activeTab: 'settings'` before the change falls back
+  on the next load. Pinned as a case, because it is not hypothetical.
+- **Laid out as the Teams window's twin** — one section per thing you set, headed by its name,
+  the Add button at the right-hand end of that heading row, one Done. Same 1100px, and it needs
+  it: `.grid.two` is auto-fit at 260px a track, so at the 560px base all five fields stack into a
+  column six deep.
+- **The window's own note sits under its h2**, not under the closing row. A sentence below Done
+  is a sentence after the way out.
+- **Reset and Done share the closing row**, destructive left, way out right. Reset is deliberately
+  NOT up beside "+ Add a type", where a mis-click costs every label somebody has set.
+- **`renderSettingsForm()` runs on the way IN**, not just at boot: every field in that window is
+  also written by Reset and by a restore, and a window opening on a value the app no longer holds
+  is the worst kind of wrong — one nothing on screen contradicts.
+- **The glyph is ⚙ and the button is LAST in the row.** The comment above the header buttons had
+  already named ⚙ as the family's settings mark before this app had one — it is Money Map's.
+- **It goes in a shared view**, with the other three writing controls.
+- The `#tab-settings { margin-left: auto }` rule went with the tab. Nothing else in that strip
+  wants pushing right.
+
 ### Installing It — no schema change
 
 `manifest.webmanifest`, three PNG icons and an apple-touch-icon, all drawn by `make_favicon.py`

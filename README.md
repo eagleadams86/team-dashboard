@@ -326,7 +326,7 @@ as does anything unrecognisable in a hand-edited copy.
 The page also **holds still while it loads**. This app is one 560KB HTML file that the browser
 paints as it parses, with the script that fills it at the foot — so for about a tenth of a second
 you used to watch an empty skeleton assemble and then everything pop in at once, and a reload on
-Settings or Your Data painted the whole dashboard first and then swapped it out. The header shows
+Your Data painted the whole dashboard first and then swapped it out. The header shows
 straight away, because everything in that row carries its final width in the markup; the rest
 appears once, complete, on the tab you left it on. If the script ever fails outright the page
 reveals itself anyway after two seconds, so a broken load is a visibly broken page rather than a
@@ -448,8 +448,9 @@ browser with nothing in it opens on Your Data. It was the last thing here still 
 of nothing — a tab whose entire content was a card saying there was no data yet. It asks about
 **all** your teams rather than the one you're looking at, which is what keeps it from appearing
 and disappearing as you move through the picker, and what leaves an empty team beside a full one
-still able to say so. In a **shared view** it is never hidden: Your Data and Settings are both
-taken away there, so hiding this one as well would leave a tab strip with nothing in it.
+still able to say so. In a **shared view** it is never hidden: Your Data is taken away there and
+the header's buttons with it, so hiding this one as well would leave a tab strip with nothing
+in it.
 
 Which team you're looking at is a position on *this* device and deliberately isn't part of
 your data: it stays out of backups and share links for the same reason the theme does.
@@ -733,6 +734,15 @@ project at the front anyway.
 
 ## Settings
 
+**A window off the header**, behind the ⚙ button at the right-hand end — beside Teams & Stages,
+Back up and Share, and laid out the same way. It was the fourth tab until 22 Aug 2026, which put
+a page you visit twice a year in a strip whose other entries are ways of *reading* your numbers.
+Settings is a thing you go and set, like teams and backups, and all three of those were already
+buttons.
+
+Because it opens over the dashboard rather than replacing it, a change lands on the charts behind
+it — rename the defect word and the chart titles follow while the window is still open.
+
 Everything the charts depend on, shared by all your teams:
 
 - **Defect work type** — the exact text in your Type column that means "defect"
@@ -770,8 +780,8 @@ Two figures a team **sets** rather than measures, both optional and both **empty
 - **WIP ≤** — how much work this team means to have open at once.
 - **85% ≤** — how long it means an item to take: the promise the 85th percentile is read against.
 
-They live in **Teams & Stages**, on the team's own row, and **not** in Settings — which is the
-one design decision here worth stating. Every setting in this app is shared by every team, and
+They live in **Teams & Stages**, on the team's own row, and **not** in the Settings window
+beside it — which is the one design decision here worth stating. Every setting in this app is shared by every team, and
 can be, because each describes how a *figure is worked out*: what counts as a defect, what a
 same-day item is worth. These two describe a team's own board. A limit of eight means something
 different to a team of three and a team of twelve, and a promise is made by the people who have
@@ -1488,7 +1498,7 @@ cells get a leading apostrophe, which Excel, Numbers and Sheets all read as "thi
 genuine negative number is left alone — net flow is negative for half the weeks on a busy board,
 and quoting it would break the arithmetic you exported a CSV to do.
 
-The two tables in **Settings** and the **Teams & Stages** window have no export buttons: they are
+The two tables in the **Settings** and **Teams & Stages** windows have no export buttons: they are
 configuration — a Display→Value mapping, and a list of names — rather than figures anybody puts
 in a status email.
 
@@ -1664,8 +1674,9 @@ along regardless of how old their start is. The line under the link reads `219 o
 from 18 Nov 2023` so the cost of a longer window is visible before you send it; a window that
 would leave nothing at all says so.
 
-The recipient sees a standing "Read-only view" bar, the dashboard only (no Your Data or
-Settings tabs), and a link back to their own data. Nothing they do is saved, and nothing
+The recipient sees a standing "Read-only view" bar, the dashboard only (no Your Data tab, and
+none of the header buttons that write — Teams & Stages, Back up, Share or Settings), and a link
+back to their own data. Nothing they do is saved, and nothing
 already in their browser is touched — `save()`, `persist()` and `saveView()` are all
 no-ops in a shared view, and no service worker is installed. A link that arrives truncated (mail
 apps do this) shows an error card rather than ever falling through to the viewer's own

@@ -272,10 +272,6 @@ html[data-first-run] #teamSel { display: none; }
 .tab[aria-selected="true"] { background: var(--unit-active-bg);
   border-color: var(--unit-active-bg); color: var(--unit-active-txt); font-weight: 600; }
 .tab[aria-selected="true"]:hover { border-color: var(--unit-active-bg); }
-/* Settings looks after the app rather than at this team's numbers, so it sits
-   apart from the two data tabs — but only while the row fits on one line
-   (same rule as the sibling app's All teams tab). */
-@media (min-width: 470px) { #tab-settings { margin-left: auto; } }
 
 /* Chart-group sub-tabs. Deliberately NOT the filled pill above: an underlined
    row reads as subordinate by construction, so two tablists on one screen can't
@@ -948,6 +944,13 @@ dialog { background: var(--surface); color: var(--text-primary);
    gap where a control should be. */
 #itemDialog { max-width: 640px; }
 #manageDialog { max-width: 1100px; }
+/* The same width as the window above, because it is laid out as that window's
+   twin — one section per thing you set, the Add button in its heading row. It
+   also needs the room for its own reason: `.grid.two` is auto-fit at 260px a
+   track, so at the 560px base every one of those five fields would stack into a
+   column six deep, and the filter list's Display and Value are two full-width
+   boxes on one row. */
+#settingsDialog { max-width: 1100px; }
 /* The multi-team paste needs the same room, and for the same reason: it holds a
    paste box, a plan listing every team the export names and a list of the
    project ids nothing claims. At 560 the plan wraps into a column of fragments.
@@ -1162,6 +1165,12 @@ main:focus { outline: none; }
     </select>
     <button class="btn small" id="dataBtn" type="button" title="Back up, restore or clear your data"><span aria-hidden="true">⇩</span> Back up</button>
     <button class="btn small" id="shareBtn" type="button" title="Create a read-only link to show someone your figures"><span aria-hidden="true">↗</span> Share</button>
+    <!-- LAST in the row, and the gear is Money Map's own glyph for it — the
+         comment above this block already named ⚙ as the family's settings mark
+         before this app had one. Last because settings is where you go least
+         often, and because it is roughly where the eye already looked for it:
+         the tab it replaces sat at the right-hand end of the strip below. -->
+    <button class="btn small" id="settingsBtn" type="button" title="Labels, thresholds and the work type filter list — shared by every team"><span aria-hidden="true">⚙</span> Settings</button>
   </div>
 </header>
 
@@ -1203,8 +1212,13 @@ main:focus { outline: none; }
          the team picker follows, and the one the sibling app's All teams view
          follows too. Nothing shows until there is something behind it. -->
     <button class="tab" role="tab" id="tab-allteams" aria-controls="panel-allteams" aria-selected="false" tabindex="-1" hidden>All Teams</button>
+    <!-- Settings used to be the fourth tab here. It moved into the header as a
+         ⚙ button opening a window (2026-08-22), because it is not a VIEW of your
+         numbers — it is a thing you go and set, like teams, backups and sharing,
+         all three of which were already buttons. Leaving it in the strip put a
+         page you visit twice a year beside the two you read every day, and made
+         the tabs answer two different questions at once. -->
     <button class="tab" role="tab" id="tab-data"      aria-controls="panel-data"      aria-selected="false" tabindex="-1">Your Data</button>
-    <button class="tab" role="tab" id="tab-settings"  aria-controls="panel-settings"  aria-selected="false" tabindex="-1">Settings</button>
   </div>
 
   <!-- The three tab panels. The main landmark that wraps them opens ABOVE the
@@ -1435,93 +1449,6 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   </section>
 
   <!-- ══════════════════ SETTINGS ══════════════════ -->
-  <section class="panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
-    <div class="card">
-      <h2>Labels &amp; Work Types</h2>
-      <p class="hint">Shared by every team. Team names live behind the <strong>Teams &amp; Stages</strong> button in the header.</p>
-      <div class="grid two" style="margin-top:var(--sp-6)">
-        <div>
-          <label for="setCycleLabel">Word to use for cycle time on charts</label>
-          <select id="setCycleLabel">
-            <option>Cycle Time</option>
-            <option>Time in Process</option>
-            <option>TiP</option>
-            <option>In Process Time</option>
-          </select>
-        </div>
-        <div>
-          <label for="setUnplannedType">Defect work type — the exact text in your Type column</label>
-          <input type="text" id="setUnplannedType" maxlength="120" placeholder="Bug">
-        </div>
-        <div>
-          <label for="setSameDay">Cycle time to use when an item starts and finishes the same day (days)</label>
-          <input type="number" id="setSameDay" step="0.1" min="0">
-        </div>
-        <div>
-          <label for="setUnplannedLabel">Word to use for defects on charts</label>
-          <input type="text" id="setUnplannedLabel" maxlength="120" placeholder="Defect">
-        </div>
-        <div>
-          <label for="setAgedDays" id="setAgedDaysLabel">Count an in-progress item as aged after (days)</label>
-          <input type="number" id="setAgedDays" step="1" min="1" placeholder="14">
-        </div>
-      </div>
-      <!-- A measure rather than a label, so it gets its own line under the grid
-           with room for the caveat: the holidays this app cannot know about. -->
-      <div style="margin-top:var(--sp-6)">
-        <label class="checkline" for="setWorkingDays">
-          <input type="checkbox" id="setWorkingDays"><span>Count working days only (Monday to Friday)</span>
-        </label>
-        <p class="hint" style="margin-top:var(--sp-3)">
-          Cycle time, lead time and the ageing threshold skip weekends — an item started on a
-          Friday and finished on the Monday takes one day, not three. <strong>Public holidays are
-          not known to this app</strong> and still count as working days, wherever you are.
-        </p>
-      </div>
-      <div class="note info" style="margin-top:var(--sp-6)">
-        Anything whose Type is blank, or doesn't match the defect text above, counts as
-        ordinary planned work.
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Work Type Filter List</h2>
-      <p class="hint">
-        The choices in the Work Type filter on the dashboard. <strong>Display</strong> is what you pick;
-        <strong>Value</strong> is the text matched against your Type column. Leave the
-        <code>All</code> row alone — it means "no filter".
-      </p>
-      <div style="margin-top:var(--sp-6)">
-        <table class="filters">
-          <!-- The third column holds each row's Remove button and shows no
-               heading, but an EMPTY <th> is a column a screen reader announces
-               as nothing at all — axe-core's empty-table-header found it here.
-               An sr-only word names the column for a reader without putting
-               anything on screen; scope="col" on all three because a header
-               that names a column should say so. -->
-          <thead><tr><th scope="col">Display</th><th scope="col">Value</th>
-            <th scope="col" class="act"><span class="sr-only">Actions</span></th></tr></thead>
-          <tbody id="filterRows"></tbody>
-        </table>
-      </div>
-      <div class="btn-row" style="margin-top:var(--sp-5)">
-        <button class="btn" id="btnAddFilter">Add a type</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <!-- Button and note share a row. The note's flex-basis is what makes that
-           safe on a narrow window: too little room and .btn-row's wrap drops it
-           under the button rather than crushing it into a column of one word. -->
-      <div class="btn-row">
-        <button class="btn danger" id="btnResetSettings">Reset settings to defaults</button>
-        <div class="note info" style="flex:1 1 320px; min-width:0">
-          Everything the charts depend on is here, and nothing else.
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ══════════════════ TEAM DASHBOARD ══════════════════ -->
   <section class="panel" id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
 
@@ -1887,6 +1814,100 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
   <div class="row" style="justify-content:flex-end;margin-top:18px">
     <button class="btn primary" id="manageCloseBtn" type="button">Done</button>
+  </div>
+</dialog>
+
+<!-- ══ Settings — the fourth thing you GO to, beside teams, backups and sharing ══
+     It was a tab until 2026-08-22, sitting in a strip whose other entries are
+     ways of READING your numbers. Laid out like the Teams, ARTs & Stages window
+     it now sits beside: one section per thing you set, each headed by its name,
+     the Add button at the right-hand end of its heading row, and one Done. -->
+<dialog id="settingsDialog" aria-labelledby="settingsDialogTitle">
+  <h2 id="settingsDialogTitle">Settings</h2>
+  <!-- The window's own note, under its heading rather than under the closing
+       row where it started: it describes the whole window, and a sentence below
+       Done is a sentence after the way out. -->
+  <p class="manage-note">Everything the charts depend on is here, and nothing else — a setting
+    that changes nothing is worse than a missing one. Every one of them is shared by every team;
+    the two figures a team sets for ITSELF are on its own row under Teams &amp; Stages.</p>
+
+  <div class="row spread" style="margin-top:16px">
+    <strong class="manage-head">Labels &amp; Work Types</strong>
+  </div>
+  <p class="manage-note">The words on the charts, and what counts as a defect.</p>
+  <div class="grid two" style="margin-top:var(--sp-5)">
+    <div>
+      <label for="setCycleLabel">Word to use for cycle time on charts</label>
+      <select id="setCycleLabel">
+        <option>Cycle Time</option>
+        <option>Time in Process</option>
+        <option>TiP</option>
+        <option>In Process Time</option>
+      </select>
+    </div>
+    <div>
+      <label for="setUnplannedType">Defect work type — the exact text in your Type column</label>
+      <input type="text" id="setUnplannedType" maxlength="120" placeholder="Bug">
+    </div>
+    <div>
+      <label for="setSameDay">Cycle time to use when an item starts and finishes the same day (days)</label>
+      <input type="number" id="setSameDay" step="0.1" min="0">
+    </div>
+    <div>
+      <label for="setUnplannedLabel">Word to use for defects on charts</label>
+      <input type="text" id="setUnplannedLabel" maxlength="120" placeholder="Defect">
+    </div>
+    <div>
+      <label for="setAgedDays" id="setAgedDaysLabel">Count an in-progress item as aged after (days)</label>
+      <input type="number" id="setAgedDays" step="1" min="1" placeholder="14">
+    </div>
+  </div>
+  <!-- A measure rather than a label, so it gets its own line under the grid
+   with room for the caveat: the holidays this app cannot know about. -->
+  <div style="margin-top:var(--sp-6)">
+    <label class="checkline" for="setWorkingDays">
+      <input type="checkbox" id="setWorkingDays"><span>Count working days only (Monday to Friday)</span>
+    </label>
+    <p class="hint" style="margin-top:var(--sp-3)">
+      Cycle time, lead time and the ageing threshold skip weekends — an item started on a
+      Friday and finished on the Monday takes one day, not three. <strong>Public holidays are
+      not known to this app</strong> and still count as working days, wherever you are.
+    </p>
+  </div>
+  <div class="note info" style="margin-top:var(--sp-6)">
+    Anything whose Type is blank, or doesn't match the defect text above, counts as
+    ordinary planned work.
+  </div>
+
+  <div class="row spread" style="margin-top:20px">
+    <strong class="manage-head">Work Type Filter List</strong>
+    <button class="btn small" id="btnAddFilter" type="button">+ Add a type</button>
+  </div>
+  <p class="manage-note">
+    The choices in the Work Type filter on the dashboard. <strong>Display</strong> is what you pick;
+    <strong>Value</strong> is the text matched against your Type column. Leave the
+    <code>All</code> row alone — it means "no filter".
+  </p>
+  <div style="margin-top:var(--sp-5)">
+    <table class="filters">
+      <!-- The third column holds each row's Remove button and shows no
+           heading, but an EMPTY <th> is a column a screen reader announces
+           as nothing at all — axe-core's empty-table-header found it here.
+           An sr-only word names the column for a reader without putting
+           anything on screen; scope="col" on all three because a header
+           that names a column should say so. -->
+      <thead><tr><th scope="col">Display</th><th scope="col">Value</th>
+        <th scope="col" class="act"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody id="filterRows"></tbody>
+    </table>
+  </div>
+  <!-- Reset and Done share the closing row, the destructive one on the left and
+   the way out on the right — the same arrangement the Back up dialog uses,
+   and the reason Reset is not up beside "+ Add a type" where a mis-click
+   would cost somebody every label they have set. -->
+  <div class="row spread" style="margin-top:20px">
+    <button class="btn danger" id="btnResetSettings" type="button">Reset settings to defaults</button>
+    <button class="btn primary" id="settingsCloseBtn" type="button">Done</button>
   </div>
 </dialog>
 
@@ -8870,7 +8891,11 @@ function renderAll() {
 
 /* tabs — roving tabindex plus arrow keys, the sibling app's tablist manners:
    one stop in the tab order, ArrowLeft/Right/Home/End move along the row. */
-const TABS = ['dashboard', 'allteams', 'data', 'settings'];
+/* THREE, not four: Settings moved into the header as a window on 2026-08-22.
+   A saved `activeTab` of 'settings' outlives that change, and selectTab already
+   refuses a name that is not in this list — which is why nothing else had to
+   move for it. */
+const TABS = ['dashboard', 'allteams', 'data'];
 /* The two views that read the numbers, and so the two that share the control
    strip above them and take turns owning the sentence inside it. */
 const NUMBER_TABS = ['dashboard', 'allteams'];
@@ -9315,6 +9340,16 @@ $('dataBtn').addEventListener('click', () => openModal($('dataDialog')));
 $('dataCloseBtn').addEventListener('click', () => $('dataDialog').close());
 $('manageBtn').addEventListener('click', () => openModal($('manageDialog')));
 $('manageCloseBtn').addEventListener('click', () => $('manageDialog').close());
+/* Settings, on the same terms as the three buttons above it since 2026-08-22.
+   The form is written fresh on the way in rather than trusted to be in step:
+   every field in it is also written by "Reset settings to defaults" and by a
+   restore, and a window that opened holding a value the app no longer holds
+   would be the worst kind of wrong — one nothing on screen contradicts. */
+$('settingsBtn').addEventListener('click', () => {
+  renderSettingsForm();          /* writes the filter rows too */
+  openModal($('settingsDialog'));
+});
+$('settingsCloseBtn').addEventListener('click', () => $('settingsDialog').close());
 /* The stage boxes deliberately redraw nothing while they are typed in (see the
    handler above), so the dashboard behind this dialog catches up when it closes
    — including on a backdrop click or Escape, which is why this hangs off the
@@ -9478,7 +9513,8 @@ function closeOnBackdropClick(dlg) {
    reconciliation dialog, which refused to be dismissed because picking which
    copy of your data to keep had to be a choice — and it went with sync on
    2026-08-20, so the rule is now simply "every dialog". */
-['dataDialog', 'clearDialog', 'helpDialog', 'manageDialog', 'multiDialog', 'itemDialog']
+['dataDialog', 'clearDialog', 'helpDialog', 'manageDialog', 'multiDialog', 'itemDialog',
+ 'settingsDialog']
   .forEach(id => closeOnBackdropClick($(id)));
 
 /* theme */
@@ -12038,9 +12074,8 @@ if (viewOnly) {
   /* Everything that writes, imports or shares belongs to whoever owns the data,
      not to a visitor. Theme stays — that's the viewer's own preference, in its
      own key. */
-  ['manageBtn', 'dataBtn', 'shareBtn'].forEach(id => { $(id).hidden = true; });
+  ['manageBtn', 'dataBtn', 'shareBtn', 'settingsBtn'].forEach(id => { $(id).hidden = true; });
   $('tab-data').hidden = true;
-  $('tab-settings').hidden = true;
   $('privacyNote').textContent = 'This is a read-only copy someone shared with you. It was '
     + 'read from the link itself — nothing was uploaded or downloaded, and nothing you '
     + 'already had saved in this browser has been changed.';

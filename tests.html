@@ -4037,6 +4037,72 @@ group('ARTs — the grouping, and the boundary it crosses');
   ok(cwDoc.getElementById('customRange').hidden,
      'and the boxes go away again with the option, rather than sitting there inert');
 
+  /* ══════════════════════════════════════════════════════════
+     Settings became a window off the header on 2026-08-22, where it had been
+     the fourth tab. The tab strip is for ways of READING your numbers; teams,
+     backups and sharing were already buttons, and this is the fourth thing of
+     that kind rather than a third view.
+     ══════════════════════════════════════════════════════════ */
+  group('Settings is a window off the header, not a tab');
+
+  plant({ teams: [{ id: 's1', name: 'Setter',
+    rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] }], settings: {} });
+  win.renderAll();
+  const sDoc = win.document;
+
+  is(sDoc.getElementById('tab-settings'), null, 'there is no Settings tab any more');
+  is([...sDoc.querySelectorAll('.tabs .tab')].map(t => t.id),
+     ['tab-dashboard', 'tab-allteams', 'tab-data'],
+     'and the strip is three ways of reading the numbers, nothing else');
+  const sBtn = sDoc.getElementById('settingsBtn');
+  ok(!!sBtn, 'a Settings button sits in the header instead');
+  is(sBtn.parentElement.lastElementChild, sBtn,
+     'last in the row — it is the one you go to least often');
+  /* The glyph is Money Map's own for this action, and aria-hidden like every
+     other one in this row: the word beside it is already the whole label. */
+  is(sBtn.querySelector('[aria-hidden="true"]').textContent, '\u2699',
+     'wearing the family\u2019s gear glyph, hidden from a screen reader');
+
+  const sDlg = sDoc.getElementById('settingsDialog');
+  ok(!!sDlg && sDlg.tagName === 'DIALOG', 'and it opens a real <dialog>, like the other three');
+  ok(!sDlg.open, 'closed until it is asked for');
+  sBtn.click();
+  ok(sDlg.open, 'the button opens it');
+  ok(sDlg.contains(sDoc.getElementById('setAgedDays'))
+     && sDlg.contains(sDoc.getElementById('filterRows'))
+     && sDlg.contains(sDoc.getElementById('btnResetSettings')),
+     'with every control that was on the tab inside it — the fields, the filter list and reset');
+  /* Laid out as the Teams window's twin: one section per thing you set, headed
+     by its name, the Add button in that heading row. */
+  is([...sDlg.querySelectorAll('.manage-head')].map(e => e.textContent),
+     ['Labels & Work Types', 'Work Type Filter List'],
+     'two sections, each headed by its name, like the window beside it');
+  ok(sDoc.getElementById('btnAddFilter').closest('.row.spread'),
+     'and the Add button in its section\u2019s heading row rather than under the table');
+  is(win.getComputedStyle(sDlg).maxWidth, '1100px',
+     'at the family\u2019s working-window width — at 560 all five fields stack into one column');
+
+  /* The point of a window over the page: a change lands on the charts behind
+     it, so you are not switching back and forth to see what a label did. */
+  const label = sDoc.getElementById('setUnplannedLabel');
+  label.value = 'Escapes';
+  label.dispatchEvent(new win.Event('input', { bubbles: true }));
+  is(win.tdGet().settings.unplannedLabel, 'Escapes', 'a change saves as it is typed');
+  ok(sDlg.open, 'and the window stays open while it does');
+
+  sDoc.getElementById('settingsCloseBtn').click();
+  ok(!sDlg.open, 'Done closes it');
+  /* Every dialog in this app closes on a backdrop click. This one is in the
+     list; the sync dialog that used to be the exception went with sync. */
+  ok(/'itemDialog',\s*\n?\s*'settingsDialog'\]/.test(APP_SRC)
+     || /'settingsDialog'/.test((APP_SRC.match(/closeOnBackdropClick[\s\S]{0,400}/) || [''])[0]),
+     'and on a click outside it, like every other dialog here');
+
+  /* A visitor to a shared link cannot change somebody else's settings, so the
+     button goes the way manageBtn, dataBtn and shareBtn already do. */
+  ok(/\['manageBtn', 'dataBtn', 'shareBtn', 'settingsBtn'\]/.test(APP_SRC),
+     'a shared view hides it, like every other control that writes');
+
   /* ────────────────────────────────────────────────────────── */
   group('the Teams dialog matches the sibling app’s window');
 
@@ -5469,16 +5535,18 @@ group('ARTs — the grouping, and the boundary it crosses');
     win.selectTab('dashboard');
     is(stored(), 'dashboard', 'and so is moving back');
 
-    /* ALL FOUR, which is the second half of the same report. Only the two
+    /* ALL THREE, which is the second half of the same report. Only the two
        number views were remembered at first, on the reasoning that Settings and
        Your Data are "places you go to do a thing and then leave" — true of the
        trip, false of the refresh. Reloading to check something is not leaving,
        and being thrown onto the dashboard mid-edit of a work-type filter costs
-       you finding your way back to the row you were typing in. */
-    win.selectTab('settings');
-    is(stored(), 'settings', 'Settings is where you are, so it is where the app opens');
+       you finding your way back to the row you were typing in.
+       Settings itself stopped being a tab on 2026-08-22 — it is a window off the
+       header now, like teams, backups and sharing — so the case that report was
+       actually about is Your Data. A saved 'settings' outlives the change and is
+       covered below, with the other values selectTab has to refuse. */
     win.selectTab('data');
-    is(stored(), 'data', 'and so is Your Data');
+    is(stored(), 'data', 'Your Data is where you are, so it is where the app opens');
     win.selectTab('allteams');
     is(stored(), 'allteams', 'and moving back is remembered like any other move');
 
@@ -5498,6 +5566,11 @@ group('ARTs — the grouping, and the boundary it crosses');
     win.selectTab('nonsense');
     is(win.document.getElementById('panel-dashboard').hidden, false,
        'and so does a junk value from a hand-edited copy');
+    /* 'settings' is exactly that case now, and it is not hypothetical: any
+       browser that was on the Settings tab before 2026-08-22 has it saved. */
+    win.selectTab('settings');
+    is(win.document.getElementById('panel-dashboard').hidden, false,
+       'including a tab that used to exist — Settings, saved before it became a window');
     win.selectTab('dashboard');
   }
 
