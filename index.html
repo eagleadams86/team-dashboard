@@ -750,7 +750,20 @@ table.data tr.no-data td.figure { color: var(--text-muted); }
    right for "No Data Yet" sitting inside a working app and wrong for the first
    words a new reader sees; the family's welcome heading is the ordinary h2. */
 .card > .empty { max-width: 80ch; margin-left: auto; margin-right: auto; }
-.card > .empty h2 { font-size: var(--fs-xl); margin-bottom: 0; }
+/* MARGIN 0, and that is the other half of lining these up. The h2 kept the
+   browser's own ~0.83em top margin in three apps and had it zeroed in a fourth,
+   so the same welcome heading started 59px down the card in one app and 81px in
+   another. At 0 it sits exactly at the card's padding, and the first paragraph's
+   own 1em top margin is the gap under it — one number, in one place, five apps. */
+.card > .empty h2 { font-size: var(--fs-xl); margin: 0; }
+/* THE WELCOME CARD IS ONE COMPONENT ACROSS FIVE APPS, so its box is pinned here
+   rather than left to whatever each app's ordinary `.card` happens to use. Those
+   differ on purpose — 18px in the three planners, 16px in Golf Handicap, 14px on
+   PAPTrack's dense supply cards — and the welcome heading was landing 58px, 56px
+   and 54px from the top of the card in three different apps as a result. Same
+   number everywhere now, so the title starts at the same place on the page
+   whichever one you open. */
+.card.welcome { padding: 18px; }
 /* `p { margin: 0 }` at the top of this file is right for cards full of figures
    and wrong for a page of prose: without this the two opening sentences ran
    together as one block. The family's card falls a blank line between
@@ -1281,7 +1294,7 @@ main:focus { outline: none; }
        typed items — so the honest thing is to open the tab that takes both. A
        reload with still nothing entered brings the card back, which is the
        truth about where you are. -->
-  <div class="card" id="welcomeCard" hidden><div class="empty">
+  <div class="card welcome" id="welcomeCard" hidden><div class="empty">
     <h2>Welcome to Flow Metrics</h2>
     <p>A flow clinic for your delivery teams: give it your work items — a completed date, a
       start date and a type — and it works out throughput, cycle and lead time, work in
