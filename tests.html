@@ -5533,6 +5533,81 @@ group('ARTs — the grouping, and the boundary it crosses');
     if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
   }
 
+  /* ══════════════════════════════════════════════════════════
+     The Dashboard tab is hidden until something has data (2026-08-22). It was
+     the last of the four controls in renderEmptyState still offering something
+     with nothing behind it: a first run showed a Dashboard tab whose entire
+     content was a card saying there was no data yet.
+     ══════════════════════════════════════════════════════════ */
+  group('no data, no Dashboard tab');
+
+  const dashTab = () => win.document.getElementById('tab-dashboard');
+
+  plant({ teams: [{ id: 'e1', name: 'Empty', rows: [] }], settings: {} });
+  win.renderAll();
+  is(dashTab().hidden, true, 'a browser with nothing in it is not offered a dashboard');
+  is(win.document.getElementById('panel-data').hidden, false,
+     'and lands on Your Data, which is the tab that can do something about it');
+  /* selectTab's fallback used to be the dashboard unconditionally, which stopped
+     being safe the moment the dashboard could itself be hidden. */
+  win.selectTab('dashboard');
+  is(win.document.getElementById('panel-data').hidden, false,
+     'asking for it anyway lands on Your Data rather than on a panel with no tab');
+  win.selectTab('nonsense');
+  is(win.document.getElementById('panel-data').hidden, false, 'and so does a junk value');
+  /* The arrow keys walk the tabs that exist — an invisible stop would be a trap. */
+  ok(!win.tdVisibleTabs().includes('dashboard'),
+     'the arrow keys skip it, like every other hidden tab');
+
+  plant({ teams: [{ id: 'e2', name: 'Loaded',
+    rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] }], settings: {} });
+  win.renderAll();
+  is(dashTab().hidden, false, 'the first paste brings it back');
+
+  /* ANY team, not the active one. Keyed on the active team the tab would appear
+     and disappear as you moved through the picker — a control moving under the
+     pointer — and #dashEmpty, which is written for exactly this state, would
+     become unreachable. */
+  plant({ teams: [
+    { id: 'm1', name: 'Full', rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] },
+    { id: 'm2', name: 'Empty', rows: [] }
+  ], settings: {} });
+  const emptyTeamPicker = win.document.getElementById('teamSel');
+  emptyTeamPicker.value = 'm2';
+  emptyTeamPicker.dispatchEvent(new win.Event('change', { bubbles: true }));
+  is(dashTab().hidden, false,
+     'standing on an empty team beside a full one keeps the tab — it asks about ALL of them');
+  win.selectTab('dashboard');
+  is(win.document.getElementById('dashEmpty').hidden, false,
+     'and that team still gets the card written for having no data of its own');
+  /* The demo offer on that card goes, on the reasoning the one beside Load
+     pasted rows already follows: the only way to reach this card now is from a
+     working app, where a button that quietly adds three teams is a mis-click. */
+  is(win.document.getElementById('dashDemo').hidden, true,
+     'without the demo button, which would add three teams to an app that has some');
+
+  /* Losing the last of your data while standing on the dashboard has to move
+     you, not leave a panel up with no tab selected — the same thing All Teams
+     does when it drops below two teams. */
+  plant({ teams: [{ id: 'g1', name: 'Going',
+    rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] }], settings: {} });
+  win.selectTab('dashboard');
+  is(dashTab().hidden, false, 'with data, the dashboard is where you can stand');
+  plant({ teams: [{ id: 'g1', name: 'Going', rows: [] }], settings: {} });
+  is(dashTab().hidden, true, 'clearing the last data takes the tab away');
+  is(win.document.getElementById('panel-data').hidden, false,
+     'and moves you off it rather than leaving a panel up with no tab');
+
+  /* A SHARED VIEW KEEPS IT, always. Your Data and Settings are both taken away
+     there, so hiding this one as well would leave a tab strip with nothing in
+     it and a visitor with no way back to anything. */
+  ok(/\$\('tab-dashboard'\)\.hidden = !anyRows && !viewOnly;/.test(APP_SRC),
+     'the rule is off in a shared view, where the other two tabs are already gone');
+
+  plant({ teams: [{ id: 'z1', name: 'Back',
+    rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] }], settings: {} });
+  win.renderAll();
+
   group('All Teams — the per-team trend column');
 
   /* The column answers the one question the rest of that table cannot: not

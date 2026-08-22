@@ -1522,11 +1522,21 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
            for the same reason: an empty dashboard teaches nothing about what the
            charts are for. Second, not primary — pasting your own export is still
            what this screen is asking you to do. -->
-      <div class="btn-row" style="justify-content:center;margin-top:var(--sp-6)">
-        <button class="btn" id="btnSample" type="button">Load sample data</button>
+      <!-- The offer and the sentence explaining it are one thing, so they are
+           hidden as one: this card is reachable in two quite different states
+           now that the Dashboard tab itself is hidden until something has data
+           (see renderEmptyState). On a first run it is not reachable at all; the
+           state that remains is "this team is empty and another one is not",
+           where loading a demo that quietly adds three more teams to a working
+           app is the mis-click the button beside Load pasted rows is already
+           taken away to prevent. -->
+      <div id="dashDemo">
+        <div class="btn-row" style="justify-content:center;margin-top:var(--sp-6)">
+          <button class="btn" id="btnSample" type="button">Load sample data</button>
+        </div>
+        <p class="hint" style="margin-top:var(--sp-4)">Three teams and nine months of made-up
+        work items, so every chart has something behind it. You can delete it later.</p>
       </div>
-      <p class="hint" style="margin-top:var(--sp-4)">Three teams and nine months of made-up
-      work items, so every chart has something behind it. You can delete it later.</p>
     </div>
 
     <!-- Rows exist but nothing plots. Its own card, not #dashEmpty: that one
@@ -8783,6 +8793,33 @@ function renderEmptyState() {
      up with no tab selected. */
   $('tab-allteams').hidden = state.teams.length < 2;
   if (activeTab === 'allteams' && $('tab-allteams').hidden) selectTab('dashboard');
+  /* ── The dashboard goes the same way, until something has data ─────────────
+     It was the last of the four controls in this function still offering
+     something with nothing behind it: a first run showed a Dashboard tab whose
+     whole content was a card explaining that there was no data yet. The rule
+     the picker and All Teams already follow — nothing shows until there is
+     something behind it — now covers it too.
+
+     ANY team, not the active one, and that is the important half. Keyed on the
+     active team the tab would appear and disappear as you moved through the
+     picker, which is a control moving under the pointer; and #dashEmpty, which
+     is written for exactly "this team is empty and another one is not", would
+     become unreachable. Keyed on all of them the tab is stable from the first
+     paste onwards, and that card keeps the one state it is for.
+
+     NEVER in a shared view. Your Data and Settings are both taken away there,
+     so hiding this one as well would leave a tab strip with nothing in it — and
+     a link whose teams somehow carried no rows would show a visitor no way back
+     to anything. */
+  const anyRows = state.teams.some(t => t.rows.length);
+  $('tab-dashboard').hidden = !anyRows && !viewOnly;
+  if (activeTab === 'dashboard' && $('tab-dashboard').hidden) selectTab('data');
+  /* The demo offer on the empty dashboard goes with it, on the reasoning the
+     one beside Load pasted rows already follows: with the tab hidden until
+     something has data, the only way to reach that card is from a working app,
+     where a button that quietly adds three teams is a mis-click rather than a
+     help. Guarded, because a shared view rewrites this card's contents. */
+  if ($('dashDemo')) $('dashDemo').hidden = anyRows;
   /* The same reasoning as the demo button beside it: this is the first-run door
      into typing an item, and once this team HAS rows the Loaded Data card below
      carries its own "+ Add item" in the place you would look for it. Two live
@@ -8825,7 +8862,12 @@ function selectTab(name) {
   /* A tab that is not on offer must never be landed on. All Teams is taken away
      below two teams, and a position saved while it was there outlives the team
      that was deleted — or the share link that arrived with one team in it. */
-  if (!TABS.includes(name) || $('tab-' + name).hidden) name = 'dashboard';
+  /* The fallback used to be the dashboard unconditionally, which stopped being
+     safe the moment the dashboard could itself be hidden. Your Data is the right
+     landing in that case for the same reason boot picks it: it is the one tab
+     that can do something about there being no data. */
+  if (!TABS.includes(name) || $('tab-' + name).hidden)
+    name = $('tab-dashboard').hidden ? 'data' : 'dashboard';
   activeTab = name;
   /* Remembered for the next load — every tab, see DEFAULT_VIEW. saveView() is a
      no-op in a shared view, so someone else's link can never move where YOUR
@@ -8855,6 +8897,11 @@ function selectTab(name) {
 /* Hidden tabs are skipped — a shared view keeps only the dashboard, and an
    invisible stop on the end of the row would be a trap for the arrow keys. */
 const visibleTabs = () => TABS.filter(t => !$('tab-' + t).hidden);
+/* For the suite: which tabs the arrow keys will actually walk. Assigned HERE
+   rather than in the hook block a few thousand lines above, where reading this
+   `const` before its declaration would be the temporal-dead-zone error that has
+   taken the whole app down twice. */
+window.tdVisibleTabs = visibleTabs;
 TABS.forEach(t => {
   const tab = $('tab-' + t);
   tab.addEventListener('click', () => selectTab(t));
@@ -12001,7 +12048,12 @@ if (viewOnly) {
   renderAll();
   /* No rows at all still wins: there is nothing for either number view to show,
      and Your Data is the one place that can do anything about it. */
-  selectTab(activeRows().length ? view.activeTab : 'data');
+  /* ANY team, matching the rule that decides whether the Dashboard tab exists
+     at all — it used to ask about the ACTIVE team, which sent somebody whose
+     other teams were full to Your Data because the one they happened to be on
+     was empty. selectTab refuses a hidden tab either way, so this only decides
+     where a browser with nothing at all opens. */
+  selectTab(state.teams.some(t => t.rows.length) ? view.activeTab : 'data');
   /* Last, after the tab is chosen: the whole point of the hold is that the
      reader never sees the panel this lands on being swapped for another one. */
   bootDone();

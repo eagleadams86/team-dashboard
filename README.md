@@ -443,6 +443,14 @@ first run is the paste box and its instructions, and nothing else. The **Loaded 
 the **Clean up old data** card and the **Append to existing** / **Clear this team's data**
 buttons all appear the moment rows exist (`renderEmptyState()`).
 
+**The Dashboard tab follows the same rule**: it isn't there until something has data, and a
+browser with nothing in it opens on Your Data. It was the last thing here still offering a page
+of nothing — a tab whose entire content was a card saying there was no data yet. It asks about
+**all** your teams rather than the one you're looking at, which is what keeps it from appearing
+and disappearing as you move through the picker, and what leaves an empty team beside a full one
+still able to say so. In a **shared view** it is never hidden: Your Data and Settings are both
+taken away there, so hiding this one as well would leave a tab strip with nothing in it.
+
 Which team you're looking at is a position on *this* device and deliberately isn't part of
 your data: it stays out of backups and share links for the same reason the theme does.
 
@@ -452,10 +460,11 @@ your data: it stays out of backups and share links for the same reason the theme
 that **every feature has to be reachable from it**. Three teams, about nine months of
 made-up work items ending today, and one of the three deliberately short of a column.
 
-The button sits on both empty surfaces — beside *Load pasted rows* on the Your Data tab,
-which is where a first run opens, and on the empty dashboard, which is what you get if you
-press Dashboard before pasting. Pressing it switches you to the dashboard, and it disappears
-once anything holds data.
+The button sits beside *Load pasted rows* on the Your Data tab, which is where a first run
+opens — and, since the Dashboard tab is [hidden until something has data](#teams), that is now
+the only place it can be met on a first run. Pressing it switches you to the dashboard. It
+disappears once anything holds data, and so does the copy of it on the empty-dashboard card,
+which from a working app would be a mis-click that quietly adds three teams.
 
 It lands on **Team Long Tail**, because Team Healthy Flow's board is the prettier one and says
 less — the reason this app reads the 85th percentile rather than the average is only visible

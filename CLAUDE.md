@@ -245,6 +245,30 @@ in `beforePrint`.
 - `#printHead` is the print-only line naming the team (or the train) and the window, because the
   header's picker and the tab strip both go. It does NOT repeat the app name the header keeps.
 
+### The Dashboard Tab Is Hidden Until Something Has Data — no schema change
+
+Asked for straight after the six above. It was the last control in
+`renderEmptyState()` still offering something with nothing behind it: a first run showed a
+Dashboard tab whose entire content was a card explaining that there was no data yet.
+
+- **ANY team, not the active one**, and that is the load-bearing half. Keyed on the active team
+  the tab would appear and disappear as somebody moved through the picker — a control moving
+  under the pointer — and `#dashEmpty`, which is written for exactly "this team is empty and
+  another one is not", would become unreachable.
+- **NEVER in a shared view.** `tab-data` and `tab-settings` are both hidden there, so hiding this
+  one too would leave a tab strip with nothing in it. Verified against a real link whose team
+  carried no rows: one tab, and the card that explains itself.
+- **`selectTab`'s fallback moved with it.** It was `'dashboard'` unconditionally, which stopped
+  being safe the moment the dashboard could be hidden; it is now Your Data in that case — the one
+  tab that can do something about there being no data, which is the same reasoning boot uses.
+- **Boot's predicate moved too**, from the ACTIVE team's rows to any team's. It used to send
+  somebody whose other teams were full to Your Data because the one they happened to be on was
+  empty.
+- **The demo offer on `#dashEmpty` goes when any team has rows** (`#dashDemo`, hidden as a unit
+  with the sentence explaining it). With the tab gone on a first run, the only way to reach that
+  card is from a working app, where a button that quietly adds three teams is the same mis-click
+  the one beside *Load pasted rows* is already taken away to prevent.
+
 ### Installing It — no schema change
 
 `manifest.webmanifest`, three PNG icons and an apple-touch-icon, all drawn by `make_favicon.py`
