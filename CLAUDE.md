@@ -452,6 +452,18 @@ this file was written to keep out. **Read this whole section before changing any
   `normalizeSettings` fills gaps rather than overwriting, so they reach only a first run and "Reset
   settings to defaults" and no existing dashboard's figures move. There is a test saying so
   directly beside each new value — that property is the whole licence.
+- **A TEST THAT SAVES CAN PLANT THE TRAP IT LATER WALKS INTO** (2026-08-22). `plant()` starts
+  every group from known DATA (`td-state`); it does NOT touch the VIEW (`td-view`) — which tab,
+  which window, the custom From/To pair — and every `saveView()` writes there. The custom-window
+  group ends on a deliberate half-pair (a From, no To) to check the "Both dates are needed" note,
+  and then opened by assuming both boxes were empty, which is the precondition the app's prefill
+  guards on ("a pair typed earlier is theirs and is not overwritten"). So it passed on a browser
+  that had never run the suite and failed from the second run onwards, on identical code —
+  three red tests that looked like an app bug and were not. **CI can never catch this**: it is a
+  fresh profile every run, so it only ever sees run 1. The group sets its own precondition through
+  the app's own change handlers now, and restores it at the end with an assertion on the restore,
+  so a broken reset fails loudly instead of going quiet until somebody runs the suite twice.
+  Anything new that depends on a view value does the same.
 - **WATCH FOR TESTS THAT READ A DEFAULT INSTEAD OF SETTING ONE.** Two scatter tests moved with
   `sameDayValue`, and one of them was a PAIR meant to show that changing the setting moves a dot —
   it had quietly stopped showing anything the moment its contrast value became the new default. A

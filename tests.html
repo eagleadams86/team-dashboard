@@ -363,6 +363,14 @@ async function run(TD, win) {
      would fail tests that have nothing to do with created dates. Answer that
      question for the suite, in one place, and start from a known-empty app so a
      run's result never depends on what the last person did in the app. */
+  /* DATA ONLY, and that distinction has cost a day once (2026-08-22). The app
+     keeps two saved things: the data (`td-state`, which this replaces) and the
+     VIEW — which tab, which window, the custom From/To pair — in `td-view`,
+     which this does not touch and which every saveView() writes to. A group that
+     depends on a view value must SET it, the way the custom-window group below
+     now does; assuming it is pristine means passing on a browser that has never
+     run the suite and failing from the second run onwards, which CI can never
+     see because CI is a fresh profile every time. */
   const plant = (data) => {
     const real = win.confirm;
     win.confirm = () => true;
@@ -3998,6 +4006,41 @@ group('ARTs — the grouping, and the boundary it crosses');
      dashboard has to BE on screen — an earlier group may have left the app on
      another tab, and a note nobody is looking at is not written. */
   cwDoc.getElementById('tab-dashboard').click();
+
+  /* ── This group has to SET its precondition, not assume it ─────────────────
+     Everything below is about what choosing Custom does WITH NOTHING TYPED, and
+     the app only prefills when both boxes are empty — "a pair typed earlier is
+     theirs and is not overwritten", which is the right behaviour and is why the
+     monthsSel handler guards on it.
+
+     The trap: view.customFrom / customTo live in `td-view` and are SAVED, and
+     the run below deliberately ends on a half-pair (a From, no To) to check the
+     "Both dates are needed" note. So this group used to plant the trap it then
+     walked into — it passed on a browser that had never run the suite and failed
+     from the second run onwards, on identical code. CI never saw it, because CI
+     is a fresh profile every time; it only ever bit a local run.
+
+     plant() above starts from known DATA — it does not touch the view. So the
+     window is reset here, through the app's own change handlers rather than by
+     writing localStorage, which exercises the real path and keeps this honest
+     about what the app does. The tail of the group puts it back the same way. */
+  const clearPair = () => {
+    for (const id of ['customFrom', 'customTo']) {
+      const box = cwDoc.getElementById(id);
+      box.value = '';
+      box.dispatchEvent(new win.Event('change', { bubbles: true }));
+    }
+  };
+  /* Off Custom first, so the "boxes are away" assertion below is testing the
+     rule rather than the leftovers of an interrupted run. Whichever rolling
+     span leads the list will do — this is not asserting the default, the
+     expectations further down do that. */
+  if (monthsSel.value === 'custom') {
+    monthsSel.value = [...monthsSel.options].find(o => o.value !== 'custom').value;
+    monthsSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  }
+  clearPair();
+
   const wasMonths = monthsSel.value;
   ok(cwDoc.getElementById('customRange').hidden,
      'the boxes are away until Custom is chosen — two controls that do nothing otherwise');
@@ -4036,6 +4079,17 @@ group('ARTs — the grouping, and the boundary it crosses');
   monthsSel.dispatchEvent(new win.Event('change', { bubbles: true }));
   ok(cwDoc.getElementById('customRange').hidden,
      'and the boxes go away again with the option, rather than sitting there inert');
+
+  /* And leave no half-pair behind. Not tidiness: this suite runs on localhost,
+     against the same saved view the app itself reads there, so a stray From with
+     no To would sit in the app afterwards — and it is what made this group fail
+     on its own second run. The assertion is the point of the cleanup: it fails
+     loudly if the reset ever stops working, rather than going quiet until
+     somebody runs the suite twice. */
+  clearPair();
+  is([cwDoc.getElementById('customFrom').value, cwDoc.getElementById('customTo').value],
+     ['', ''],
+     'and the group leaves the window as it found it, so a second run starts clean');
 
   /* ══════════════════════════════════════════════════════════
      Settings became a window off the header on 2026-08-22, where it had been
