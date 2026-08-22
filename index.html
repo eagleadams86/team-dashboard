@@ -297,6 +297,16 @@ html[data-first-run] #teamSel { display: none; }
    A fine pointer never takes that path, which is why no desktop ever shows it — found
    on an iPhone. Fixed across the whole family in one pass; PAPTrack led. */
 dialog:focus { outline: none; }
+/* WHERE FOCUS GOES WHEN THE CONTROL YOU PRESSED DISAPPEARS (2026-08-22). Clearing a
+   team's rows leaves nothing to clear, so the button that was just pressed hides itself
+   — and a focused element that becomes display:none drops focus to <body>, the top of
+   the document. It stays IN the DOM, so this is not the destroyed-node case the other
+   apps have; the effect on a keyboard or screen-reader user is the same. `focusPanel()`
+   moves focus to the heading of the panel instead, which is also what now says there is
+   nothing there.
+   The ring is OPT IN and keyboard-only, the same rule as `dialog:focus` above. */
+.landing:focus { outline: none; }
+.landing.ring-focus:focus { outline: 2px solid var(--focus-border); outline-offset: 2px; }
 /* .grid sets display:grid, which beats the UA rule for [hidden] — force it. */
 [hidden] { display: none !important; }
 
@@ -10525,7 +10535,26 @@ $('welcomeSampleBtn').addEventListener('click', loadSample);
 $('welcomeRestoreBtn').addEventListener('click', () => openModal($('dataDialog')));
 $('btnLoad').addEventListener('click', () => doLoad('replace'));
 $('btnAppend').addEventListener('click', () => doLoad('append'));
-$('btnClear').addEventListener('click', () => {
+/* Move focus into a panel when the control the user was standing on has gone — either
+   removed by a re-render or hidden because it has nothing left to do. `fromKeyboard`
+   comes from the click event's `detail`: 0 when a button was activated with Enter or
+   Space, non-zero for a real mouse or finger. Focus moves either way, so a screen reader
+   announces the panel on a phone too; only the visible ring is conditional. tabIndex is
+   set here rather than in the markup, so the heading is a focus target only for the
+   moment it is landed on and never joins the tab order. */
+function focusPanel(panelId, fromKeyboard) {
+  const h = document.getElementById(panelId)?.querySelector('h2');
+  if (!h) return;
+  h.tabIndex = -1;
+  h.classList.add('landing');
+  if (fromKeyboard) {
+    h.classList.add('ring-focus');
+    h.addEventListener('blur', () => h.classList.remove('ring-focus'), { once: true });
+  }
+  h.focus();
+}
+
+$('btnClear').addEventListener('click', (e) => {
   const team = activeTeam();
   if (!team || !team.rows.length) return;
   if (!confirm('Delete all ' + team.rows.length + ' items for ' + team.name + '?\n\nThis cannot be undone.')) return;
@@ -10533,6 +10562,9 @@ $('btnClear').addEventListener('click', () => {
   save();
   $('parseNote').innerHTML = '';
   renderAll();
+  /* With no rows left this button hides itself, and a focused element that becomes
+     display:none hands focus to <body>. Put it on the panel heading instead. */
+  focusPanel('panel-data', e.detail === 0);
 });
 $('dateOrder').addEventListener('change', e => {
   view.dateOrder = e.target.value;

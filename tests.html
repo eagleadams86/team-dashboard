@@ -298,7 +298,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 1622;
+const EXPECTED = 1626;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3024,6 +3024,17 @@ async function run(TD, win) {
      'without this the whole dialog rings itself on every phone and tablet');
   ok(/dlg\.tabIndex = -1;\s*\n\s*dlg\.focus\(\);/.test(APP_SRC),
      'and that container focus is still how the keyboard is kept down');
+
+  /* A CONTROL THAT HIDES ITSELF TAKES FOCUS WITH IT. Clearing a team's rows leaves
+     nothing to clear, so btnClear goes display:none — and a focused element that is
+     hidden hands focus to <body>, the top of the document. It stays in the DOM, so this
+     is not the destroyed-node case; the effect on a keyboard user is the same. */
+  ok(/function focusPanel\(panelId, fromKeyboard\)/.test(APP_SRC), 'the helper has to exist');
+  ok(/renderAll\(\);[\s\S]{0,240}?focusPanel\('panel-data', e\.detail === 0\);/.test(APP_SRC),
+     'clearing must hand focus to the panel heading, with the modality');
+  ok(/\.landing:focus \{ outline: none/.test(APP_SRC) &&
+     /\.landing\.ring-focus:focus \{ outline: 2px solid var\(--focus-border\)/.test(APP_SRC),
+     'the landing heading is quiet by default and rings only for the keyboard');
   ok(/let p = url\.pathname;/.test(SW_SRC) && /SHELL_PATHS\.has\(p\)/.test(SW_SRC),
      'shellKey matches on the path alone, so the cache-buster still hits the cached file');
 
