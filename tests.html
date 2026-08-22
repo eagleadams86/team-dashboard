@@ -4056,8 +4056,23 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and the strip is three ways of reading the numbers, nothing else');
   const sBtn = sDoc.getElementById('settingsBtn');
   ok(!!sBtn, 'a Settings button sits in the header instead');
-  is(sBtn.parentElement.lastElementChild, sBtn,
-     'last in the row — it is the one you go to least often');
+  /* ── The family's header order ─────────────────────────────────────────────
+     Every app in the family lays this row out the same way, so a control is in
+     the same place whichever one you have open. Right to left: theme · Share ·
+     Back up · ⚙ settings · ☰ manage · the record picker · zoom · find ·
+     everything else, and an app skips whatever it hasn't got.
+
+     Settings was last in this row from the day it left the tab strip until the
+     order landed on 2026-08-22 — "the one you go to least often". The family
+     puts the furniture beyond it instead: the theme picker changes nothing but
+     how the page looks, so it is the one thing that belongs at the very end.
+
+     Pinned as the whole row rather than as one button's position, because that
+     is the invariant — a new control added in the middle is exactly the change
+     that should have to come back and say where it goes. */
+  is([...sBtn.parentElement.children].filter(e => e.id).map(e => e.id),
+     ['teamSel', 'manageBtn', 'settingsBtn', 'dataBtn', 'shareBtn', 'themeSel'],
+     'in the family\u2019s header order, with the theme picker last of all');
   /* The glyph is Money Map's own for this action, and aria-hidden like every
      other one in this row: the word beside it is already the whole label. */
   is(sBtn.querySelector('[aria-hidden="true"]').textContent, '\u2699',
@@ -5633,7 +5648,8 @@ group('ARTs — the grouping, and the boundary it crosses');
   win.renderAll();
   is(dashTab().hidden, true, 'a browser with nothing in it is not offered a dashboard');
   is(win.document.getElementById('panel-data').hidden, false,
-     'and lands on Your Data, which is the tab that can do something about it');
+     'and stands on Your Data underneath, the tab that can do something about it '
+     + '\u2014 though what is ON screen in that state is the welcome card below');
   /* selectTab's fallback used to be the dashboard unconditionally, which stopped
      being safe the moment the dashboard could itself be hidden. */
   win.selectTab('dashboard');
@@ -5689,6 +5705,58 @@ group('ARTs — the grouping, and the boundary it crosses');
      it and a visitor with no way back to anything. */
   ok(/\$\('tab-dashboard'\)\.hidden = !anyRows && !viewOnly;/.test(APP_SRC),
      'the rule is off in a shared view, where the other two tabs are already gone');
+
+  /* ══════════════════════════════════════════════════════════
+     The welcome card (2026-08-22). With nothing recorded anywhere the app has
+     no views to offer, so the whole apparatus goes and one card takes the page.
+     Every app in the family opens on this same card, in the same words and the
+     same order — what the app is, where the figures go, the three ways in, then
+     a line for each button.
+     ══════════════════════════════════════════════════════════ */
+  group('the welcome card — the first screen, before anything is recorded');
+  {
+    plant({ teams: [{ id: 'w1', name: 'Nothing', rows: [] }], settings: {} });
+    win.renderAll();
+    const wDoc = win.document;
+    const shown = (el) => !!el && win.getComputedStyle(el).display !== 'none' && !el.hidden;
+
+    ok(shown(wDoc.getElementById('welcomeCard')), 'an empty browser opens on the card');
+    /* It REPLACES the app rather than sitting above it. Read off computed style,
+       not the `hidden` property: the gate is a CSS rule on `data-welcome`
+       precisely because selectTab() writes `hidden` and would win the race. */
+    ok(!shown(wDoc.querySelector('.tabs')), 'with the tab strip gone');
+    ok(!shown(wDoc.getElementById('viewControls')), 'the view controls gone');
+    ok(['dashboard', 'allteams', 'data'].every(t => !shown(wDoc.getElementById('panel-' + t))),
+       'and every panel gone — one card, and nothing else');
+
+    /* The three ways in, in the family's words and the family's Title Case. */
+    is(['welcomeFreshBtn', 'welcomeSampleBtn', 'welcomeRestoreBtn']
+         .map(id => wDoc.getElementById(id).textContent.trim()),
+       ['Start Fresh', 'Load Sample Data', 'Restore a Backup'],
+       'offering the family\u2019s three buttons, in the family\u2019s order');
+    /* The privacy claim the footer three inches below also makes. This app has
+       no sync and no account, and the two sentences must never disagree. */
+    ok(/Nothing is uploaded/.test(wDoc.getElementById('welcomeCard').textContent),
+       'and saying where the figures go, in the footer\u2019s own terms');
+
+    /* Start Fresh writes nothing — there is nothing to create — so it dismisses
+       the card for this sitting and opens the tab that takes a paste. */
+    wDoc.getElementById('welcomeFreshBtn').click();
+    ok(!shown(wDoc.getElementById('welcomeCard')), 'Start Fresh puts the card away');
+    ok(shown(wDoc.getElementById('panel-data')), 'and lands on Your Data');
+    ok(shown(wDoc.querySelector('.tabs')), 'with the tab strip back');
+
+    /* A reload with still nothing entered honestly lands back here: the flag is
+       in memory on purpose, because nothing was created to remember. */
+    win.renderAll();
+    ok(!shown(wDoc.getElementById('welcomeCard')),
+       'and it stays away for the rest of the sitting, not just the one render');
+
+    /* Never over somebody else\u2019s figures: a visitor must not be offered
+       three buttons that write to their own browser. */
+    ok(/!anyRows && !viewOnly && !welcomeStarted/.test(APP_SRC),
+       'and it is off in a shared view, where those buttons would write over a link');
+  }
 
   plant({ teams: [{ id: 'z1', name: 'Back',
     rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] }], settings: {} });

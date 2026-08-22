@@ -439,7 +439,7 @@ shared by every team — one place to say what a "defect" is.
 
 The picker only appears once there are **two or more** teams: with one team it is not a
 choice. It is part of a wider rule — nothing shows until there is something behind it, so a
-first run is the paste box and its instructions, and nothing else. The **Loaded data** card,
+first run is the [welcome card](#the-first-thing-you-see) and nothing else. The **Loaded data** card,
 the **Clean up old data** card and the **Append to existing** / **Clear this team's data**
 buttons all appear the moment rows exist (`renderEmptyState()`).
 
@@ -455,15 +455,45 @@ in it.
 Which team you're looking at is a position on *this* device and deliberately isn't part of
 your data: it stays out of backups and share links for the same reason the theme does.
 
+## The First Thing You See
+
+With nothing recorded anywhere there are no tabs, no view controls and no panels — just one
+card in the middle of the page:
+
+> **Welcome to Flow Metrics**
+>
+> A flow clinic for your delivery teams: give it your work items — a completed date, a start
+> date and a type — and it works out throughput, cycle and lead time, work in progress, and
+> the age of everything still open…
+>
+> **Start Fresh** · **Load Sample Data** · **Restore a Backup**
+
+**Start Fresh** opens *Your Data*, where you paste a report out of Jira or add work items one
+at a time. **Load Sample Data** loads [the demo](#the-demo--trying-it-without-pasting-anything).
+**Restore a Backup** opens the same [*Back Up & Restore*](#back-up--restore) window the ⇩
+button does.
+
+It writes nothing. There is nothing to create here — the figures come from a paste or from
+typed items — so *Start Fresh* just puts the card away for this sitting and opens the tab that
+takes both. Reload with still nothing entered and the card comes back, which is the truth
+about where you are.
+
+Before this the app opened straight onto the Your Data tab and its paste box, which answers
+"how do I fill this in" to somebody who hasn't yet been told what the thing is. Every app in
+the family now opens on this same card, in the same words and the same order — what the app
+is, where the figures go, the three ways in, then a line for each button. The second paragraph
+is the privacy claim the footer also makes, and the two must never disagree: this app has no
+sync and no account, so it says so outright.
+
 ## The Demo — Trying It Without Pasting Anything
 
 **Load sample data** isn't filler to fill the screen: it's this app's demo, and the rule is
 that **every feature has to be reachable from it**. Three teams, about nine months of
 made-up work items ending today, and one of the three deliberately short of a column.
 
-The button sits beside *Load pasted rows* on the Your Data tab, which is where a first run
-opens — and, since the Dashboard tab is [hidden until something has data](#teams), that is now
-the only place it can be met on a first run. Pressing it switches you to the dashboard. It
+The button is on the [welcome card](#the-first-thing-you-see) a first run opens on, and again
+beside *Load pasted rows* on the Your Data tab you reach from it — and, since the Dashboard tab
+is [hidden until something has data](#teams), those are the two places it can be met. Pressing it switches you to the dashboard. It
 disappears once anything holds data, and so does the copy of it on the empty-dashboard card,
 which from a working app would be a mis-click that quietly adds three teams.
 

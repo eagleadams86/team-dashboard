@@ -737,6 +737,34 @@ table.data tr.no-data td.figure { color: var(--text-muted); }
 
 .empty { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
 .empty h2 { font-size: 16px; margin-bottom: 12px; color: var(--text-primary); }
+/* ── The welcome card, and only it ───────────────────────────────────────────
+   Every other empty state here is `.card.empty` on one element, so this nested
+   form matches nothing else in the app.
+
+   An empty state is nothing but centred sentences — there is no table under it
+   whose position a wrapped line would cost — and a CENTRED line is the hard one
+   to read back, because both ends move and the eye has nothing to return to.
+   80ch, centred in whatever the card is. Money Map's rule and its number.
+
+   The heading takes the page size back. `.empty h2` above is 16px, which is
+   right for "No Data Yet" sitting inside a working app and wrong for the first
+   words a new reader sees; the family's welcome heading is the ordinary h2. */
+.card > .empty { max-width: 80ch; margin-left: auto; margin-right: auto; }
+.card > .empty h2 { font-size: 1.5em; margin-bottom: 0; }
+/* `p { margin: 0 }` at the top of this file is right for cards full of figures
+   and wrong for a page of prose: without this the two opening sentences ran
+   together as one block. The family's card falls a blank line between
+   paragraphs, which is also the gap the button row wants above it. */
+.card > .empty p { margin: 1em 0 0; }
+/* While the welcome card is up it IS the app: the tab strip, the shared view
+   controls and all three panels go. Done in CSS rather than by setting `hidden`
+   on each of them, because selectTab() writes those same properties and runs at
+   boot AFTER renderEmptyState — the JS version was overwritten a tick later and
+   the Your Data panel came back under the card. An attribute nothing else
+   touches cannot lose that race. */
+html[data-welcome] .tabs,
+html[data-welcome] #viewControls,
+html[data-welcome] .panel { display: none !important; }
 .empty pre { display: inline-block; text-align: left; margin: 16px 0 0;
   background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 12px 16px; font-family: var(--font-mono); font-size: 12px;
@@ -1151,7 +1179,27 @@ main:focus { outline: none; }
          ⚙ for settings — so the same action looks the same in every app. ☁️ Sign
          in to sync keeps its emoji: the sync module rewrites that label as the
          state changes, and it is the one control here about somewhere else. -->
+    <!-- ── The family's header order ───────────────────────────────────────────
+         Every app in the family lays this row out the same way, so a control is
+         in the same place whichever one you have open. Right to left, because
+         the row is right-aligned and the right-hand end is the fixed one:
+
+           theme · Share · Back up · ⚙ settings · ☰ manage · the record picker ·
+           zoom · find · everything else
+
+         An app skips whatever it hasn't got and the rest close up. The THEME
+         PICKER IS ALWAYS LAST — it is the one control that changes nothing but
+         how the page looks, so it sits at the far end, out of the way of the
+         controls that do something. Settings was last here until 2026-08-22 on
+         the reasoning that it is where you go least often; the family order puts
+         the furniture beyond it instead, which is the same argument carried one
+         step further. -->
     <button class="btn small" id="manageBtn" type="button" title="Add or rename teams, group them into ARTs, and set up workflow stages"><span aria-hidden="true">☰</span> Teams &amp; Stages</button>
+    <!-- The gear is Money Map's own glyph for it — the comment above this block
+         named ⚙ as the family's settings mark before this app had one. -->
+    <button class="btn small" id="settingsBtn" type="button" title="Labels, thresholds and the work type filter list — shared by every team"><span aria-hidden="true">⚙</span> Settings</button>
+    <button class="btn small" id="dataBtn" type="button" title="Back up, restore or clear your data"><span aria-hidden="true">⇩</span> Back up</button>
+    <button class="btn small" id="shareBtn" type="button" title="Create a read-only link to show someone your figures"><span aria-hidden="true">↗</span> Share</button>
     <label class="sr-only" for="themeSel">Theme</label>
     <!-- The four unified themes, listed alphabetically (matches the sibling app).
          Midnight is pre-selected to match the theme the boot script in <head>
@@ -1163,14 +1211,6 @@ main:focus { outline: none; }
       <option value="midnight" selected>✦ Midnight</option>
       <option value="sepia">📜 Sepia</option>
     </select>
-    <button class="btn small" id="dataBtn" type="button" title="Back up, restore or clear your data"><span aria-hidden="true">⇩</span> Back up</button>
-    <button class="btn small" id="shareBtn" type="button" title="Create a read-only link to show someone your figures"><span aria-hidden="true">↗</span> Share</button>
-    <!-- LAST in the row, and the gear is Money Map's own glyph for it — the
-         comment above this block already named ⚙ as the family's settings mark
-         before this app had one. Last because settings is where you go least
-         often, and because it is roughly where the eye already looked for it:
-         the tab it replaces sat at the right-hand end of the strip below. -->
-    <button class="btn small" id="settingsBtn" type="button" title="Labels, thresholds and the work type filter list — shared by every team"><span aria-hidden="true">⚙</span> Settings</button>
   </div>
 </header>
 
@@ -1220,6 +1260,46 @@ main:focus { outline: none; }
          the tabs answer two different questions at once. -->
     <button class="tab" role="tab" id="tab-data"      aria-controls="panel-data"      aria-selected="false" tabindex="-1">Your Data</button>
   </div>
+
+  <!-- ══════════════════ THE FIRST SCREEN ══════════════════
+       The family's welcome card, to the shape Money Map settled on and Sprint
+       Predictability took next: what the app IS, then where the figures go,
+       then the three ways in, then a line for each of them in the button's own
+       words. A reader deciding whether this is the thing they want is deciding
+       off the first paragraph, so it says what gets worked out rather than
+       promising "insight"; the second is the privacy claim the footer three
+       inches below already makes, and the two must never disagree.
+
+       It REPLACES the whole app while it is up — renderEmptyState() takes the
+       tab strip, the view controls and all three panels away with it. Before
+       this, a first run opened on the Your Data tab with a paste box explaining
+       a Jira export, which answers "how do I fill this in" to somebody who has
+       not yet been told what it is.
+
+       Start Fresh dismisses it for this sitting rather than writing anything:
+       there is nothing to create here — the data comes from a paste or from
+       typed items — so the honest thing is to open the tab that takes both. A
+       reload with still nothing entered brings the card back, which is the
+       truth about where you are. -->
+  <div class="card" id="welcomeCard" hidden><div class="empty">
+    <h2>Welcome to Flow Metrics</h2>
+    <p>A flow clinic for your delivery teams: give it your work items — a completed date, a
+      start date and a type — and it works out throughput, cycle and lead time, work in
+      progress, and the age of everything still open, grouped into Flow, Delivery and
+      Health, for one team or across all of them.</p>
+    <p>Everything you enter stays in this browser. Nothing is uploaded — there is no account
+      and no server.</p>
+    <p style="margin-top:16px">
+      <button class="btn primary" id="welcomeFreshBtn" type="button">Start Fresh</button>
+      <button class="btn" id="welcomeSampleBtn" type="button">Load Sample Data</button>
+      <button class="btn" id="welcomeRestoreBtn" type="button">Restore a Backup</button></p>
+    <p><strong>Start Fresh</strong> opens Your Data, where you paste a report out of Jira or
+      add work items one at a time — a board kept by hand works just as well.</p>
+    <p><strong>Load Sample Data</strong> fills every chart with three invented teams and nine
+      months of work items, each team named for the one thing it shows, so you can see what
+      the app does before typing anything of your own. The figures are made up.</p>
+    <p><strong>Restore a Backup</strong> reads a Flow Metrics export.</p>
+  </div></div>
 
   <!-- The three tab panels. The main landmark that wraps them opens ABOVE the
        tab strip now (see the note there), so there is no second <main> here —
@@ -8821,6 +8901,12 @@ function renderSettingsForm() {
    picks teams itself, so it stays useful from any team as long as some team
    holds data. The picker is also hidden pre-paint on a true first run (see the
    boot script in <head>) so it never blinks in and out. */
+/* Set by Start Fresh on the welcome card and never saved — see renderEmptyState
+   below. Declared ABOVE the only function that reads it: a `let` read before its
+   declaration is the temporal-dead-zone error that has taken this app down
+   twice, and boot calls renderEmptyState from the foot of the page. */
+let welcomeStarted = false;
+
 function renderEmptyState() {
   const rows = activeRows().length;
   $('teamSel').hidden    = state.teams.length < 2;
@@ -8871,6 +8957,28 @@ function renderEmptyState() {
      working app it is clutter, and a mis-click that quietly adds three teams. */
   $('btnSampleData').hidden = state.teams.some(t => t.rows.length);
   document.documentElement.removeAttribute('data-first-run');
+
+  /* ── The welcome card, and everything it stands in for ─────────────────────
+     With nothing recorded anywhere the app has no views to offer, so the whole
+     apparatus goes and one card takes the page: the tab strip, the shared view
+     controls and all three panels. The alternative — which is what this used to
+     do — is a Your Data tab holding a paste box, i.e. answering "how do I fill
+     this in" before anything has said what the app is.
+
+     Never in a shared view: a link arrives with somebody's figures in it, and a
+     visitor must not be offered three buttons that write to their own browser.
+
+     `welcomeStarted` is deliberately in memory only. Start Fresh creates
+     nothing — the data comes from a paste or from typed items — so there is no
+     state to persist, and a reload with still nothing entered honestly lands
+     back here.
+
+     What is hidden is hidden in CSS, off `data-welcome` — see the rule beside
+     `.card > .empty`. Setting `hidden` on each panel from here loses a race with
+     selectTab(), which writes the same property and runs later in boot. */
+  const firstRun = !anyRows && !viewOnly && !welcomeStarted;
+  $('welcomeCard').hidden = !firstRun;
+  document.documentElement.toggleAttribute('data-welcome', firstRun);
 }
 
 function renderAll() {
@@ -10170,6 +10278,18 @@ $('multiDateOrder').addEventListener('change', e => {
 });
 
 [$('btnSample'), $('btnSampleData')].forEach(b => b.addEventListener('click', loadSample));
+/* The welcome card's three. Start Fresh writes nothing — it dismisses the card
+   for this sitting and opens the one tab that can do something about there
+   being no data. Restore opens the same Back Up & Restore window the ⇩ button
+   in the header does; it was reachable only from there, which is a strange
+   thing to hunt for on the screen whose whole job is "how do I get started". */
+$('welcomeFreshBtn').addEventListener('click', () => {
+  welcomeStarted = true;
+  renderEmptyState();
+  selectTab('data');
+});
+$('welcomeSampleBtn').addEventListener('click', loadSample);
+$('welcomeRestoreBtn').addEventListener('click', () => openModal($('dataDialog')));
 $('btnLoad').addEventListener('click', () => doLoad('replace'));
 $('btnAppend').addEventListener('click', () => doLoad('append'));
 $('btnClear').addEventListener('click', () => {
