@@ -188,12 +188,12 @@
 html, body { margin: 0; padding: 0; }
 body {
   background: var(--bg); color: var(--text-primary);
-  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font: var(--fw-normal) var(--fs-base)/var(--lh-base) var(--font-sans);
   -webkit-font-smoothing: antialiased;   /* text-size-adjust: theme.css, pack rule 9 */
 }
 h1, h2, h3 { margin: 0; font-weight: var(--fw-semibold); letter-spacing: -.01em; }
 p { margin: 0; }
-code { font-family: var(--font-mono); font-size: 12px; }
+code { font-family: var(--font-mono); font-size: var(--fs-xs); }
 button, select, input, textarea { font: inherit; color: inherit; }
 
 .shell { max-width: 1500px; margin: 0 auto; padding: 0 16px 64px; }
@@ -213,7 +213,7 @@ header { position: sticky; top: 0; z-index: 20; background: var(--surface);
 /* The auto right margin is what pushes the control cluster to the right edge; it
    moved back onto .brand on 2026-08-20, when the .applink left the header for the
    footer. Mirrored in Sprint Predictability. */
-.brand { font-size: 17px; font-weight: 700; letter-spacing: -.01em; margin: 0 auto 0 0; }
+.brand { font-size: var(--fs-md); font-weight: 700; letter-spacing: -.01em; margin: 0 auto 0 0; }
 .brand span { color: var(--text-muted); font-weight: 500; }
 /* The mark from the browser tab, worn in the header too. Width and height are on
    the element, not just in CSS, so the row is laid out at its final size before the
@@ -249,10 +249,10 @@ header { position: sticky; top: 0; z-index: 20; background: var(--surface);
 .btn.primary:disabled:hover { opacity: .45; }
 /* Shared height for the header chrome: a native <select> ignores line-height,
    so the height is pinned on both or the row lines up on neither edge. */
-.btn.small { padding: 4px 9px; font-size: 13px; min-height: var(--chrome-h); }
+.btn.small { padding: 4px 9px; font-size: var(--fs-xs); min-height: var(--chrome-h); }
 #teamSel, #themeSel { width: auto; background: var(--surface-alt); color: var(--text-primary);
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
-  padding: 4px 9px; font-size: 13px; cursor: pointer; min-height: var(--chrome-h); }
+  padding: 4px 9px; font-size: var(--fs-xs); cursor: pointer; min-height: var(--chrome-h); }
 #teamSel:hover, #themeSel:hover { border-color: var(--text-muted); }
 #teamSel { min-width: 140px; }
 /* Set by the boot script in <head> when nothing is saved yet, so a first run
@@ -292,7 +292,7 @@ html[data-first-run] #teamSel { display: none; }
 [hidden] { display: none !important; }
 
 /* controls */
-label { display: block; font-size: 13px; color: var(--text-secondary);
+label { display: block; font-size: var(--fs-xs); color: var(--text-secondary);
   font-weight: 600; margin-bottom: 4px; }
 /* THE TYPE LIST IS THE THEME PACK'S OWN, not one grown here a field at a time.
    The history of this rule is the argument for that: `input[type="date"]` had to
@@ -325,15 +325,15 @@ input[type="password"] {
    takes Chromium's native × with it; a search box that has no other way to clear
    itself should offer one. */
 input[type="search"] { -webkit-appearance: none; appearance: none; }
-textarea { font-family: var(--font-mono); font-size: 12px; resize: vertical; min-height: 190px; }
+textarea { font-family: var(--font-mono); font-size: var(--fs-xs); resize: vertical; min-height: 190px; }
 select { cursor: pointer; }
 
 /* cards */
 .card { background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
 .card + .card { margin-top: 18px; }
-.card h2 { font-size: 16px; margin-bottom: 4px; }
-.card .hint { color: var(--text-secondary); font-size: 13px; }
+.card h2 { font-size: var(--fs-md); margin-bottom: 4px; }
+.card .hint { color: var(--text-secondary); font-size: var(--fs-xs); }
 
 .grid { display: grid; gap: 16px; }
 .grid.two { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: end; }
@@ -419,7 +419,7 @@ select { cursor: pointer; }
 .artscope-row .hint { margin: 0 0 4px; }
 /* A team's train, under its name in the table. Only drawn when the table is
    showing more than one, which is the only time it says anything. */
-.team-art { display: block; font-size: 12px; color: var(--text-secondary);
+.team-art { display: block; font-size: var(--fs-xs); color: var(--text-secondary);
   font-weight: 400; margin-top: 2px; }
 
 /* The three answers, under the chart that shows their working. A definition
@@ -446,7 +446,7 @@ select { cursor: pointer; }
    with, so flex-end just left it sitting low against the taller fields beside
    it. It centres on its own row instead. */
 .controls .window { margin-left: auto; align-self: center; text-align: right;
-  font-size: 13px; color: var(--text-secondary); }
+  font-size: var(--fs-xs); color: var(--text-secondary); }
 .controls .window strong { color: var(--text-primary); font-weight: var(--fw-semibold); }
 
 /* summary tiles — the sibling app's tile, minus the RAG states: this dashboard
@@ -488,11 +488,11 @@ select { cursor: pointer; }
 .tile { display: grid; grid-row: span 3; grid-template-rows: subgrid; align-content: start;
   border: 1px solid var(--border); border-left-width: 6px;
   border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface); }
-.tile .label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase;
+.tile .label { font-size: var(--fs-xs); color: var(--text-secondary); text-transform: uppercase;
   letter-spacing: .04em; font-weight: 600;
   display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.tile .value { font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin-top: 2px; }
-.tile .foot { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.tile .value { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.02em; margin-top: 2px; }
+.tile .foot { font-size: var(--fs-xs); color: var(--text-secondary); margin-top: 2px; }
 
 /* The ⓘ help button, straight from the sibling app: the circle is sized to the
    label's own line so adding it never makes the row taller, and the pointer
@@ -502,7 +502,7 @@ select { cursor: pointer; }
 .tile-help { position: relative; margin-left: 7px;
   flex: none; width: 16px; height: 16px; padding: 0; border-radius: 50%;
   border: 1px solid var(--border-strong); background: transparent;
-  color: var(--text-secondary); font-size: 11px; font-weight: 700; line-height: 1;
+  color: var(--text-secondary); font-size: var(--fs-xs); font-weight: 700; line-height: 1;
   font-family: inherit; text-transform: none; cursor: pointer; }
 .tile-help::after { content: ''; position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%); width: 24px; height: 24px; }
@@ -616,15 +616,15 @@ body.maxi-open { overflow: hidden; }
    before, and the ring now has somewhere to be drawn. The 8px top margin plus
    4px of padding is the 12px this div used to carry inline. */
 #manageDialog .table-scroll { margin: 8px -4px 0; padding: 4px; }
-table.data { width: 100%; border-collapse: collapse; font-size: 14px;
+table.data { width: 100%; border-collapse: collapse; font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums; }
 table.data th, table.data td { text-align: left; padding: 8px 12px;
   border-bottom: 1px solid var(--border); white-space: nowrap; }
-table.data th { font-size: 12px; font-weight: 600; letter-spacing: .04em;
+table.data th { font-size: var(--fs-xs); font-weight: 600; letter-spacing: .04em;
   text-transform: uppercase; color: var(--text-secondary); position: sticky; top: 0;
   background: var(--surface); border-bottom-color: var(--border-strong); }
 table.data tbody tr:hover { background: var(--surface-alt); }
-table.data td.num { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+table.data td.num { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
 .table-cap { max-height: 460px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 
 /* ── The All teams table ─────────────────────────────────────────────────────
@@ -715,7 +715,7 @@ table.data tr.no-data td.figure { color: var(--text-muted); }
 
 /* status notes */
 .note { border: 1px solid var(--border); border-left-width: 3px;
-  border-radius: var(--radius-sm); padding: 12px; font-size: 13px; }
+  border-radius: var(--radius-sm); padding: 12px; font-size: var(--fs-xs); }
 .note.ok   { border-left-color: var(--ok);   background: var(--ok-bg);   color: var(--text-primary); }
 .note.err  { border-left-color: var(--err);  background: var(--err-bg);  color: var(--text-primary); }
 .note.info { border-left-color: var(--border-strong); background: var(--surface-alt); color: var(--text-secondary); }
@@ -726,17 +726,17 @@ table.data tr.no-data td.figure { color: var(--text-muted); }
    exists for inline text and the two would fight over colour and size. */
 .note.caution { border-left-color: var(--warn); background: var(--warn-bg); color: var(--text-primary); }
 .note ul { margin: 8px 0 0; padding-left: 24px; }
-.note li { font-family: var(--font-mono); font-size: 12px; }
+.note li { font-family: var(--font-mono); font-size: var(--fs-xs); }
 /* The mono list above is for cells lifted out of an export — a problem row,
    read back the way it was pasted. The multi-team plan's lists are the opposite:
    team names and sentences about them, and a team's own name set in a monospace
    face reads as data out of a work system rather than as something its owner
    called it. Same list, ordinary prose. */
-.note ul.plain li { font-family: inherit; font-size: 13px; margin-bottom: 4px; }
+.note ul.plain li { font-family: inherit; font-size: var(--fs-xs); margin-bottom: 4px; }
 .note ul.plain li .btn { margin-left: 6px; vertical-align: baseline; }
 
 .empty { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
-.empty h2 { font-size: 16px; margin-bottom: 12px; color: var(--text-primary); }
+.empty h2 { font-size: var(--fs-md); margin-bottom: 12px; color: var(--text-primary); }
 /* ── The welcome card, and only it ───────────────────────────────────────────
    Every other empty state here is `.card.empty` on one element, so this nested
    form matches nothing else in the app.
@@ -767,7 +767,7 @@ html[data-welcome] #viewControls,
 html[data-welcome] .panel { display: none !important; }
 .empty pre { display: inline-block; text-align: left; margin: 16px 0 0;
   background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 12px 16px; font-family: var(--font-mono); font-size: 12px;
+  padding: 12px 16px; font-family: var(--font-mono); font-size: var(--fs-xs);
   color: var(--text-primary); overflow-x: auto; max-width: 100%; }
 
 /* ── The Teams dialog's tables ───────────────────────────────────────────────
@@ -782,7 +782,7 @@ html[data-welcome] .panel { display: none !important; }
    400px box holding "Team Long Tail", which reads as a mistake rather than as
    room.
    The cap is what keeps the four columns spread the way the sibling's are. */
-table.manage { width: 100%; border-collapse: collapse; font-size: 14px;
+table.manage { width: 100%; border-collapse: collapse; font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums; }
 table.manage td { text-align: right; padding: 10px 12px;
   border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -820,14 +820,14 @@ table.manage input.aliases { max-width: none; }
    three digits is all either of these ever holds. */
 table.manage td.target { min-width: 112px; white-space: nowrap; }
 table.manage .target-set { display: inline-flex; align-items: center; gap: 6px;
-  color: var(--text-secondary); font-size: 13px; }
+  color: var(--text-secondary); font-size: var(--fs-xs); }
 table.manage input.target { width: 64px; max-width: 64px; text-align: right; }
 /* A row with nothing in it yet — the ARTs table before the first train. */
 table.manage td.empty-row { text-align: left; color: var(--text-secondary);
   border-bottom: 0; padding-left: 0; }
 /* The section headings inside the dialog, and the note under each one. */
-.manage-head { font-size: 14px; font-weight: var(--fw-semibold); color: var(--text-primary); }
-.manage-note { color: var(--text-secondary); font-size: 12px; margin: 4px 0 0; }
+.manage-head { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.manage-note { color: var(--text-secondary); font-size: var(--fs-xs); margin: 4px 0 0; }
 
 /* settings filter list, and the Teams dialog's table */
 table.filters { width: 100%; border-collapse: collapse; }
@@ -838,7 +838,7 @@ table.filters { width: 100%; border-collapse: collapse; }
    column keeps the table's right edge. */
 table.filters td { padding: 4px 12px 4px 0; vertical-align: middle; }
 table.filters th { text-align: left; padding: 0 12px 6px 0;
-  font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  font-size: var(--fs-xs); font-weight: 600; letter-spacing: .04em;
   text-transform: uppercase; color: var(--text-secondary); }
 table.filters td:last-child, table.filters th:last-child { padding-right: 0; }
 table.filters td.act { width: 1%; }
@@ -862,7 +862,7 @@ table.filters th.act, table.filters td.act { text-align: right; }
    here invents a palette value; same rule as `.btn:disabled`. */
 .icon-btn { appearance: none; background: none; border: 1px solid var(--border-strong);
   color: var(--text-muted); border-radius: var(--radius-sm); cursor: pointer;
-  width: 30px; height: 30px; font-size: 14px; line-height: 1; }
+  width: 30px; height: 30px; font-size: var(--fs-sm); line-height: 1; }
 .icon-btn:hover { color: var(--text-primary); border-color: var(--text-muted); }
 .icon-btn.danger:hover { color: var(--err); border-color: var(--err); }
 .icon-btn:disabled { opacity: .45; cursor: not-allowed; }
@@ -873,7 +873,7 @@ table.filters th.act, table.filters td.act { text-align: right; }
 
 /* footer notes — the sibling app's .privacy: lined up with the text inside the
    last card (18px of card padding + its 1px border), not with the card edge. */
-.privacy { font-size: 12px; color: var(--text-muted); margin: 28px 0 0; padding-left: 19px; }
+.privacy { font-size: var(--fs-xs); color: var(--text-muted); margin: 28px 0 0; padding-left: 19px; }
 .privacy-links { margin-top: 6px; }
 .privacy-links a { color: var(--text-muted); }
 .privacy-links a:hover { color: var(--text-secondary); }
@@ -889,7 +889,7 @@ footer .applink { margin: 0 19px 0 auto; }
 /* share dialog furniture — the sibling app's, unchanged */
 fieldset.formpanel { border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 12px; margin: 14px 0 0; background: var(--surface-alt); min-width: 0; }
-legend { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+legend { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em;
   color: var(--text-secondary); font-weight: 700; padding: 0 6px; }
 /* overflow-x is spelled out because `overflow-y: auto` alone leaves the browser
    free to reserve a horizontal scrollbar it never needs — a 15px white stripe
@@ -899,12 +899,12 @@ legend { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
    Mirrored in Sprint Velocity and Golf Handicap. */
 .checklist-head { display: flex; align-items: baseline; justify-content: space-between;
   gap: 10px; margin-bottom: 8px; }
-label.checkline { display: flex; gap: 8px; align-items: center; font-size: 14px;
+label.checkline { display: flex; gap: 8px; align-items: center; font-size: var(--fs-sm);
   font-weight: 400; color: var(--text-primary); margin: 0; min-height: 24px; }
 .checkline input { flex: none; }
-#shareLink { width: 100%; font-family: var(--font-mono); font-size: 11px;
+#shareLink { width: 100%; font-family: var(--font-mono); font-size: var(--fs-xs);
   color: var(--text-secondary); }
-.warn { color: var(--err); font-size: 13px; margin-top: 10px; }
+.warn { color: var(--err); font-size: var(--fs-xs); margin-top: 10px; }
 /* Live regions have to stay in the tree to announce, so they're emptied rather
    than hidden — this collapses them, margin included, while they hold nothing. */
 .warn:empty, #shareMeta:empty { display: none; }
@@ -913,10 +913,10 @@ label.checkline { display: flex; gap: 8px; align-items: center; font-size: 14px;
    irreversible action in the app should take a deliberate open, not sit a
    mis-click away from Download backup. Same pattern in the sibling apps. */
 details.danger-zone { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
-details.danger-zone > summary { cursor: pointer; font-size: 13px; font-weight: 600;
+details.danger-zone > summary { cursor: pointer; font-size: var(--fs-xs); font-weight: 600;
   color: var(--text-secondary); }
 details.danger-zone > summary:hover { color: var(--text-primary); }
-details.danger-zone p { color: var(--text-secondary); font-size: 13px; }
+details.danger-zone p { color: var(--text-secondary); font-size: var(--fs-xs); }
 
 /* read-only share view: a standing bar above the tabs, so a borrowed link never
    reads as your own data. The focus colour, not amber — a shared view is just a
@@ -924,7 +924,7 @@ details.danger-zone p { color: var(--text-secondary); font-size: 13px; }
 .viewbar { display: flex; gap: 10px 14px; align-items: baseline; flex-wrap: wrap;
   border: 1px solid var(--border-strong); border-left: 4px solid var(--focus-border);
   border-radius: var(--radius); background: var(--surface-alt);
-  padding: 11px 14px; margin-bottom: 16px; font-size: 13px; }
+  padding: 11px 14px; margin-bottom: 16px; font-size: var(--fs-xs); }
 .viewbar strong { font-weight: 700; }
 .viewbar .muted { color: var(--text-secondary); }
 .viewbar .mine { margin-left: auto; color: var(--accent); }
@@ -1015,8 +1015,8 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
    hidden — but a 62px graphic in a narrow column is the first thing to give up
    room when the table has to fit a phone. */
 @media (max-width: 620px) { .spark { display: none; } .spark-val { margin-left: 0; } }
-dialog h2 { font-size: 16px; margin-bottom: 12px; }
-dialog p { color: var(--text-secondary); font-size: 14px; }
+dialog h2 { font-size: var(--fs-md); margin-bottom: 12px; }
+dialog p { color: var(--text-secondary); font-size: var(--fs-sm); }
 /* The help sheet's body is written into #helpBody with textContent — never
    markup, which is the whole reason a note can quote a reader's own label safely
    — so the only paragraph break available to it is a newline. Left at
@@ -1035,7 +1035,7 @@ dialog p { color: var(--text-secondary); font-size: 14px; }
 #toast { position: fixed; left: 50%; right: auto; top: auto; bottom: 24px;
   margin: 0; transform: translateX(-50%);
   background: var(--btn-bg); color: var(--btn-text); border: 0; padding: 10px 18px;
-  border-radius: var(--radius-pill); font-size: 14px; font-weight: 600; z-index: 100;
+  border-radius: var(--radius-pill); font-size: var(--fs-sm); font-weight: 600; z-index: 100;
   opacity: 0; pointer-events: none; overflow: visible; transition: opacity .2s;
   max-width: calc(100% - 32px); text-align: center; }
 #toast.show { opacity: 1; }
@@ -5456,7 +5456,7 @@ function haltForNewerData(found) {
   card.setAttribute('style', 'max-width:34em;border:1px solid var(--border,#262f4a);'
     + 'border-radius:12px;padding:24px 26px;background:var(--surface,#121829)');
   const h = document.createElement('h1');
-  h.setAttribute('style', 'margin:0 0 12px;font-size:20px');
+  h.setAttribute('style', 'margin:0 0 12px;font-size:var(--fs-lg)');
   h.textContent = 'This Data Was Saved by a Newer Version';
   const p1 = document.createElement('p');
   p1.setAttribute('style', 'margin:0 0 12px');
@@ -6198,6 +6198,22 @@ function token(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+/* SIZES are read back the same way, and for a stronger reason than the colours
+   above. Chart text is painted onto a canvas, so it cannot inherit anything —
+   every size in a Chart.js config is a NUMBER OF PIXELS, which is exactly the
+   thing the rem ramp exists to stop: a number pins that text to itself while the
+   rest of the page follows the reader's own default text size.
+
+   This resolves a --fs-* step against the LIVE root font size, so a reader who
+   has set their browser's default to 20px gets bigger axis ticks too. Called at
+   build time for each chart, like token() — a theme change already rebuilds
+   them, and a root-size change reloads the page. */
+function fsPx(step) {
+  const v = token('--fs-' + step);
+  const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  return v.endsWith('rem') ? parseFloat(v) * root : parseFloat(v);
+}
+
 function hexToRgb(hex) {
   const h = hex.replace('#', '');
   const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
@@ -6352,14 +6368,14 @@ function baseOptions(yTitle, tipFormat, tickFormat, xTitle, partial) {
     },
     scales: {
       x: {
-        title: { display: true, text: xTitle || 'Year-Week Number', color: textCol, font: { size: 11 } },
+        title: { display: true, text: xTitle || 'Year-Week Number', color: textCol, font: { size: fsPx('xs') } },
         grid: { color: grid, drawBorder: false },
-        ticks: { color: tickCol, font: { size: 10 }, maxRotation: 60, minRotation: 0, autoSkipPadding: 8 }
+        ticks: { color: tickCol, font: { size: fsPx('xs') }, maxRotation: 60, minRotation: 0, autoSkipPadding: 8 }
       },
       y: {
-        title: { display: true, text: yTitle, color: textCol, font: { size: 11 } },
+        title: { display: true, text: yTitle, color: textCol, font: { size: fsPx('xs') } },
         grid: { color: grid, drawBorder: false },
-        ticks: { color: tickCol, font: { size: 10 }, callback: v => yFormat(v) }
+        ticks: { color: tickCol, font: { size: fsPx('xs') }, callback: v => yFormat(v) }
       }
     }
   };
@@ -6674,7 +6690,7 @@ function drawCharts(d) {
     qualOpts.plugins.legend = {
       display: true, position: 'top',
       labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
-                font: { size: 11 }, filter: item => item.text !== 'Trend' }
+                font: { size: fsPx('xs') }, filter: item => item.text !== 'Trend' }
     };
     defectSets.push({
       label: state.settings.unplannedLabel + ' raised',
@@ -6704,7 +6720,7 @@ function drawCharts(d) {
   respOpts.plugins.legend = {
     display: true, position: 'top',
     labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
-              font: { size: 11 }, filter: item => item.text !== 'Trend' }
+              font: { size: fsPx('xs') }, filter: item => item.text !== 'Trend' }
   };
   renderChart('chartCycleTime', {
     type: 'line',
@@ -6833,7 +6849,7 @@ function drawCharts(d) {
   cfdOpts.plugins.legend = {
     display: true, position: 'top',
     labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
-              font: { size: 11 } }
+              font: { size: fsPx('xs') } }
   };
   /* One tooltip listing all three bands, so the reader gets the whole stack at a
      period rather than whichever band the pointer happened to land on — the
@@ -6905,7 +6921,7 @@ function drawCharts(d) {
     wipOpts.plugins.legend = {
       display: true, position: 'top',
       labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
-                font: { size: 11 }, filter: item => item.text !== 'Trend' }
+                font: { size: fsPx('xs') }, filter: item => item.text !== 'Trend' }
     };
   }
   renderChart('chartWip', {
@@ -7155,7 +7171,7 @@ function drawCharts(d) {
     ageOpts.plugins.legend = {
       display: true, position: 'top',
       labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
-                font: { size: 11 }, filter: item => item.datasetIndex < dotSets.length }
+                font: { size: fsPx('xs') }, filter: item => item.datasetIndex < dotSets.length }
     };
     /* Named by its key where the paste carried one, and by its type and start
        date where it did not — the same rule, and the same wording, as the
