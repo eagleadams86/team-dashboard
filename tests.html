@@ -71,6 +71,21 @@
      check below has passed. -->
 
 <script>
+/* One cache-buster for this run, on every hidden frame AND every fetch of a file
+   this repo ships. The two are different caches and they can disagree: on
+   2026-08-22 the lottery repo's suite reported all-green against a page three
+   features out of date, because its source-level tests were reading the file off
+   the server while its frames ran a copy the browser had cached. Nothing errored
+   and nothing looked wrong — the new code was simply never run. A suite that can
+   pass against a build which exists nowhere is worse than no suite, because it
+   turns "untested" into "verified".
+
+   `no-store` as well as the query, since a query alone is only a hint. The
+   GitHub API call further down is deliberately left alone: it is somebody
+   else's endpoint, not a file we ship. */
+const BUST = '?t=' + Date.now();
+const bustFetch = (f, init) => fetch(f + BUST, Object.assign({ cache: 'no-store' }, init || {}));
+
 /* ── The reference sample: 141 items. Every expectation below is pinned to this
       exact dataset, so any change to the maths shows up as a failure here.
       ────────────────────────────────────────────────────────────────────── */
@@ -2876,7 +2891,7 @@ async function run(TD, win) {
   f2.setAttribute('data-td-tests', '');
   f2.setAttribute('aria-hidden', 'true');
   f2.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
-  await new Promise((resolve) => { f2.onload = resolve; f2.src = 'index.html'; document.body.appendChild(f2); });
+  await new Promise((resolve) => { f2.onload = resolve; f2.src = 'index.html' + BUST; document.body.appendChild(f2); });
   const mig = f2.contentWindow.tdGet();
   is(mig.teams.length, 1, 'the v1 rows become one team');
   is(mig.teams[0].name, 'Kraken', 'named from the v1 teamName setting');
@@ -2904,7 +2919,7 @@ async function run(TD, win) {
      "nothing private is ever cached" is the single promise holding that up. */
   const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const [swRes, killRes, appRes] = await Promise.all(
-    [fetch('sw.js'), fetch('sw-kill.js'), fetch('index.html')]);
+    [bustFetch('sw.js'), bustFetch('sw-kill.js'), bustFetch('index.html')]);
   ok(swRes.ok, 'sw.js is missing');
   ok(killRes.ok, 'sw-kill.js is missing — the escape hatch has to exist BEFORE it is needed');
   const SW_SRC = await swRes.text();
@@ -2978,7 +2993,7 @@ async function run(TD, win) {
      back to what it documents and no statement of who wrote it. The privacy
      link itself is deliberately absent from it: you are standing on that page.
      ══════════════════════════════════════════════════════════ */
-  const privRes = await fetch('privacy.html');
+  const privRes = await bustFetch('privacy.html');
   ok(privRes.ok, 'privacy.html is missing — the app footer links straight at it');
   const PRIV_SRC = await privRes.text();
   ok(/>How it works</.test(PRIV_SRC),
@@ -3045,7 +3060,7 @@ async function run(TD, win) {
   ok(/function paintThemeColor\(\)/.test(APP_SRC) && /token\('--bg'\)/.test(APP_SRC),
      'and the theme picker repaints it from the pack\u2019s --bg rather than a literal of its own');
 
-  const manRes = await fetch('manifest.webmanifest');
+  const manRes = await bustFetch('manifest.webmanifest');
   ok(manRes.ok, 'manifest.webmanifest is missing');
   const MAN = await manRes.json();
   is(MAN.scope, './', 'the scope is this app\u2019s own directory');
@@ -3068,7 +3083,7 @@ async function run(TD, win) {
   }
   ok(shell.includes('manifest.webmanifest'),
      'the manifest itself is cached too: a launcher re-reads it to draw the window');
-  const appleRes = await fetch('apple-touch-icon.png', { method: 'HEAD' });
+  const appleRes = await bustFetch('apple-touch-icon.png', { method: 'HEAD' });
   ok(appleRes.ok, 'and apple-touch-icon.png exists, which only the head links');
 
   /* ══════════════════════════════════════════════════════════
@@ -3145,7 +3160,7 @@ async function run(TD, win) {
   f4.setAttribute('data-td-tests', '');
   f4.setAttribute('aria-hidden', 'true');
   f4.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
-  await new Promise((resolve) => { f4.onload = resolve; f4.src = 'index.html'; document.body.appendChild(f4); });
+  await new Promise((resolve) => { f4.onload = resolve; f4.src = 'index.html' + BUST; document.body.appendChild(f4); });
   is(localStorage.getItem('td-sync-uid'), null,
      'booting the app clears the Google account id sync left in localStorage');
   is(localStorage.getItem('td-updated'), null, 'and the timestamp key nothing reads any more');
@@ -3172,7 +3187,7 @@ async function run(TD, win) {
   f3.setAttribute('data-td-tests', '');
   f3.setAttribute('aria-hidden', 'true');
   f3.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
-  await new Promise((resolve) => { f3.onload = resolve; f3.src = 'index.html'; document.body.appendChild(f3); });
+  await new Promise((resolve) => { f3.onload = resolve; f3.src = 'index.html' + BUST; document.body.appendChild(f3); });
   const w3 = f3.contentWindow;
 
   ok(w3.tdGet === undefined,
@@ -3942,7 +3957,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   /* Its own fetch: APP_SRC is declared further down this function, and reading a
      `const` before its declaration is the temporal-dead-zone error that has taken
      this app down twice — see ART_NONE in CLAUDE.md. */
-  const PRINT_SRC = await (await fetch('index.html')).text();
+  const PRINT_SRC = await (await bustFetch('index.html')).text();
   const printBlock = (PRINT_SRC.match(/@media print \{[\s\S]*?\n\}/) || [''])[0];
   ok(printBlock.length > 0, 'there is an @media print block');
   ['.tabs', '.tile-help', 'header .btn', '#toast', '#chartMaxi', 'dialog']
@@ -5490,7 +5505,7 @@ group('ARTs — the grouping, and the boundary it crosses');
     f.setAttribute('data-td-tests', '');
     f.setAttribute('aria-hidden', 'true');
     f.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
-    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html'; document.body.appendChild(f); });
+    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html' + BUST; document.body.appendChild(f); });
     const doc = f.contentWindow.document;
     is(doc.getElementById('panel-allteams').hidden, false,
        'the app opens on All Teams when that is where it was left');
@@ -5608,7 +5623,7 @@ group('ARTs — the grouping, and the boundary it crosses');
      Chart.js exists; now update the FILE too, in all three repos that carry
      it") instead of a false record. It is the theme pack's rule in another
      repo: a generated artefact has to match its source. */
-  const [pkgRes, libRes] = await Promise.all([fetch('package.json'), fetch('chart.min.js')]);
+  const [pkgRes, libRes] = await Promise.all([bustFetch('package.json'), bustFetch('chart.min.js')]);
   ok(pkgRes.ok, 'a manifest exists for Dependabot to scan');
   ok(libRes.ok, 'and the library it names is vendored beside it');
   const PKG_SRC = await pkgRes.text(), LIB_SRC = await libRes.text();
@@ -6157,7 +6172,7 @@ group('a card with no chart matches the one beside it');
     f.setAttribute('data-td-tests', '');
     f.setAttribute('aria-hidden', 'true');
     f.style.cssText = 'position:absolute;left:-9999px;width:1240px;height:900px;border:0';
-    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html'; document.body.appendChild(f); });
+    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html' + BUST; document.body.appendChild(f); });
     const cw = f.contentWindow, cd = cw.document;
     cd.getElementById('stab-health').click();
 
@@ -6383,7 +6398,7 @@ if (LOCAL_HOSTS.includes(location.hostname)) {
   frame.setAttribute('aria-hidden', 'true');
   frame.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
   frame.addEventListener('load', onAppLoad);
-  frame.src = 'index.html';           /* set before append: one load event, the real one */
+  frame.src = 'index.html' + BUST;    /* set before append: one load event, the real one */
   document.body.appendChild(frame);
 } else {
   /* Two reasons to be here, needing different sentences: a published copy

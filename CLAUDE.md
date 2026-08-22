@@ -1534,6 +1534,27 @@ app now holds identifiers out of a work system, and the answer to "where does th
   tests passed" whenever the parser, boundaries, or metrics change; CI
   (`.github/workflows/tests.yml`) runs it headless on every push on port 8013.
   When a rule in this file changes, change the matching test in the same commit.
+- **tests.html busts its own cache, on the frames AND on the source fetches
+  (2026-08-22), and that is not tidiness.** `const BUST = '?t=' + Date.now()` goes
+  on all six hidden `iframe.src`es and through `bustFetch()` on every read of a
+  file this repo ships. The frame cache and the HTTP cache are different caches
+  and they can disagree: in the lottery repo the same harness reported
+  **all-green against a page three features out of date**, because the
+  source-level tests were reading the file off the server while the frames ran a
+  copy the browser had cached. Nothing errored; the new code was simply never
+  run. A suite that can pass against a build which exists nowhere is worse than
+  no suite — it turns "untested" into "verified". **If a test passes when you
+  expected it to fail, check the frame's `contentWindow` has the function you
+  just wrote before believing anything.** The `api.github.com` call is
+  deliberately left un-busted: somebody else's endpoint, not a file we ship.
+- **A second consecutive local run of the suite fails three date tests, and it is
+  the harness, not the app (found 2026-08-22, NOT yet fixed).** The suite plants
+  data and leaves `td-view` behind, so the next run boots the app with a
+  `customFrom` already saved — and the three "the date strip is prefilled with
+  the ends of the data" tests then see the restored window instead of the
+  default one. CI never sees it because it starts from a clean profile.
+  `localStorage.removeItem('td-view')` before a run, or expect three red rows
+  that mean nothing. Same family as the ambient-state trap in Money Map.
 - The header/chrome is shared with Sprint Velocity — a chrome change in one repo
   is mirrored in the other, including the cross-`applink`. That link lives in the
   **footer** since 2026-08-20 (it sat in the header beside the title before), where
