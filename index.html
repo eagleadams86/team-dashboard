@@ -900,7 +900,18 @@ footer .applink { margin: 0 19px 0 auto; }
 
 /* share dialog furniture — the sibling app's, unchanged */
 fieldset.formpanel { border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 12px; margin: 14px 0 0; background: var(--surface-alt); min-width: 0; }
+  padding: 12px; margin: 0; background: var(--surface-alt); min-width: 0;
+}
+/* ── The gap between stacked panels, and only between them ──────────────────
+   Money Map's rule, adopted here on 2026-08-22 so the share window's spacing
+   matches it. An ADJACENT-SIBLING rule rather than a margin on every panel
+   cancelled on the first one: `.formpanel:first-of-type` zeroes the first
+   fieldset among its SIBLINGS, which inside the share dialog is Your Link —
+   the other two are nested in `.share-choices` and so are not its siblings. The
+   panel that needed the gap was the one losing it. This says the thing directly:
+   a panel that FOLLOWS another panel, or follows the side-by-side row, is
+   spaced from it; a panel that follows nothing is not. */
+.formpanel + .formpanel, .share-choices + .formpanel { margin-top: 20px; }
 legend { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em;
   color: var(--text-secondary); font-weight: 700; padding: 0 6px; }
 /* overflow-x is spelled out because `overflow-y: auto` alone leaves the browser
@@ -1016,6 +1027,20 @@ dialog { background: var(--surface); color: var(--text-primary);
      it opens. */
   #shareDialog .share-choices { display: grid; grid-template-columns: 1fr 1fr;
     gap: 0 14px; }
+/* The nested pair are NOT spaced from each other — they sit side by side, and
+   the grid's own column gap is what separates them. Without this the adjacent-
+   sibling rule above catches the second one (it does follow the first in source
+   order) and pushes it 20px down, so the pair starts out of step and the row
+   ends ragged. Money Map carries the same override for the same reason.
+   Also a flex column, so the list inside can fill the panel rather than
+   stopping at its own height and leaving the pair unequal. */
+#shareDialog .share-choices > .formpanel {
+  margin-top: 0; display: flex; flex-direction: column; }
+/* The list fills its panel. `flex: 1` takes whatever slack the other panel
+   leaves; `min-height: 0` is what lets it shrink again, since a flex item's
+   default `min-height: auto` refuses to go below its content. The cap stays for
+   the stacked case, where nothing holds the panel open. */
+#shareDialog .share-choices .checklist { max-height: none; flex: 1 1 auto; min-height: 0; }
 }
 dialog::backdrop { background: rgba(0, 0, 0, .55); }
 /* ── The All Teams trend column ──────────────────────────────────────────────
