@@ -288,7 +288,15 @@ function near(actual, expected, name, eps) {
 }
 function ok(cond, name, msg) { record(!!cond, name, msg); }
 /* The floor the run is measured against — see the check at the foot of run().
-   1623 checks as of 2026-08-22. */
+   1623 checks as of 2026-08-22.
+
+   Deliberately LOOSER than the eight sibling suites, which pin their floor at
+   the exact number they register. They count TESTS, and registration there is
+   static — a flat list of t() calls — so exact costs nothing and catches the
+   loss of a single one. This suite counts ASSERTIONS, and a good many sit
+   inside loops over app data (the theme table, the demo teams, a derived
+   series), so the total moves legitimately when that data changes size. An
+   exact floor here would go red for a reason that is not about the tests. */
 const EXPECTED = 1600;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
