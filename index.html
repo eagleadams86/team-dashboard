@@ -1070,15 +1070,31 @@ main:focus { outline: none; }
    — which is why the grid is left alone rather than forced to one column, where
    every canvas would have to be re-rendered at a size the print layout only
    knows about after this stylesheet has already applied. */
+/* ── On paper ────────────────────────────────────────────────────────────────
+   THE PALETTE, THE FAMILY CHROME AND THE PAPER MANNERS ARE NOT HERE. `theme.css`
+   owns them as of 2026-08-22 (pack rule 13): the Light palette unless the reader
+   is already on Light or Sepia, `.headbar`'s buttons and the tab bar out of the
+   way, 12mm margins, a static header, repeated table headings, canvases printed
+   in colour rather than dropped to save ink. Five apps in this family had each
+   written their own version of that; what is left below is the part only THIS
+   app knows.
+
+   The colour swap in `beforePrint()` stays and is not duplication: it is there
+   for the CANVASES, which the stylesheet cannot reach. See the note beside it. */
 @media print {
-  @page { margin: 12mm; }
-  /* A chart cut in half by a page break is a chart nobody can read. */
+  /* A chart cut in half by a page break is a chart nobody can read. The pack
+     keeps ROWS, images and canvases whole; these are the bigger units this app
+     thinks in, and they are its own to name. */
   .chart-card, .card, .tile, table { break-inside: avoid; }
-  /* Everything that is a control rather than a figure. The tab strip goes with
-     them: what prints is the view that is on screen, which is the one the reader
-     chose to print. */
-  .skip, .tabs, .subtabs, .applink, .tile-help, .chart-max, .table-scroll .btn,
-  header .btn, header select, header label, #toast, #chartMaxi, #shareBar,
+  /* Everything that is a control rather than a figure, in this app's own words.
+     `.tabs` and the header's BUTTONS are the pack's now; `.subtabs` is a second
+     tab strip it cannot know about, and `header select` stays deliberately —
+     the pack leaves header selects alone because in Sprint Velocity the team
+     picker's value is the answer, whereas here `.print-only` below already says
+     which team and which window these figures are, so the picker itself is
+     furniture. */
+  .skip, .subtabs, .applink, .tile-help, .chart-max, .table-scroll .btn,
+  header select, header label, #toast, #chartMaxi, #shareBar,
   [data-export], dialog, #viewControls .field { display: none !important; }
   /* The window note stays, and it is the one thing here that must: a figure on
      paper is worthless without the dates it covers. Its container is a flex row
@@ -1088,7 +1104,7 @@ main:focus { outline: none; }
   /* The header keeps its title and loses its controls, so the print-only line
      under it is what says WHICH team and which window these figures are. */
   .print-only { display: block !important; }
-  header { position: static; border: 0; }
+  header { border: 0; }   /* the pack already makes it static */
   /* Nothing scrolls on paper — a table inside an overflow box would print
      cropped at the edge of a box nobody can drag. */
   .table-scroll { overflow: visible !important; }
@@ -9480,16 +9496,18 @@ $('themeSel').value = (() => {
    first paint, so the meta in the markup is already wrong for anybody who is not
    on Midnight. */
 /* ── Printing ────────────────────────────────────────────────────────────────
-   The COLOUR half of printing; the layout half is the @media print block in the
-   stylesheet. Midnight and Dark are light text on a dark page, and a browser
-   does not print backgrounds — so printed as they are, they come out as pale
-   grey text on white paper, with charts drawn in colours picked to sit on
-   black. Switching to the theme pack's own Light palette for the duration of
-   the print is the whole fix, and it is done here rather than in CSS for two
-   reasons: it invents no colour (Light is the pack's, gated for contrast like
-   every other theme), and the charts are CANVASES — they re-read the CSS
-   variables only when they are drawn, so a print-only palette in a stylesheet
-   would leave every chart in the theme it was last rendered in.
+   The half of printing that a stylesheet cannot do. `theme.css` puts the Light
+   palette on paper for everything drawn in CSS (pack rule 13, 2026-08-22); this
+   is here for the CANVASES, which it cannot reach.
+
+   A chart re-reads the CSS variables only when it is DRAWN, and a print-media
+   value is invisible to `getComputedStyle` — so a print-only palette in a
+   stylesheet leaves every chart in the theme it was last rendered in, drawn in
+   colours picked to sit on black, on a page that has just become light.
+   Swapping the theme and re-rendering is what fixes that, and it invents no
+   colour: Light is the pack's own, gated for contrast like every other theme.
+   The rest of the page needs none of this — the stylesheet has already handled
+   it — which is why this function survived the move.
 
    Sepia and Light are left alone: both are already ink on a pale ground.
    Nothing is saved: the theme in localStorage is untouched, so the swap cannot

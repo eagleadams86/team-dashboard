@@ -3960,9 +3960,22 @@ group('ARTs — the grouping, and the boundary it crosses');
   const PRINT_SRC = await (await bustFetch('index.html')).text();
   const printBlock = (PRINT_SRC.match(/@media print \{[\s\S]*?\n\}/) || [''])[0];
   ok(printBlock.length > 0, 'there is an @media print block');
-  ['.tabs', '.tile-help', 'header .btn', '#toast', '#chartMaxi', 'dialog']
+  /* `.tabs` and `header .btn` used to be in this list. They moved into
+     theme.css on 2026-08-22 (pack rule 13) along with the palette, the margins,
+     the repeated table headings and the page-break manners — five apps in this
+     family had each written their own version of all of that. What stays here
+     is the furniture only THIS app has. */
+  ['.subtabs', '.tile-help', 'header select', '#toast', '#chartMaxi', 'dialog']
     .forEach(sel => ok(printBlock.indexOf(sel) >= 0,
       'paper has no use for ' + sel + ', so print takes it away'));
+  const packCss = await (await bustFetch('theme.css')).text();
+  const packPrint = packCss.slice(packCss.indexOf('@media print'));
+  ok(packPrint.length > 0 && /\.headbar button/.test(packPrint)
+     && /role="tablist"/.test(packPrint),
+     'and the family chrome really is hidden by the pack — a stale theme.css '
+     + 'would put the tab strip back on the page with nothing here to catch it');
+  ok(/:root:not\(\[data-theme="light"\]\)/.test(packPrint),
+     'along with the light palette, which is why the swap below is only for the canvases');
   ok(/#viewControls \{ display: block/.test(printBlock),
      'while the window note stays — a figure on paper is worthless without the dates it covers');
   /* THE invariant. Colours belong to the theme pack, and the print block is
