@@ -287,6 +287,9 @@ function near(actual, expected, name, eps) {
   record(ok, name, 'expected ≈' + expected + '\n     got ' + actual);
 }
 function ok(cond, name, msg) { record(!!cond, name, msg); }
+/* The floor the run is measured against — see the check at the foot of run().
+   1623 checks as of 2026-08-22. */
+const EXPECTED = 1600;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1222,8 +1225,26 @@ async function run(TD, win) {
     { filterValue: '', months: 'all', bucket: 'week', asOf: D(2026, 8, 10) });
   is(stacked.cycleScatter.points.map(p => p.stack), [2, 2, 1],
      'and derive stamps it on the finished-item dots, so the tooltip need not guess');
-  ok(stacked.ageing.count === 0 || stacked.ageing.points.every(p => p.stack === 1),
-     'age dots are spread across their column, so none of them ever stack');
+  /* Age dots come off items still IN FLIGHT, so the fixture above — every row
+     finished — produced no age points at all and this assertion ran on an empty
+     array, where `.every()` is true whatever the rule is. It needs work that is
+     genuinely unfinished, and the hard case is three items of the SAME type
+     started on the SAME day: identical column, identical age, so without the
+     even spread across the column all three would land on one pixel. */
+  const flight = TD.derive(stackRows.concat([
+    { started: D(2026, 8, 4), type: 'Story', key: 'DAE-4' },
+    { started: D(2026, 8, 4), type: 'Story', key: 'DAE-5' },
+    { started: D(2026, 8, 4), type: 'Story', key: 'DAE-6' }
+  ]), SAMPLE_SETTINGS,
+    { filterValue: '', months: 'all', bucket: 'week', asOf: D(2026, 8, 10) });
+  is(flight.ageing.count, 3, 'the three unfinished items are the ones in flight');
+  is(flight.ageing.points.length, 3, 'and each gets its own dot');
+  ok(flight.ageing.points.every(p => p.stack === 1),
+     'age dots are spread across their column, so none of them ever stack',
+     JSON.stringify(flight.ageing.points.map(p => p.stack)));
+  is(new Set(flight.ageing.points.map(p => p.x)).size, 3,
+     'three same-age items in one column sit at three different x positions — '
+     + 'that spread is what makes the stack always 1');
 
   const tip = (raw) => Dots.dotTipFooter([{ raw }]);
   is(tip({ key: 'DAE-9', stack: 1 }), ['Click to copy DAE-9'],
@@ -1268,7 +1289,10 @@ async function run(TD, win) {
      'and one shared footer writes the single copy line on both');
   /* Charts that are not scatters of items must NOT copy: their points are
      periods and buckets, and there is nothing to put on a clipboard. */
-  ok(!liveCharts.chartThroughput || !liveCharts.chartThroughput.options.onClick,
+  ok(liveCharts.chartThroughput,
+     'the throughput chart must be drawn — without this the rule below is asserted '
+     + 'about a chart that is not there, and passes on its absence');
+  ok(!liveCharts.chartThroughput.options.onClick,
      'a chart whose points are periods carries no copy handler');
 
   /* ────────────────────────────────────────────────────────── */
@@ -6628,6 +6652,17 @@ group('a card with no chart matches the one beside it');
   ok(!mDoc.querySelector('.shell').inert, 'with the page handed back');
 
   /* ────────────────────────────────────────────────────────── */
+  /* A completeness floor. This suite has no per-test isolation, so "everything
+     that ran passed" is only half an answer — an early `return` added to run()
+     would end it quietly with a green summary over a fraction of the checks.
+     The floor is what makes the count itself an assertion. Raise it when the
+     suite grows; it is deliberately a floor and not an exact figure, so adding
+     a check never fails the build. */
+  if (passed + failed < EXPECTED) {
+    record(false, 'the suite ran only ' + (passed + failed) + ' of at least ' + EXPECTED
+      + ' checks — it ended early, so a green result here would cover a fraction of it',
+      'if checks were deliberately removed, lower EXPECTED to match');
+  }
   const sum = document.getElementById('summary');
   sum.className = failed ? 'bad' : 'ok';
   sum.textContent = failed
@@ -6647,10 +6682,18 @@ function onAppLoad() {
     return;
   }
   run(w.TD, w).catch(function (e) {
-    record(false, 'test run threw', e && e.stack ? e.stack : String(e));
+    /* Say that the run was CUT SHORT, not merely that one thing failed. Unlike
+       every sibling suite — which wraps each test in its own try, so a failure
+       costs one row — this one is a single straight-line function, so a throw
+       anywhere abandons every assertion after it. The old wording here read
+       "1 of 400 failed", which looks like 399 passing tests when in truth
+       1200-odd were never reached. */
+    record(false, 'test run threw — everything after this point did NOT run',
+           e && e.stack ? e.stack : String(e));
     const sum = document.getElementById('summary');
     sum.className = 'bad';
-    sum.textContent = failed + ' of ' + (passed + failed) + ' failed';
+    sum.textContent = 'RUN CUT SHORT after ' + (passed + failed) + ' of ~' + EXPECTED
+      + ' checks — ' + failed + ' failed, the rest never ran';
   });
 }
 
