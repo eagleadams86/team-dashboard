@@ -54,7 +54,7 @@
 /* Bump when the shell list changes, so old caches are purged on activate. It is
    NOT load-bearing for freshness — network-first means a forgotten bump cannot
    serve you stale code — it only stops dead entries accumulating. */
-const CACHE = 'td-shell-v1';
+const CACHE = 'td-shell-v2';
 const PREFIX = 'td-shell-';
 
 /* THE ALLOWLIST, and the security boundary of this file. Every entry is a file
@@ -62,12 +62,29 @@ const PREFIX = 'td-shell-';
    the work items, not tests.html, not the repo's own notes. A request that is not on this list is not intercepted at all: it goes
    to the network as if this worker did not exist. Adding a line here is a
    security decision, so justify it in the commit. */
+/* The manifest and the four install icons joined on 2026-08-22, when the app
+   became installable. Each is a file already committed in this repo, so the
+   origin-wide-cache rule above is unchanged by them. They earn their place
+   because an INSTALLED app is the copy most likely to be opened with no network
+   at all: a launcher re-reads the manifest and its icons to draw the window, and
+   without them a cold offline start shows a blank icon and can drop back out of
+   standalone display.
+
+   Their justification is written HERE rather than between the entries, because
+   the suite pulls every quoted string out of the array below straight from the
+   source, comments and all — a note sitting inside it with an apostrophe in the
+   prose would hand that check a fake entry. */
 const SHELL = [
   './',
   'chart.min.js',
   'theme.css',
   'privacy.html',
-  'favicon.ico'
+  'favicon.ico',
+  'manifest.webmanifest',
+  'icon-192.png',
+  'icon-512.png',
+  'icon-512-maskable.png',
+  'apple-touch-icon.png'
 ];
 
 /* Resolved against this file's own URL, so the same list works unchanged on

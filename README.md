@@ -20,7 +20,7 @@ measures that move together are read together:
 | Group | Question it answers | What's plotted |
 |---|---|---|
 | **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); **every finished item, as a dot**; lead time |
-| **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started) |
+| **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started); **[raised, started, finished](#raised-started-finished-the-cumulative-flow-diagram)** — the cumulative flow diagram |
 | **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **[work item age](#work-item-age-what-to-do-this-morning)**, by workflow stage where your export says one; defect rate — defects resolved and defects raised; **[time in stage](#where-the-time-goes-time-in-stage)**, where the wait actually goes |
 | **Forecast** — what that implies | When will this batch be done, and how much by a date? | Two distributions from ten thousand simulated runs, one per question |
 
@@ -28,19 +28,19 @@ The first three describe what already happened. **Forecast** is the only one tha
 forward, and it is the reason for collecting any of the rest — see
 [Forecasting](#forecasting-what-the-pace-youve-had-implies) below.
 
-Charts sit two to a row at any window wide enough for the pair. Every group holds an even number
-of them today, so none is left over — the one card that isn't a chart, **time in stage**, spans
-both columns instead, because a five-column table in half a row scrolls sideways on an ordinary
-laptop. A group with an odd count of real charts leaves its last one alone
-on its row, keeping a single column's width and sitting **centred** rather than stretching the
-full width. A chart drawn twice as wide as the ones above it reads as the more important one,
+Charts sit two to a row at any window wide enough for the pair. **Delivery holds three**, so its
+last one — the cumulative flow diagram — is alone on its row: it keeps a single column's width and
+sits **centred** rather than stretching the full width. The one card that isn't a chart, **time in
+stage**, does span both columns, because a five-column table in half a row scrolls sideways on an
+ordinary laptop. A chart drawn twice as wide as the ones above it reads as the more important one,
 which it isn't, and its bars stop being comparable with theirs at a glance. On a narrow window
 every chart is full width, so there is nothing to centre.
 
 Any one of them can be **[filled to the window](#one-chart-filling-the-window)** with the ⤢ in
 its corner, with the header still there above it.
 
-**Choose how much history to show** — 1 month, **12 weeks (a PI)**, 3, 6, 9 or 12 months, or All.
+**Choose how much history to show** — 1 month, **12 weeks (a PI)**, 3, 6, 9 or 12 months, All, or
+**[Custom dates](#a-window-between-two-dates-you-type)**.
 Every option but the PI is a number of calendar months; a planning increment is six two-week
 sprints, so it is 84 days flat rather than three months rounded — a few days out of step with the
 sprints it is made of would defeat the point of having it. It sits between *1 month* and *3
@@ -190,6 +190,44 @@ detail on a second line beneath: which grouping, which series, the window averag
 identifiable at a glance across a room in a stand-up; the sentence under it answers "plotted
 how?". The **ⓘ button** sits on the name and opens a plain-English note on what the figure means
 and which direction is good.
+
+## A Window Between Two Dates You Type
+
+Every option in the window picker but one is counted back from the newest date in your data:
+*the last three months*, *the last 12 weeks*. **Custom dates** is the one that isn't. Choose it
+and two date boxes appear beside the picker; the figures are then read between exactly those two
+dates.
+
+It exists for the thing a rolling window structurally cannot do: **compare two fixed periods**.
+Last quarter against the quarter before it. The three months either side of a reorganisation. The
+period a change was supposed to help, read on its own terms rather than as part of a span that
+keeps moving as more data arrives.
+
+A few details worth knowing, each of which is there for a reason:
+
+- **Choosing it doesn't change the picture.** The boxes are filled in with the window you were
+  already looking at — the last three months of your data — so you start by editing a window
+  rather than building one from nothing. A control that emptied the charts the instant you chose
+  it would read as broken.
+- **The end is clamped to your data.** Type a *To* of next month and the figures are still read
+  as of the last date your export actually reaches. Everything in this app is read as of the
+  newest date in the data rather than as of today, deliberately — work in progress and aged work
+  are both read at the window's end, so an end date past the export would age every open item for
+  free against data that stopped weeks ago.
+- **Both dates are needed, and *From* must come before *To*.** Half a pair is the state you pass
+  through on the way to typing the second date, so it means "no custom window" rather than an
+  error — the note under the strip says so while it waits, instead of leaving two boxes that hold
+  dates and appear to be ignored.
+- **Neither box will take a date in the future**, the same rule every other date field here
+  follows.
+- **It reaches All Teams too**, and there it does the aligning the shared date exists for by
+  construction: every team is read between the same two dates, however much or little data each
+  of them has inside them.
+- A window your data doesn't reach plots nothing, and says which dates it found nothing between
+  rather than blaming the work type filter.
+
+Which dates you're looking at is a position on *this* device, like the team you have picked: it
+is not part of your data, so it stays out of backups and share links.
 
 ## One of a Pair
 
@@ -384,7 +422,13 @@ button beside that picker — a name is edited in place, **↑** and **↓** mov
 and **×** deletes it. Each row also holds a **project id** — the letters at the front of that
 team's issue keys, `DAE` for `DAE-1552` — which is what lets [one export covering several
 teams](#pasting-several-teams-at-once) be pasted in one go and split between them. It is
-optional, it changes no figure, and a team without one simply takes nothing from a split. The
+optional, it changes no figure, and a team without one simply takes nothing from a split.
+
+Each row also holds the two figures the team **sets** rather than measures: **WIP ≤**, how much
+work it means to have open at once, and **85% ≤**, how long it means an item to take. Both are
+covered under [your own limit and your own target](#your-own-limit-and-your-own-target) below.
+
+The
 order matters: it is the order teams appear in that picker and down
 the All Teams table. That window also holds your [Agile Release Trains](#grouping-teams-into-arts)
 and your [workflow stages](#where-the-time-goes-time-in-stage), and is
@@ -422,9 +466,9 @@ page rather than a list of names you'd have to open one by one:
 
 | Team | What it's there to show |
 |---|---|
-| **Team Healthy Flow** | The healthy board. Carries issue keys (`KFR-…`), as Team Long Tail does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. The baseline the other two read against. |
-| **Team Long Tail** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Team Healthy Flow's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. |
-| **Team Bare Export** | A newer team: four months of history, **no created dates, no issue keys, no Status column and no stage times at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. Also proves each team's data stands on its own. |
+| **Team Healthy Flow** | The healthy board. Carries issue keys (`KFR-…`), as Team Long Tail does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. It sets a **WIP limit of 6 and a 10-day target** and is comfortably inside both. The baseline the other two read against. |
+| **Team Long Tail** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Team Healthy Flow's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. It sets **the same limit of 6 and the same 10-day target Team Healthy Flow does** and keeps neither — which is the point of the pair carrying identical figures. |
+| **Team Bare Export** | A newer team: four months of history, **no created dates, no issue keys, no Status column and no stage times at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. It sets **no limit and no target**, which is how every browser starts and the only way the no-line, no-verdict face of those two is reachable. Also proves each team's data stands on its own. |
 
 Team Healthy Flow and Team Long Tail also arrive with the **project ids their own keys are
 built from** (`KFR` and `HRN`), so [pasting several teams at once](#pasting-several-teams-at-once)
@@ -710,6 +754,45 @@ Everything the charts depend on, shared by all your teams:
 
 Nothing else is here on purpose: a setting that changes nothing is worse than a missing one.
 
+## Your Own Limit and Your Own Target
+
+Two figures a team **sets** rather than measures, both optional and both **empty out of the box**:
+
+- **WIP ≤** — how much work this team means to have open at once.
+- **85% ≤** — how long it means an item to take: the promise the 85th percentile is read against.
+
+They live in **Teams & Stages**, on the team's own row, and **not** in Settings — which is the
+one design decision here worth stating. Every setting in this app is shared by every team, and
+can be, because each describes how a *figure is worked out*: what counts as a defect, what a
+same-day item is worth. These two describe a team's own board. A limit of eight means something
+different to a team of three and a team of twelve, and a promise is made by the people who have
+to keep it.
+
+What they do:
+
+- The **limit** is drawn flat across the work in progress chart, and the *Work in progress* tile
+  says whether today is inside it and by how much: *limit 6 — over by 3*.
+- The **target** is drawn on both scatter charts — every finished item, and work item age — and
+  the *85th percentile* tile says *target 10.0 — met* or *not met*. It is compared with the
+  percentile rather than with the average deliberately: a target is a promise about the next
+  item, which is the one question an average cannot answer. On the age chart it means something
+  slightly different and equally useful — an item still open above that line has already blown
+  the promise, and knowing that this morning beats reading it next month.
+
+**Neither changes a single figure.** They are what the figures are compared *to*, which is why
+leaving both blank costs nothing: the app states the numbers and does not judge them, exactly as
+it did before these existed. That is also why nothing is set by default — a limit the app picked
+would draw a line across your chart claiming you had agreed to it.
+
+**Nothing turns a colour.** The verdict is a sentence on the tile, and the bars over a limit are
+the same colour as the bars under it. This app states figures rather than grading them, its
+palette has nothing on the red-green axis to grade with, and a period over a limit is something
+to look at rather than a failure to mark.
+
+Both **travel in a share link**, so the person you send it to sees the same lines you do. Both are
+**per team**, so the All Teams table — which compares teams against each other rather than against
+their own promises — deliberately doesn't carry them.
+
 ## What Isn't Here, and Why
 
 **Blocked time** — how long an item couldn't move because something was in its way. A plain
@@ -769,8 +852,9 @@ re-entered:
 
 Rows gained an optional created date (`k` on the wire, backup `version: 3`, `schema: 3` in the
 saved state; the working-days setting later took both markers to `4`, ARTs to `5`,
-the issue key to `6`, the per-team project id to `7`, workflow stages to `8` and the per-row
-current stage to `9`). A row without one is left exactly as it was — no `k` key is written —
+the issue key to `6`, the per-team project id to `7`, workflow stages to `8`, the per-row
+current stage to `9` and the per-team [limit and target](#your-own-limit-and-your-own-target)
+to `10`). A row without one is left exactly as it was — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before. **The issue key
 (`i` on the wire) follows exactly the same rule**: absent unless there is one, so a team whose
 export has no key column saves byte-identically to before that field existed, and the first save
@@ -780,7 +864,14 @@ exactly what it stored before the feature existed.
 
 **Stage times follow the same rule**: no `g` key on a row until there are day counts to put
 in it, and no `stages` list on the document until you set one up, so a browser that never uses
-the feature saves exactly what it saved before it existed.
+the feature saves exactly what it saved before it existed. **So do the limit and the target**: a
+team that has set neither writes neither key, and both are re-typed in seconds if an older build
+ever drops them — which is why they are not on the list of fields the app stops and asks about.
+
+The limit and the target **do travel in a share link**, unlike the project id: they are drawn on
+the charts a link exists to show, and a link without them would give the reader a different
+picture from the sender's. An older cached build simply drops both and draws the charts without
+the lines.
 
 **Created dates, issue keys and stage times are never dropped silently.** A backup saved by a build older
 than the one that added a field simply has none of it in the file. It restores without
@@ -903,6 +994,42 @@ worth knowing:
 Net-flow bars use the theme's accent for positive and `--serious` for negative — deliberately
 not the red/green pair, because the coaching goal is "keep around zero", so neither sign is
 good or bad.
+
+## Raised, Started, Finished: the Cumulative Flow Diagram
+
+The third card in **Delivery**, and the only chart here that shows work arriving and work leaving
+in the same picture. Everything the team holds is stacked at the end of each period, in three
+bands:
+
+| Band | What it is |
+|---|---|
+| **Finished** (bottom) | Delivered by that date |
+| **In progress** (middle) | Started and not finished — the same figure the work in progress chart plots |
+| **Raised, not started** (top) | Raised and still waiting to be picked up |
+
+**Read the bands, not the lines.** The middle band's *thickness* is work in progress, so a band
+that widens from left to right is work piling up faster than it leaves — whatever the throughput
+tile says, and visible weeks before the cycle time chart catches up with it. The bottom band's
+*slope* is delivery: flat means nothing finished that period. Two edges running parallel is a team
+in balance, which is the shape to want; it is also the shape that says a forecast can be trusted.
+
+Three details, each of which is a decision rather than an accident:
+
+- **The finished band starts at zero on the left edge.** What the team delivered *before* the
+  window isn't stacked underneath it — with nine months of history under a three-month window,
+  that would put 130 items in the bottom band and leave the two bands that matter as a sliver at
+  the top of the card. Nothing else moves for it: a band is the gap between two curves, so
+  subtracting the same figure from all three leaves every thickness exactly as it was. The
+  in-progress band is still a real count of open work, not just of work opened inside the window.
+- **The top band needs a Created column**, and is left off entirely without one rather than drawn
+  as a flat zero claiming there is no backlog — the same stance the lead time chart takes on the
+  same column. Team Bare Export in the demo is the two-band version.
+- **An item with no start date** was never observably in progress, so it goes straight into the
+  finished band on the day it closed rather than being given a spell in the middle one.
+
+The middle band is worked out a different way from the work in progress chart beside it — a
+subtraction of two cumulative counts, against a walk over the items — and a test pins the two as
+equal. If they ever disagree, one of them is wrong.
 
 ## Every Finished Item: the Spread, Not the Average
 
@@ -1379,6 +1506,30 @@ own label — "Aug 2026" and "Sep 2026" sort backwards as text.
 Because [export](#taking-a-table-off-the-page) reads the rendered page, **the sort travels with
 it**: sort by cycle time, press ⬇ CSV, and the file arrives in that order.
 
+## Printing It
+
+**Ctrl-P / ⌘-P prints the view you're looking at**, and the page is laid out for paper rather
+than photographed off the screen. What goes is everything a piece of paper cannot use: the tab
+strip, the three pickers, the header's buttons, the ⓘ circles, the maximise buttons and the
+export buttons. What stays is the figures, the charts, and — the one that matters — **the note
+saying which dates they cover**, plus a line naming the team or the train. A figure on paper
+without its window is worthless, and the header's team picker is one of the things that has just
+gone.
+
+**A dark theme prints as a light one.** Browsers don't print page backgrounds, so Midnight and
+Dark would otherwise come off the printer as pale grey text on white paper, with charts drawn in
+colours picked to sit on black. The page switches itself to the **Light** theme for the duration
+of the print and back afterwards — no colour is invented for paper, and nothing is saved, so the
+swap can't outlive the print. Light and Sepia are left exactly as they are; both are already ink
+on a pale ground.
+
+Charts print because a canvas is an image, drawn at device resolution, so it scales down cleanly
+onto the page. A chart filling the window is brought back down first — printed as it stands, it
+would be one chart on page one and a blank page two.
+
+For figures somebody needs to *use* rather than read, the
+[Copy and ⬇ CSV buttons](#taking-a-table-off-the-page) are still the better route.
+
 ## Cleaning Up Old Data
 
 Years of history make every paste and backup heavier without telling you anything new.
@@ -1475,6 +1626,10 @@ key in storage, so a link cannot carry anything in that field the app would not 
 dialog says so above the link. A recipient still on an older cached build simply sees dots named
 by work type, as they were before keys existed.
 
+**A team's [limit and target](#your-own-limit-and-your-own-target) travel with it**, so the
+lines on the charts and the verdicts on the tiles read the same for the recipient as for you.
+The project id deliberately does not — it routes a paste the recipient has no way to make.
+
 **Stage times travel too, and so do the stage names they belong to** — they are what the figures
 *are*, and a link carrying counts without names would arrive showing nothing. Only the stages
 the shared items actually spent time in go, on the same reasoning that sends only the trains
@@ -1517,6 +1672,24 @@ opens, just without the line saying where the history starts.
 It's a **snapshot**: later edits don't appear in links already sent, and a sent link can't
 be withdrawn — treat it like emailing a spreadsheet.
 
+## Installing It
+
+Chrome's **Install page as app**, Safari's **Add to Dock** and iOS's **Add to Home Screen** all
+turn Flow Metrics into a real app window with its own icon, rather than a browser tab or a
+shortcut with a blank square next to it. That takes a `manifest.webmanifest` and PNG icons —
+neither the inline SVG icon nor `favicon.ico` is any use to any of them — and both are in the
+repo, drawn by `make_favicon.py` from the same mark the favicon uses.
+
+Installing is a **window, not a sandbox**: an installed app shares the browser's storage, so
+nothing about it changes what any page on this origin can already reach. The manifest's scope is
+its own directory, which matters more than it looks here — every one of these apps is served from
+the same origin, and a scope of `/` would capture Sprint Predictability and Money Map into this
+app's window.
+
+The offline cache below came first, which is the wrong way round: an installed copy is the one
+most likely to be opened with no network at all, so the manifest and its icons are cached with
+the rest of the shell.
+
 ## Working Offline
 
 The app keeps a copy of itself on your device, so it opens with no network at all — on a
@@ -1526,7 +1699,7 @@ export, share links, backup and restore. There is no longer any part of the app 
 network — sync was the one exception, and it is gone.
 
 What's kept is only the app's own public files — the page, the stylesheet, the chart
-library and the icon, the same files anyone can read on GitHub. **Nothing of yours is ever
+library, the icons and the install manifest, the same files anyone can read on GitHub. **Nothing of yours is ever
 put there**, which matters more than it sounds: every one of these apps shares a single
 browser origin, so that cache is not private to this app.
 
@@ -1737,13 +1910,18 @@ right instruction — update the file too, in all three repos that carry it.
 | `privacy.html` | Privacy policy — what the app stores and where it does (and doesn't) go |
 | `.github/workflows/tests.yml` | Runs `tests.html` headless on every push |
 | `favicon.ico` | Tab icon — the fallback a browser fetches from the site root on its own |
-| `make_favicon.py` | Draws `favicon.ico` to match the inline SVG icon in `index.html` |
+| `manifest.webmanifest` | What makes the app [installable](#installing-it) — its name, its window and its icons |
+| `icon-192.png`, `icon-512.png` | The install icons a launcher draws the app with |
+| `icon-512-maskable.png` | The same mark full bleed, for launchers that crop an icon to their own outline |
+| `apple-touch-icon.png` | Safari's own preference, square and opaque — Apple applies its own corners |
+| `make_favicon.py` | Draws `favicon.ico` and all four PNGs above, all from the same mark as the inline SVG icon in `index.html` |
 
 The icon is three weeks of flow side by side, on the midnight tile the whole app family
 wears; the header shows the same mark. `make_favicon.py` (Pillow) keeps `favicon.ico` and
 the page's inline SVG the same picture, rather than leaving a binary nobody can review in a
 diff. Re-run it with `python3 make_favicon.py`, then bump the `?v=` on every `favicon.ico`
-reference — browsers hold on to an icon for a long time.
+reference — browsers hold on to an icon for a long time. The install PNGs are versioned by
+`sw.js`'s `CACHE` constant instead; bump that too.
 
 Four themes — Midnight (default), Dark, Light, Sepia — from the shared theme pack. Palette
 changes belong in the pack, not here. 

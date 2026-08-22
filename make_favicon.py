@@ -9,6 +9,24 @@ rather than hand-editing a binary nobody can review in a diff.
 
     python3 make_favicon.py
 
+It also writes the INSTALL icons — the PNGs manifest.webmanifest and the
+apple-touch-icon link name. Three rules, and they are the whole reason there
+are four files rather than one:
+
+- **favicon.ico and the manifest's `any` icons are ROUNDED.** Nothing masks
+  them, so the corners have to be in the file.
+- **The maskable icon is full bleed with square corners.** A launcher crops it
+  to whatever outline it likes — a circle on a lot of Android ones — so anything
+  in the corners is thrown away and rounding it would round a picture that is
+  about to be rounded again. Nothing has to move for that crop: the safe zone is
+  the centre disc of 80% of the width, radius 25.6 in this 64 viewport, and the
+  furthest point of the mark — the round cap at (18,46), and its mirror at
+  (46,46) — is 23.8 from the centre. Widen a bar or drop its base and re-check
+  that number.
+- **apple-touch-icon.png is SQUARE and opaque**, for the same reason in reverse:
+  Apple applies its own corner radius, and a rounded source under that mask
+  leaves a pale seam inside the curve.
+
 The mark is what the app measures: three weeks of flow, side by side, one of
 them a good week. It's the family shape — the midnight page as a rounded tile,
 the soft disc in the bottom-left corner, one gradient stroke in the accent —
@@ -36,6 +54,14 @@ BARS = [(18, 30), (32, 18), (46, 25)]   # (x, top) — three weeks, one of them 
 
 SCALE = 8                       # supersample, then reduce
 SIZES = [16, 32, 48, 64, 128, 256]
+
+# The INSTALL icons, named by manifest.webmanifest and by index.html's
+# apple-touch-icon link, and cached by sw.js. Renaming one means editing all
+# three of those as well as this line. 192 and 512 are the two sizes Chrome asks
+# for when it offers "Install app"; 180 is Apple's.
+PWA_ICONS = [(192, 'icon-192.png'), (512, 'icon-512.png')]
+MASKABLE = (512, 'icon-512-maskable.png')
+APPLE = (180, 'apple-touch-icon.png')
 
 
 def lerp(a, b, t):
@@ -69,7 +95,7 @@ def bar_points(x, top, base, steps=400):
     return [(x, top + (base - top) * s / steps) for s in range(steps + 1)]
 
 
-def build():
+def build(rounded=True):
     n = 64 * SCALE
     img = Image.new('RGBA', (n, n), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -82,6 +108,11 @@ def build():
     for x, top in BARS:
         stamp(d, bar_points(x, top, BAR_BASE), BAR_WIDTH)
 
+    if not rounded:
+        # Full bleed, for the maskable icon and for Apple's — see the docstring.
+        # The glow is drawn to overflow the tile, so without the mask below it
+        # needs cutting back to it, which dropping the alpha channel does.
+        return img.convert('RGB')
     # Round the corners with an alpha mask. The SVG leaves the disc square at
     # the edges; an icon reads better rounded, and this is the file that ends
     # up on a bookmarks bar.
@@ -98,9 +129,25 @@ def main():
     frames[-1].save('favicon.ico', format='ICO',
                     sizes=[(s, s) for s in SIZES])
     print('favicon.ico written at ' + ', '.join(f'{s}px' for s in SIZES))
+
+    square = build(rounded=False)
+    for size, name in PWA_ICONS:
+        art.resize((size, size), Image.LANCZOS).save(name, format='PNG', optimize=True)
+        print(f'{name} written (rounded — nothing masks a `purpose: any` icon)')
+    size, name = APPLE
+    # No alpha channel: Apple asks for an opaque icon, and every pixel of this
+    # one is opaque already — carrying the channel would only invite a renderer
+    # to composite it against something.
+    square.resize((size, size), Image.LANCZOS).save(name, format='PNG', optimize=True)
+    print(f'{name} written (square, opaque — Apple masks it)')
+    size, name = MASKABLE
+    square.resize((size, size), Image.LANCZOS).save(name, format='PNG', optimize=True)
+    print(f'{name} written (full bleed — the launcher supplies the shape)')
+
     print('Now bump the ?v= on both favicon.ico references in index.html — '
           'browsers cache an icon for a long time and will keep showing the old '
-          'one otherwise.')
+          'one otherwise. The install icons are versioned by sw.js\'s CACHE '
+          'constant instead; bump that too.')
 
 
 if __name__ == '__main__':

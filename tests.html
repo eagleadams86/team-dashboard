@@ -926,7 +926,7 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 9, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 10, 'SCHEMA was bumped in the same commit as the whitelist widening');
 
   /* ══════════════════════════════════════════════════════════
      THE CURRENT STAGE — the half a plain Jira export can feed.
@@ -1407,8 +1407,8 @@ async function run(TD, win) {
      it plots — and every name must have a help entry behind it, since the ⓘ
      that opens one sits on the name. */
   is(Object.keys(d.names).sort(),
-     ['agedWork', 'cycleScatter', 'cycleTime', 'defectRate', 'forecastHowMany', 'forecastWhen',
-      'itemAge', 'leadTime', 'netFlow', 'stageTime', 'throughput', 'wip'],
+     ['agedWork', 'cfd', 'cycleScatter', 'cycleTime', 'defectRate', 'forecastHowMany',
+      'forecastWhen', 'itemAge', 'leadTime', 'netFlow', 'stageTime', 'throughput', 'wip'],
      'every chart has a name of its own');
   ok(Object.keys(d.names).every(k => d.titles[k]),
      'and a sentence under it saying what it plots');
@@ -1614,6 +1614,77 @@ async function run(TD, win) {
     { filterValue: '', months: 'pi' });
   is(Math.round((piTeams.train.endDate - piTeams.train.startDate) / 86400000) + 1, 84,
      'and All Teams reads it the same way');
+
+  /* ══════════════════════════════════════════════════════════
+     A window between two typed dates (2026-08-22). Every other window here is
+     counted back from the newest date in the data; this is the only one that
+     answers "these dates", which is what comparing two fixed periods needs.
+     ══════════════════════════════════════════════════════════ */
+  group('a window between two typed dates');
+
+  /* What counts as a usable pair, pinned as a pure function so the control strip
+     and derive() can never disagree about it. */
+  ok(!!TD.customWindow('2015-01-01', '2015-03-31'), 'two dates in order make a window');
+  ok(!!TD.customWindow('2015-01-01', '2015-01-01'),
+     'and both ends on one day is a window of one day, not an empty one');
+  is(TD.customWindow('2015-03-31', '2015-01-01'), null, 'a From after a To makes none');
+  is(TD.customWindow('2015-01-01', ''), null, 'nor does half a pair');
+  is(TD.customWindow('last tuesday', '2015-01-01'), null, 'nor does something that is not a date');
+  is(TD.customWindow('2015-1-1', '2015-03-31'), null,
+     'the shape is the ISO one a date box hands back, not anything a Date could parse');
+
+  const cRows = [
+    { completed: D(2015, 1, 20), started: D(2015, 1, 10), type: 'Story' },
+    { completed: D(2015, 2, 20), started: D(2015, 2, 10), type: 'Story' },
+    { completed: D(2015, 3, 20), started: D(2015, 3, 10), type: 'Story' },
+    { completed: D(2015, 6, 20), started: D(2015, 6, 10), type: 'Story' }
+  ];
+  const cWin = TD.derive(cRows, SAMPLE_SETTINGS,
+    { months: 'custom', customFrom: '2015-02-01', customTo: '2015-03-31', bucket: 'month' });
+  is(cWin.customUsed, true, 'the typed window is the one in force');
+  is(cWin.buckets, ['2015-02', '2015-03'], 'and the axis holds exactly the months it names');
+  is(cWin.summary.completedTotal, 2, 'counting only what finished inside it');
+  /* The point of the feature: two fixed periods, compared. */
+  const cPrev = TD.derive(cRows, SAMPLE_SETTINGS,
+    { months: 'custom', customFrom: '2014-12-01', customTo: '2015-01-31', bucket: 'month' });
+  is(cPrev.summary.completedTotal, 1, 'the period before it counts its own, and only its own');
+
+  /* THE END IS CLAMPED TO THE DATA. Work in progress and aged work are read at
+     the window's end, so a To past the export would age every open item for
+     free against data that stopped weeks ago. */
+  const cPast = TD.derive(cRows, SAMPLE_SETTINGS,
+    { months: 'custom', customFrom: '2015-01-01', customTo: '2029-12-31', bucket: 'month' });
+  is(cPast.endDate.getTime(), D(2015, 6, 20).getTime(),
+     'a To past the end of the data is clamped back to it — nothing is read as of a date '
+     + 'the export has not reached');
+  is(cPast.startDate.getTime(), D(2015, 1, 1).getTime(), 'while the From is exactly what was typed');
+
+  /* An incomplete pair is a state the reader passes THROUGH on the way to typing
+     the second date, so it means "no custom window" rather than an error. */
+  const cHalf = TD.derive(cRows, SAMPLE_SETTINGS,
+    { months: 'custom', customFrom: '2015-02-01', customTo: '', bucket: 'month' });
+  is(cHalf.customUsed, false, 'half a pair is not a window');
+  is(cHalf.startDate, null, 'and falls back to no start bound rather than to an error');
+  is(cHalf.summary.completedTotal, 4, 'so everything is still on screen while it is typed');
+
+  /* A window the data does not reach leaves nothing on the axis, which is the
+     honest answer — the dashboard has its own message for it. */
+  is(TD.derive(cRows, SAMPLE_SETTINGS,
+    { months: 'custom', customFrom: '2016-01-01', customTo: '2016-03-31' }).empty, true,
+     'a window past the end of the data plots nothing');
+
+  /* It reaches All Teams, and there it does the aligning the shared date exists
+     for — every team is read between the same two dates by construction. */
+  const cTeams = TD.deriveTeams([
+    { id: 'ct1', name: 'One', rows: cRows },
+    { id: 'ct2', name: 'Two', rows: [{ completed: D(2015, 2, 5), started: D(2015, 2, 1), type: 'Story' }] }
+  ], SAMPLE_SETTINGS, { months: 'custom', customFrom: '2015-02-01', customTo: '2015-03-31',
+                        bucket: 'month' });
+  is(cTeams.rows.map(r => r.d.endDate.getTime()),
+     cTeams.rows.map(() => cTeams.train.endDate.getTime()),
+     'every team is read as of the same date — the typed one, not its own last export');
+  is(cTeams.rows[1].d.startDate.getTime(), D(2015, 2, 1).getTime(),
+     'and from the same start, however little data the team has in it');
 
   /* ────────────────────────────────────────────────────────── */
   group('derive() — grouping');
@@ -1990,6 +2061,86 @@ async function run(TD, win) {
    ], SAMPLE_SETTINGS, { filterValue: '', months: 'all' }).summary.wipRatio, null,
      'no throughput in the last month means no ratio, not infinity');
 
+  /* ────────────────────────────────────────────────────────── */
+  group('the cumulative flow diagram — three bands that cannot disagree');
+
+  /* Five items over three weeks: two finished, two still open, one finished the
+     day it was started and one raised long before anyone picked it up. */
+  const cfdRows = [
+    { created: D(2015, 1, 1), started: D(2015, 1, 5), completed: D(2015, 1, 12), type: 'Story' },
+    { created: D(2015, 1, 2), started: D(2015, 1, 6), completed: D(2015, 1, 19), type: 'Story' },
+    { created: D(2015, 1, 3), started: D(2015, 1, 13), completed: null, type: 'Story' },
+    { created: D(2015, 1, 4), started: D(2015, 1, 14), completed: null, type: 'Story' }
+  ];
+  const dCfd = TD.derive(cfdRows, SAMPLE_SETTINGS, { months: 'all', bucket: 'week' });
+
+  /* THE assertion. The middle band is work in progress, worked out a different
+     way from the chart that plots it — a subtraction of two cumulative counts
+     against openCounts walking the items. If these two ever disagree, one of
+     them is wrong, and this is the test that says so. */
+  is(dCfd.cfd.inProgress, dCfd.wip,
+     'the middle band IS work in progress, read at the same points the wip chart is');
+  ok(dCfd.cfd.done.every((v, i) => i === 0 || v >= dCfd.cfd.done[i - 1]),
+     'the finished band never goes down — nothing un-finishes');
+  ok(dCfd.cfd.waiting.every(v => v >= 0) && dCfd.cfd.inProgress.every(v => v >= 0),
+     'and no band is ever negative, which a stacked chart would happily draw');
+  is(dCfd.cfd.doneTo[dCfd.cfd.doneTo.length - 1], 2, 'two items had finished by the end');
+  is(dCfd.cfd.base, 0, 'with nothing delivered before the window, so nothing is subtracted');
+  is(dCfd.cfd.raisedTo[dCfd.cfd.raisedTo.length - 1], 4,
+     'and all four had been raised — the top curve counts every item, not the window\u2019s');
+
+  /* Counted over EVERY item rather than the window's own, which is what makes
+     the middle band a real count of open work. A one-month window over this data
+     still knows about the items opened before it. */
+  const dCfdWin = TD.derive(cfdRows.concat([
+    { created: D(2014, 6, 1), started: D(2014, 6, 2), completed: D(2014, 6, 3), type: 'Story' }
+  ]), SAMPLE_SETTINGS, { months: 1, bucket: 'week' });
+  ok(dCfdWin.cfd.doneTo[0] >= 1,
+     'the underlying count still knows about everything finished before the window');
+  /* THE BASELINE. Everything delivered before the window is subtracted from all
+     three curves, so the finished band starts at zero and the two bands above it
+     are not a sliver on a card. Subtracting one constant from all three cannot
+     move a band's thickness — which is why the assertion above it still holds. */
+  ok(dCfdWin.cfd.base >= 1, 'and it is subtracted rather than stacked under the window');
+  is(dCfdWin.cfd.done[0], dCfdWin.cfd.doneTo[0] - dCfdWin.cfd.base,
+     'the finished band is the curve minus that baseline');
+  is(dCfdWin.cfd.inProgress, dCfdWin.wip,
+     'while the middle band is untouched by it — a band is a gap between two curves');
+
+  /* The two fallbacks, each of which is also the honest reading. */
+  const dNoStart = TD.derive([
+    { created: null, started: null, completed: D(2015, 1, 12), type: 'Story' }
+  ], SAMPLE_SETTINGS, { months: 'all', bucket: 'week' });
+  is(dNoStart.cfd.inProgress, [0],
+     'an item completed with no start date was never observably in progress');
+  is(dNoStart.cfd.done, [1], 'it goes straight to the finished band on the day it closed');
+  const dNoCreated = TD.derive([
+    { created: null, started: D(2015, 1, 5), completed: D(2015, 1, 12), type: 'Story' }
+  ], SAMPLE_SETTINGS, { months: 'all', bucket: 'week' });
+  is(dNoCreated.cfd.waiting, [0],
+     'and an item with no raised date joins the picture when work started on it');
+  is(dNoCreated.hasCreated, false,
+     'with hasCreated false, which is what takes the backlog band off the chart entirely');
+
+  /* And on screen: the band is absent rather than flat, because a flat zero is a
+     claim that there is no backlog where the truth is that this export cannot
+     see one. */
+  plant({ teams: [{ id: 'cf1', name: 'Raised', rows: [
+    { c: '2015-01-12', s: '2015-01-05', k: '2015-01-01', t: 'Story' },
+    { c: '2015-01-19', s: '2015-01-06', k: '2015-01-02', t: 'Story' } ] }], settings: {} });
+  win.renderAll();
+  is(win.tdCharts().chartCfd.data.datasets.map(ds => ds.label),
+     ['Finished', 'In progress', 'Raised, not started'],
+     'three bands where the export carries created dates, bottom to top');
+  ok(win.tdCharts().chartCfd.options.scales.y.stacked,
+     'stacked, or three curves would sit on top of each other rather than adding up');
+  plant({ teams: [{ id: 'cf2', name: 'Bare', rows: [
+    { c: '2015-01-12', s: '2015-01-05', t: 'Story' },
+    { c: '2015-01-19', s: '2015-01-06', t: 'Story' } ] }], settings: {} });
+  win.renderAll();
+  is(win.tdCharts().chartCfd.data.datasets.map(ds => ds.label), ['Finished', 'In progress'],
+     'and two without them — the band is absent, never drawn flat at zero');
+
   /* ══════════════════════════════════════════════════════════
      Column detection. A real Jira export leads with an issue key and orders
      the dates however it likes, so the columns are worked out from the data.
@@ -2199,7 +2350,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 9, 'the schema marker is 9 — the version that added the per-row current stage');
+  is(St.SCHEMA, 10, 'the schema marker is 10 — the version that added the per-team limit and target');
 
   /* ────────────────────────────────────────────────────────── */
   group('Work in progress — started but not finished');
@@ -2766,7 +2917,9 @@ async function run(TD, win) {
   const shell = [...shellMatch[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).sort();
   /* Exact equality, not "contains". A new entry has to be added here too, which
      is the moment to ask whether the file is genuinely public. */
-  is(shell, ['./', 'chart.min.js', 'favicon.ico', 'privacy.html', 'theme.css'],
+  is(shell, ['./', 'apple-touch-icon.png', 'chart.min.js', 'favicon.ico', 'icon-192.png',
+             'icon-512-maskable.png', 'icon-512.png', 'manifest.webmanifest', 'privacy.html',
+             'theme.css'],
      'the offline shell list holds only files that are already public');
   const banned = [/\.json$/, /^tests\.html$/, /\.py$/, /CLAUDE/i, /README/i, /NOTICE/i, /data/i];
   let leaked = null;
@@ -2865,6 +3018,58 @@ async function run(TD, win) {
      'the halt’s Reload clears only this app’s caches before reloading');
   ok(/reg\.unregister\(\)/.test(APP_SRC),
      'and unregisters the worker first, or the reload is answered from the same stale cache');
+
+  /* ══════════════════════════════════════════════════════════
+     Installing it (2026-08-22). The app was offline-capable for months before it
+     was installable, which is the wrong way round: an installed copy is the one
+     most likely to be opened with no network at all. Every assertion below is
+     about the four things that have to agree — the manifest, the files it names,
+     the links in the head, and the CSP directive without which the browser never
+     fetches any of it.
+     ══════════════════════════════════════════════════════════ */
+  group('installing it — the manifest, its icons and the directive that admits them');
+
+  ok(/<link rel="manifest" href="manifest\.webmanifest">/.test(APP_SRC),
+     'the page links a manifest, or nothing offers to install it');
+  ok(/manifest-src 'self'/.test(cspMatch[1]),
+     "the CSP spells out manifest-src 'self' — under default-src 'none' the manifest fetch is "
+     + 'refused and "Install app" silently stops appearing');
+  ok(!/manifest-src[^;]*https?:/.test(cspMatch[1]), 'and admits no off-origin host there either');
+  ok(/<link rel="apple-touch-icon" href="apple-touch-icon\.png">/.test(APP_SRC),
+     'and an apple-touch-icon, which Safari prefers over the manifest\u2019s own');
+  ok(/<meta name="theme-color" content="#0a0e1a">/.test(APP_SRC),
+     'with a theme-color for the installed window\u2019s title bar, holding the default theme\u2019s '
+     + 'background as a literal because it has to be right before any script runs');
+  /* The literal in the head is only ever right for Midnight, so the picker has
+     to rewrite it — from the pack's own --bg, never from a colour of its own. */
+  ok(/function paintThemeColor\(\)/.test(APP_SRC) && /token\('--bg'\)/.test(APP_SRC),
+     'and the theme picker repaints it from the pack\u2019s --bg rather than a literal of its own');
+
+  const manRes = await fetch('manifest.webmanifest');
+  ok(manRes.ok, 'manifest.webmanifest is missing');
+  const MAN = await manRes.json();
+  is(MAN.scope, './', 'the scope is this app\u2019s own directory');
+  is(MAN.start_url, './', 'and so is the start url');
+  /* The named case, and the reason scope is relative: every one of these apps is
+     served from ONE origin, so a scope of "/" would capture the siblings into
+     this app’s window. */
+  ok(MAN.scope !== '/' && MAN.id.indexOf('team-dashboard') >= 0,
+     'never a scope of "/" — the family shares an origin, and that would swallow the siblings');
+  is(MAN.display, 'standalone', 'it installs as an app window rather than a browser tab');
+  is(MAN.icons.map(i => i.purpose).sort(), ['any', 'any', 'maskable'],
+     'two unmasked icons and one maskable — a launcher crops the maskable to its own outline');
+  /* Every file the manifest names has to BE there: a 404 in this list is the
+     failure that shows up as a blank icon on somebody’s home screen and
+     nowhere else. */
+  for (const icon of MAN.icons) {
+    const res = await fetch(icon.src, { method: 'HEAD' });
+    ok(res.ok, 'the manifest names ' + icon.src + ' and the file is there');
+    ok(shell.includes(icon.src), 'and it is cached for offline — ' + icon.src);
+  }
+  ok(shell.includes('manifest.webmanifest'),
+     'the manifest itself is cached too: a launcher re-reads it to draw the window');
+  const appleRes = await fetch('apple-touch-icon.png', { method: 'HEAD' });
+  ok(appleRes.ok, 'and apple-touch-icon.png exists, which only the head links');
 
   /* ══════════════════════════════════════════════════════════
      Sync was removed on 2026-08-20. This app holds figures taken from a work
@@ -3189,7 +3394,8 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', artId: '"><script>', rows: [] }])[0].artId,
      null, 'a hostile pointer is dropped, not swapped for a fresh id');
   is(Object.keys(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', rows: [] }])[0]).sort(),
-     ['artId', 'id', 'name', 'projectId', 'rows'], 'and every team carries the field, set or not');
+     ['artId', 'id', 'name', 'projectId', 'rows', 'sleDays', 'wipLimit'],
+     'and every team carries the field, set or not');
 
   /* ══════════════════════════════════════════════════════════
      The project id — a team's address, and the only thing that can say which
@@ -3495,6 +3701,314 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(projBox.value, '', 'and on blur the box shows what was actually stored');
   appDoc.getElementById('manageCloseBtn').click();
 
+  /* ══════════════════════════════════════════════════════════
+     The two figures a team SETS rather than measures (2026-08-22): a
+     work-in-progress limit and a cycle time target. They are the first stored
+     fields that are neither measured off an export nor a label, and the first
+     that are per TEAM where every other setting is shared — so the boundary,
+     the not-set default and the readings taken against them are all pinned.
+     ══════════════════════════════════════════════════════════ */
+  group('a team’s own limit and target — the boundary');
+
+  /* Not set is the DEFAULT and has to stay so: a limit the app picked would draw
+     a line on somebody's chart claiming they had agreed to it. Everything that
+     is not a usable positive number lands there. */
+  is(TD.cleanWipLimit(8), 8, 'a whole number of items is a limit');
+  is(TD.cleanWipLimit('8'), 8, 'and so is the string a number box hands back');
+  is(TD.cleanWipLimit(8.4), 8, 'a fraction of an item is rounded — half an item cannot be open');
+  is(TD.cleanWipLimit(''), null, 'an empty box is NOT SET, which is how a limit is removed');
+  is(TD.cleanWipLimit(0), null, 'zero is refused: nobody sets a limit of starting nothing');
+  is(TD.cleanWipLimit(-3), null, 'and so is a negative one');
+  is(TD.cleanWipLimit('eight'), null, 'a word stores nothing rather than NaN');
+  is(TD.cleanWipLimit('"><script>'), null, 'and markup from a hand-edited copy stores nothing');
+  is(TD.cleanWipLimit(99999), TD.TEAM_TARGET_MAX,
+     'a hand-edited copy cannot put a number on the axis that squashes every real figure');
+  is(TD.cleanSleDays(10), 10, 'a target is a number of days');
+  is(TD.cleanSleDays(0.5), 0.5,
+     'and half a day is a real one — sameDayValue defaults to it, so a cycle time can BE it');
+  is(TD.cleanSleDays(10.44), 10.4, 'kept to a tenth, like the figures it is compared with');
+  is(TD.cleanSleDays(0), null, 'zero is not a promise anybody can keep');
+  is(TD.cleanSleDays(null), null, 'and nothing set is nothing set');
+
+  /* The same door a team crosses. A share link and a hand-edited backup can say
+     anything, and both reach sanitizeTeams. */
+  const tgt = (raw) => win.TDState.sanitizeTeams([Object.assign({ id: 'x', name: 'X', rows: [] }, raw)])[0];
+  is(tgt({ wipLimit: 8, sleDays: 10 }).wipLimit, 8, 'a real limit survives the boundary');
+  is(tgt({ wipLimit: 8, sleDays: 10 }).sleDays, 10, 'and so does a real target');
+  is(tgt({ wipLimit: '"><script>' }).wipLimit, null, 'where a hostile value is dropped whole');
+  is(tgt({}).wipLimit, null, 'a team that has set neither carries null, not undefined');
+
+  /* Nothing is written until there is something to write, so a browser that
+     never sets either serialises byte-identically to before the feature — the
+     rule artId, the project id and the day counts already follow. */
+  plant({ teams: [{ id: 'w1', name: 'Plain', rows: [] }], settings: {} });
+  const plainTeam = JSON.parse(win.localStorage.getItem('td-state')).teams[0];
+  ok(!('wipLimit' in plainTeam) && !('sleDays' in plainTeam),
+     'no keys at all on a team that has set neither');
+  plant({ teams: [{ id: 'w2', name: 'Bounded', wipLimit: 8, sleDays: 10, rows: [] }], settings: {} });
+  const setTeam = JSON.parse(win.localStorage.getItem('td-state')).teams[0];
+  is([setTeam.wipLimit, setTeam.sleDays], [8, 10], 'and both written once they are set');
+
+  /* They DO travel in a link, where the project id deliberately does not: a
+     project id routes a paste the recipient cannot make, and these two are drawn
+     on the charts the link exists to show. */
+  plant({ teams: [{ id: 'sh1', name: 'Alpha', wipLimit: 6, sleDays: 12, projectId: 'DAE',
+                    rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Bug' }] }], settings: {} });
+  const spTgt = win.TDShare.buildSharePayload(['sh1']);
+  is([spTgt.teams[0].wipLimit, spTgt.teams[0].sleDays], [6, 12],
+     'the limit and the target ride along, so the reader sees the sender\u2019s picture');
+  is(spTgt.teams[0].projectId, undefined, 'while the project id still does not');
+  is(win.TDShare.SHARE_PAYLOAD_V, 1,
+     'and the payload version is unchanged — an older build drops both and draws no lines');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a team’s own limit and target — what is read against them');
+
+  const tgtRows = [
+    { completed: TD.utcDate(2015, 1, 12), started: TD.utcDate(2015, 1, 5), created: null, type: 'Story' },
+    { completed: TD.utcDate(2015, 1, 19), started: TD.utcDate(2015, 1, 5), created: null, type: 'Story' },
+    { completed: null, started: TD.utcDate(2015, 1, 16), created: null, type: 'Story' },
+    { completed: null, started: TD.utcDate(2015, 1, 17), created: null, type: 'Story' },
+    { completed: null, started: TD.utcDate(2015, 1, 18), created: null, type: 'Story' }
+  ];
+  const dTgtNone = TD.derive(tgtRows, SAMPLE_SETTINGS, { months: 'all', bucket: 'week' });
+  is(dTgtNone.wipLimit, null, 'no limit passed is no limit read');
+  is(dTgtNone.summary.overWipLimit, null,
+     'and the reading is null rather than false — a team is not inside a limit it never agreed to');
+  is(dTgtNone.summary.sleMet, null, 'the same for a target nobody set');
+  ok(!dTgtNone.cycleScatter.lines.some(l => l.key === 'sle'),
+     'and no target line is drawn on the scatter');
+
+  const dTgt = TD.derive(tgtRows, SAMPLE_SETTINGS,
+    { months: 'all', bucket: 'week', wipLimit: 2, sleDays: 10 });
+  is(dTgt.summary.currentWip, 3, 'three items are open at the end of the data');
+  is(dTgt.summary.wipLimit, 2, 'the limit is stated as USED, not as passed');
+  is(dTgt.summary.overWipLimit, true, 'three against a limit of two is over it');
+  is(TD.derive(tgtRows, SAMPLE_SETTINGS,
+    { months: 'all', bucket: 'week', wipLimit: 3 }).summary.overWipLimit, false,
+     'and three against a limit of three is INSIDE it — strictly over, never equal, '
+     + 'which is the reading the ageing threshold already takes');
+  ok(dTgt.summary.wipLimitBreaches >= 1,
+     'the periods that ended over it are counted too — "over today" and "over most weeks" '
+     + 'are different findings');
+
+  /* The target is compared with the PERCENTILE, never the average: a target is a
+     promise about the next item, which is the one question an average cannot
+     answer. These two items took 7 and 14 days, so the 85th is 14. */
+  is(dTgt.summary.p85CycleTime, 14, 'the percentile these rows produce');
+  is(dTgt.summary.sleDays, 10, 'against a target of ten');
+  is(dTgt.summary.sleMet, false, 'which is not met — and the app says so in words, never in a colour');
+  is(TD.derive(tgtRows, SAMPLE_SETTINGS,
+    { months: 'all', bucket: 'week', sleDays: 14 }).summary.sleMet, true,
+     'a target the percentile exactly reaches IS met — the promise was "within", not "under"');
+  const sleLine = dTgt.cycleScatter.lines.find(l => l.key === 'sle');
+  ok(!!sleLine && sleLine.value === 10, 'the target is a line on the scatter, at the figure set');
+  ok(dTgt.ageing.lines.some(l => l.key === 'sle'),
+     'and on the age chart too: an OPEN item past the target has already blown the promise');
+
+  /* A hand-edited view is a door like any other. */
+  is(TD.derive(tgtRows, SAMPLE_SETTINGS,
+    { months: 'all', bucket: 'week', wipLimit: 'lots' }).wipLimit, null,
+     'a junk value on the view is validated at its point of use, like every other view field');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a team’s own limit and target — the boxes and the lines');
+
+  plant({ teams: [
+    { id: 'ui1', name: 'Bounded', wipLimit: 2, sleDays: 10, rows: [
+      { c: '2015-01-12', s: '2015-01-05', t: 'Story' },
+      { c: '2015-01-19', s: '2015-01-05', t: 'Story' },
+      { s: '2015-01-16', t: 'Story' },
+      { s: '2015-01-17', t: 'Story' },
+      { s: '2015-01-18', t: 'Story' } ] }
+  ], settings: {} });
+  win.renderAll();
+  const uiDoc = win.document;
+  uiDoc.getElementById('manageBtn').click();
+  const wipBox = uiDoc.querySelector('#teamRows input[data-wip-limit]');
+  const sleBox = uiDoc.querySelector('#teamRows input[data-sle-days]');
+  ok(!!wipBox && !!sleBox, 'both boxes are in the Teams dialog, from the first team');
+  is([wipBox.value, sleBox.value], ['2', '10'], 'each showing what is stored');
+  /* The label is the prefix a sighted reader sees AND the accessible name — one
+     element doing both jobs, because this table deliberately has no header row. */
+  ok(uiDoc.querySelector('label[for="' + wipBox.id + '"]'),
+     'the visible prefix IS the label element, so the two cannot drift apart');
+  /* The accessible name CONTAINS the visible label — WCAG 2.5.3, so a voice
+     control user saying what they can see reaches the box. What it adds beyond
+     the visible prefix is which row it belongs to. */
+  ok(/^WIP limit/.test(wipBox.getAttribute('aria-label'))
+     && /row 1/.test(wipBox.getAttribute('aria-label')),
+     'and the box announces itself in full to a screen reader, starting with the words on screen',
+     wipBox.getAttribute('aria-label'));
+
+  /* Typing stores what will be DRAWN, so a box and a chart can never disagree.
+     The value is set and an input event dispatched — a synthetic click never
+     reaches a number field's spin arrows. */
+  wipBox.value = '4.6';
+  wipBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  is(win.tdGet().teams[0].wipLimit, 5, 'a typed fraction is stored as the whole items it means');
+  wipBox.dispatchEvent(new win.Event('change', { bubbles: true }));
+  is(wipBox.value, '5', 'and on blur the box shows what was actually stored');
+  wipBox.value = '';
+  wipBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  is(win.tdGet().teams[0].wipLimit, undefined,
+     'clearing the box removes the limit — not-set is reachable, and writes no key at all');
+  wipBox.value = '2';
+  wipBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  wipBox.dispatchEvent(new win.Event('change', { bubbles: true }));
+  uiDoc.getElementById('manageCloseBtn').click();
+
+  win.renderAll();
+  const wipChart = win.tdCharts().chartWip;
+  const limitSet = wipChart.data.datasets.find(ds => /^Limit /.test(ds.label || ''));
+  ok(!!limitSet, 'the limit is drawn flat across the work in progress chart');
+  is(limitSet.data, [2, 2], 'at the figure set, in every period the chart draws');
+  /* Not recoloured where the bars cross it: this app states figures rather than
+     judging them, and the palette has no red-green axis to judge with. */
+  is(typeof wipChart.data.datasets[0].backgroundColor, 'string',
+     'while the bars keep ONE colour for every period — a per-bar colour would be the app '
+     + 'grading a period rather than stating it');
+  const tileText = uiDoc.getElementById('dashTiles').textContent;
+  ok(/limit 2/.test(tileText) && /over by 1/.test(tileText),
+     'and the tile states the limit and how far over it today is, in words', tileText);
+  ok(/target 10/.test(tileText) && /not met/.test(tileText),
+     'with the target read against the percentile beside it', tileText);
+
+  /* ══════════════════════════════════════════════════════════
+     On paper (2026-08-22). These figures get read in rooms, and until this
+     existed Ctrl-P produced a dark page with a tab strip, three pickers and a
+     row of buttons on it. Two halves, and the split is the thing to pin: LAYOUT
+     in an @media print block, COLOUR in beforeprint — because a canvas re-reads
+     its colours only when it is drawn, so a print-only palette in a stylesheet
+     would leave every chart in the theme it was last rendered in.
+     ══════════════════════════════════════════════════════════ */
+  group('printing — what comes off the page');
+
+  plant({ teams: [{ id: 'pr1', name: 'Printable', rows: [
+    { c: '2015-01-12', s: '2015-01-05', t: 'Story' },
+    { c: '2015-01-19', s: '2015-01-06', t: 'Story' } ] }], settings: {} });
+  win.renderAll();
+  const prDoc = win.document;
+  prDoc.getElementById('tab-dashboard').click();
+
+  /* The header's team picker and the tab strip both go on paper, so without this
+     line a printed page would not say whose figures it holds. */
+  const printLine = prDoc.getElementById('printHead');
+  ok(!!printLine, 'there is a print-only line under the header');
+  is(win.getComputedStyle(printLine).display, 'none', 'invisible on screen');
+  ok(/^Printable/.test(printLine.textContent), 'and it names the team it holds',
+     printLine.textContent);
+  /* Not the app name: the header keeps its title on paper directly above this,
+     and printing it twice on page one reads as a mistake. */
+  ok(!/Flow Metrics/.test(printLine.textContent),
+     'without repeating the app name the header above it already carries',
+     printLine.textContent);
+  ok(/2015/.test(printLine.textContent), 'with the window the figures cover',
+     printLine.textContent);
+
+  /* Midnight prints as pale grey on white without this: a browser does not print
+     backgrounds, so light-on-dark comes off the printer as light-on-paper. */
+  const prTheme = prDoc.getElementById('themeSel');
+  prTheme.value = 'midnight';
+  prTheme.dispatchEvent(new win.Event('change', { bubbles: true }));
+  win.dispatchEvent(new win.Event('beforeprint'));
+  is(prDoc.documentElement.getAttribute('data-theme'), 'light',
+     'printing switches to the pack\u2019s own Light palette — no colour is invented for paper');
+  const printedLine = win.tdCharts().chartThroughput.data.datasets[0].borderColor;
+  is(printedLine,
+     win.getComputedStyle(prDoc.documentElement).getPropertyValue('--series-1').trim(),
+     'and the charts are REDRAWN in it, which a stylesheet alone could not do to a canvas');
+  win.dispatchEvent(new win.Event('afterprint'));
+  is(prDoc.documentElement.getAttribute('data-theme'), 'midnight',
+     'and the theme comes back afterwards');
+  is(win.localStorage.getItem('td-theme'), 'midnight',
+     'with nothing saved either way — a print cannot change which theme you use');
+
+  /* Already ink on a pale ground: swapping those would be a change for its own
+     sake, and one that would flash the page under the reader. */
+  ['light', 'sepia'].forEach(t => {
+    prTheme.value = t;
+    prTheme.dispatchEvent(new win.Event('change', { bubbles: true }));
+    win.dispatchEvent(new win.Event('beforeprint'));
+    is(prDoc.documentElement.getAttribute('data-theme'), t,
+       t + ' is left exactly as it is — it already prints as ink on paper');
+    win.dispatchEvent(new win.Event('afterprint'));
+  });
+  prTheme.value = 'midnight';
+  prTheme.dispatchEvent(new win.Event('change', { bubbles: true }));
+
+  /* The layout half, read off the source: an @media print block that hides the
+     controls and keeps the window note. */
+  /* Its own fetch: APP_SRC is declared further down this function, and reading a
+     `const` before its declaration is the temporal-dead-zone error that has taken
+     this app down twice — see ART_NONE in CLAUDE.md. */
+  const PRINT_SRC = await (await fetch('index.html')).text();
+  const printBlock = (PRINT_SRC.match(/@media print \{[\s\S]*?\n\}/) || [''])[0];
+  ok(printBlock.length > 0, 'there is an @media print block');
+  ['.tabs', '.tile-help', 'header .btn', '#toast', '#chartMaxi', 'dialog']
+    .forEach(sel => ok(printBlock.indexOf(sel) >= 0,
+      'paper has no use for ' + sel + ', so print takes it away'));
+  ok(/#viewControls \{ display: block/.test(printBlock),
+     'while the window note stays — a figure on paper is worthless without the dates it covers');
+  /* THE invariant. Colours belong to the theme pack, and the print block is
+     exactly the kind of place a hex would get typed in for "white paper". */
+  ok(!/#[0-9a-fA-F]{3,8}\b/.test(printBlock.replace(/#[a-zA-Z][\w-]*/g, ''))
+     && !/rgba?\(/.test(printBlock),
+     'and the print block names no colour at all — that half is done by swapping theme',
+     printBlock);
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the custom window on screen — two boxes that appear with the option');
+
+  plant({ teams: [{ id: 'cw1', name: 'Windowed', rows: [
+    { c: '2015-01-20', s: '2015-01-10', t: 'Story' },
+    { c: '2015-02-20', s: '2015-02-10', t: 'Story' },
+    { c: '2015-03-20', s: '2015-03-10', t: 'Story' } ] }], settings: {} });
+  win.renderAll();
+  const cwDoc = win.document, monthsSel = cwDoc.getElementById('monthsSel');
+  /* The note under the strip belongs to whichever view is on screen, so the
+     dashboard has to BE on screen — an earlier group may have left the app on
+     another tab, and a note nobody is looking at is not written. */
+  cwDoc.getElementById('tab-dashboard').click();
+  const wasMonths = monthsSel.value;
+  ok(cwDoc.getElementById('customRange').hidden,
+     'the boxes are away until Custom is chosen — two controls that do nothing otherwise');
+  ok([...monthsSel.options].some(o => o.value === 'custom'),
+     'and Custom is the last option, after the rolling ones');
+  is(monthsSel.options[monthsSel.options.length - 1].value, 'custom',
+     'last because it is the only one that is not a span counted back from the data');
+
+  monthsSel.value = 'custom';
+  monthsSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  ok(!cwDoc.getElementById('customRange').hidden, 'choosing it brings the boxes out');
+  /* Prefilled with the window that was already on screen, so the picture does
+     not change at the moment of switching — a control that empties the charts
+     the instant it is chosen reads as broken. */
+  is(cwDoc.getElementById('customTo').value, '2015-03-20',
+     'the To is prefilled with the end of the data');
+  is(cwDoc.getElementById('customFrom').value, '2014-12-20',
+     'and the From with three months before it — the app\u2019s own default window');
+  is(cwDoc.getElementById('customFrom').max, TD.todayLocalISO(),
+     'neither box will take a date in the future, which every other date field here refuses too');
+
+  const fromBox = cwDoc.getElementById('customFrom');
+  fromBox.value = '2015-02-01';
+  fromBox.dispatchEvent(new win.Event('change', { bubbles: true }));
+  ok(/Feb 1, 2015/.test(cwDoc.getElementById('windowNote').textContent),
+     'typing a date moves the window, and the note under the strip says so',
+     cwDoc.getElementById('windowNote').textContent);
+  /* An incomplete pair says what it is waiting for rather than silently showing
+     everything under two boxes that hold dates. */
+  cwDoc.getElementById('customTo').value = '';
+  cwDoc.getElementById('customTo').dispatchEvent(new win.Event('change', { bubbles: true }));
+  ok(/Both dates are needed/.test(cwDoc.getElementById('windowNote').textContent),
+     'and half a pair says so', cwDoc.getElementById('windowNote').textContent);
+
+  monthsSel.value = wasMonths;
+  monthsSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  ok(cwDoc.getElementById('customRange').hidden,
+     'and the boxes go away again with the option, rather than sitting there inert');
+
   /* ────────────────────────────────────────────────────────── */
   group('the Teams dialog matches the sibling app’s window');
 
@@ -3552,17 +4066,17 @@ group('ARTs — the grouping, and the boundary it crosses');
   const teamRow = win.document.querySelector('#teamRows tr');
   is(teamRow.querySelector('.count').textContent, '1 item',
      'a count carries its own noun, singular when it should be');
-  /* Name, project id, count, actions. The project id box is present from the
-     first team — unlike the ART picker below it, which needs an ART to exist
-     before it can offer anything. */
-  is(teamRow.cells.length, 4, 'and there is no ART cell until an ART exists');
+  /* Name, project id, the two targets, count, actions. All four boxes are
+     present from the first team — unlike the ART picker below them, which needs
+     an ART to exist before it can offer anything. */
+  is(teamRow.cells.length, 6, 'and there is no ART cell until an ART exists');
   ok(teamRow.querySelector('input.projid'),
      'while the project id box is there from the first team — it is typed in, not chosen');
 
   plant({ arts: [{ id: 'ax', name: 'Delivery' }],
           teams: [{ id: 'z1', name: 'Zephyr', artId: 'ax', rows: [] },
                   { id: 'z2', name: 'Zither', rows: [] }], settings: {} });
-  is(win.document.querySelector('#teamRows tr').cells.length, 5,
+  is(win.document.querySelector('#teamRows tr').cells.length, 7,
      'the ART cell appears the moment there is a train to choose');
   is(win.document.querySelector('#artRows .count').textContent, '1 team',
      'and an ART states how many teams are on it, in its own words');
@@ -4150,7 +4664,40 @@ group('ARTs — the grouping, and the boundary it crosses');
      'Team Long Tail\u2019s defect rate is at least double Team Healthy Flow\u2019s',
      longTail.summary.unplannedShare + ' vs ' + healthy.summary.unplannedShare);
 
-  /* Worhealthy days is a setting rather than a team, so the demo can only reach it
+  /* THE LIMIT AND THE TARGET (2026-08-22). Two teams carry the SAME pair and
+     only one of them keeps either, which is what makes the figures mean
+     something — a demo where each team had its own limit would show two lines
+     and teach nothing. The third sets neither, which is the state every real
+     browser starts in and the only way the no-line, no-verdict face is
+     reachable at all. */
+  is(demo.map(t => t.wipLimit), [6, 6, null],
+     'two teams set the same work-in-progress limit, and the third sets none');
+  is(demo.map(t => t.sleDays), [10, 10, null], 'and the same cycle time target');
+  const targeted = (name) => {
+    const t = demoOf(demo, name);
+    return TD.derive(t.rows, win.TDState.normalizeSettings({}),
+      { filterValue: null, months: 'all', bucket: 'week',
+        wipLimit: t.wipLimit, sleDays: t.sleDays });
+  };
+  const tHealthy = targeted('Team Healthy Flow'), tLong = targeted('Team Long Tail');
+  is([tHealthy.summary.overWipLimit, tLong.summary.overWipLimit], [false, true],
+     'four in flight is inside the limit and nine is over it — both faces of the tile');
+  is([tHealthy.summary.sleMet, tLong.summary.sleMet], [true, false],
+     'and the same ten-day promise is kept by one board and missed by the other');
+  is(targeted('Team Bare Export').summary.overWipLimit, null,
+     'while the team that set neither is judged by neither');
+
+  /* The cumulative flow diagram's two faces, and they come free from a column
+     Team Bare Export already does not have: three bands where an export carries
+     created dates, two where it does not. */
+  is([healthy.hasCreated, settle(demoOf(demo, 'Team Bare Export').rows).hasCreated], [true, false],
+     'so the backlog band is on two of the three boards and absent from the third');
+  ok(healthy.cfd.waiting.some(v => v > 0),
+     'with something actually in it — a band of zeros would demonstrate nothing');
+  is(healthy.cfd.inProgress, healthy.wip,
+     'and the middle band is the same work in progress the chart beside it plots');
+
+  /* Working days is a setting rather than a team, so the demo can only reach it
      by covering weekends. Were the generator ever changed to land completions on
      weekdays only, the toggle would be a control that does nothing on the one
      dataset anybody is shown. */
@@ -4158,7 +4705,7 @@ group('ARTs — the grouping, and the boundary it crosses');
     win.TDState.normalizeSettings({ workingDays: true }),
     { filterValue: null, months: 'all', bucket: 'week' });
   ok(longTailWork.summary.p85CycleTime < longTail.summary.p85CycleTime,
-     'the demo spans weekends, so worhealthy days visibly shortens its cycle times',
+     'the demo spans weekends, so working days visibly shortens its cycle times',
      longTailWork.summary.p85CycleTime + ' vs ' + longTail.summary.p85CycleTime);
   ok(longTailWork.summary.agedNow < longTail.summary.agedNow,
      'and drops an item out of Team Long Tail\u2019s aged count, so the ageing rule follows too',

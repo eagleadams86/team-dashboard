@@ -13,6 +13,31 @@
      step. img-src allows data: URIs, so the SVG costs no extra request. -->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'> <defs><linearGradient id='g' x1='10' y1='52' x2='54' y2='12' gradientUnits='userSpaceOnUse'> <stop offset='0' stop-color='%23818cf8'/><stop offset='1' stop-color='%23a5b4fc'/></linearGradient></defs> <rect width='64' height='64' rx='14' fill='%230a0e1a'/> <circle cx='14' cy='52' r='20' fill='%23141c33'/> <path d='M18 30V46M32 18V46M46 25V46' fill='none' stroke='url(%23g)' stroke-width='8' stroke-linecap='round'/> </svg>">
 <link rel="alternate icon" href="favicon.ico?v=1">
+<!-- Installing the app. The manifest is what turns Chrome's "Install page as
+     app" into a real app window with this name and icon rather than a bare
+     shortcut, and Safari's Add to Dock and iOS's Add to Home Screen read it too.
+     All of them need FILES: the SVG data URI above and favicon.ico are no use to
+     any of them, which is why make_favicon.py emits PNGs of the same mark.
+     apple-touch-icon is Safari's own preference and is listed separately from
+     the manifest's icons.
+     The app was offline-capable for months before it was installable, which is
+     the wrong way round: an INSTALLED copy is the one most likely to be opened
+     with no network at all, and sw.js caches these four files for exactly that.
+     `scope` is the manifest's own directory (it is "./" in the file), and that
+     matters more here than it looks: every one of these apps is served from the
+     SAME origin, and a scope of "/" would capture Sprint Predictability and
+     Money Map into this app's window. Nothing here changes what any page on the
+     origin can already reach — an installed app shares the browser's storage —
+     so installing is a window, not a sandbox. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!-- The installed window's title bar takes its colour from here. It holds the
+     manifest's midnight to start with, because that is the default theme and
+     this has to be right before any script runs; the theme picker rewrites it
+     from the theme pack's own --bg whenever the theme changes, so a Light window
+     doesn't keep a midnight bar above it. No colour is invented — it is read
+     back out of theme.css. -->
+<meta name="theme-color" content="#0a0e1a">
 <!--
   This app talks to NOTHING. Since sync was removed (2026-08-20) there is no
   external origin left in this policy at all — no CDN, no Google, no analytics,
@@ -22,7 +47,16 @@
     script-src 'self' 'unsafe-inline'   the page's own code, and the theme
                                         bootstrap that must run before paint
     style-src  'self' 'unsafe-inline'   theme.css and inline style attributes
-    img-src    'self' data:             the favicon, and the SVG data: icon
+    img-src    'self' data:             the favicon, the install icons and the
+                                        SVG data: icon
+    manifest-src 'self'                 manifest.webmanifest, and it has to be
+                                        spelled out: a manifest is NOT covered
+                                        by img-src or by any other directive
+                                        here, so under `default-src 'none'` the
+                                        fetch is refused and "Install app"
+                                        silently stops appearing. It buys
+                                        nothing but a static JSON file on this
+                                        origin — a manifest executes nothing
     worker-src 'self'                   sw.js, which is what makes it offline
     connect-src 'none'                  stated OUTRIGHT rather than left to the
                                         default, because this is the directive
@@ -37,7 +71,7 @@
   announce itself. Read the note where the sync module used to be, at the foot
   of the page, before adding one.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; worker-src 'self'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; manifest-src 'self'; worker-src 'self'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <!--
   Flow Metrics — weekly flow metrics from your work items. (The repo, the backup
   marker and the Pages path are all still "team-dashboard": the app was renamed
@@ -720,6 +754,19 @@ table.manage input.projid::placeholder { text-transform: none; }
    that is allowed past the 320px cap. Also after it, and for the same
    specificity reason the project id is. */
 table.manage input.aliases { max-width: none; }
+/* The two figures a team SETS rather than measures — its work-in-progress limit
+   and its cycle time target. Each box wears its meaning in FRONT of it, because
+   this table deliberately has no header row (see the note above it): two bare
+   number boxes in a row of teams are two questions rather than two fields.
+   The prefix is muted and small so the row still scans name-first, and the pair
+   is held on one line — a box that wrapped under its own label would read as a
+   value belonging to the column beside it. `width` as well as `max-width`: an
+   <input> is 20 characters wide by default whatever its max-width says, and
+   three digits is all either of these ever holds. */
+table.manage td.target { min-width: 112px; white-space: nowrap; }
+table.manage .target-set { display: inline-flex; align-items: center; gap: 6px;
+  color: var(--text-secondary); font-size: 13px; }
+table.manage input.target { width: 64px; max-width: 64px; text-align: right; }
 /* A row with nothing in it yet — the ARTs table before the first train. */
 table.manage td.empty-row { text-align: left; color: var(--text-secondary);
   border-bottom: 0; padding-left: 0; }
@@ -966,6 +1013,56 @@ main:focus { outline: none; }
     transition-duration: .01ms !important; scroll-behavior: auto !important;
   }
 }
+
+/* Shown only on paper. There is exactly one of these — the line naming the team
+   and the window — and it is built by the same render that writes the note under
+   the control strip, so the two can never describe different things. */
+.print-only { display: none; }
+
+/* ── On paper (2026-08-22) ────────────────────────────────────────────────────
+   These figures get read in rooms. Until this existed the only ways one left the
+   app were a CSV, a share link and a screenshot, and Ctrl-P produced a dark page
+   with a tab strip, three pickers and a set of buttons on it.
+
+   TWO HALVES, and the division matters. This block is LAYOUT — what a piece of
+   paper cannot use is taken away, and what is left is kept whole. The COLOURS
+   are handled in JS instead (see beforePrint): the page switches to the theme
+   pack's own Light palette for the duration of the print and back afterwards, so
+   nothing here invents a colour and Midnight does not print as white text on
+   white paper. There is deliberately no `background: #fff` anywhere below — a
+   browser does not print backgrounds unless it is told to, so the page comes out
+   on paper's own white with the light theme's ink on it, and asking for
+   print-color-adjust would only spend somebody's toner on a surface colour.
+
+   Charts print because a canvas is an image: the browser scales the bitmap to
+   the paper's width. It is drawn at device resolution, so it downscales cleanly
+   — which is why the grid is left alone rather than forced to one column, where
+   every canvas would have to be re-rendered at a size the print layout only
+   knows about after this stylesheet has already applied. */
+@media print {
+  @page { margin: 12mm; }
+  /* A chart cut in half by a page break is a chart nobody can read. */
+  .chart-card, .card, .tile, table { break-inside: avoid; }
+  /* Everything that is a control rather than a figure. The tab strip goes with
+     them: what prints is the view that is on screen, which is the one the reader
+     chose to print. */
+  .skip, .tabs, .subtabs, .applink, .tile-help, .chart-max, .table-scroll .btn,
+  header .btn, header select, header label, #toast, #chartMaxi, #shareBar,
+  [data-export], dialog, #viewControls .field { display: none !important; }
+  /* The window note stays, and it is the one thing here that must: a figure on
+     paper is worthless without the dates it covers. Its container is a flex row
+     for the pickers that have just gone. */
+  #viewControls { display: block; border: 0; padding: 0; margin: 0 0 10px; }
+  #windowNote { text-align: left; }
+  /* The header keeps its title and loses its controls, so the print-only line
+     under it is what says WHICH team and which window these figures are. */
+  .print-only { display: block !important; }
+  header { position: static; border: 0; }
+  /* Nothing scrolls on paper — a table inside an overflow box would print
+     cropped at the edge of a box nobody can drag. */
+  .table-scroll { overflow: visible !important; }
+  body, .shell, main { display: block; }
+}
 </style>
 </head>
 <body>
@@ -1038,6 +1135,12 @@ main:focus { outline: none; }
        and has not changed. -->
   <main id="maincontent" tabindex="-1">
 
+  <!-- Printed only. The header's team picker and the tab strip are both taken
+       away on paper, so without this a printed page would not say whose figures
+       it holds. Written by whichever view is on screen, beside the note under the
+       control strip, so the two cannot describe different things. -->
+  <p class="print-only" id="printHead"></p>
+
   <!-- Filled once when a share link is opened; empty and invisible otherwise. -->
   <div id="shareBar"></div>
 
@@ -1094,7 +1197,26 @@ main:focus { outline: none; }
         <option value="9">9 months</option>
         <option value="12">12 months</option>
         <option value="all">All</option>
+        <!-- Last, because it is the only option that is not a span counted back
+             from the data: every other one answers "the most recent…", and this
+             one answers "these dates". It is what makes a comparison of two
+             fixed periods possible at all — a quarter against the quarter
+             before it, or the three months either side of a reorganisation —
+             which a rolling window structurally cannot do. -->
+        <option value="custom">Custom dates…</option>
       </select>
+    </div>
+    <!-- Only while Custom is chosen. Two boxes standing empty beside a rolling
+         window would be two controls that do nothing, which is the orphaned-field
+         rule; and hiding them keeps the strip the width it has always been for
+         everybody who never touches this. -->
+    <div class="field" id="customRange" hidden>
+      <label for="customFrom">From</label>
+      <input type="date" id="customFrom">
+    </div>
+    <div class="field" id="customRangeTo" hidden>
+      <label for="customTo">To</label>
+      <input type="date" id="customTo">
     </div>
     <div class="field">
       <label for="bucketSel">Group by</label>
@@ -1459,6 +1581,23 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           <div class="chart-title" id="titleNetFlow"></div>
           <div class="chart-wrap"><canvas id="chartNetFlow"></canvas></div>
         </div>
+
+        <!-- The cumulative flow diagram, and it sits in Delivery deliberately:
+             the two cards above it plot what left and the difference between
+             what arrived and what left, and this is the same story told as one
+             picture over the whole history. Third in the group, so a reader
+             meets the two simple counts before the stacked one that contains
+             them both. -->
+        <!-- `solo`, like the lead time card in Flow: the third card in a
+             two-column group is alone on its row, and the class narrows it to one
+             column's width and centres it so a lone chart does not read as the
+             important one. The maximise button is there for anybody who wants it
+             big, which is what that button is for. -->
+        <div class="chart-card solo">
+          <div class="chart-name" id="nameCfd"></div>
+          <div class="chart-title" id="titleCfd"></div>
+          <div class="chart-wrap"><canvas id="chartCfd"></canvas></div>
+        </div>
       </div>
 
       <div class="grid charts" id="spanel-health" role="tabpanel" aria-labelledby="stab-health" hidden>
@@ -1636,6 +1775,11 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     issue keys — <em>DAE</em> for DAE-1552. It is what lets one export covering several teams be
     pasted in one go and split between them; it changes no figure. Leave it blank and the team
     simply takes nothing from a split.</p>
+  <p class="manage-note"><strong>WIP &le;</strong> is how much work this team means to have open
+    at once, and <strong>85% &le;</strong> how long it means an item to take &mdash; the promise
+    the 85th percentile is read against. Both are drawn as a line on the charts and neither
+    changes a figure: they are what the figures are compared to. Leave either blank and the app
+    states the number without judging it, which is what it does today.</p>
   <div class="table-scroll">
     <table class="manage" id="teamTable" aria-label="Teams"><tbody id="teamRows"></tbody></table>
   </div>
@@ -2196,6 +2340,21 @@ function bucketLabel(d, bucket) {
   return weekKey(d);
 }
 
+/* A window between two typed dates, or null where the pair does not make one.
+   PURE and exported, so what counts as a usable pair is a test rather than a
+   rediscovery — and so the control strip and derive() can never disagree about
+   whether the boxes on screen add up to a window.
+
+   Both ends inclusive, like every other window here. A single day is a legal
+   answer: from and to on the same date is one day, not an empty range. */
+function customWindow(fromISO, toISO) {
+  const ISO = /^\d{4}-\d{2}-\d{2}$/;
+  if (!ISO.test(String(fromISO || '')) || !ISO.test(String(toISO || ''))) return null;
+  const from = new Date(fromISO + 'T00:00:00Z'), to = new Date(toISO + 'T00:00:00Z');
+  if (isNaN(from) || isNaN(to) || from > to) return null;
+  return { from, to };
+}
+
 function isoOf(d) { return d ? d.toISOString().slice(0, 10) : ''; }
 
 function prettyDate(d) {
@@ -2740,6 +2899,47 @@ function cleanStageDays(v) {
   const n = Number(s);
   if (!Number.isFinite(n) || n < 0) return null;
   return Math.min(Math.round(n * 100) / 100, STAGE_DAYS_MAX);
+}
+
+/* ── The two figures a team SETS rather than measures ────────────────────────
+   A work-in-progress limit and a cycle time target: the first says how much this
+   team means to have open at once, the second what it means to be able to
+   promise about a single item. Both landed 2026-08-22, and they are the first
+   things stored here that are neither measured off an export nor a label — which
+   is exactly why they are guarded like everything else on the way in.
+
+   PER TEAM rather than in Settings, and that is the whole design decision. Every
+   other setting in this app is one value shared by every team, and it can be,
+   because each describes how a FIGURE is worked out — what counts as a defect,
+   what a same-day item is worth. These two describe a team's own board: a limit
+   of eight across a team of three and a team of twelve is a limit that means
+   something for at most one of them, and a promise is made by the people who
+   have to keep it. So they sit beside the ART and the project id in the Teams
+   dialog.
+
+   Null means "not set", and NOT-SET IS THE DEFAULT AND MUST STAY SO. A limit the
+   app picked would draw a line across somebody's chart claiming they had agreed
+   to it, and the one thing worse than no target is one nobody chose. Everything
+   downstream reads null as "draw nothing, say nothing" rather than as a zero.
+
+   A limit of zero is refused for the same reason a threshold of zero is: it
+   would mean the team has agreed to start nothing, which is not a limit anybody
+   sets. The ceiling is a guard on a hand-edited copy rather than a real bound —
+   a number in the thousands would squash every real figure into the axis. */
+const TEAM_TARGET_MAX = 999;
+function cleanWipLimit(v) {
+  /* Whole items: half an item cannot be in progress. Rounded rather than
+     refused, because a stored 8.4 is somebody's old value or a hand-edit, and
+     eight is the honest reading of it. */
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n > 0 ? Math.min(n, TEAM_TARGET_MAX) : null;
+}
+function cleanSleDays(v) {
+  /* A tenth of a day, matching what a cycle time can actually be: sameDayValue
+     defaults to 0.5, so a target of half a day is a figure this app can really
+     compare against. */
+  const n = Math.round(Number(v) * 10) / 10;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, TEAM_TARGET_MAX) : null;
 }
 
 /* Which columns of a paste are stage columns, and whose stage each one is.
@@ -3791,6 +3991,15 @@ function derive(rows, settings, view, stages) {
      wording on every chart that states one, because a screen mixing the two
      measures would be unreadable. */
   const workingDays = settings.workingDays === true;
+  /* The two figures the TEAM set, arriving the way asOf and the forecast's two
+     questions do — on the view object, from the caller, because they belong to
+     one team where `settings` belongs to all of them. Validated HERE at their
+     point of use like every other view field: a caller can pass anything, a
+     saved copy can say anything, and null — not set — is the answer to all of
+     it. Nothing below may treat null as a zero: no limit is not a limit of
+     none. */
+  const wipLimit = cleanWipLimit(view.wipLimit);
+  const sleDays = cleanSleDays(view.sleDays);
   const dayNoun = workingDays ? 'working days' : 'days';
   const DayNoun = workingDays ? 'Working Days' : 'Days';
 
@@ -3859,7 +4068,35 @@ function derive(rows, settings, view, stages) {
      Only ever LATER than this team's own — a caller passes the newest date
      across every team, and an earlier one would hide data rather than align it,
      which is not a thing any caller should be able to ask for by accident. */
+  /* ── A window between two dates somebody typed ──────────────────────────────
+     The one window here that is not counted back from the data. Everything else
+     answers "the most recent N months"; this answers "these dates", which is
+     what a comparison of two fixed periods needs — a quarter against the one
+     before it, the three months either side of a change.
+
+     Validated HERE at its point of use, like every other view field, and a pair
+     that does not make a window — one box empty, a from after a to, a value that
+     is not a date — simply means no custom window rather than an error: the
+     picker is on Custom the moment it is chosen, and the boxes are filled in
+     after that, so the incomplete state is a state the reader passes THROUGH.
+
+     THE END IS CLAMPED TO THE DATA. Every figure in this app is read as of the
+     newest date in the data rather than as of today, deliberately, and a typed
+     end date past the export would quietly break that: work in progress and
+     aged work are read at the window's end, so a `to` of next month would age
+     every open item by a month for free against an export that stopped weeks
+     ago. Clamping keeps "as of" meaning what it means everywhere else. A `from`
+     past the end of the data leaves nothing on the axis, which is the honest
+     answer to asking for a window the data does not reach. */
+  const custom = view.months === 'custom' ? customWindow(view.customFrom, view.customTo) : null;
   if (view.asOf instanceof Date && !isNaN(view.asOf) && view.asOf > endDate) endDate = view.asOf;
+  /* The clamp comes LAST, after the shared date, and the order is the whole
+     trick. A team whose export stops mid-window is still read as of the date
+     every other team is read as of — that is what the shared date is for, and a
+     typed window must not undo it — while nothing anywhere is read as of a date
+     past the typed end or past the data. deriveTeams derives the train under the
+     same window, so the date it shares is already inside it. */
+  if (custom && custom.to < endDate) endDate = custom.to;
   /* "All" means no start bound at all. */
   /* "All" means no start bound at all; a PI is a fixed number of WEEKS, where
      every other option is a number of months. It is the one window here that is
@@ -3868,7 +4105,8 @@ function derive(rows, settings, view, stages) {
      about. 84 days rather than 12 months / 4.33: a PI is weeks, and rounding it
      through months would land it a few days out of step with the sprints it is
      made of. Inclusive of both ends, like the month windows beside it. */
-  const startDate = view.months === 'all' ? null
+  const startDate = custom ? custom.from
+    : view.months === 'all' || view.months === 'custom' ? null
     : view.months === 'pi' ? addDays(endDate, -(PI_WEEKS * 7 - 1))
     : edate(endDate, -Number(view.months));
 
@@ -3899,6 +4137,22 @@ function derive(rows, settings, view, stages) {
     weekStarts.push(w);
     if (weekStarts.length > 1200) break;               /* runaway guard */
   }
+
+  /* An axis with nothing on it, which only a TYPED window can produce: every
+     rolling window is counted back from the data, so its end is always a bucket
+     the data reaches, and its start floors at the first completion. A From after
+     the last export leaves the loop above with nothing to walk — and everything
+     below this line indexes `weekStarts[0]`.
+
+     It returns the same shape the no-completions case above returns, and carries
+     the same two fields, so a caller that already handles one handles this
+     without knowing there are two. The dashboard names the dates in its own
+     message; All Teams says the same thing about a train. */
+  if (!weekStarts.length) return {
+    empty: true, weeks: [], startDate, endDate,
+    dataEnd, inProgressCount: items.length - finished.length,
+    customUsed: !!custom
+  };
 
   /* Does this data carry created dates at all? Everything downstream of it —
      lead time and the defects-raised series — shows an empty state rather than
@@ -4017,6 +4271,84 @@ function derive(rows, settings, view, stages) {
   const wip = openCounts(items, evalPoints);
   const agedCount = agedCounts(items, evalPoints, agedDays, wip, workingDays);
 
+  /* ── The cumulative flow diagram ───────────────────────────────────────────
+     Three cumulative counts read at the same points work in progress is read
+     at: how much had been raised by then, how much had been started, and how
+     much had been finished. Drawn stacked, the bands between them are the
+     backlog, the work in flight and the work delivered — the canonical Kanban
+     chart, and the only one here that shows arrival and departure in the same
+     picture. A widening middle band is work piling up faster than it leaves;
+     two lines running parallel is a team in balance, whatever its throughput
+     happens to be.
+
+     COUNTED OVER EVERY ITEM, not over the window's own. That is what makes it a
+     cumulative flow diagram rather than a running total of a slice: the middle
+     band's height at each point IS work in progress at that point, and a window
+     that started counting from zero would show a team with fifty items open as
+     though it had none. `wip` above is the same subtraction over the same
+     points, and a test pins the two as equal — if they ever disagree, one of
+     them is wrong.
+
+     THE TWO FALLBACKS ARE WHAT KEEP THE BANDS FROM GOING NEGATIVE, and each is
+     also the honest reading:
+       • an item completed with no start date was never observably in progress,
+         so it enters both the started and the finished count on the day it
+         closed and contributes nothing to the middle band;
+       • an item with no raised date joins the picture when work started on it,
+         so it never sits in a backlog this export cannot see.
+     Without them a paste missing either column would draw a band below zero,
+     which Chart.js will happily stack.
+
+     The top band is only worth drawing where the export carries created dates
+     at all — `hasCreated` — and the chart layer decides that, not this. */
+  const cfdRaised = [], cfdStarted = [], cfdDone = [];
+  const raisedAt = items.map(r => r.created || r.started || r.completed);
+  const startedAt = items.map(r => r.started || r.completed);
+  const doneAt = items.map(r => r.completed);
+  evalPoints.forEach(pt => {
+    const t = pt.getTime();
+    let raised = 0, startedN = 0, done = 0;
+    for (let i = 0; i < items.length; i++) {
+      if (raisedAt[i] && raisedAt[i].getTime() <= t) raised++;
+      if (startedAt[i] && startedAt[i].getTime() <= t) startedN++;
+      if (doneAt[i] && doneAt[i].getTime() <= t) done++;
+    }
+    cfdRaised.push(raised);
+    cfdStarted.push(startedN);
+    cfdDone.push(done);
+  });
+  /* ── THE BASELINE, and it is what makes the chart readable ─────────────────
+     Everything already DELIVERED before the window opened is subtracted from all
+     three curves. Nine months of history under a three-month window puts 130
+     finished items in the bottom band and leaves the two bands that matter — the
+     nine in flight and the three waiting — as a sliver at the top of the card.
+
+     Subtracting one constant from all three curves cannot change a single band's
+     THICKNESS, because a band is a difference between two of them: work in
+     progress and the backlog are exactly as they were, and `cfd.inProgress` still
+     equals `wip` point for point. What it changes is only where the stack sits on
+     the axis — the finished band now starts at zero on the left edge and grows by
+     what this window delivered, which is the same reading its slope always had.
+
+     Counted from strictly BEFORE the first bucket, not from the first eval point:
+     using the point itself would swallow the completions inside the opening
+     bucket and start the chart by hiding a week of delivery. */
+  const cfdBase = items.filter(r => r.completed && r.completed < weekStarts[0]).length;
+  const cfd = {
+    /* The BANDS, not the curves: a stacked chart is given the thickness of each
+       layer, and stating them here is what keeps the arithmetic in the one place
+       every other figure is worked out. Bottom to top, which is also the order
+       they are drawn in. */
+    done: cfdDone.map(v => v - cfdBase),
+    inProgress: cfdStarted.map((v, i) => v - cfdDone[i]),
+    waiting: cfdRaised.map((v, i) => v - cfdStarted[i]),
+    /* What was subtracted, and the curves as they stand before it — for anything
+       that wants a running total of everything this team has ever held rather
+       than the thickness of a band. */
+    base: cfdBase,
+    raisedTo: cfdRaised, startedTo: cfdStarted, doneTo: cfdDone
+  };
+
   /* The coaching rule this exists to serve compares work in progress against a
      month's throughput, so the denominator is a month however the charts are
      grouped — counting back from the newest date in the data, like every other
@@ -4116,6 +4448,16 @@ function derive(rows, settings, view, stages) {
     text: 'half took under ' + ageShort(ageMedian) });
   if (ageP85 != null) scatterLines.push({ key: 'p85', value: ageP85,
     text: CYCLE_PERCENTILE + '% took under ' + ageShort(ageP85) });
+  /* The promise, where the team has made one — and the only line on either
+     scatter that is not something this data did. That is exactly why it is
+     worth drawing: the percentile line says what the team achieves and this
+     says what it meant to, and the gap between the two is the whole reading.
+     It goes on the AGE chart as well, through the same list: an item still open
+     that has already passed the target has blown the promise, and knowing that
+     this morning is worth more than reading it next month. Last in the list so
+     it draws over the two it is being compared with. */
+  if (sleDays != null) scatterLines.push({ key: 'sle', value: sleDays,
+    text: 'target ' + ageShort(sleDays) });
 
   /* Written before the points leave derive, so how crowded a dot is is a pinned
      property of the data rather than something the tooltip works out on the
@@ -4427,7 +4769,12 @@ function derive(rows, settings, view, stages) {
     throughput, unplannedRate, avgCycleTime, netFlow, started,
     avgLeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
     throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
-    wip, agedCount, agedDays, ageing, cycleScatter, forecast,
+    wip, agedCount, agedDays, ageing, cycleScatter, forecast, cfd,
+    /* The two figures the team set, returned as USED rather than as passed —
+       every label that states one reads it from here, the same rule
+       `workingDays` and `dayNoun` follow, so a line on a chart and the sentence
+       under it can never disagree about what the target is. Null is "not set". */
+    wipLimit, sleDays,
     /* Keyed by stage id and carrying no names — see stageTimesOf. Read over the
        same window AND the same work-type filter every figure above it is read
        over, so the two controls at the top of the page reach it exactly as they
@@ -4471,6 +4818,27 @@ function derive(rows, settings, view, stages) {
       p85CycleTime: percentileOf(windowCycles, CYCLE_PERCENTILE),
       medianCycleTime: percentileOf(windowCycles, 50),
       currentWip: wip.length ? wip[wip.length - 1] : 0,
+      /* Read against the limit, where there is one. `overWipLimit` is about NOW
+         — the figure the tile beside it states — and `wipLimitBreaches` counts
+         the periods that ENDED over it, which is the difference between "we are
+         over today" and "we are over most weeks". Both null rather than false or
+         0 when no limit is set: there is no reading to state, and a false would
+         say the team is inside a limit it never agreed to.
+         Strictly OVER, never equal: a limit of eight means eight is allowed,
+         which is the same reading `agedCounts` takes of the ageing threshold. */
+      wipLimit,
+      overWipLimit: wipLimit == null ? null
+        : (wip.length ? wip[wip.length - 1] : 0) > wipLimit,
+      wipLimitBreaches: wipLimit == null ? null
+        : wip.filter(v => v > wipLimit).length,
+      /* And the promise against what was actually delivered. Null when either
+         half is missing — no target set, or nothing finished to measure. The
+         comparison is the percentile rather than the average deliberately: a
+         target is a promise about the next item, which is the one question an
+         average cannot answer. */
+      sleDays,
+      sleMet: sleDays == null || percentileOf(windowCycles, CYCLE_PERCENTILE) == null
+        ? null : percentileOf(windowCycles, CYCLE_PERCENTILE) <= sleDays,
       agedNow: agedCount.length ? agedCount[agedCount.length - 1] : 0,
       asOf: endDate,
       monthlyThroughput,
@@ -4489,9 +4857,22 @@ function derive(rows, settings, view, stages) {
        export said "14 weeks · 190 items" about a window holding 67 of them. The
        note states both now; this is the half that answers the question the
        sentence above it asked. */
-    windowItemCount: completedTotal + (items.length - finished.length),
-    inProgressCount: items.length - finished.length,
+    /* Both counts are read AS OF the window's end, not as of now — `wip`'s last
+       value, which is the same figure the tile states. For every rolling window
+       those are the same number, because the window ends where the data does and
+       an item with no completion is open at that date by definition. A TYPED
+       window is where they part company: asking for last January and being told
+       how many items are open today would be a figure from outside the window
+       stated inside it. */
+    windowItemCount: completedTotal + (wip.length ? wip[wip.length - 1] : 0),
+    inProgressCount: wip.length ? wip[wip.length - 1] : 0,
     startDate, endDate,
+    /* Whether the typed window is the one in force. False while the picker says
+       Custom and the boxes do not yet make a window — the state a reader passes
+       through on the way to typing the second date — so the note under the strip
+       can say what is actually being shown rather than letting the boxes imply
+       something else. */
+    customUsed: !!custom,
     /* What each chart IS, as against what it plots. Short enough to head a card
        — the sentence in `titles` carries the detail. Cycle time follows the
        "word to use for cycle time" setting, because that setting exists to
@@ -4502,6 +4883,11 @@ function derive(rows, settings, view, stages) {
       throughput: 'Throughput',
       netFlow: 'Net flow',
       leadTime: 'Lead time',
+      /* Named for what it shows rather than for what it is called in the
+         literature — "cumulative flow diagram" is the one name on this screen
+         that has to be learnt before it means anything. The ⓘ gives it its
+         proper name, so somebody who knows the term still finds it. */
+      cfd: 'Raised, started, finished',
       wip: 'Work in progress',
       agedWork: 'Aged work',
       /* Named for what a dot IS rather than for the chart type — nobody at a
@@ -4533,6 +4919,8 @@ function derive(rows, settings, view, stages) {
         + CYCLE_PERCENTILE + 'th Percentile',
       throughput: 'Items Completed per ' + Noun,
       netFlow: 'Net Flow per ' + Noun + ' (Items Completed − Items Started)',
+      cfd: 'Work Raised, Started and Finished in This Window, Stacked at the End of Each '
+        + Noun + ' — the Cumulative Flow Diagram',
       leadTime: 'Average Lead Time per ' + Noun + ' (Raised to Delivered)',
       wip: 'Work in Progress at the End of Each ' + Noun,
       agedWork: 'Items in Progress Longer Than ' + agedDays + ' ' + DayNoun,
@@ -4562,6 +4950,7 @@ function derive(rows, settings, view, stages) {
       cycleTime: cycleLabel + ' (' + dayNoun + ')',
       throughput: 'Count of closed items during ' + noun,
       netFlow: 'Items completed − items started',
+      cfd: 'Items, counted from the start of the window',
       leadTime: 'Lead time (' + dayNoun + ')',
       wip: 'Items open at period end',
       agedWork: 'Items older than ' + agedDays + ' ' + dayNoun,
@@ -4625,7 +5014,13 @@ function deriveTeams(teams, settings, view, stages) {
     /* In the picker's order, deliberately. Sorting is a thing the reader asks
        for by pressing a column; until they do, a team should be where they
        expect to find it rather than wherever its throughput put it today. */
-    rows: list.map(t => ({ id: t.id, name: t.name, d: derive(t.rows || [], settings, shared, stages) }))
+    /* Each row gets its OWN team's limit and target folded into the shared view
+       — the one thing on this screen that is per team rather than per window.
+       The train above deliberately gets neither: a limit belongs to a board, and
+       adding eight of them up would invent a figure nobody agreed to. */
+    rows: list.map(t => ({ id: t.id, name: t.name,
+      d: derive(t.rows || [], settings,
+        Object.assign({}, shared, { wipLimit: t.wipLimit, sleDays: t.sleDays }), stages) }))
   };
 }
 
@@ -4703,7 +5098,14 @@ window.TD = {
   stageTimesOf, STAGE_DAYS_MAX, STAGE_ALIAS_MAX, STAGE_ALIAS_MAX_LEN,
   /* The current-stage half: the value matcher and the two synthetic column
      labels the stage axis uses. */
-  stageIdForStatus, AGE_NO_STAGE, AGE_OTHER_STAGES
+  stageIdForStatus, AGE_NO_STAGE, AGE_OTHER_STAGES,
+  /* The two figures a team sets. Pure guards, so what a hand-edited copy can put
+     on somebody's chart is pinned without a dialog on screen. */
+  cleanWipLimit, cleanSleDays, TEAM_TARGET_MAX,
+  /* What counts as a usable pair of typed dates, and the local-calendar "today"
+     the boxes are capped at. Both are function declarations far below this line
+     and are hoisted, which is why naming them here is safe — see issueSortKey. */
+  customWindow, todayLocalISO
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -4827,7 +5229,14 @@ const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', act
      Which train you are looking at is a position on this device: scoping the
      laptop to Payments should not yank the phone to it. Validated at its point
      of use, where an id pointing at a deleted ART falls back to every team. */
-  artFilter: '' };
+  artFilter: '',
+  /* The custom window's two ends, as ISO dates, and empty when it has none.
+     In `view` with the rest of the window controls — which dates you are looking
+     at is a position on this device, like the team you have picked, so it needs
+     no schema bump and no place in a share payload. Validated at their point of
+     use in derive(), like every other view field: an incomplete or backwards
+     pair simply means no custom window rather than an error. */
+  customFrom: '', customTo: '' };
 
 const LS = {
   state: 'td-state', view: 'td-view', theme: 'td-theme',
@@ -5048,8 +5457,14 @@ function sanitizeTeams(teams) {
        hand-edited backup or a share link cannot use a team's project id as a
        free-text field. Anything that is not a project id becomes no project id
        — a team that routes nothing, which is an ordinary state. */
+    /* The two figures the team SETS — see cleanWipLimit. Null means not set,
+       which is the ordinary state and the one a hostile or nonsensical value
+       falls back to: a limit this app invented would draw a line on somebody's
+       chart claiming they had agreed to it. */
     return { id, name: String((t && t.name) || 'Untitled team').slice(0, 120),
              artId, projectId: cleanProjectId(t && t.projectId),
+             wipLimit: cleanWipLimit(t && t.wipLimit),
+             sleDays: cleanSleDays(t && t.sleDays),
              rows: hydrateRows(t && t.rows) };
   });
 }
@@ -5219,7 +5634,9 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 9 added the per-row CURRENT stage (`w`), read from an ordinary Status
+/* SCHEMA 10 added the two figures a team sets rather than measures — a
+   work-in-progress limit and a cycle time target, both per team and both
+   optional; 9 added the per-row CURRENT stage (`w`), read from an ordinary Status
    column; 8 added workflow stages — `state.stages` and a `g` of day counts on
    each row; 7 added the per-team project id — the address a multi-team paste is
    split by; 6 added the per-row issue key; 5 added ARTs — `state.arts` and an
@@ -5234,7 +5651,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 9;
+const SCHEMA = 10;
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
    hydrateState() keeps only the keys it knows, which is right for a hostile
@@ -5274,6 +5691,12 @@ function serializeState() {
       /* Likewise the project id: written only when there is one, so a browser
          that never splits a paste serialises byte-identically to before. */
       if (t.projectId) out.projectId = t.projectId;
+      /* And the two targets, on the same rule again: a team that has set
+         neither writes neither key. Null is "not set" everywhere else in the
+         app, so writing `null` here would be storing the absence of a value
+         rather than not storing a value. */
+      if (t.wipLimit) out.wipLimit = t.wipLimit;
+      if (t.sleDays) out.sleDays = t.sleDays;
       return out;
     }),
     /* Likewise: no key at all until an ART exists. */
@@ -5399,6 +5822,15 @@ function loadView() {
      boot. */
   for (const [k, id] of [['months', 'monthsSel'], ['dateOrder', 'dateOrder']]) {
     if (![...$(id).options].some(o => o.value === String(view[k]))) view[k] = DEFAULT_VIEW[k];
+  }
+  /* The custom window's two ends go straight into a date box, which shows an
+     empty field for anything that is not an ISO date — so a hand-edited copy
+     would leave a box that looks blank while the saved value went on being
+     read. Cleared here so what is stored and what is shown are the same thing.
+     derive() checks the PAIR at its point of use; this checks each end can be
+     displayed at all. */
+  for (const k of ['customFrom', 'customTo']) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(view[k] || ''))) view[k] = '';
   }
 }
 
@@ -6217,6 +6649,59 @@ function drawCharts(d) {
     if (charts.chartLeadTime) { charts.chartLeadTime.destroy(); delete charts.chartLeadTime; }
   }
 
+  /* ── The cumulative flow diagram ──
+     Three bands stacked: what has been delivered, what is in flight, and what
+     has been raised and not started. The middle band's THICKNESS is work in
+     progress and the bottom band's SLOPE is throughput, so this one card
+     contains both of the charts above it — which is why it is drawn last in the
+     group rather than first.
+
+     Filled areas, not lines: the reading is the height of each band, and an
+     unfilled stack is three curves nobody can subtract by eye. The fills are
+     `tint()`ed toward the surface rather than made translucent, which is what
+     keeps the boundary between two bands a clean edge — overlapping alpha would
+     make the middle band a different colour where it sits over the bottom one.
+
+     THREE colours from the pack's ramp, spread across it rather than adjacent:
+     1, 3 and 5 are the widest separation five tokens allow, and the ramp is
+     picked off the blue-yellow axis so no two of them collapse under red-green
+     deficiency. This is the app's first three-series chart; everything else here
+     needed two, which is why the pair at the top of this function is a pair. */
+  const cfdOpts = baseOptions(d.axisTitles.cfd, int0, null, d.axisTitles.x, d.partial);
+  cfdOpts.scales.y.beginAtZero = true;
+  cfdOpts.scales.y.ticks.precision = 0;
+  cfdOpts.scales.y.stacked = true;
+  cfdOpts.plugins.legend = {
+    display: true, position: 'top',
+    labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
+              font: { size: 11 } }
+  };
+  /* One tooltip listing all three bands, so the reader gets the whole stack at a
+     period rather than whichever band the pointer happened to land on — the
+     comparison between them IS the chart. */
+  cfdOpts.plugins.tooltip.mode = 'index';
+  cfdOpts.plugins.tooltip.intersect = false;
+  const cfdBand = (label, data, colour) => ({
+    label, data,
+    borderColor: colour,
+    backgroundColor: tint(colour, 0.55),
+    borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 4, tension: 0, fill: true
+  });
+  const cfdSets = [
+    cfdBand('Finished', d.cfd.done, seriesMain),
+    cfdBand('In progress', d.cfd.inProgress, token('--series-3'))
+  ];
+  /* The backlog band only where the export can see one. Without created dates
+     every item enters this picture on the day work started, so the band would be
+     a flat zero pretending the team has nothing waiting — which is a claim, not
+     a gap. The lead time chart takes the same stance on the same column. */
+  if (d.hasCreated) cfdSets.push(cfdBand('Raised, not started', d.cfd.waiting, seriesAlt));
+  renderChart('chartCfd', {
+    type: 'line',
+    data: { labels: d.bucketLabels, datasets: cfdSets },
+    options: cfdOpts
+  });
+
   /* ── Work in progress, and how much of it has gone stale ──
      Both are a state read at each period's end rather than a count over it, so
      they're plotted as bars: a line implies a value between the points, and
@@ -6224,19 +6709,49 @@ function drawCharts(d) {
   const wipOpts = baseOptions(d.axisTitles.wip, int0, null, d.axisTitles.x, d.partial);
   wipOpts.scales.y.beginAtZero = true;
   wipOpts.scales.y.ticks.precision = 0;
+  const wipSets = [{
+    label: 'Work in progress',
+    data: d.wip,
+    backgroundColor: tint(seriesMain, 0.68),
+    borderColor: seriesMain,
+    borderWidth: 1.5,
+    order: 1
+  }, trendDataset(d.wip)];
+  /* The limit, where the team has set one, drawn flat across every period. It is
+     the second colour and a dash of its own — the same treatment the ageing
+     threshold gets on the age chart, because it is the same KIND of thing: a
+     line the reader drew, as against the two percentile lines, which are things
+     their data did.
+     The bars are deliberately NOT recoloured where they cross it. This app
+     states figures rather than judging them, the palette has no red-green axis
+     to judge with, and a bar that changed colour would be the app calling a
+     period a failure — where the line lets the reader see the same thing and
+     decide. It carries a legend entry instead, which is what names the line
+     without a second card: this chart has a legend the moment it has two
+     things on it. */
+  if (d.wipLimit != null) {
+    wipSets.push({
+      label: 'Limit ' + d.wipLimit,
+      data: d.wip.map(() => d.wipLimit),
+      type: 'line',
+      borderColor: seriesAlt,
+      borderWidth: 1.5,
+      borderDash: [10, 3],
+      pointRadius: 0,
+      pointHitRadius: 0,
+      fill: false,
+      tension: 0,
+      order: 0
+    });
+    wipOpts.plugins.legend = {
+      display: true, position: 'top',
+      labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
+                font: { size: 11 }, filter: item => item.text !== 'Trend' }
+    };
+  }
   renderChart('chartWip', {
     type: 'bar',
-    data: {
-      labels: d.bucketLabels,
-      datasets: [{
-        label: 'Work in progress',
-        data: d.wip,
-        backgroundColor: tint(seriesMain, 0.68),
-        borderColor: seriesMain,
-        borderWidth: 1.5,
-        order: 1
-      }, trendDataset(d.wip)]
-    },
+    data: { labels: d.bucketLabels, datasets: wipSets },
     options: wipOpts
   });
 
@@ -6328,7 +6843,10 @@ function drawCharts(d) {
     scatOpts.interaction = { mode: 'nearest', intersect: true };
     scatOpts.plugins.refLabels = { lines: scat.lines.map(l => ({
       text: l.text, value: l.value,
-      colour: l.key === 'median' ? token('--text-muted') : token('--text-secondary')
+      /* The chip is painted in the line's own colour, so the same three-way
+         reading applies here as it does to the dashes above. */
+      colour: l.key === 'sle' ? seriesAlt
+        : l.key === 'median' ? token('--text-muted') : token('--text-secondary')
     })) };
     /* The item's key leads the tooltip when the paste carried one — this is the
        chart the key was added for, and the point of it is that a dot far above
@@ -6367,8 +6885,10 @@ function drawCharts(d) {
           pointHoverRadius: 7,
           order: 1
         }].concat(scat.lines.map(l => refLine(l.value,
-          l.key === 'median' ? token('--text-muted') : token('--text-secondary'),
-          l.key === 'median' ? [6, 4] : [2, 3])))
+          l.key === 'sle' ? seriesAlt
+            : l.key === 'median' ? token('--text-muted') : token('--text-secondary'),
+          l.key === 'sle' ? [4, 2, 1, 2]
+            : l.key === 'median' ? [6, 4] : [2, 3])))
       },
       options: scatOpts
     });
@@ -6423,10 +6943,17 @@ function drawCharts(d) {
        that is decided here is the pair of things that are drawing and nothing
        else — a colour and a dash. Told apart by BOTH, so the three are still
        distinguishable printed, or to someone who reads one of them as grey. */
+    /* The target shares the threshold's COLOUR and takes a dash of its own, and
+       that pairing is deliberate rather than a colour running out: both are
+       lines the reader drew, where the two above are things their data did, so
+       reading them as one family is right. They are still told apart by the
+       dash — dot-dash against long-dash — which is what keeps the three legible
+       printed, or to somebody who reads one of them as grey. */
     const REF_STYLE = {
       median:    { colour: token('--text-muted'),     dash: [6, 4] },
       p85:       { colour: token('--text-secondary'), dash: [2, 3] },
-      threshold: { colour: seriesAlt,                   dash: [10, 3] }
+      threshold: { colour: seriesAlt,                   dash: [10, 3] },
+      sle:       { colour: seriesAlt,                   dash: [4, 2, 1, 2] }
     };
     const refs = [], refTexts = [];
     a.lines.forEach((l) => {
@@ -6570,7 +7097,7 @@ function drawCharts(d) {
   };
   /* Both lines, so the label reads the way the card does. */
   const label = k => d.names[k] + ' — ' + d.titles[k];
-  ['defectRate', 'cycleTime', 'throughput', 'netFlow', 'wip', 'agedWork']
+  ['defectRate', 'cycleTime', 'throughput', 'netFlow', 'cfd', 'wip', 'agedWork']
     .forEach(k => describe('chart' + k.charAt(0).toUpperCase() + k.slice(1), label(k)));
   if (d.hasCreated) describe('chartLeadTime', label('leadTime'));
   if (d.cycleScatter.points.length) describe('chartCycleScatter', label('cycleScatter'));
@@ -6598,6 +7125,31 @@ const $ = id => document.getElementById(id);
 
    Pluralised on the TOTAL in the "of" form, the same rule the team count beside
    it follows — "1 of 3 team" reads as a bug in everything else on the page. */
+/* Said when the picker is on Custom and the boxes do not yet make a window —
+   one box empty, or a From after a To. Without it the sentence above would read
+   "Showing all data" under two date boxes holding dates, which looks like the
+   app ignoring them rather than waiting for them. Shared by both views, like
+   itemsInWindow below and for the same reason: the same sentence about a
+   different scope. */
+/* The line that only appears on paper: which team (or which train), and the
+   window the figures cover. Written by whichever view is on screen, from the
+   same derived result the note under the strip is written from. */
+function printHead(what, d) {
+  const span = d && d.startDate
+    ? prettyDate(d.startDate) + ' to ' + prettyDate(d.endDate)
+    : d && d.endDate ? 'all data up to ' + prettyDate(d.endDate) : '';
+  /* No app name: the header keeps its title on paper, directly above this, and
+     printing it twice on page one reads as a mistake. What this line adds is the
+     two things the header cannot say once its picker and its tab strip are gone
+     — whose figures these are, and what window they cover. */
+  $('printHead').textContent = what + (span ? ' — ' + span : '');
+}
+
+function customNote(d) {
+  if (view.months !== 'custom' || d.customUsed) return '';
+  return '<br>Both dates are needed, and From must come before To.';
+}
+
 function itemsInWindow(d) {
   const inWindow = d.windowItemCount == null ? d.itemCount : d.windowItemCount;
   const all = d.itemCount;
@@ -6660,6 +7212,26 @@ const METRIC_HELP = {
       + 'that last bar is still plotted, but it is left out of the average, because a period '
       + 'that has not finished happening is an incomplete observation rather than a slow one. '
       + 'The steady delivery tile reads the same whole periods.' },
+  cfd: { title: 'Raised, Started, Finished',
+    body: 'The cumulative flow diagram — the one chart that shows work arriving and work '
+      + 'leaving in the same picture. Every item this team holds is stacked at the end of each '
+      + 'period: finished at the bottom, in progress above it, and raised-but-not-started on '
+      + 'top.\n\n'
+      + 'Read the BANDS, not the lines. The middle band is how much is in flight — the same '
+      + 'figure the work in progress chart plots — so a band that widens is work piling up '
+      + 'faster than it leaves, whatever the throughput tile says. The bottom band\u2019s slope '
+      + 'is delivery: flat means nothing finished that period. Two edges running parallel is a '
+      + 'team in balance, which is the shape to want.\n\n'
+      + 'The finished band starts at zero on the left edge: what this team delivered BEFORE '
+      + 'the window is not stacked underneath it, which on a long history would leave the two '
+      + 'bands that matter as a sliver at the top of the card. Nothing else moves for that — a '
+      + 'band is the gap between two curves, so subtracting the same figure from all three '
+      + 'leaves every thickness exactly as it was, and the in-progress band is still a real '
+      + 'count of open work rather than only of work opened inside the window. The top '
+      + 'band needs a Created column and is left off entirely without one, rather than drawn as '
+      + 'a flat zero claiming there is no backlog. An item with no start date has never '
+      + 'observably been in progress, so it goes straight to the bottom band on the day it '
+      + 'closed.' },
   netFlow: { title: 'Net Flow',
     body: 'Is our completion pace consistent? Items completed minus items started. '
       + 'Around zero is the goal: persistently below zero means more work starts than '
@@ -6675,7 +7247,12 @@ const METRIC_HELP = {
       + 'figure most work beats and a sixth of it misses badly. Watch the gap between this '
       + 'line and the average: a wide gap means the work is unpredictable even when it is '
       + 'quick on a good day, and predictability is usually worth more to whoever is asking '
-      + 'than speed. It is a real duration some item actually took, never an interpolation.' },
+      + 'than speed. It is a real duration some item actually took, never an interpolation.\n\n'
+      + 'Set a target for the team under Teams & Stages in the header and this figure is read '
+      + 'against it: the target is drawn on the two scatter charts and the tile says whether it '
+      + 'was met. It is compared with this percentile rather than with the average on purpose — '
+      + 'a target is a promise about the next item, which is the one question an average cannot '
+      + 'answer. Leave it blank and the app states the figure without judging it.' },
   throughputBand: { title: 'Steady Delivery',
     body: 'Is our pace steady? The band most periods land in: ' + THROUGHPUT_HIGH_PERCENTILE
       + '% of whole periods delivered at least the first figure, and ' + THROUGHPUT_HIGH_PERCENTILE
@@ -6701,7 +7278,12 @@ const METRIC_HELP = {
       + 'a month’s throughput, and nearer a quarter for most teams — the WIP vs throughput '
       + 'tile states that ratio. It is a rule of thumb, not a target this app holds you to, '
       + 'which is why nothing here turns a colour when you cross it. Less work in progress '
-      + 'means shorter cycle times, for the same reason a shorter queue moves faster.' },
+      + 'means shorter cycle times, for the same reason a shorter queue moves faster.\n\n'
+      + 'Set a limit for the team under Teams & Stages in the header and it is drawn flat '
+      + 'across this chart, with the tile saying whether today is inside it and by how much. '
+      + 'The bars are deliberately not recoloured where they cross the line: this app states '
+      + 'figures rather than judging them, and a period over the limit is something to look at '
+      + 'rather than a failure to mark. Leave it blank and no line is drawn.' },
   agedWork: { title: 'Aged Work',
     body: 'How many open items have been open too long? Anything still in progress beyond the '
       + 'threshold in Settings — two weeks by default, and worth keeping under a month, '
@@ -6913,6 +7495,40 @@ function renderTeamRows() {
     'autocapitalize="characters" autocomplete="off" placeholder="e.g. DAE" value="' +
     escapeHtml(t.projectId || '') + '"></td>';
 
+  /* The two figures this team SETS rather than measures. Both are optional and
+     both are EMPTY by default: a limit the app picked would draw a line across
+     somebody's chart claiming they had agreed to it, so there is no placeholder
+     figure either — the visible label says what the box means, and nothing
+     inside it suggests a value already chosen.
+     The <label> is the prefix a sighted reader sees AND the accessible name, one
+     element doing both jobs, which is what keeps the two from drifting the way a
+     visible span beside an sr-only label would. It is positional like the name
+     box above — typing in this dialog deliberately does not re-render the row,
+     so a label built from the value would go stale with every keystroke. */
+  const targetCell = (t, i, kind) => {
+    const id = kind + '-of-' + t.id;
+    const isWip = kind === 'wip';
+    const value = isWip ? t.wipLimit : t.sleDays;
+    return '<td class="target"><span class="target-set">' +
+      '<label for="' + escapeHtml(id) + '">' +
+      (isWip ? 'WIP \u2264' : CYCLE_PERCENTILE + '% \u2264') + '</label>' +
+      '<input class="target" type="number" inputmode="numeric" id="' + escapeHtml(id) + '"' +
+      ' data-' + (isWip ? 'wip-limit' : 'sle-days') + '="' + escapeHtml(t.id) + '"' +
+      ' min="' + (isWip ? '1' : '0.1') + '" max="' + TEAM_TARGET_MAX + '"' +
+      ' step="' + (isWip ? '1' : '0.5') + '" autocomplete="off"' +
+      /* The accessible name has to CONTAIN the visible label — WCAG 2.5.3, so
+         somebody saying "WIP" to a voice control reaches the box in front of
+         them. Hence "WIP limit" and "85% target" rather than the fuller wording
+         that spells either of them out; what the aria-label adds beyond the
+         visible prefix is which row it belongs to, which the prefix alone cannot
+         say when three teams each have one. */
+      ' aria-label="' + (isWip ? 'WIP limit in items' : CYCLE_PERCENTILE
+        + '% cycle time target in days') + ' for team in row ' + (i + 1) + '"' +
+      ' value="' + (value == null ? '' : value) + '">' +
+      (isWip ? '' : '<span aria-hidden="true">d</span>') +
+      '</span></td>';
+  };
+
   tb.innerHTML = '';
   state.teams.forEach((t, i) => {
     const tr = document.createElement('tr');
@@ -6922,6 +7538,8 @@ function renderTeamRows() {
         '" aria-label="Name of team, row ' + (i + 1) + '"></td>' +
       projCell(t, i) +
       artCell(t, i) +
+      targetCell(t, i, 'wip') +
+      targetCell(t, i, 'sle') +
       /* The count carries its own noun, the way the sibling's rows do. With no
          header row there is nothing else to say what the number is. */
       '<td class="count">' + t.rows.length + (t.rows.length === 1 ? ' item' : ' items') + '</td>' +
@@ -7110,12 +7728,20 @@ function renderDashboard() {
   renderTitle();
 
   const rows = activeRows();
+  const team = activeTeam();
   /* The forecast's two questions ride in with the rest of the view: derive() is
      the one place any figure is worked out, and validating them there is what
      lets renderForecast write the accepted values back into the boxes. */
+  /* The team's own limit and target ride in the same way, and they are the one
+     thing here that comes off the TEAM rather than off the view or the settings
+     — which is why they are passed rather than read: derive() takes a team's
+     rows, not a team, and giving it one would let it reach for anything else on
+     the object. */
   const d = derive(rows, state.settings,
     { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket,
-      forecastItems: view.forecastItems, forecastDate: view.forecastDate },
+      customFrom: view.customFrom, customTo: view.customTo,
+      forecastItems: view.forecastItems, forecastDate: view.forecastDate,
+      wipLimit: team && team.wipLimit, sleDays: team && team.sleDays },
     state.stages);
   const plottable = !d.empty && d.weeks.length > 0;
 
@@ -7138,6 +7764,18 @@ function renderDashboard() {
       $('dashNothingBody').textContent = rows.length + ' item' + (rows.length === 1 ? ' is' : 's are')
         + ' in progress. Every chart keys off a completion, so the dashboard'
         + ' starts with the first item that finishes.';
+    } else if (rows.length && view.months === 'custom'
+               && customWindow(view.customFrom, view.customTo)) {
+      /* Before the filter branch below, because a typed window is the more
+         likely cause the moment somebody has typed one — and the message names
+         BOTH possible causes rather than guessing between them, which would
+         send a reader to widen dates that were never the problem. */
+      $('dashNothingTitle').textContent = 'Nothing in These Dates';
+      $('dashNothingBody').textContent = 'No item'
+        + (currentFilterValue() ? ' matching the ' + view.filterDisplay + ' work type filter' : '')
+        + ' finished between ' + prettyDate(customWindow(view.customFrom, view.customTo).from)
+        + ' and ' + prettyDate(customWindow(view.customFrom, view.customTo).to)
+        + '. Widen the dates above, or pick one of the rolling windows.';
     } else if (rows.length) {
       $('dashNothingTitle').textContent = 'No Items Match This Filter';
       $('dashNothingBody').textContent = 'Nothing completed matches the '
@@ -7156,7 +7794,11 @@ function renderDashboard() {
     : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(d.endDate) + '</strong>';
   /* The strip above is shared with All Teams, so the sentence in it belongs to
      whichever of the two is actually on screen. */
-  if (activeTab === 'dashboard') $('windowNote').innerHTML = span + '<br>' +
+  /* The team object this render already holds — NOT a bare `name`, which in a
+     browser resolves to window.name and would put whatever the last page in this
+     tab called itself on somebody's printout. */
+  if (activeTab === 'dashboard') printHead((team && team.name.trim()) || 'This team', d);
+  if (activeTab === 'dashboard') $('windowNote').innerHTML = span + customNote(d) + '<br>' +
     d.buckets.length + ' ' + (d.buckets.length === 1 ? d.bucketNoun : d.bucketNounPlural) +
     ' &middot; ' + itemsInWindow(d) +
     (d.inProgressCount ? ' (' + d.inProgressCount + ' in progress)' : '') +
@@ -7195,10 +7837,21 @@ function renderDashboard() {
     tile(d.cyclePercentile + 'th percentile ' + (state.settings.cycleTimeLabel || 'cycle time').toLowerCase(),
       s.p85CycleTime == null ? '—' : num1(s.p85CycleTime),
       d.cyclePercentile + '% of items finished within this'
-        + (s.medianCycleTime == null ? '' : '; half within ' + num1(s.medianCycleTime)),
+        + (s.medianCycleTime == null ? '' : '; half within ' + num1(s.medianCycleTime))
+        /* The promise, stated in WORDS and never in a colour. Nothing in this
+           palette sits on the red-green axis, and a tile that turned a shade
+           would be the app grading a team where the sentence lets them read the
+           two figures and decide. "met" and "past" rather than good and bad, for
+           the same reason. */
+        + (s.sleMet == null ? ''
+          : '; target ' + num1(s.sleDays) + (s.sleMet ? ' — met' : ' — not met')),
       'cycleTimePercentile') +
     tile('Work in progress', String(s.currentWip),
-      'open items as of ' + prettyDate(s.asOf), 'wip') +
+      'open items as of ' + prettyDate(s.asOf)
+        + (s.wipLimit == null ? ''
+          : '; limit ' + s.wipLimit + (s.overWipLimit
+            ? ' — over by ' + (s.currentWip - s.wipLimit) : ' — inside it')),
+      'wip') +
     tile('Aged work', String(s.agedNow),
       'in progress over ' + d.agedDays + ' ' + d.dayNoun, 'agedWork');
 
@@ -7675,7 +8328,8 @@ function renderAllTeams() {
      estate's total with some rows hidden under it. */
   const inScope = teamsInArt(state.teams, scope);
   const all = deriveTeams(inScope, state.settings,
-    { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket },
+    { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket,
+      customFrom: view.customFrom, customTo: view.customTo },
     state.stages);
   const train = all.train;
   const table = $('allTeamsTable');
@@ -7719,6 +8373,13 @@ function renderAllTeams() {
     none.textContent = (scope && !inScope.length)
       ? 'No team is on ' + artName + ' yet. Open Teams & Stages in the header and set a team\u2019s '
         + 'ART to put it on this train.'
+      : (inScope.some(t => t.rows.length) && view.months === 'custom'
+         && customWindow(view.customFrom, view.customTo))
+        ? 'No team' + where + ' finished anything'
+          + (currentFilterValue() ? ' matching the ' + view.filterDisplay + ' work type filter' : '')
+          + ' between ' + prettyDate(customWindow(view.customFrom, view.customTo).from)
+          + ' and ' + prettyDate(customWindow(view.customFrom, view.customTo).to)
+          + '. Widen the dates above, or pick one of the rolling windows.'
       : inScope.some(t => t.rows.length)
         ? 'Nothing completed matches the ' + view.filterDisplay + ' work type filter in any team'
           + where + ', so there is nothing to compare. Pick another type — or All — above.'
@@ -7742,7 +8403,8 @@ function renderAllTeams() {
     ? 'Showing <strong>' + prettyDate(train.startDate) + '</strong> to <strong>'
       + prettyDate(train.endDate) + '</strong>'
     : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(train.endDate) + '</strong>';
-  $('windowNote').innerHTML = span + '<br>' + 'every team, as of the same date' +
+  printHead('every team' + (scopePhrase ? ' ' + scopePhrase : ''), train);
+  $('windowNote').innerHTML = span + customNote(train) + '<br>' + 'every team, as of the same date' +
     '<br>' + itemsInWindow(train) + ' across ' +
     inScope.length + ' team' + (inScope.length === 1 ? '' : 's') +
     (scope ? ' ' + escapeHtml(scopePhrase) : '');
@@ -8731,9 +9393,58 @@ $('themeSel').value = (() => {
   if (t === 'slate') t = 'dark';
   return THEMES.includes(t) ? t : 'midnight';
 })();
+/* The installed window's title bar. The <head> holds the default theme's
+   background as a literal, because that has to be right before any script runs;
+   from then on it is read back out of the theme pack's own --bg, so no colour is
+   invented here and a Light window never keeps a midnight bar above it. Called
+   at boot as well as on a change: the theme is restored from localStorage before
+   first paint, so the meta in the markup is already wrong for anybody who is not
+   on Midnight. */
+/* ── Printing ────────────────────────────────────────────────────────────────
+   The COLOUR half of printing; the layout half is the @media print block in the
+   stylesheet. Midnight and Dark are light text on a dark page, and a browser
+   does not print backgrounds — so printed as they are, they come out as pale
+   grey text on white paper, with charts drawn in colours picked to sit on
+   black. Switching to the theme pack's own Light palette for the duration of
+   the print is the whole fix, and it is done here rather than in CSS for two
+   reasons: it invents no colour (Light is the pack's, gated for contrast like
+   every other theme), and the charts are CANVASES — they re-read the CSS
+   variables only when they are drawn, so a print-only palette in a stylesheet
+   would leave every chart in the theme it was last rendered in.
+
+   Sepia and Light are left alone: both are already ink on a pale ground.
+   Nothing is saved: the theme in localStorage is untouched, so the swap cannot
+   outlive the print even if `afterprint` never fires. */
+let themeBeforePrint = null;
+function beforePrint() {
+  /* A chart filling the window is a fixed overlay with the page inert behind
+     it — printed, it would be one chart on page one and a blank page two. */
+  closeMaxi();
+  const now = document.documentElement.getAttribute('data-theme');
+  if (now === 'light' || now === 'sepia') return;
+  themeBeforePrint = now;
+  document.documentElement.setAttribute('data-theme', 'light');
+  renderViews();                            /* charts re-read the CSS variables */
+}
+function afterPrint() {
+  if (!themeBeforePrint) return;
+  document.documentElement.setAttribute('data-theme', themeBeforePrint);
+  themeBeforePrint = null;
+  renderViews();
+}
+window.addEventListener('beforeprint', beforePrint);
+window.addEventListener('afterprint', afterPrint);
+
+function paintThemeColor() {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  const bg = token('--bg');
+  if (meta && bg) meta.setAttribute('content', bg);
+}
+paintThemeColor();
 $('themeSel').addEventListener('change', e => {
   document.documentElement.setAttribute('data-theme', e.target.value);
   localStorage.setItem(LS.theme, e.target.value);
+  paintThemeColor();
   renderDashboard();                       /* charts re-read the CSS variables */
 });
 
@@ -9493,7 +10204,7 @@ $('stageRows').addEventListener('click', e => {
 
 $('btnAddTeam').addEventListener('click', () => {
   const team = { id: newId(), name: 'Team ' + (state.teams.length + 1),
-                 artId: null, projectId: '', rows: [] };
+                 artId: null, projectId: '', wipLimit: null, sleDays: null, rows: [] };
   state.teams.push(team);
   view.activeTeamId = team.id;
   save();
@@ -9517,6 +10228,24 @@ $('teamRows').addEventListener('input', e => {
     team.projectId = cleanProjectId(e.target.value);
     save();
     renderTeamIdWarning();
+    return;
+  }
+  /* The limit and the target, cleaned where they are written — the same rule the
+     project id above follows, and for the same reason: what is stored is what
+     the charts draw, and a box reading 8.4 while the chart holds 8 is a
+     disagreement nobody can see. An empty box is not-set, which is the ordinary
+     state, so clearing one has to be able to REMOVE a limit rather than being
+     refused as nonsense. Neither re-renders: that would replace the input being
+     typed in. The dashboard behind the dialog is redrawn on close, like every
+     other change made in here. */
+  const wipOf = e.target.dataset && e.target.dataset.wipLimit;
+  const sleOf = e.target.dataset && e.target.dataset.sleDays;
+  if (wipOf || sleOf) {
+    const team = state.teams.find(t => t.id === (wipOf || sleOf));
+    if (!team) return;
+    if (wipOf) team.wipLimit = cleanWipLimit(e.target.value);
+    else team.sleDays = cleanSleDays(e.target.value);
+    save();
     return;
   }
   const id = e.target.dataset && e.target.dataset.team;
@@ -9545,6 +10274,21 @@ $('teamRows').addEventListener('change', e => {
   if (projOf) {
     const team = state.teams.find(t => t.id === projOf);
     if (team) e.target.value = team.projectId || '';
+    return;
+  }
+  /* Same treatment for the two targets: on blur the box shows what was actually
+     stored, so a typed 8.4 comes back as 8 rather than leaving a field quietly
+     disagreeing with the line on the chart. And this is where they redraw — the
+     input handler cannot, because re-rendering would take away the box being
+     typed in, and the charts behind this dialog are what the numbers are for. */
+  const wipOf = e.target.dataset && e.target.dataset.wipLimit;
+  const sleOf = e.target.dataset && e.target.dataset.sleDays;
+  if (wipOf || sleOf) {
+    const team = state.teams.find(t => t.id === (wipOf || sleOf));
+    if (!team) return;
+    const stored = wipOf ? team.wipLimit : team.sleDays;
+    e.target.value = stored == null ? '' : stored;
+    renderViews();
     return;
   }
   const id = e.target.dataset && e.target.dataset.artOf;
@@ -9581,7 +10325,49 @@ $('teamRows').addEventListener('click', e => {
    called renderDashboard alone, which is exactly the bug that left the strip
    working on one tab and inert on the other. */
 $('filterSel').addEventListener('change', e => { view.filterDisplay = e.target.value; saveView(); renderViews(); });
-$('monthsSel').addEventListener('change', e => { view.months = e.target.value; saveView(); renderViews(); });
+/* The custom window's two boxes: shown with the option, hidden without it, and
+   never left standing empty beside a rolling window — two controls that do
+   nothing is the orphaned-field rule. `max` is today, because a date in the
+   future is refused everywhere else it can be typed here; derive() clamps the
+   end to the data's own last date as well, so nothing is ever read as of a date
+   the export has not reached. */
+function syncCustomRange() {
+  const on = view.months === 'custom';
+  $('customRange').hidden = !on;
+  $('customRangeTo').hidden = !on;
+  $('customFrom').value = view.customFrom || '';
+  $('customTo').value = view.customTo || '';
+  const today = todayLocalISO();
+  $('customFrom').max = today;
+  $('customTo').max = today;
+}
+$('monthsSel').addEventListener('change', e => {
+  view.months = e.target.value;
+  /* Choosing Custom with nothing typed fills the boxes with the window that was
+     already on screen — the last three months of the data, the app's own default
+     — so the picture does not change at the moment of switching. A control that
+     empties the charts the instant it is chosen reads as broken; this way the
+     reader edits a window rather than building one from nothing. Only when both
+     boxes are empty: a pair typed earlier is theirs and is not overwritten. */
+  if (view.months === 'custom' && !view.customFrom && !view.customTo) {
+    const anchor = historyAnchor(state.teams);
+    if (anchor) {
+      view.customTo = isoOf(anchor);
+      view.customFrom = isoOf(edate(anchor, -Number(DEFAULT_VIEW.months)));
+    }
+  }
+  syncCustomRange();
+  saveView();
+  renderViews();
+});
+/* On 'change' rather than on 'input': a date box fires input as each part is
+   typed, and half a date is not a window — it would redraw the whole dashboard
+   twice on the way to one. */
+['customFrom', 'customTo'].forEach(id => $(id).addEventListener('change', e => {
+  view[id] = e.target.value || '';
+  saveView();
+  renderViews();
+}));
 /* The data table's last column follows this too, so it re-renders as well. */
 $('bucketSel').addEventListener('change', e => {
   view.bucket = e.target.value; saveView(); renderDataTable(); renderViews();
@@ -10248,6 +11034,17 @@ function buildSharePayload(teamIds, win) {
         : t.rows)
     };
     if (t.artId) out.artId = t.artId;
+    /* The limit and the target DO travel, where the project id deliberately
+       does not, and the two are not inconsistent: a project id is a routing
+       rule for a paste box the recipient does not have, where these two are
+       drawn on the charts the link exists to show. A link without them would
+       show the reader a different picture from the one the sender is looking at
+       — the same argument that carries the issue keys.
+       SHARE_PAYLOAD_V is NOT bumped for them, matching ARTs, keys and stages: an
+       older cached build drops both fields and draws the charts without the
+       lines, which is graceful degradation rather than a wrong number. */
+    if (t.wipLimit) out.wipLimit = t.wipLimit;
+    if (t.sleDays) out.sleDays = t.sleDays;
     return out;
   });
   /* Only the trains the shared teams are actually on. Sharing one team should
@@ -10801,6 +11598,14 @@ const DEMO_TEAMS = [
   { name: 'Team Healthy Flow', seed: 20260819, dated: true, art: true, key: 'KFR',
     weeks: 40, perWeek: [4, 7], cycle: [2, 6], tailChance: 0.05, tail: [8, 14],
     wait: [1, 4], wip: [3, 5, 8, 11],
+    /* The limit and the target this team is INSIDE. Four items in flight against
+       a limit of six, and an 85th percentile around six days against a promise
+       of ten — which is what makes Team Long Tail's identical pair mean
+       something: the two boards carry the same numbers and only one of them
+       keeps them. Both are safely clear of their line rather than a day inside
+       it, because the demo is regenerated against today's date every time it is
+       loaded and a figure that only just passes would eventually not. */
+    wipLimit: 6, sleDays: 10,
     /* Where Team Healthy Flow's time goes: mostly into building the thing. That is what
        a healthy board looks like, and it is the reading Team Long Tail's has to be
        compared against for either to mean anything. The headings are the Jira
@@ -10814,6 +11619,13 @@ const DEMO_TEAMS = [
   { name: 'Team Long Tail', seed: 71104, dated: true, art: true, key: 'HRN',
     weeks: 40, perWeek: [3, 6], cycle: [3, 8], tailChance: 0.18, tail: [22, 48],
     wait: [2, 9], wip: [4, 9, 13, 17, 21, 26, 31, 38, 45],
+    /* THE SAME TWO FIGURES Team Healthy Flow carries, and that is the point of
+       putting them here at all: nine items in flight against a limit of six, and
+       an 85th percentile in the twenties against the same ten-day promise. The
+       limit line sits under the bars and the target line sits under the dots, so
+       both charts say the same thing the tiles do — and a reader who has looked
+       at Team Healthy Flow first has something to compare it with. */
+    wipLimit: 6, sleDays: 10,
     /* Team Long Tail's whole story in one row of the table: barely a third of its time is
        spent building, and more than half of it is spent waiting to be reviewed
        or waiting to be tested. That is the finding the feature exists to
@@ -10857,6 +11669,10 @@ const DEMO_TEAMS = [
      the single most common reason a roll-up lies, and the Data to column exists
      to catch it; without a team like this the column is a row of matching dates
      that looks like it does nothing. */
+  /* And Team Bare Export sets NEITHER, deliberately — the third face of the
+     feature and the one every browser starts in: no line on the charts, no
+     verdict on the tiles, and the figures stated without being judged. A demo
+     where every team had a limit would teach that a limit is compulsory. */
   { name: 'Team Bare Export', seed: 5150, dated: false, stale: 9,
     weeks: 16, perWeek: [2, 4], cycle: [2, 7], tailChance: 0.08, tail: [10, 18],
     wait: [0, 0], wip: [2, 6, 16],
@@ -11017,6 +11833,9 @@ function loadSample() {
     + 'Team Healthy Flow and Team Long Tail also carry stage times, so the Health tab can '
     + 'show where their time goes — Team Long Tail spends more of it queueing than '
     + 'building. Team Bare Export carries none.\n\n'
+    + 'Both of them set the same work-in-progress limit and the same cycle time target, and '
+    + 'only one of them keeps either. Team Bare Export sets neither, which is how every '
+    + 'browser starts.\n\n'
     + 'It is added alongside anything you already have, and you can delete it later.')) return;
 
   /* A first run auto-creates an empty "My team" (hydrateState), so loading the
@@ -11068,7 +11887,14 @@ function loadSample() {
        appears in its "takes nothing from a split" line. */
     const team = { id: newId(), name: profile.name,
                    artId: profile.art ? demoArt.id : null,
-                   projectId: profile.key || '', rows: parsed.rows };
+                   projectId: profile.key || '',
+                   /* Two of the three carry a limit and a target; Team Bare
+                      Export carries neither, which is the state every real
+                      browser starts in. Null rather than undefined, so a demo
+                      team is the same shape sanitizeTeams builds. */
+                   wipLimit: profile.wipLimit || null,
+                   sleDays: profile.sleDays || null,
+                   rows: parsed.rows };
     state.teams.push(team);
     /* Land on Team Long Tail. Team Healthy Flow's board is the prettier one and
        says less: the reason this app reads the 85th percentile rather than the
@@ -11115,6 +11941,7 @@ if (viewOnly) {
   $('dashEmpty').innerHTML = '<h2>Opening Shared View&hellip;</h2>';
   $('monthsSel').value = view.months;
   $('bucketSel').value = view.bucket;
+  syncCustomRange();
   selectTab('dashboard');
   openSharedView();   /* lifts the boot hold itself — it is async */
 } else {
@@ -11125,6 +11952,7 @@ if (viewOnly) {
 
   $('monthsSel').value = view.months;
   $('bucketSel').value = view.bucket;
+  syncCustomRange();
   $('dateOrder').value = view.dateOrder;
   renderSettingsForm();
   renderAll();
