@@ -1061,7 +1061,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
    room when the table has to fit a phone. */
 @media (max-width: 620px) { .spark { display: none; } .spark-val { margin-left: 0; } }
 dialog h2 { font-size: var(--fs-md); margin-bottom: 12px; }
-dialog p { color: var(--text-secondary); font-size: var(--fs-sm); }
+dialog p { color: var(--text-secondary); font-size: var(--fs-xs); }
 /* The help sheet's body is written into #helpBody with textContent — never
    markup, which is the whole reason a note can quote a reader's own label safely
    — so the only paragraph break available to it is a newline. Left at
@@ -2102,11 +2102,14 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
   </div>
   <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
-  <div class="note info" style="margin-top:16px">
-    Restoring <strong>replaces every team in this browser</strong>. You'll see what the file
-    holds and be asked to confirm first. A backup file is also how you move your data to
-    another device — download it here, and restore it there.
-  </div>
+  <!-- A PLAIN PARAGRAPH, not a `.note info` box. It was the only bordered strip
+       in any of the five Back Up windows — "one even has an extra box for no
+       reason" — and a box is this app's device for a note that explains a
+       SECTION of a working page, not for the one sentence of small print under
+       a pair of buttons that every sibling states plainly. -->
+  <p style="margin-top:12px">Restoring <strong>replaces every team in this browser</strong>.
+    You'll see what the file holds and be asked to confirm first. A backup file is also how
+    you move your data to another device — download it here, and restore it there.</p>
   <details class="danger-zone">
     <summary>Start Again</summary>
     <p style="margin-top:10px">Deletes every team and every work item in this browser. Your
