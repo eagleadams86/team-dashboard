@@ -1022,6 +1022,22 @@ main:focus { outline: none; }
 
 <div class="shell">
 
+  <!-- <main> opens HERE, above the tab strip, not below it — and that is the
+       whole point of the change (2026-08-21). It used to wrap the panel alone,
+       which left the tabs in no landmark at all AND meant the skip link jumped
+       PAST them: a keyboard user who took the skip link had the entire tab row
+       behind them, reachable only by shift-tabbing back. The tabs and the panel
+       they drive are one widget, so the landmark goes round both. axe-core's
+       `region` rule found the landmark half; the skip-link half was the reason
+       worth acting on. The share bar comes with them: it describes what is on
+       screen, so it is content rather than furniture.
+
+       The tabpanel role still goes on an inner div, never on <main> itself —
+       putting a role ON the element IS its role, so `role="tabpanel"` there
+       would silently replace the main landmark. That mistake is recorded below
+       and has not changed. -->
+  <main id="maincontent" tabindex="-1">
+
   <!-- Filled once when a share link is opened; empty and invisible otherwise. -->
   <div id="shareBar"></div>
 
@@ -1040,12 +1056,12 @@ main:focus { outline: none; }
     <button class="tab" role="tab" id="tab-settings"  aria-controls="panel-settings"  aria-selected="false" tabindex="-1">Settings</button>
   </div>
 
-  <!-- The three tab panels, wrapped so there is a main landmark to skip to.
-       <main> goes AROUND them, never on one: `role="tabpanel"` on the element
-       would silently replace the landmark, which is the mistake the sibling
-       app's comment records. tabindex="-1" because a skip link has to be able
-       to move focus here, and nothing else may put it in the tab order. -->
-  <main id="maincontent" tabindex="-1">
+  <!-- The three tab panels. The main landmark that wraps them opens ABOVE the
+       tab strip now (see the note there), so there is no second <main> here —
+       a document may only have one, and a duplicate is the sort of thing that
+       validates fine and confuses every landmark list. `role="tabpanel"` still
+       goes on the panels themselves and never on <main>: putting a role ON the
+       element IS its role, which would silently replace the landmark. -->
 
   <!-- ══════════════════ THE VIEW CONTROLS ══════════════════
        SHARED by the two views that read the numbers — Dashboard and All teams
@@ -1307,7 +1323,14 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       </p>
       <div style="margin-top:var(--sp-6)">
         <table class="filters">
-          <thead><tr><th>Display</th><th>Value</th><th class="act"></th></tr></thead>
+          <!-- The third column holds each row's Remove button and shows no
+               heading, but an EMPTY <th> is a column a screen reader announces
+               as nothing at all — axe-core's empty-table-header found it here.
+               An sr-only word names the column for a reader without putting
+               anything on screen; scope="col" on all three because a header
+               that names a column should say so. -->
+          <thead><tr><th scope="col">Display</th><th scope="col">Value</th>
+            <th scope="col" class="act"><span class="sr-only">Actions</span></th></tr></thead>
           <tbody id="filterRows"></tbody>
         </table>
       </div>
@@ -1726,8 +1749,8 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     anywhere else, so it is worth taking one.
   </p>
   <div class="btn-row" style="margin-top:12px">
-    <button class="btn" id="btnExport" type="button">⬇ Download backup (JSON)</button>
-    <button class="btn" id="btnImport" type="button">⬆ Restore from backup…</button>
+    <button class="btn" id="btnExport" type="button"><span aria-hidden="true">⬇</span> Download backup (JSON)</button>
+    <button class="btn" id="btnImport" type="button"><span aria-hidden="true">⬆</span> Restore from backup…</button>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
   </div>
   <div class="note info" style="margin-top:16px">
@@ -2846,7 +2869,12 @@ function parsePastedRows(text, order, stages) {
     if (loose.cols.completed >= 0 || loose.cols.started >= 0) read = loose;
   }
 
-  const raw = read.rows, header = read.header, skippedHeader = read.skippedHeader,
+  /* `header` is deliberately not pulled out here: detectColumns() has already
+     read it and handed back `cols`, so a second binding was dead the moment the
+     column resolution moved inside readAs(). CodeQL's js/unused-local-variable
+     caught it — a small thing, but a name that looks live and is not is the sort
+     of thing the next reader trusts. */
+  const raw = read.rows, skippedHeader = read.skippedHeader,
         resolved = read.resolved, cols = read.cols;
 
   /* Did the app CHOOSE the date order, or fall back to its default? With every
@@ -9784,7 +9812,7 @@ function exportButtons(tableId, name) {
     '<button type="button" class="btn small" data-export="' + escapeHtml(tableId) + '"' +
     ' data-export-name="' + escapeHtml(name) + '" data-export-how="copy">Copy</button>' +
     '<button type="button" class="btn small" data-export="' + escapeHtml(tableId) + '"' +
-    ' data-export-name="' + escapeHtml(name) + '" data-export-how="csv">⬇ CSV</button>' +
+    ' data-export-name="' + escapeHtml(name) + '" data-export-how="csv"><span aria-hidden="true">⬇</span> CSV</button>' +
     '</span>';
 }
 
@@ -10371,7 +10399,7 @@ function shareBanner() {
     && /^\d{4}-\d{2}-\d{2}$/.test(shareMeta.from) ? shareMeta.from : null;
   const from = fromISO ? new Date(fromISO + 'T00:00:00Z') : null;
   return '<div class="viewbar">' +
-    '<strong>👁 Read-only view' + (shareMeta && shareMeta.label ? ' — ' + escapeHtml(shareMeta.label) : '') + '</strong>' +
+    '<strong><span aria-hidden="true">👁️</span> Read-only view' + (shareMeta && shareMeta.label ? ' — ' + escapeHtml(shareMeta.label) : '') + '</strong>' +
     '<span class="muted">Shared' + (when ? ' on ' + when : '') + '. ' +
     (from && !isNaN(from) ? 'Covers work from ' + escapeHtml(prettyDate(from)) + ' onward. ' : '') +
     'Nothing you do here is saved, and your own data is untouched.</span>' +

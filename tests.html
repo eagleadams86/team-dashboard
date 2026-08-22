@@ -272,6 +272,27 @@ function near(actual, expected, name, eps) {
   record(ok, name, 'expected ≈' + expected + '\n     got ' + actual);
 }
 function ok(cond, name, msg) { record(!!cond, name, msg); }
+/* HTML comments explain things by naming them — including the very elements
+   these assertions look for, and one of those notes lives in a <style> block a
+   strip does not reach. So the comments come out before the page is matched
+   against, or the prose passes the test it is describing.
+
+   Looped until the string stops changing, rather than a single .replace(). One
+   pass over a multi-character delimiter can leave a NEW opener behind that the
+   pass already went past — `<` `!--` `<` `!--` `--` `>` collapses to a live
+   `<` `!--` on the way out — so a single pass is only as good as the input is
+   well-formed. CodeQL's js/incomplete-multi-character-sanitization flagged
+   exactly this. The stakes are low (this reads local repo files to assert on
+   them, it does not sanitize anything a browser will render) but a test that
+   can be fooled about what is commented out is a test that can miss a live
+   off-origin script, so it is worth doing properly. Same helper, same wording,
+   in every sibling repo’s suite. */
+const stripHtmlComments = (s) => {
+  let out = String(s), prev;
+  do { prev = out; out = out.replace(/<!--[\s\S]*?-->/g, ''); } while (out !== prev);
+  return out;
+};
+
 
 
 /* ── The scorecard, where the suite itself can't run ─────────────────────────
@@ -2821,7 +2842,7 @@ async function run(TD, win) {
      <style> block, which an HTML-comment strip does not reach — so a bare
      /<main>/ or a bare '<footer' would pass on a page that had lost the element
      and kept the comment explaining it, which is the one way this could rot. */
-  const PRIV_BARE = PRIV_SRC.replace(/<!--[\s\S]*?-->/g, '');
+  const PRIV_BARE = stripHtmlComments(PRIV_SRC);
   ok(/<footer class="foot">/.test(PRIV_BARE),
      'the footer is a real <footer> \u2014 a contentinfo landmark, not a styled paragraph');
   ok(/<main>/.test(PRIV_BARE),

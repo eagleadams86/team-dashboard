@@ -1783,3 +1783,20 @@ Share it freely: it is [MIT licensed](LICENSE), so anyone — including a compan
 for — may use, modify and redistribute it. Running it inside an organisation conveys no
 ownership of it; permission comes from that licence, granted by the author as copyright
 holder. [NOTICE](NOTICE) records this in full.
+
+## The Landmarks (2026-08-21)
+
+`<main>` opens **above** the tab strip, not below it. It used to wrap the tab panel alone,
+which had two consequences: the tabs sat in no landmark at all (axe-core's `region` rule),
+and — the reason worth acting on — **the skip link jumped past them**, so a keyboard user who
+took "Skip to content" had the entire tab row behind them, reachable only by shift-tabbing
+back. The tabs and the panel they drive are one widget, so the landmark goes round both. The
+share bar comes inside with them: it describes what is on screen, so it is content rather
+than furniture.
+
+`role="tabpanel"` still goes on the inner div and never on `<main>` — putting a role ON an
+element IS its role, so it would silently replace the landmark. That older note stands
+unchanged.
+
+Every page in this repo passes axe-core at WCAG 2.1 A and AA plus its best-practice rules, in
+all four themes, with data loaded and on every tab.
