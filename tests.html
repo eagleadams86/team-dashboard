@@ -288,7 +288,8 @@ function near(actual, expected, name, eps) {
 }
 function ok(cond, name, msg) { record(!!cond, name, msg); }
 /* The floor the run is measured against — see the check at the foot of run().
-   1636 checks as of 2026-08-22 (typed stage times took it from 1623).
+   1643 checks as of 2026-08-22 (typed stage times took 1623 to 1636; telling the target
+   and the ageing threshold apart took it to 1643).
 
    Deliberately LOOSER than the eight sibling suites, which pin their floor at
    the exact number they register. They count TESTS, and registration there is
@@ -3884,6 +3885,22 @@ group('ARTs — the grouping, and the boundary it crosses');
   const sleBox = uiDoc.querySelector('#teamRows input[data-sle-days]');
   ok(!!wipBox && !!sleBox, 'both boxes are in the Teams dialog, from the first team');
   is([wipBox.value, sleBox.value], ['2', '10'], 'each showing what is stored');
+
+  /* ── THE TARGET AND THE AGEING THRESHOLD ARE NOT THE SAME NUMBER ──────────
+     Reported by Charles on 2026-08-22, looking at "85% ≤ 10 d" in this dialog
+     beside "aged after 10 days" in Settings: "are these duplicate settings?"
+     They never were — one is read against work that FINISHED, the other flags
+     work that has not — but nothing on screen said so, and the demo happens to
+     show 10 for both. Each of the three places that touches one of them now
+     explains the other. Pinned so a tidy-up cannot quietly take it back out. */
+  const teamNotes = [...uiDoc.querySelectorAll('.manage-note')]
+    .map(p2 => p2.textContent.replace(/\s+/g, ' '));
+  ok(teamNotes.some(t => /FINISHED/.test(t) && /ageing threshold/.test(t)),
+     'the Teams dialog says the target is read against FINISHED work, and names the '
+     + 'threshold as the separate question it is');
+  ok(teamNotes.some(t => /\blower\b/.test(t)),
+     'and says which way round the two normally sit, which is the part that changes what '
+     + 'somebody types');
   /* The label is the prefix a sighted reader sees AND the accessible name — one
      element doing both jobs, because this table deliberately has no header row. */
   ok(uiDoc.querySelector('label[for="' + wipBox.id + '"]'),
@@ -3912,6 +3929,30 @@ group('ARTs — the grouping, and the boundary it crosses');
   wipBox.dispatchEvent(new win.Event('input', { bubbles: true }));
   wipBox.dispatchEvent(new win.Event('change', { bubbles: true }));
   uiDoc.getElementById('manageCloseBtn').click();
+
+  /* The other end of the same pair, where the threshold is typed. */
+  uiDoc.getElementById('settingsBtn').click();
+  const agedHint = uiDoc.getElementById('setAgedDaysLabel').parentElement.querySelector('.hint');
+  ok(agedHint && /Unfinished work only/.test(agedHint.textContent),
+     'the ageing threshold says, right where it is typed, that it counts unfinished work only');
+  ok(agedHint && /85%/.test(agedHint.textContent) && /lower/.test(agedHint.textContent),
+     'names the target it is mistaken for, and which way round they go');
+  uiDoc.getElementById('settingsCloseBtn').click();
+
+  /* And the chart's own note carries the reasoning, which neither box has room
+     for: the threshold is what decides whether this chart leads or lags. */
+  uiDoc.querySelector('[data-help="agedWork"]').click();
+  const agedHelp = uiDoc.getElementById('helpBody').textContent;
+  ok(/UNFINISHED/.test(agedHelp) && /85% target/.test(agedHelp),
+     'the Aged Work note tells the two apart by which work each one reads');
+  ok(/BELOW that target/.test(agedHelp),
+     'and says why the threshold sits below it — an item already past the target is too late '
+     + 'to rescue, which is the whole argument');
+  uiDoc.getElementById('helpDialog').close();
+  uiDoc.querySelector('[data-help="cycleTimePercentile"]').click();
+  ok(/ageing threshold/.test(uiDoc.getElementById('helpBody').textContent),
+     'and the percentile note points back at it, so the pair is explained from either end');
+  uiDoc.getElementById('helpDialog').close();
 
   win.renderAll();
   const wipChart = win.tdCharts().chartWip;

@@ -1892,6 +1892,16 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     the 85th percentile is read against. Both are drawn as a line on the charts and neither
     changes a figure: they are what the figures are compared to. Leave either blank and the app
     states the number without judging it, which is what it does today.</p>
+  <!-- The two numbers look alike on screen and are read against different work,
+       which was reported as "are these duplicate settings?". Said where the
+       target is typed, and again beside the threshold in Settings. -->
+  <p class="manage-note"><strong>85% &le; is about work that has FINISHED</strong> &mdash; it is
+    checked against the items this team delivered. The separate
+    <strong>ageing threshold</strong> in Settings is about work that has <em>not</em>: how long
+    something can sit open before it is flagged. They are different questions, so they are
+    usually different numbers &mdash; and the threshold is normally the <strong>lower</strong>
+    of the two, because an item that has already passed your target is too late to rescue. A
+    promise of 10 days is often watched with a threshold around 6.</p>
   <div class="table-scroll">
     <table class="manage" id="teamTable" aria-label="Teams"><tbody id="teamRows"></tbody></table>
   </div>
@@ -1924,7 +1934,8 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <em>Build</em>, <em>Review</em>, <em>Test</em>. Paste a <strong>Time in Status</strong>
     export with a column per status and each item's days land in the stage you have matched
     that status to. Several statuses can feed one stage: list them all and their days are
-    added together.</p>
+    added together. No export? Every stage you add here also gets a box on the work item
+    form, so the days can simply be typed in.</p>
   <p class="manage-note"><strong>You type the status names, and this app never stores them.</strong>
     A status name is work-system text, so it is matched while your paste is being read and
     then thrown away with the rest of it — what is saved is the stage name you chose and a
@@ -1987,6 +1998,14 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <div>
       <label for="setAgedDays" id="setAgedDaysLabel">Count an in-progress item as aged after (days)</label>
       <input type="number" id="setAgedDays" step="1" min="1" placeholder="14">
+      <!-- Its own hint because this box is routinely mistaken for a team's
+           85% target, which sits in Teams & Stages and reads almost the same.
+           The distinction is which work each one looks at. -->
+      <p class="hint" style="margin-top:var(--sp-3)">Unfinished work only &mdash; nothing that
+        has completed is ever counted here. Not the same as a team&rsquo;s
+        <strong>85% &le;</strong> target, which is checked against work that has finished; set
+        this <strong>lower</strong> than that target so something is flagged while there is
+        still time to act on it.</p>
     </div>
   </div>
   <!-- A measure rather than a label, so it gets its own line under the grid
@@ -7555,7 +7574,11 @@ const METRIC_HELP = {
       + 'against it: the target is drawn on the two scatter charts and the tile says whether it '
       + 'was met. It is compared with this percentile rather than with the average on purpose — '
       + 'a target is a promise about the next item, which is the one question an average cannot '
-      + 'answer. Leave it blank and the app states the figure without judging it.' },
+      + 'answer. Leave it blank and the app states the figure without judging it.\n\n'
+      + 'That target is not the same thing as the ageing threshold in Settings, though the two '
+      + 'read alike. This one is checked against work that has FINISHED; the threshold flags '
+      + 'work that has not, and normally sits below the target so something is caught while '
+      + 'there is still time to act on it. See Aged Work.' },
   throughputBand: { title: 'Steady Delivery',
     body: 'Is our pace steady? The band most periods land in: ' + THROUGHPUT_HIGH_PERCENTILE
       + '% of whole periods delivered at least the first figure, and ' + THROUGHPUT_HIGH_PERCENTILE
@@ -7592,7 +7615,16 @@ const METRIC_HELP = {
       + 'threshold in Settings — two weeks by default, and worth keeping under a month, '
       + 'counted in whichever days the working-days setting says. Read '
       + 'as of the newest date in your data rather than today, so a paste of last quarter’s '
-      + 'export reports that quarter. One caveat: the clean-up tool’s option to also remove '
+      + 'export reports that quarter.\n\n'
+      + 'This is the one chart here that can tell you something before it has happened, and '
+      + 'the threshold is what decides whether it does. It counts UNFINISHED work, so it is a '
+      + 'different question from a team’s 85% target, which is checked against work that '
+      + 'has already finished — and it is worth setting BELOW that target. An item that has '
+      + 'been open as long as you promised the whole thing would take has already missed; '
+      + 'flagged a few days earlier, it is still something you can swarm on, split or unblock. '
+      + 'If your promise is 10 days, a threshold around 6 is what turns this chart into a '
+      + 'warning rather than a post-mortem.\n\n'
+      + 'One caveat: the clean-up tool’s option to also remove '
       + 'unfinished items deletes long-running work in progress, which is exactly what this '
       + 'chart counts, so history before a clean-up like that will read low.' },
   teamTrend: { title: 'Throughput Trend',

@@ -848,6 +848,36 @@ Both **travel in a share link**, so the person you send it to sees the same line
 **per team**, so the All Teams table — which compares teams against each other rather than against
 their own promises — deliberately doesn't carry them.
 
+### The Target Is Not the Ageing Threshold
+
+These two read almost the same on screen — **85% ≤ 10 d** on a team's row, and **count an
+in-progress item as aged after 10 days** in Settings — and they answer different questions:
+
+| | **85% ≤ N d** (per team) | **Aged after N** (Settings, shared) |
+|---|---|---|
+| Looks at | Work that has **finished** | Work that has **not** |
+| Asks | Did 85% of what we delivered get through in N days? | How long can something sit open before we want to see it? |
+| Default | Not set | 14 |
+
+**The threshold usually wants to be the lower of the two, and that is the part worth acting on.**
+If your promise is ten days, an item that has already been open ten days has *missed* it — being
+told so is a post-mortem, not a warning. Flag it at six and it is still something you can swarm on,
+split, or unblock. Aged work is the one chart here that can tell you about a miss before it
+happens, and the threshold is what decides whether it does.
+
+Picking the lower number off your own data beats guessing: if your median cycle time is 4 days and
+your 85th percentile is 10, then anything sitting at 6 or 7 is already unusual for you.
+
+Going the other way is a real choice too. On a board carrying a lot of genuinely long work, a tight
+threshold flags everything and the chart becomes noise you stop reading — raising it above the
+target turns it into an escalation list rather than a nudge list. And setting them equal is
+coherent if what you want is the literal reading, *show me anything already past what we promised*.
+It just tells you about work you can no longer save.
+
+One structural note: the target is **per team** and the threshold is **shared by every team**, so
+with more than one team they cannot all match anyway. A promise is made by the people who keep it;
+the threshold is closer to a house convention.
+
 ## What Isn't Here, and Why
 
 **Blocked time** — how long an item couldn't move because something was in its way. A plain

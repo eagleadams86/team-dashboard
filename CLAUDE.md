@@ -562,6 +562,36 @@ a Jira and the knowledge to export from it.
   what is drawn is a permutation of the array being written back to; a Map is built once per render
   rather than an `indexOf` per row.
 
+## The Target and the Ageing Threshold Are Not Duplicates (2026-08-22) — wording only
+
+Reported by Charles, looking at `85% ≤ 10 d` in Teams & Stages beside *count an in-progress item
+as aged after 10 days* in Settings: **"are these duplicate settings?"** They never were, and no
+figure changed here — but nothing on screen said which was which, and the demo happens to show 10
+for both, so the question was the app's fault rather than the reader's.
+
+- **The distinction is WHICH WORK EACH ONE READS**, and every explanation added says that first.
+  `sleDays` is compared with the 85th percentile cycle time of **finished** items
+  (`percentileOf(windowCycles, CYCLE_PERCENTILE) <= sleDays`); `settings.agedDays` is compared
+  with the current age of items **still open** (`r.age > agedDays`). Nothing that has completed is
+  ever counted by the second, and nothing unfinished by the first.
+- **THE THRESHOLD NORMALLY SITS BELOW THE TARGET, and that is the part that changes what somebody
+  types.** An item open as long as the whole promise has already missed it, so a threshold equal to
+  the target turns the one leading indicator on the dashboard into a lagging one. The copy says
+  this in the two places a number is entered and argues it in the Aged Work note.
+- **Said in FOUR places, from both ends**: the Teams dialog note (where the target is typed), a
+  hint under the Settings box (where the threshold is typed), the `agedWork` help, and a pointer
+  back from the `cycleTimePercentile` help. A reader who is confused is looking at one of them, not
+  at whichever one we decided to put it under.
+- **No live "your 85th percentile is X, try Y" suggestion, deliberately.** The threshold is global
+  and the target is per team, so there is no single percentile to suggest from — and a number the
+  app proposed would be the app drawing a line somebody had not agreed to, which is the rule
+  `wipLimit`/`sleDays` already follow.
+- **They cannot be merged, and nobody should try.** Two populations, two scopes (per team vs
+  shared), two defaults (null vs 14). The reason they LOOK alike is that both are a count of days
+  next to a comparison operator, which is a presentation coincidence.
+- Pinned in tests.html: all four passages, including the "lower" guidance, so a tidy-up cannot take
+  the explanation out and leave the boxes.
+
 ## Days in Each Stage, Typed In (2026-08-22) — no schema change
 
 Reported by Charles: *"flow metrics doesn't appears to have a way to manually key time in status
