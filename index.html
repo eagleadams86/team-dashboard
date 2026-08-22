@@ -1243,7 +1243,7 @@ main:focus { outline: none; }
     <!-- The gear is Money Map's own glyph for it — the comment above this block
          named ⚙ as the family's settings mark before this app had one. -->
     <button class="btn small" id="settingsBtn" type="button" title="Labels, thresholds and the work type filter list — shared by every team"><span aria-hidden="true">⚙</span> Settings</button>
-    <button class="btn small" id="dataBtn" type="button" title="Back up, restore or clear your data"><span aria-hidden="true">⇩</span> Back up</button>
+    <button class="btn small" id="dataBtn" type="button" title="Back up, restore or clear your data"><span aria-hidden="true">⇩</span> Back Up</button>
     <button class="btn small" id="shareBtn" type="button" title="Create a read-only link to show someone your figures"><span aria-hidden="true">↗</span> Share</button>
     <label class="sr-only" for="themeSel">Theme</label>
     <!-- The four unified themes, listed alphabetically (matches the sibling app).
@@ -1512,12 +1512,12 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         </div>
       </div>
       <div class="btn-row" style="margin-top:var(--sp-6)">
-        <button class="btn primary" id="btnLoad">Load pasted rows</button>
-        <button class="btn" id="btnAppend" hidden>Append to existing</button>
+        <button class="btn primary" id="btnLoad">Load Pasted Rows</button>
+        <button class="btn" id="btnAppend" hidden>Append to Existing</button>
         <!-- Always offered, unlike Append and Clear: this is the button that
              makes sense BEFORE there is any data — one export covering the whole
              train, split into teams that may not exist yet. -->
-        <button class="btn" id="btnMultiOpen" type="button">Paste several teams&hellip;</button>
+        <button class="btn" id="btnMultiOpen" type="button">Paste Several Teams&hellip;</button>
         <!-- The demo is offered on BOTH empty surfaces, because there are two and
              either can be the first one you see: a first run opens on this tab
              (selectTab at boot picks 'data' when there are no rows), while
@@ -1531,9 +1531,9 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              export. Somebody keeping a small board by hand — no Jira, or no idea
              how to get a report out of it — would find nothing they could use.
              Asked for by Charles on 2026-08-21 for exactly that reader. -->
-        <button class="btn" id="btnAddItem" type="button">Add an item&hellip;</button>
-        <button class="btn" id="btnSampleData" type="button">Load sample data</button>
-        <button class="btn danger" id="btnClear" hidden>Clear this team's data</button>
+        <button class="btn" id="btnAddItem" type="button">Add an Item&hellip;</button>
+        <button class="btn" id="btnSampleData" type="button">Load Sample Data</button>
+        <button class="btn danger" id="btnClear" hidden>Clear This Team's Data</button>
       </div>
       <!-- role="status": the result of a load — including its data errors — is
            announced to a screen reader, the same promise the cleanup preview
@@ -1548,7 +1548,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <div class="row spread">
         <h2>Loaded Data <span class="hint" id="rowCount"></span></h2>
         <span class="row" style="gap:6px">
-          <button class="btn small" id="btnAddItem2" type="button">+ Add item</button>
+          <button class="btn small" id="btnAddItem2" type="button">+ Add Item</button>
           <span id="dataExport"></span>
         </span>
       </div>
@@ -1567,7 +1567,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         is deleted.
       </p>
       <div class="btn-row" style="margin-top:var(--sp-6)">
-        <button class="btn" id="btnCleanup" type="button">Remove old items&hellip;</button>
+        <button class="btn" id="btnCleanup" type="button">Remove Old Items&hellip;</button>
       </div>
     </div>
 
@@ -1600,7 +1600,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
            taken away to prevent. -->
       <div id="dashDemo">
         <div class="btn-row" style="justify-content:center;margin-top:var(--sp-6)">
-          <button class="btn" id="btnSample" type="button">Load sample data</button>
+          <button class="btn" id="btnSample" type="button">Load Sample Data</button>
         </div>
         <p class="hint" style="margin-top:var(--sp-4)">Three teams and nine months of made-up
         work items, so every chart has something behind it. You can delete it later.</p>
@@ -1877,7 +1877,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
   <div class="row spread">
     <strong class="manage-head">Teams</strong>
-    <button class="btn small" id="btnAddTeam" type="button">+ Add a team</button>
+    <button class="btn small" id="btnAddTeam" type="button">+ Add a Team</button>
   </div>
   <p class="manage-note">Each team keeps its own work items. The picker in the header chooses
     which one the dashboard is showing; Settings are shared by all of them.</p>
@@ -1916,7 +1916,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        you named here, and the only thing a paste contributes is numbers. -->
   <div class="row spread" style="margin-top:20px">
     <strong class="manage-head">Workflow Stages</strong>
-    <button class="btn small" id="btnAddStage" type="button">+ Add a stage</button>
+    <button class="btn small" id="btnAddStage" type="button">+ Add a Stage</button>
   </div>
   <p class="manage-note">A stage is a part of your workflow you want to measure the wait in —
     <em>Build</em>, <em>Review</em>, <em>Test</em>. Paste a <strong>Time in Status</strong>
@@ -2006,7 +2006,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
   <div class="row spread" style="margin-top:20px">
     <strong class="manage-head">Work Type Filter List</strong>
-    <button class="btn small" id="btnAddFilter" type="button">+ Add a type</button>
+    <button class="btn small" id="btnAddFilter" type="button">+ Add a Type</button>
   </div>
   <p class="manage-note">
     The choices in the Work Type filter on the dashboard. <strong>Display</strong> is what you pick;
@@ -2031,7 +2031,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
    and the reason Reset is not up beside "+ Add a type" where a mis-click
    would cost somebody every label they have set. -->
   <div class="row spread" style="margin-top:20px">
-    <button class="btn danger" id="btnResetSettings" type="button">Reset settings to defaults</button>
+    <button class="btn danger" id="btnResetSettings" type="button">Reset Settings to Defaults</button>
     <button class="btn primary" id="settingsCloseBtn" type="button">Done</button>
   </div>
 </dialog>
@@ -2074,9 +2074,9 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   </div>
 
   <div class="btn-row" style="margin-top:var(--sp-6)">
-    <button class="btn" id="btnMultiCheck" type="button">Check this paste</button>
-    <button class="btn primary" id="btnMultiLoad" type="button">Split into teams</button>
-    <button class="btn" id="btnMultiAppend" type="button">Append to each team</button>
+    <button class="btn" id="btnMultiCheck" type="button">Check This Paste</button>
+    <button class="btn primary" id="btnMultiLoad" type="button">Split into Teams</button>
+    <button class="btn" id="btnMultiAppend" type="button">Append to Each Team</button>
   </div>
 
   <!-- role="status", like the paste report on the tab: what a load did, and what
@@ -2097,8 +2097,8 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     anywhere else, so it is worth taking one.
   </p>
   <div class="btn-row" style="margin-top:12px">
-    <button class="btn" id="btnExport" type="button"><span aria-hidden="true">⬇︎</span> Download backup (JSON)</button>
-    <button class="btn" id="btnImport" type="button"><span aria-hidden="true">⬆︎</span> Restore from backup…</button>
+    <button class="btn" id="btnExport" type="button"><span aria-hidden="true">⬇︎</span> Download Backup (JSON)</button>
+    <button class="btn" id="btnImport" type="button"><span aria-hidden="true">⬆︎</span> Restore from Backup…</button>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
   </div>
   <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
@@ -2115,7 +2115,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <p style="margin-top:10px">Deletes every team and every work item in this browser. Your
       settings and your theme are kept.</p>
     <div class="row" style="margin-top:10px">
-      <button class="btn danger" id="clearBtn" type="button">Delete all data</button>
+      <button class="btn danger" id="clearBtn" type="button">Delete All Data</button>
     </div>
   </details>
   <div class="row" style="justify-content:flex-end;margin-top:18px">
@@ -2192,10 +2192,10 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <div id="itemWarn" class="warn" role="status" style="margin-top:var(--sp-5)"></div>
 
   <div class="row spread" style="margin-top:18px">
-    <button class="btn danger" id="itemDelete" type="button" hidden>Delete this item</button>
+    <button class="btn danger" id="itemDelete" type="button" hidden>Delete This Item</button>
     <span class="row" style="margin-left:auto">
       <button class="btn" id="itemCancel" type="button">Cancel</button>
-      <button class="btn primary" id="itemSave" type="button">Save item</button>
+      <button class="btn primary" id="itemSave" type="button">Save Item</button>
     </span>
   </div>
 </dialog>
@@ -2204,10 +2204,10 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <h2 id="clearTitle">Delete All Data?</h2>
   <p id="clearBody"></p>
   <div class="row spread" style="margin-top:18px">
-    <button class="btn" id="clearBackupBtn" type="button">&#11015; Download backup first</button>
+    <button class="btn" id="clearBackupBtn" type="button">&#11015; Download Backup First</button>
     <span class="row">
       <button class="btn" id="clearCancel" type="button">Cancel</button>
-      <button class="btn danger" id="clearConfirm" type="button">Delete everything</button>
+      <button class="btn danger" id="clearConfirm" type="button">Delete Everything</button>
     </span>
   </div>
 </dialog>
@@ -2265,10 +2265,10 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <div id="cleanupPreview" role="status" style="margin-top:var(--sp-6)"></div>
 
   <div class="row" style="justify-content:space-between;margin-top:18px;gap:10px;flex-wrap:wrap">
-    <button class="btn" id="cleanupBackupBtn" type="button">&#11015; Back up first</button>
+    <button class="btn" id="cleanupBackupBtn" type="button">&#11015; Back up First</button>
     <span class="row" style="gap:10px">
       <button class="btn" id="cleanupCancelBtn" type="button">Cancel</button>
-      <button class="btn danger" id="cleanupRunBtn" type="button">Remove items</button>
+      <button class="btn danger" id="cleanupRunBtn" type="button">Remove Items</button>
     </span>
   </div>
 </dialog>
@@ -2285,7 +2285,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <legend>Which Teams</legend>
     <div class="checklist-head">
       <span class="hint" id="shareTeamCount" role="status"></span>
-      <button type="button" class="btn small" id="shareSelectAll">Select all</button>
+      <button type="button" class="btn small" id="shareSelectAll">Select All</button>
     </div>
     <div class="checklist" id="shareTeams"></div>
   </fieldset>
@@ -2334,8 +2334,8 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <p class="hint" id="shareMeta" role="status" style="margin:8px 0 0"></p>
     <p class="warn" id="shareWarn" role="status"></p>
     <div class="row" style="margin-top:10px">
-      <button type="button" class="btn primary" id="shareCopyBtn">Copy link</button>
-      <button type="button" class="btn" id="shareOpenBtn">Preview it</button>
+      <button type="button" class="btn primary" id="shareCopyBtn">Copy Link</button>
+      <button type="button" class="btn" id="shareOpenBtn">Preview It</button>
     </div>
   </fieldset>
 
@@ -2359,7 +2359,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <h2 id="helpTitle"></h2>
   <p id="helpBody" style="margin:0"></p>
   <div class="row" style="justify-content:flex-end;margin-top:18px">
-    <button class="btn primary" id="helpCloseBtn" type="button">Got it</button>
+    <button class="btn primary" id="helpCloseBtn" type="button">Got It</button>
   </div>
 </dialog>
 
@@ -10158,7 +10158,7 @@ function showMultiNote(res, route, mode) {
           + ' <button class="btn small" type="button" data-create-team="' + escapeHtml(u.projectId)
           + '">Create Team ' + escapeHtml(u.projectId) + '</button></li>').join('') + '</ul>'
       + (n > 1 ? '<div style="margin-top:var(--sp-4)"><button class="btn small" type="button" '
-          + 'data-create-team="*">Create all ' + n + ' teams</button></div>' : '')
+          + 'data-create-team="*">Create All ' + n + ' Teams</button></div>' : '')
       + '<div style="margin-top:var(--sp-4)">Or give one of these ids to a team you already have, '
       + 'under <strong>Teams &amp; Stages</strong>. Either way the paste stays in the box — check it again '
       + 'and they will be included.</div>'
