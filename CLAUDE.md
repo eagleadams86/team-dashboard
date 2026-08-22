@@ -1399,11 +1399,29 @@ not regress:
   figures rather than judging them, a 50% answer is not "bad", and a red/green ramp is
   unreadable to the person most likely to be handed a forecast in a room. The answer rows carry
   the same four fills as swatches, which is what saves the shading from needing a legend.
-- Adding the target date meant adding `input[type="date"]` to the app's own base input rule —
-  without it the box kept the UA's 2px border and zero padding and sat 10px shorter than the
-  number box beside it. Golf Handicap's rule already listed it. **Not theme drift**: the pack
-  owns the two date-specific rules (the 16px touch floor and turning the native appearance off),
-  the control's box is each app's own.
+- **The base field rule's TYPE LIST is the theme pack's own** (2026-08-22). `select,
+  textarea, input[type=text|number|date|month|search|tel|url|email|password]` — the same
+  list the pack enumerates in its coarse-pointer rule. It has to stay a whitelist (a
+  checkbox handed a surface, a border and padding stops being a checkbox), but a whitelist
+  grown by hand is a field that arrives silently UNSTYLED, wearing the browser's own box
+  beside fields wearing the theme's. Nothing fails and nothing logs. It has happened twice
+  in this family in opposite directions: this app was missing `date`, Golf Handicap was
+  missing `search`. Borrowing the pack's list is what stops it being a fresh discovery each
+  time, since it answers the same question ("is this a thing you type into?") in the one
+  place that should. **Adding a type to one means adding it to the other.**
+  `input[type=search]` also takes `appearance: none`, like the pack's date fields, because
+  the native inset shape ignores the border and radius — that removes Chromium's native ×
+  too, so a search box with no other way to clear itself should offer one.
+  **Sprint Predictability is the design lead**; Money Map and Golf Handicap carry the
+  identical list. PAPTrack and the dashboard style fields by CONTAINER (`.field input`) and
+  by class (`.ctl`) instead — element selectors, which have no equivalent gap — and the
+  lottery pages style their few fields per component. Those three are deliberately NOT
+  converted; don't "finish the job" by giving them a type list.
+  The date case is this app's own instance of it: adding the forecast's target date meant
+  adding `input[type="date"]` to this rule, because without it the box kept the UA's 2px
+  border and zero padding and sat 10px shorter than the number box beside it. **Not theme
+  drift**: the pack owns the two date-specific rules (the 16px touch floor and turning the
+  native appearance off), the control's box is each app's own.
 
 ## Security (shared origin)
 

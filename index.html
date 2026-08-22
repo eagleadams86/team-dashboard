@@ -298,17 +298,37 @@ html[data-first-run] #teamSel { display: none; }
 /* controls */
 label { display: block; font-size: 13px; color: var(--text-secondary);
   font-weight: 600; margin-bottom: 4px; }
-/* input[type="date"] was added when the forecast gained a target date: without
-   it the box kept the UA's own 2px border and zero padding and sat 10px shorter
-   than the number box beside it. Golf Handicap's rule already listed it, which
-   is why this only surfaced here. The pack owns the two date-specific rules
-   (the 16px touch floor and turning the native appearance off); the box itself
-   is each app's own, so this is not theme drift. */
-input[type="text"], input[type="number"], input[type="date"], select, textarea {
+/* THE TYPE LIST IS THE THEME PACK'S OWN, not one grown here a field at a time.
+   The history of this rule is the argument for that: `input[type="date"]` had to
+   be added when the forecast gained a target date, because without it the box
+   kept the UA's own 2px border and zero padding and sat 10px shorter than the
+   number box beside it — and Golf Handicap's list already had `date`, which is
+   why it surfaced only here. Then Golf Handicap shipped a `type=search` box
+   wearing the browser's own grey shape, because ITS list had no `search`. Same
+   fault twice, in opposite directions.
+
+   It has to stay a whitelist — a checkbox handed a surface, a border and padding
+   stops being a checkbox — so the fix is to make the whitelist the one the pack
+   already enumerates in its coarse-pointer rule, which answers the same question
+   ("is this a thing you type into?") in the one place that should answer it.
+   ADDING A TYPE TO ONE MEANS ADDING IT TO THE OTHER.
+
+   The pack owns the two date-specific rules (the 16px touch floor and turning the
+   native appearance off); the box itself is each app's own, so this is not theme
+   drift. Sprint Predictability is the design lead and carries the same list. */
+select, textarea,
+input[type="text"], input[type="number"], input[type="date"], input[type="month"],
+input[type="search"], input[type="tel"], input[type="url"], input[type="email"],
+input[type="password"] {
   background: var(--surface); color: var(--text-primary);
   border: 1px solid var(--input-border); border-radius: var(--radius-sm);
   padding: 7px 9px; width: 100%;
 }
+/* A search field is drawn natively with its own inset shape, which ignores the
+   border and radius above — the same move the pack makes for date fields. It
+   takes Chromium's native × with it; a search box that has no other way to clear
+   itself should offer one. */
+input[type="search"] { -webkit-appearance: none; appearance: none; }
 textarea { font-family: var(--font-mono); font-size: 12px; resize: vertical; min-height: 190px; }
 select { cursor: pointer; }
 
