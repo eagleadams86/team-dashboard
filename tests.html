@@ -298,7 +298,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 1620;
+const EXPECTED = 1622;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3014,6 +3014,16 @@ async function run(TD, win) {
 
   /* The markup asks for favicon.ico?v=1, so the key has to be the path alone. */
   ok(/favicon\.ico\?v=1/.test(APP_SRC), 'the favicon cache-buster is still there');
+
+  /* THE CONTAINER RING. openModal focuses the dialog itself on a coarse pointer so that
+     opening a form does not drag the on-screen keyboard up with it — which also makes the
+     dialog match the :focus-visible rule, and every phone and tablet drew a 2px ring around
+     the whole window until 2026-08-22. A fine pointer never takes that path, so no desktop
+     and no CI run will ever show this coming back; the source is the only guard. */
+  ok(/dialog:focus \{ outline: none/.test(APP_SRC),
+     'without this the whole dialog rings itself on every phone and tablet');
+  ok(/dlg\.tabIndex = -1;\s*\n\s*dlg\.focus\(\);/.test(APP_SRC),
+     'and that container focus is still how the keyboard is kept down');
   ok(/let p = url\.pathname;/.test(SW_SRC) && /SHELL_PATHS\.has\(p\)/.test(SW_SRC),
      'shellKey matches on the path alone, so the cache-buster still hits the cached file');
 
