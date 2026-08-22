@@ -5935,7 +5935,7 @@ group('ARTs — the grouping, and the boundary it crosses');
      the app went on serving 4.4.1, and the repo would then state a version it
      does not run. This is what stops that being quiet — a manifest-only bump
      fails here, which turns the PR into the correct instruction ("a newer
-     Chart.js exists; now update the FILE too, in all three repos that carry
+     Chart.js exists; now update the FILE too, in all four repos that carry
      it") instead of a false record. It is the theme pack's rule in another
      repo: a generated artefact has to match its source. */
   const [pkgRes, libRes] = await Promise.all([bustFetch('package.json'), bustFetch('chart.min.js')]);
