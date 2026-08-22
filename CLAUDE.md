@@ -17,9 +17,10 @@ file records what is specific to this repo and what must never regress.
 - **A row is three ISO dates, one short work-type label, one issue key and a
   set of NUMBERS keyed by stage id.
   Nothing else. There are no free-text or comment fields anywhere in this app —
-  don't add one.** A team carries a name, an optional `artId` and an optional
-  project id — the last added 2026-08-20 and guarded by the same shape as the
-  front of a key. See the project id section below. `state.stages` carries names
+  don't add one.** A team carries a name, an optional `artId`, an optional
+  project id — added 2026-08-20 and guarded by the same shape as the front of a
+  key — and, since 2026-08-22, two optional NUMBERS it sets rather than measures:
+  a work-in-progress limit and a cycle time target. See the project id section below. `state.stages` carries names
   and aliases the reader typed; **nothing on a row is ever a word** — see the
   workflow stages section, which is the longest one in this file for a reason.
 - **The issue key was added on 2026-08-20 at Charles's explicit request**, and it
@@ -122,6 +123,146 @@ file records what is specific to this repo and what must never regress.
 
 - **Which tab you were on IS remembered, for the two number views only.** `view.activeTab`, restored at boot. It used to be deliberately not saved — the old comment said "a reload should open on the dashboard" — which was out of step with both siblings (Sprint Predictability keeps `settings.view`, Money Map keeps `ui.activeTab`) and with the fact that All Teams is where somebody with several teams works. Changed 2026-08-21 after it was reported as annoying. Settings and Your Data are NOT remembered, on purpose. No new guard was needed: `selectTab` already refuses a hidden or unknown tab and falls back to the dashboard, which is exactly the All-Teams-disappears-below-two-teams case.
 - **The All Teams Throughput trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **The header names the metric** — it shipped as a bare "Trend" and that was not enough beside eight other columns that each name theirs. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart.
+
+## Six Gaps Closed (2026-08-22) — SCHEMA 9 → 10
+
+Asked for as a set, after a review that listed what the app was missing. Five features and one
+piece of plumbing. The two that touch storage are first; the rest change no saved field.
+
+### The Limit and the Target — SCHEMA 9 → 10
+
+`t.wipLimit` and `t.sleDays` on each team: how much work it means to have open at once, and how
+long it means an item to take. Both optional, both `null` by default, guarded by `cleanWipLimit`
+and `cleanSleDays` at both boundaries (the input handler and `sanitizeTeams`) like every other
+stored field. `SCHEMA` and the whitelist moved in the same commit, as the rule at the top says.
+
+- **PER TEAM, NOT IN SETTINGS, and that is the whole decision.** Every setting here is shared by
+  every team and can be, because each describes how a FIGURE IS WORKED OUT — what a defect is,
+  what a same-day item is worth. These two describe a team's own board: a limit of eight means
+  something different to a team of three and a team of twelve, and a promise is made by the
+  people who keep it. Do not "tidy" them into the Settings tab.
+- **NOT SET IS THE DEFAULT AND MUST STAY SO.** A limit the app picked would draw a line across
+  somebody's chart claiming they had agreed to it. Every reader treats null as "draw nothing, say
+  nothing" — never as a zero, and never as false: `summary.overWipLimit` and `summary.sleMet` are
+  **null** when there is nothing to read against, because `false` would say a team is inside a
+  limit it never agreed to.
+- **They reach `derive()` on the VIEW object**, the way `asOf` and the forecast's two questions
+  do, and are validated there at their point of use. `derive` takes a team's rows, not a team;
+  handing it the team object would let it reach for anything else on there.
+- **Strictly over, never equal** — a limit of eight allows eight. Same reading `agedCounts`
+  already takes of the ageing threshold, and pinned.
+- **The target is compared with the PERCENTILE, not the average.** A target is a promise about
+  the next item, which is the one question an average cannot answer.
+- **NOTHING TURNS A COLOUR.** The verdict is a sentence on the tile; the bars over a limit are
+  the colour of the bars under it. The app states figures rather than grading them, the palette
+  has nothing on the red-green axis to grade with, and a bar that changed colour would be the app
+  calling a period a failure. The limit line and the target line take `--series-5` and a dash of
+  their own — the ageing threshold's colour, because all three are **lines the reader drew**, as
+  against the median and percentile lines, which are things their data did.
+- **They TRAVEL in a share link where the project id does not**, and the two are not
+  inconsistent: a project id routes a paste the recipient cannot make, and these are drawn on the
+  charts the link exists to show. `SHARE_PAYLOAD_V` was NOT bumped, matching ARTs, keys and
+  stages — an older build drops both and draws no lines, which is graceful degradation.
+- **`tdAdopt`'s losing-a-field prompt was NOT extended to them**, on the re-typeability test that
+  kept ARTs and the project id out of it: two numbers typed in a dialog in seconds.
+- The boxes live on the team's row in Teams & Stages with their meaning in FRONT of them
+  ("WIP ≤", "85% ≤"), because that table deliberately has no header row. The `<label>` is both
+  the visible prefix and the accessible name, and the `aria-label` **starts with the words on
+  screen** (WCAG 2.5.3) and adds only which row it belongs to.
+- The demo's two keyed teams carry **the same limit and the same target** and only one keeps
+  either; Team Bare Export carries neither. Identical figures on two boards is the point — a
+  limit per team would show two lines and teach nothing.
+
+### The Cumulative Flow Diagram — no schema change
+
+Three cumulative counts read at the same eval points work in progress is read at, stacked:
+finished, in progress, raised-and-not-started. Third card in **Delivery**, `solo` like the lead
+time card in Flow.
+
+- **`cfd.inProgress` IS `wip`, and a test pins the two as equal.** They are worked out different
+  ways — a subtraction of two cumulative counts against `openCounts` walking the items — so if
+  they ever disagree, one of them is wrong. That equality is also what makes the band readable as
+  work in progress rather than as "work opened inside the window".
+- **THE BASELINE IS WHAT MAKES IT READABLE.** Everything delivered before the window opens is
+  subtracted from all three curves. Without it, nine months of history under a three-month window
+  puts 130 items in the bottom band and leaves the two that matter as a sliver. Subtracting one
+  constant from all three cannot move a band's THICKNESS — a band is a difference — so nothing
+  else changes. Counted from strictly before the first bucket, not from the first eval point,
+  which would swallow the opening bucket's completions.
+- **Two fallbacks keep the bands off negative**, and each is also the honest reading: an item
+  completed with no start date enters both counts on the day it closed (never observably in
+  progress), and an item with no created date joins at its start. Without them a paste missing
+  either column draws a band below zero, which Chart.js will happily stack.
+- **The backlog band is absent without created dates, never flat at zero** — a flat zero is a
+  claim that there is no backlog where the truth is that the export cannot see one. Same stance
+  the lead time chart takes on the same column.
+- Three colours from the pack's ramp — `--series-1`, `--series-3`, `--series-5`, the widest
+  separation five tokens allow. **The app's first three-series chart**; everything else needed
+  two, which is why the pair at the top of `drawCharts` is a pair. Colour is not the only cue: the
+  bands are in a fixed order bottom to top and the chart carries a legend.
+
+### A Window Between Two Dates — no schema change
+
+`months: 'custom'` plus `view.customFrom` / `view.customTo`, and `customWindow()` — pure and
+exported — deciding what counts as a usable pair. In `view`, so no schema bump and no place in a
+share payload.
+
+- **The END IS CLAMPED to the data, and the clamp comes AFTER the shared date.** That ordering is
+  the trick: a team whose export stops mid-window is still read as of the date every other team
+  is read as of (what `asOf` is for), while nothing is ever read as of a date past the typed end
+  or past the data. Get it the other way round and All Teams stops aligning.
+- **An incomplete or backwards pair means NO custom window, not an error** — it is the state a
+  reader passes through on the way to typing the second date. The note under the strip says what
+  it is waiting for rather than leaving two filled boxes looking ignored.
+- **Choosing Custom prefills the boxes with the window already on screen**, so the picture does
+  not change at the moment of switching. Only when both are empty: a pair typed earlier is theirs.
+- **`derive()` gained an empty-axis return.** A typed window is the only one that can leave
+  `weekStarts` empty — every rolling window ends where the data does and floors at the first
+  completion — and everything below that line indexes `weekStarts[0]`. It returns the same shape
+  the no-completions case does.
+- **`inProgressCount` and `windowItemCount` are now read AS OF the window's end** (`wip`'s last
+  value) rather than "not completed yet". Identical for every rolling window; the typed window is
+  where they part company, and "how many are open today" stated inside a window about last
+  January is a figure from outside it.
+
+### Printing — no schema change
+
+Two halves, and the split is the thing to keep: **layout** in an `@media print` block, **colour**
+in `beforePrint`.
+
+- **The print block names no colour at all**, and a test asserts it. Browsers do not print
+  backgrounds, so the page comes out on paper's own white; asking for `print-color-adjust` would
+  spend somebody's toner on a surface colour.
+- **Midnight and Dark switch to the pack's Light palette for the duration of the print**, in JS,
+  because charts are CANVASES: they re-read the CSS variables only when they are drawn, so a
+  print-only palette in a stylesheet would leave every chart in the theme it was last rendered
+  in. Nothing is saved, so the swap cannot outlive the print. Light and Sepia are left alone.
+- `closeMaxi()` first: a chart filling the window is a fixed overlay with the page inert behind
+  it, and would print as one chart and a blank page.
+- The grid is deliberately NOT forced to one column — the print layout's width is only known
+  after the stylesheet applies, and every canvas would need re-rendering at a size nothing had
+  measured. A canvas is an image drawn at device resolution; it downscales cleanly.
+- `#printHead` is the print-only line naming the team (or the train) and the window, because the
+  header's picker and the tab strip both go. It does NOT repeat the app name the header keeps.
+
+### Installing It — no schema change
+
+`manifest.webmanifest`, three PNG icons and an apple-touch-icon, all drawn by `make_favicon.py`
+from the same mark, all on `sw.js`'s SHELL list.
+
+- **`manifest-src 'self'` has to be spelled out in the CSP.** Under `default-src 'none'` a
+  manifest is covered by no other directive, so the fetch is refused and "Install app" silently
+  stops appearing. It admits a static JSON file on this origin and nothing else.
+- **`scope` is `./`, never `/`.** Every app in the family is served from ONE origin, and a scope
+  of `/` would capture Sprint Predictability and Money Map into this app's window.
+- The install files are cached because an INSTALLED copy is the one most likely to be opened with
+  no network at all — a launcher re-reads the manifest and its icons to draw the window. All of
+  them are already public in this repo, so the origin-wide-cache rule is unchanged by them.
+- `<meta name="theme-color">` holds Midnight as a literal (it must be right before any script
+  runs) and `paintThemeColor()` rewrites it from the pack's own `--bg` on every theme change.
+- The maskable icon is full bleed with square corners; the safe zone is a disc of radius 25.6 in
+  the 64 viewport and the mark's furthest point is 23.8 from centre. Widen a bar or drop its base
+  and re-check that number — it is written down in `make_favicon.py`.
 
 ## Workflow Stages (2026-08-21) — SCHEMA 7 → 8
 
