@@ -232,7 +232,7 @@ header { position: sticky; top: 0; z-index: 20; background: var(--surface);
 
 /* buttons */
 .btn { background: var(--surface-alt); color: var(--text-primary);
-  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-control); border-radius: var(--radius-sm);
   padding: 7px 12px; cursor: pointer; white-space: nowrap; }
 .btn:hover { border-color: var(--text-muted); }
 .btn.primary { background: var(--btn-bg); color: var(--btn-text); border-color: var(--btn-bg); }
@@ -243,14 +243,14 @@ header { position: sticky; top: 0; z-index: 20; background: var(--surface);
    The cleanup dialog leans on this to say "there is nothing to remove"; the
    share dialog's copy buttons have always been disabled while a link builds. */
 .btn:disabled { opacity: .45; cursor: not-allowed; }
-.btn:disabled:hover { border-color: var(--border-strong); }
+.btn:disabled:hover { border-color: var(--border-control); }
 .btn.danger:disabled:hover { background: transparent; border-color: var(--err); }
 .btn.primary:disabled:hover { opacity: .45; }
 /* Shared height for the header chrome: a native <select> ignores line-height,
    so the height is pinned on both or the row lines up on neither edge. */
 .btn.small { padding: 4px 9px; font-size: var(--fs-xs); min-height: var(--chrome-h); }
 #teamSel, #themeSel { width: auto; background: var(--surface-alt); color: var(--text-primary);
-  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-control); border-radius: var(--radius-sm);
   padding: 4px 9px; font-size: var(--fs-xs); cursor: pointer; min-height: var(--chrome-h); }
 #teamSel:hover, #themeSel:hover { border-color: var(--text-muted); }
 #teamSel { min-width: 140px; }
@@ -264,7 +264,7 @@ html[data-first-run] #teamSel { display: none; }
 
 /* tabs — buttons, filled when selected, exactly as the sibling app draws them */
 .tabs { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
-.tab { background: var(--surface-alt); border: 1px solid var(--border-strong);
+.tab { background: var(--surface-alt); border: 1px solid var(--border-control);
   border-radius: var(--radius-sm); padding: 8px 14px; cursor: pointer;
   color: var(--text-primary); font-weight: 500; }
 .tab:hover { border-color: var(--text-muted); }
@@ -530,7 +530,7 @@ select { cursor: pointer; }
    reads as part of it rather than as a control you can press. */
 .tile-help { position: relative; margin-left: 7px;
   flex: none; width: 16px; height: 16px; padding: 0; border-radius: 50%;
-  border: 1px solid var(--border-strong); background: transparent;
+  border: 1px solid var(--border-control); background: transparent;
   color: var(--text-secondary); font-size: var(--fs-xs); font-weight: 700; line-height: 1;
   font-family: inherit; text-transform: none; cursor: pointer; }
 .tile-help::after { content: ''; position: absolute; top: 50%; left: 50%;
@@ -575,7 +575,7 @@ select { cursor: pointer; }
 .chart-max { position: absolute; top: 13px; right: 13px; z-index: 1;
   display: flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; padding: 0; border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong); background: transparent;
+  border: 1px solid var(--border-control); background: transparent;
   color: var(--text-secondary); cursor: pointer; }
 .chart-max:hover { color: var(--text-primary); background: var(--surface-alt);
   border-color: var(--text-secondary); }
@@ -902,13 +902,13 @@ table.filters th.act, table.filters td.act { text-align: right; }
    it did. The reorder arrows are not destructive and must not light up as though
    they were. Disabled dims by opacity rather than by a greyed colour, so nothing
    here invents a palette value; same rule as `.btn:disabled`. */
-.icon-btn { appearance: none; background: none; border: 1px solid var(--border-strong);
+.icon-btn { appearance: none; background: none; border: 1px solid var(--border-control);
   color: var(--text-muted); border-radius: var(--radius-sm); cursor: pointer;
   width: 30px; height: 30px; font-size: var(--fs-sm); line-height: 1; }
 .icon-btn:hover { color: var(--text-primary); border-color: var(--text-muted); }
 .icon-btn.danger:hover { color: var(--err); border-color: var(--err); }
 .icon-btn:disabled { opacity: .45; cursor: not-allowed; }
-.icon-btn:disabled:hover { color: var(--text-muted); border-color: var(--border-strong); }
+.icon-btn:disabled:hover { color: var(--text-muted); border-color: var(--border-control); }
 /* The buttons at the end of a row: kept on one line and pushed to the right edge,
    so the arrows line up down the table however wide the columns end up. */
 .rowacts { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
