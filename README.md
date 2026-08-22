@@ -115,8 +115,11 @@ apart by the edge, so the edge has to be able to carry it.
 
 Not everyone has a Jira, or knows how to get a report out of one. **Add an item** sits beside the
 paste box on a first run, and **+ Add item** on the Loaded Data card once you have rows: one short
-form — started, completed, work type, and optionally a created date, an item name and the stage it
-is sitting in.
+form — started, completed, work type, and optionally a created date, an item name, the stage it
+is sitting in, and **how many days it spent in each of your stages**.
+
+**Everything on the dashboard can be filled in from that form.** There is no chart, tile or table
+here that needs an export — the stage day counts were the last thing that did, until 2026-08-22.
 
 It also closes a gap the paste box never could: **press any row in Loaded Data to edit it, or
 delete it.** Before this the card said "read-only — to correct a row, fix it in your source and
@@ -128,6 +131,9 @@ Two things worth knowing:
   day-first/month-first question a pasted `1/3/26` raises does not arise here at all.
 - **Press anywhere on a row** in Loaded Data to open it, not just its name — though a click that
   ends a text selection is ignored, so dragging a figure out to copy it still works.
+- **An empty stage box is not a zero.** Leave a stage blank and that item simply says nothing about
+  it; type `0` and you are saying it crossed that stage inside a day. The medians on the Time in
+  Stage table only count the boxes you actually filled in, which is what keeps them honest.
 - **A date in the future is refused**, in any of the three fields, and the message says why: every
   window on the dashboard is measured back from the newest date in your data, so one item dated
   next year would empty every chart on it.
@@ -847,8 +853,8 @@ their own promises — deliberately doesn't carry them.
 **Blocked time** — how long an item couldn't move because something was in its way. A plain
 Jira export doesn't carry it: "Flagged" is a state, not a duration, and reconstructing the
 duration needs the issue's status history. Half of what that needed
-[now exists](#where-the-time-goes-time-in-stage): a Time in Status export is read, and its days
-land against stages you named. What's still missing is a way to say **which of your stages is
+[now exists](#where-the-time-goes-time-in-stage): a Time in Status export is read — or the days
+are typed in — and they land against stages you named. What's still missing is a way to say **which of your stages is
 blocked time** rather than working time — which is a decision about meaning, not a parse, and
 it hasn't been built. Set up a stage for your blocked statuses and the table will at least show
 you how much of the wait they account for.
@@ -1129,9 +1135,12 @@ Stages read **two different kinds of export**, and you set them up once for both
 |---|---|
 | **A Status column** (where each item is now) — an ordinary Jira export | The work item age chart grouped by **stage**: what is sitting in each part of the workflow, and how long it has been there |
 | **A Time in Status export** (a column per status, holding days) — usually a marketplace add-on | The **Time in Stage** table below: how long work typically waits in each stage |
+| **Neither** — you type the days in yourself | The same **Time in Stage** table. Every stage you set up gets a box on the work item form |
 
 Most people have the first and not the second. That is fine — the first is the one that answers
-*where is the work stuck*, and it needs nothing installed.
+*where is the work stuck*, and it needs nothing installed. And if you have neither, the third row
+is not a consolation prize: the table reads typed figures and pasted ones identically, because they
+are the same figures once saved.
 
 ### You Name the Stages. Your Export's Status Names Are Never Stored
 
@@ -1149,6 +1158,14 @@ Paste an export with a **Status** column and each in-flight item is filed under 
 status matches. Paste a **Time in Status** export — one row per issue, one column per status,
 each cell a number of days — and the days land in the stage each status is matched to, several
 columns adding together where several statuses feed one stage.
+
+**Or type the days in.** Once a stage exists it gets a box on the Add/Edit Work Item form, so a
+board kept by hand — or a couple of figures read off a Jira screen without exporting anything —
+fills this table exactly as an export does. Leave a box empty for a stage you have no figure for;
+that is different from typing `0`, which says the item crossed it inside a day. The days are
+**calendar** days either way, which is what a Time in Status export counts and what the card says
+on its face — the working-days setting governs the three durations this app measures itself, and
+cannot honestly be applied to a single total someone else worked out.
 
 **The status names — in your headings and in your Status column's cells — are matched while the
 paste is being read, and then thrown away with the rest of it.** What is saved is the stage name *you* chose and a

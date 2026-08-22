@@ -288,7 +288,7 @@ function near(actual, expected, name, eps) {
 }
 function ok(cond, name, msg) { record(!!cond, name, msg); }
 /* The floor the run is measured against — see the check at the foot of run().
-   1623 checks as of 2026-08-22.
+   1636 checks as of 2026-08-22 (typed stage times took it from 1623).
 
    Deliberately LOOSER than the eight sibling suites, which pin their floor at
    the exact number they register. They count TESTS, and registration there is
@@ -297,7 +297,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 1600;
+const EXPECTED = 1610;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -6124,11 +6124,79 @@ group('ARTs — the grouping, and the boundary it crosses');
     is(TD.buildManualRow({ started: '2026-01-19', stage: 'nope' }, stages).row.stage, undefined,
        'and a stage nothing answers to is dropped rather than stored');
 
-    /* Day counts have no control on the form, and a field with no control is a
-       field the next save silently drops unless it is carried through. */
+    /* ── DAYS IN EACH STAGE, TYPED IN (2026-08-22) ───────────────────────────
+       Reported by Charles: "flow metrics doesn't appear to have a way to
+       manually key time in status data." It was the only field on a row with no
+       door but a paste, which made the Time in Stage card the only card in the
+       app a reader without a Jira report could not fill. */
+    const withDays = TD.buildManualRow(
+      { started: '2026-01-19', stageDays: { sr: '2.5' } }, stages);
+    is(withDays.error, undefined, 'a typed day count builds without complaint');
+    is(withDays.row.stages.sr, 2.5, 'and lands as a number under its stage id');
+
+    /* EMPTY IS NOT ZERO, and this is the assertion that keeps the card honest:
+       writing a 0 into every untouched box would lower every median on it by
+       counting stages nobody measured. */
+    const twoStages = [{ id: 'sr', name: 'Review', match: [] },
+                       { id: 'sb', name: 'Build', match: [] }];
+    const partial = TD.buildManualRow(
+      { started: '2026-01-19', stageDays: { sr: '3', sb: '' } }, twoStages);
+    is(Object.keys(partial.row.stages), ['sr'],
+       'an EMPTY box is left off the row altogether — no figure, not a zero');
+    const zero = TD.buildManualRow(
+      { started: '2026-01-19', stageDays: { sr: '0' } }, stages);
+    is(zero.row.stages.sr, 0,
+       'where a typed 0 IS kept — an item can genuinely cross a stage inside a day');
+
+    /* A row nobody typed a figure on serialises as it did before the feature. */
+    const noneTyped = TD.buildManualRow(
+      { started: '2026-01-19', stageDays: { sr: '', sb: '  ' } }, twoStages);
+    is(noneTyped.row.stages, undefined,
+       'and a row with every box empty gains no stages object at all');
+
+    /* Refused, not dropped — the rule every other field on this form follows. */
+    ok(TD.buildManualRow({ started: '2026-01-19', stageDays: { sr: '3d 4h' } }, stages).error,
+       'a day count that is not a plain number is refused, never guessed at');
+    ok(TD.buildManualRow({ started: '2026-01-19', stageDays: { sr: '-2' } }, stages).error,
+       'and so is a negative one');
+    /* The ceiling is REFUSED here where a paste has it CLAMPED: cleanStageDays
+       pins 9999 to ten years for a paste nobody is watching, and a figure
+       silently changed under somebody looking straight at it is worse. */
+    is(TD.cleanStageDays('9999'), TD.STAGE_DAYS_MAX, 'a PASTE clamps a figure over the ceiling');
+    ok(TD.buildManualRow({ started: '2026-01-19', stageDays: { sr: '9999' } }, stages).error,
+       'where the FORM hands it back rather than quietly changing it');
+
+    /* An id nothing answers to cannot get in: the boxes are built from the
+       stage list, and buildManualRow reads that list rather than the object. */
+    is(TD.buildManualRow({ started: '2026-01-19', stageDays: { nope: '4' } }, stages)
+         .row.stages, undefined, 'a day count under an unknown stage id is ignored');
+
+    /* Its keys come from outside, so the object has none of Object's own. */
+    const proto = TD.buildManualRow({ started: '2026-01-19', stageDays: { sr: '1' } }, stages);
+    is(Object.getPrototypeOf(proto.row.stages), null,
+       'the day counts object has NO PROTOTYPE, as in the parse and the hydrate');
+
+    /* The same shape a paste produces, which is the whole contract of this
+       function — the two doors have to be indistinguishable once saved. */
+    const pasted = TD.parsePastedRows(
+      'Start Date\tCompleted\tReview\n2026-01-19\t2026-01-21\t2.5', 'auto',
+      [{ id: 'sr', name: 'Review', match: ['Review'] }]).rows[0];
+    is(pasted.stages.sr, TD.buildManualRow(
+      { started: '2026-01-19', completed: '2026-01-21', stageDays: { sr: '2.5' } }, stages)
+      .row.stages.sr, 'and a typed figure equals the same figure pasted');
+
+    /* With no stages there are no boxes, so a field with no control on the form
+       is carried rather than dropped — the trap the sibling app records under
+       `capacityScale`. */
     const carried = TD.buildManualRow(
-      { started: '2026-01-19', keepStages: { sr: 3 } }, stages);
-    is(carried.row.stages, { sr: 3 }, 'an edit keeps the stage times it cannot show');
+      { started: '2026-01-19', keepStages: { sr: 3 } }, []);
+    is(carried.row.stages, { sr: 3 }, 'an edit keeps stage times it has no box to show');
+    /* And with stages present the BOXES are the whole truth: a figure cleared
+       on the form has to actually clear, or an edit could never remove one. */
+    const cleared = TD.buildManualRow(
+      { started: '2026-01-19', stageDays: { sr: '' }, keepStages: { sr: 3 } }, stages);
+    is(cleared.row.stages, undefined,
+       'where clearing the box REMOVES the figure — the form outranks what was held');
 
     /* ── A DATE THAT HAS NOT HAPPENED YET ────────────────────────────────────
        Refused rather than warned-and-saved, because of how badly it fails:

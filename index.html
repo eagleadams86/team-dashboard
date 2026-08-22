@@ -1581,7 +1581,8 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <h2>No Data Yet</h2>
       <p>Head to the <strong>Your Data</strong> tab and paste your work items — a completed
       date, a start date and a type. Add a created date too and you get lead time as
-      well:</p>
+      well. No Jira export to hand? <strong>Add a Work Item</strong> on that same tab asks
+      for the same things one item at a time, stage times included:</p>
       <pre>Created      Start Date   Completed    Type
 2015-01-02   2015-01-14   2015-01-21   Story
 2015-01-09   2015-01-14   2015-01-26   Bug
@@ -1671,8 +1672,9 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           <div class="chart-title" id="titleLeadTime"></div>
           <div class="chart-wrap"><canvas id="chartLeadTime"></canvas></div>
           <div class="note info needs-created" hidden>
-            Add a <strong>Created</strong> column to your paste to see lead time — how long
-            work takes from being raised, not just from being started.
+            Lead time needs a <strong>Created</strong> date — how long work takes from being
+            raised, not just from being started. Add a Created column to your paste, or fill
+            in the Created box on an item.
           </div>
         </div>
 
@@ -2186,6 +2188,28 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <label for="itemStage">Sitting in <span class="hint">(optional)</span></label>
       <select id="itemStage"></select>
     </div>
+  </div>
+
+  <!-- ── Days in each stage ───────────────────────────────────────────
+       The other door onto the one field that had none: the Time in Stage card
+       could only ever be filled by a Time in Status export until 2026-08-22.
+       Its own fieldset rather than more boxes in the grid above, because this
+       is a variable-length list and the four fields above it are fixed — and
+       because a legend can carry the calendar-days sentence once for all of
+       them instead of hanging it off five separate hints.
+
+       Rebuilt on every open, like the picker above it: the dialog next door can
+       add, rename, reorder or delete a stage between one item and the next. -->
+  <div id="itemStageDaysWrap" hidden style="margin-top:var(--sp-5)">
+    <fieldset class="formpanel">
+      <legend>Days in Each Stage <span class="hint">(optional)</span></legend>
+      <p class="hint" style="margin-bottom:var(--sp-4)">Calendar days, counted the way a
+        Time in Status export counts them — the working-days setting does not apply here.
+        Leave a box <strong>empty</strong> if you do not have that figure; an empty box is
+        left out altogether, where a <strong>0</strong> says the item crossed that stage
+        inside a day.</p>
+      <div class="grid two" id="itemStageDays"></div>
+    </fieldset>
   </div>
 
   <!-- role="status" so a rejected save is announced rather than only shown. -->
@@ -3587,10 +3611,63 @@ function buildManualRow(f, stages) {
      is dropped rather than stored, as everywhere else. */
   const stageId = String(f.stage || '');
   if (!completed && stageId && (stages || []).some(st => st.id === stageId)) row.stage = stageId;
-  /* Day counts are not offered by this form: they come per item out of a Time in
-     Status export and there is no honest way to type five of them per row. An
-     item being EDITED keeps whatever it already had. */
-  if (f.keepStages) row.stages = f.keepStages;
+  /* ── Days in each stage, typed in ──────────────────────────────────
+     Offered on the form since 2026-08-22. It used to say day counts came only
+     out of a Time in Status export and that "there is no honest way to type
+     five of them per row" — which left the Time in Stage card as the ONE card
+     in this app with no door but a paste, in an app whose second door exists
+     precisely because not everybody has a Jira they can get a report out of.
+     Five boxes is what the dialog next door already asks for, and typing a
+     figure off a board is no less honest than typing the dates above it.
+
+     EVERY GUARD THE PASTE CROSSES IS CROSSED HERE: cleanStageDays on each
+     value, an id that must answer to a stage that exists (the boxes are built
+     from `stages`, so an id can only come from one), and an object with NO
+     PROTOTYPE — `Object.create(null)`, as in the parse and the hydrate.
+
+     EMPTY IS NOT ZERO. That is the distinction parsePastedRows draws off the
+     raw text and the one that keeps this table honest: an empty box is "no
+     figure for that stage" and the stage is left off the row altogether, where
+     a typed 0 is a real measurement of an item that crossed a stage inside a
+     day. Never write a 0 into an empty box to "tidy" this up — it would lower
+     every median on the card by counting stages nobody measured.
+
+     REFUSED rather than dropped, like every other field on this form — and the
+     ceiling is refused rather than clamped. cleanStageDays quietly pins a
+     pasted 9999 to ten years because a paste is hundreds of rows with nobody
+     watching; a form is one row with somebody looking straight at it, so a
+     figure that would be silently changed is handed back instead. */
+  if (stages && stages.length) {
+    const days = Object.create(null);
+    let anyDays = false;
+    for (const st of stages) {
+      const raw = (f.stageDays && Object.prototype.hasOwnProperty.call(f.stageDays, st.id))
+        ? f.stageDays[st.id] : '';
+      const text = String(raw == null ? '' : raw).trim();
+      if (!text) continue;                  /* no figure for that stage — not a zero */
+      const n = cleanStageDays(text);
+      if (n == null) {
+        return { error: 'Time in ' + st.name + ' has to be a plain number of days — 2, or '
+          + '2.5, or 0 for an item that crossed it inside a day. Leave the box empty if you '
+          + 'do not have that figure.' };
+      }
+      if (Number(text) > STAGE_DAYS_MAX) {
+        return { error: 'Time in ' + st.name + ' is longer than ten years, which is as much '
+          + 'as this holds. Check the figure.' };
+      }
+      days[st.id] = n;
+      anyDays = true;
+    }
+    if (anyDays) row.stages = days;
+  } else if (f.keepStages) {
+    /* No stages, so nothing on screen could have set this: carry whatever the
+       row already had rather than letting a save drop it. hydrateState prunes
+       day counts whose stage is gone and the stage delete takes them with it,
+       so this is only reachable mid-session — it is kept because a field with
+       no control on the form is a field the next save silently drops, which is
+       the trap the sibling app records under `capacityScale`. */
+    row.stages = f.keepStages;
+  }
   return { row };
 }
 
@@ -7032,7 +7109,8 @@ function drawCharts(d) {
   scatNone.textContent = hasScatter ? ''
     : 'Nothing completed in this window has a start date, so no item has a '
       + (state.settings.cycleTimeLabel || 'cycle time').toLowerCase()
-      + ' to plot. Add a start column to your paste and every finished item appears here.';
+      + ' to plot. Add a start column to your paste, or fill in the Started box on an item, '
+      + 'and every finished item appears here.';
 
   if (!hasScatter) {
     if (charts.chartCycleScatter) { charts.chartCycleScatter.destroy(); delete charts.chartCycleScatter; }
@@ -7464,7 +7542,8 @@ const METRIC_HELP = {
     body: 'How long from an idea being raised to the customer having it — the whole wait, '
       + 'including the time an item sat in the backlog before anyone picked it up. Cycle '
       + 'time only starts counting once work does, so lead time is always the longer of the '
-      + 'two, and the gap between them is queue. Needs a Created column in your paste.' },
+      + 'two, and the gap between them is queue. Needs a created date on each item — a '
+      + 'Created column in your paste, or the box on the item itself.' },
   cycleTimePercentile: { title: '85th Percentile Cycle Time',
     body: 'The number to forecast with. 85% of the items completed finished within this many '
       + 'days, so it is a promise you can make about the next one — where an average is a '
@@ -7824,8 +7903,9 @@ function renderStageRows() {
   });
   if (!state.stages.length) {
     tb.innerHTML = '<tr><td colspan="4" class="empty-row">' +
-      'No stages yet. Add one, name the statuses that feed it, and paste an export with a ' +
-      'column per status.</td></tr>';
+      'No stages yet. Add one and name the statuses that feed it. Then paste an export with ' +
+      'a column per status \u2014 or type the days straight onto each work item, which is ' +
+      'what the boxes on the Add a Work Item form are for.</td></tr>';
   }
   renderStageAliasWarning();
 }
@@ -8205,10 +8285,15 @@ function renderStageTime(d) {
        none would be simply wrong, and would send somebody to check a set-up
        that is already right. Point them at what they DO have instead. */
     const teamHasCurrent = !!(team && team.rows.some(r => r.stage));
+    /* Every one of these names BOTH doors, and that is the point of them since
+       2026-08-22: this card was the only one in the app a reader could not fill
+       without a Jira report, and a message sending them back to an export they
+       may not be able to produce would keep it that way in effect. */
     none.textContent = !state.stages.length
       ? 'No workflow stages yet. Open Teams & Stages in the header, add the parts of your workflow you '
         + 'want to measure — Build, Review, Test — and list the Jira statuses that feed each '
-        + 'one. Then paste an export with a Status column, or a Time in Status one.'
+        + 'one. Then either paste an export with a Status column or a Time in Status one, or '
+        + 'type the days in yourself: every stage you add gets a box on each work item.'
       : teamHasStages
         ? 'No item in this window carries stage times under the ' + view.filterDisplay
           + ' work type filter — this team has some, just not here. Widen '
@@ -8217,11 +8302,13 @@ function renderStageTime(d) {
           ? 'Your export says where each item IS, but not how long it has been there — so this '
             + 'table has nothing to measure. Your stages are still working: the work item age '
             + 'chart above groups by them, which answers what is sitting in each stage right '
-            + 'now. Filling this in needs a Time in Status export, with a column per status '
-            + 'holding a number of days.'
+            + 'now. What this needs is a number of days per stage, from a Time in Status export '
+            + 'or from the boxes on the item itself — open a row in Loaded Data and fill in the '
+            + 'stages you know.'
           : 'None of this team\u2019s items carry stage times yet. Paste a Time in Status export '
             + '— one row per issue, one column per status — and the days land in the stage each '
-            + 'status is matched to.';
+            + 'status is matched to. Or type them: open any row in Loaded Data, or add an item, '
+            + 'and there is a box for each of your stages.';
     return;
   }
 
@@ -8607,8 +8694,8 @@ function renderAllTeams() {
       : inScope.some(t => t.rows.length)
         ? 'Nothing completed matches the ' + view.filterDisplay + ' work type filter in any team'
           + where + ', so there is nothing to compare. Pick another type — or All — above.'
-        : 'No team' + where + ' has any work items yet. Paste an export on the Your Data tab and '
-          + 'every team you load will appear here side by side.';
+        : 'No team' + where + ' has any work items yet. Paste an export on the Your Data tab, '
+          + 'or add items by hand there, and every team appears here side by side.';
     $('windowNote').innerHTML = '';
     $('allTeamsTiles').innerHTML = '';
     drawTrainThroughput(null);
@@ -11161,9 +11248,42 @@ function openItemDialog(index) {
     $('itemStage').value = (r && r.stage) || '';
   }
 
+  /* One box per stage, in the reader's OWN stage order — the order the Time in
+     Stage card reads in, so the form and the card scan the same way. Drawn
+     every open for the same reason the picker above is.
+
+     An id on `r.stages` can only be a stage that exists (hydrateState prunes
+     the danglers and the stage delete takes its day counts with it), so every
+     figure a row holds has a box here and nothing is lost by reading the boxes
+     back as the whole truth. */
+  const daysWrap = $('itemStageDaysWrap');
+  daysWrap.hidden = !state.stages.length;
+  if (state.stages.length) {
+    const held = (r && r.stages) || null;
+    $('itemStageDays').innerHTML = state.stages.map(st => {
+      const boxId = 'itemStageDay-' + st.id;
+      const v = (held && held[st.id] != null) ? String(held[st.id]) : '';
+      return '<div><label for="' + escapeHtml(boxId) + '">' + escapeHtml(st.name) + '</label>'
+        + '<input type="number" id="' + escapeHtml(boxId) + '" data-stageday="'
+        + escapeHtml(st.id) + '" min="0" max="' + STAGE_DAYS_MAX + '" step="0.01" '
+        + 'inputmode="decimal" autocomplete="off" value="' + escapeHtml(v) + '"></div>';
+    }).join('');
+  }
+
   $('itemDelete').hidden = !r;
   $('itemWarn').textContent = '';
   openModal($('itemDialog'));
+}
+
+/* The typed day counts, keyed by stage id. Values stay STRINGS — see the call
+   site — and the object has no prototype because its keys come off the page. */
+function stageDaysFromForm() {
+  const out = Object.create(null);
+  if (!state.stages.length) return out;
+  $('itemStageDays').querySelectorAll('[data-stageday]').forEach(inp => {
+    out[inp.dataset.stageday] = inp.value;
+  });
+  return out;
 }
 
 $('itemSave').addEventListener('click', () => {
@@ -11176,9 +11296,15 @@ $('itemSave').addEventListener('click', () => {
     type: $('itemType').value,
     key: $('itemKey').value,
     stage: state.stages.length ? $('itemStage').value : '',
-    /* Day counts have no input here and must survive an edit — a field with no
-       control on the form is a field the next save silently drops, which is the
-       trap the sibling app records under `capacityScale`. */
+    /* Read straight off the boxes as text, NOT as numbers: an empty box and a
+       typed 0 are two different answers here, and `valueAsNumber` collapses
+       them both to NaN-or-0. buildManualRow tells them apart off the string,
+       exactly as parsePastedRows does off the raw cell. */
+    stageDays: stageDaysFromForm(),
+    /* Only reachable when there are no stages to draw boxes for — see
+       buildManualRow. A field with no control on the form is a field the next
+       save silently drops, which is the trap the sibling app records under
+       `capacityScale`. */
     keepStages: (editingItem !== null && team.rows[editingItem])
       ? team.rows[editingItem].stages : null
   }, state.stages);

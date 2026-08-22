@@ -332,6 +332,9 @@ this file was written to keep out. **Read this whole section before changing any
   parse: it is matched against the aliases the reader typed, turned into a day count, and
   discarded with the rest of the pasted text. `tests.html` asserts this directly — it
   stringifies the parsed rows and greps for the column headings.
+- **A day count can also be TYPED, since 2026-08-22** — a box per stage on the work item form. It
+  takes nothing away from the argument above: what is refused here is a status *name*, and a box
+  takes a number. See *Days in Each Stage, Typed In*.
 - **That is why matching is by ALIASES YOU TYPE and there is no "adopt this heading" button.**
   It is the obvious convenience and it is deliberately absent: one click that copies
   work-system text into permanent storage is exactly the thing this design exists to avoid.
@@ -525,10 +528,11 @@ a Jira and the knowledge to export from it.
   the ambiguous-order problem that produced a 59-day cycle time the same afternoon cannot arise
   for a typed row.
 - **The stage picker follows the parser's rule** — a stage says where an item IS, so it is offered
-  and stored only for work in flight, and an id nothing answers to is dropped. Day counts have NO
-  control on the form (there is no honest way to type five per row) and are **carried through an
-  edit** by `keepStages`: a field with no input is a field the next save silently drops, which is
-  the trap the sibling app records under `capacityScale`.
+  and stored only for work in flight, and an id nothing answers to is dropped.
+- **Day counts got a control on 2026-08-22 — see the next section.** They had none until then, and
+  were carried through an edit by `keepStages` instead. That path still exists and is still right
+  for the case it now covers: no stages set up means no boxes drawn, and a field with no input is a
+  field the next save silently drops — the trap the sibling app records under `capacityScale`.
 - **The Item cell now shows the WORK TYPE where there is no key**, where it showed a dash. It is a
   control now, and a control with no name is one nobody can find or announce; it is also the same
   fallback `dotName()` uses, so an item is called the same thing wherever the app must call it
@@ -557,6 +561,55 @@ a Jira and the knowledge to export from it.
 - **The row's index is carried on the button, not its position on screen.** The table sorts, so
   what is drawn is a permutation of the array being written back to; a Map is built once per render
   rather than an `indexOf` per row.
+
+## Days in Each Stage, Typed In (2026-08-22) — no schema change
+
+Reported by Charles: *"flow metrics doesn't appears to have a way to manually key time in status
+data. ensure every chart has a way to populate its data without pasting from jira."* He was right:
+of everything on a row, the per-stage day counts were the only field with no door but a paste,
+which made **Time in Stage the only card in the app a reader without a Jira report could not
+fill** — in an app whose second door exists precisely because not everybody has one.
+
+It stores no new field, so `SCHEMA` did not move. What changed is that `state.stages` now drives a
+box per stage on the Add/Edit Work Item form, and `buildManualRow` reads them.
+
+- **THE SAFETY ARGUMENT IS UNTOUCHED, and that is what made this a small change rather than a
+  reopening of the stages debate.** What the stages section refuses is *status names* — text out of
+  a work system, with no shape a regex can check. This adds no text at all: the stage was already
+  named by the reader in a dialog, and what the boxes take is **numbers**. The line the earlier
+  comment drew ("no honest way to type five of them per row") was about ergonomics, not safety, and
+  five boxes is what the Teams & Stages dialog next door already asks for.
+- **EMPTY IS NOT ZERO, and this is the one thing that would be easy to "tidy" and must not be.** An
+  empty box means *no figure for that stage* and the stage is left off the row entirely; a typed
+  `0` is a real measurement of an item that crossed a stage inside a day. Writing zeros into
+  untouched boxes would lower every median on the card by counting stages nobody measured. This is
+  the same distinction `parsePastedRows` draws off the raw cell text, and the values are read off
+  the form **as strings** for exactly that reason — `valueAsNumber` collapses an empty box and a
+  typed 0 into the same answer. Pinned in tests.html both ways round.
+- **REFUSED, never dropped — and the ceiling is refused where a paste has it CLAMPED.**
+  `cleanStageDays` quietly pins a pasted 9999 to ten years, which is right for hundreds of rows
+  arriving with nobody watching and wrong for one row with somebody looking straight at it. Same
+  split the date ordering already takes between the two doors, and pinned side by side for the same
+  reason: neither should get "made consistent" with the other.
+- **The boxes are the whole truth when they are drawn.** Clearing one REMOVES that figure — an edit
+  that could not take a wrong number back out would be worse than no edit. `keepStages` therefore
+  only applies when there are no stages at all, and the two paths are `if`/`else if` rather than
+  both running.
+- **In the reader's own stage order**, matching the card. Same reasoning as `renderStageTime`: a
+  workflow has a direction, and the form and the table it feeds should scan the same way.
+- **`Object.create(null)`**, as in the parse and the hydrate — the keys come off the page. Stage
+  ids cannot be `__proto__` anyway (`sanitizeStages` refuses it), which is belt and braces, not a
+  reason to skip either.
+- **Every empty state that named only the paste now names both doors.** That was the other half of
+  the request — a manual path nobody is told about is not a path. The Time in Stage card's three
+  faces, the lead time note, the cycle scatter's empty face, the lead time tile's help text, the
+  empty stages table, the All Teams empty face and the first-run dashboard card all changed. If a
+  new empty state tells somebody to go and paste something, it is wrong.
+- **Nothing else was missing.** The audit that came with this: cycle time, the scatter, lead time,
+  throughput, net flow, the CFD, WIP, aged work, item age, defect rate and both forecasts read only
+  `created`/`started`/`completed`/`type`, each of which the form has always had; the item age chart
+  groups by `stage`, which has had a picker since 2026-08-21; the train chart reads teams and ARTs,
+  both typed in dialogs. Stage day counts were the single gap.
 
 ## Three Reports From One Paste (2026-08-21) — no schema change
 
