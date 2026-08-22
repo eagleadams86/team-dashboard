@@ -3506,8 +3506,17 @@ group('ARTs — the grouping, and the boundary it crosses');
      read plain "Teams" until 2026-08-21, when the feature behind it turned out
      to be unfindable — a section nobody knows is there is a section nobody
      opens. Pinned because "Teams" is the tidier-looking label and the obvious
-     thing for a later edit to shorten it back to. */
-  is(win.document.getElementById('manageBtn').textContent, 'Teams & Stages',
+     thing for a later edit to shorten it back to.
+
+     Read WITHOUT the button's aria-hidden glyph, which every button in this row
+     gained later the same day. The glyph is decoration a screen reader is told to
+     skip, so pinning it here would make this assertion about the icon as well as
+     the label — and the thing being defended is the label. Removing the ☰ still
+     leaves the test green; shortening the words to "Teams" still fails it. */
+  const btnLabel = (el) => Array.from(el.childNodes)
+    .filter((n) => !(n.nodeType === 1 && n.getAttribute('aria-hidden') === 'true'))
+    .map((n) => n.textContent).join('').trim();
+  is(btnLabel(win.document.getElementById('manageBtn')), 'Teams & Stages',
      'and the header button names the third one, exactly as the sibling\u2019s names PIs');
   ok(win.document.getElementById('btnAddTeam').closest('.row.spread'),
      'the team Add button sits in the Teams header row');

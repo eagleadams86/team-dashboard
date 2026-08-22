@@ -13,6 +13,7 @@ file records what is specific to this repo and what must never regress.
 
 ## Only Numbers, Dates and Two Guarded Labels Are Ever Saved (2026-08-12/13, amended 2026-08-20/21)
 
+- **The header buttons wear a glyph in front of the word** (2026-08-21) — plain text characters, NOT emoji and not an icon font: one more file to fetch is the last thing a header painted this early needs, and a text glyph inherits the theme's colour for free, so it can never become the thing that carries a meaning by hue. Each is `aria-hidden` — the word beside it is already the whole label. The glyphs are Money Map's own where the same button exists there (`⇩` Back up, `↗` Share, `⚙` settings), so one action looks the same in every app, and `☰` is the list/manage one the three list-managing apps share. Added to Sprint Predictability, Flow Metrics, Golf Handicap and PAPTrack in the same commit.
 - **A row is three ISO dates, one short work-type label, one issue key and a
   set of NUMBERS keyed by stage id.
   Nothing else. There are no free-text or comment fields anywhere in this app —
