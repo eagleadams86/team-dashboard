@@ -175,12 +175,11 @@
 ──────────────────────────────────────────────────────────────────────────── */
 
 /* App tokens on top of the shared palette. color-scheme makes the browser draw
-   its own controls (pickers, spinners, scrollbars) to match the theme; the
-   shadows need a value per theme because a dark card wants a heavier one to
-   register at all. Overrides live in [data-theme] blocks AFTER the :root
-   defaults — equal specificity, so the later rule winning is load-bearing. */
+   its own controls (pickers, spinners, scrollbars) to match the theme. Overrides
+   live in [data-theme] blocks AFTER the :root defaults — equal specificity, so
+   the later rule winning is load-bearing. (A --shadow per theme lived here too,
+   until the family dropped elevation shadows outright on 2026-08-23.) */
 :root { color-scheme: dark;   /* midnight, the default */
-  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
   --chrome-h: 30px;
   /* ONE number, read by BOTH .wrap/.shell and .headbar. They have to be the same
      or the brand stops lining up with the left edge of the first card — which is
@@ -193,20 +192,16 @@
   --page-w: 1500px;
 }
 [data-theme="dark"]  { color-scheme: dark; }
-[data-theme="light"] { color-scheme: light;
-  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04); }
-[data-theme="sepia"] { color-scheme: light;
-  --shadow: 0 1px 2px rgba(90,70,30,.10), 0 4px 12px rgba(90,70,30,.07); }
+[data-theme="light"] { color-scheme: light; }
+[data-theme="sepia"] { color-scheme: light; }
 /* Auto has no palette of its own — theme.css resolves it to Light or, under
-   prefers-color-scheme: dark, to Midnight. The shadow and the color-scheme have to
-   resolve the same way, or an Auto page in light mode would wear the dark shadow and
-   tell the browser to draw its native controls dark. The dark half is left to :root,
-   which is Midnight and already carries exactly those two values. */
-[data-theme="auto"] { color-scheme: light;
-  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04); }
+   prefers-color-scheme: dark, to Midnight. All this block carries now is
+   color-scheme, and it still has to resolve the same way the palette does, or an
+   Auto page in light mode tells the browser to draw its native controls dark. The
+   dark half is left to :root, which is Midnight and already says exactly that. */
+[data-theme="auto"] { color-scheme: light; }
 @media (prefers-color-scheme: dark) {
-  [data-theme="auto"] { color-scheme: dark;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3); }
+  [data-theme="auto"] { color-scheme: dark; }
 }
 
 * { box-sizing: border-box; }
@@ -415,7 +410,7 @@ select { cursor: pointer; }
 
 /* cards */
 .card { background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+  border-radius: var(--radius); padding: 18px; }
 .card + .card { margin-top: 18px; }
 .card h2 { font-size: var(--fs-md); margin-bottom: 4px; }
 .card .hint { color: var(--text-secondary); font-size: var(--fs-xs); }
@@ -543,8 +538,7 @@ select { cursor: pointer; }
 /* dashboard controls strip */
 .controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 12px 18px; margin-bottom: 18px;
-  box-shadow: var(--shadow); }
+  border-radius: var(--radius); padding: 12px 18px; margin-bottom: 18px; }
 .controls .field { min-width: 160px; }
 /* The strip bottom-aligns its children so the selects sit on one line whatever
    height their labels wrap to — but the window note has no control to line up
@@ -624,7 +618,7 @@ select { cursor: pointer; }
 
 /* chart cards */
 .chart-card { background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 18px; min-width: 0; box-shadow: var(--shadow);
+  border-radius: var(--radius); padding: 18px; min-width: 0;
   /* The card is the containing block for its own maximise button, which sits in
      the top-right corner rather than in the heading row. */
   position: relative; }
@@ -1093,7 +1087,7 @@ details.danger-zone p { color: var(--text-secondary); font-size: var(--fs-xs); }
 /* dialog + toast */
 dialog { background: var(--surface); color: var(--text-primary);
   border: 1px solid var(--border-strong); border-radius: var(--radius);
-  padding: 20px; max-width: 560px; width: calc(100% - 32px); box-shadow: var(--shadow);
+  padding: 20px; max-width: 560px; width: calc(100% - 32px);
   /* A tall dialog on a short laptop screen used to open already scrolled past
      its own heading — showModal() focuses the first control and drags it into
      view. Cap the height so the scrolling happens inside a dialog that fits.

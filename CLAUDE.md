@@ -1741,9 +1741,13 @@ app now holds identifiers out of a work system, and the answer to "where does th
   alone — `theme.css` has to sit beside it, and opening the HTML off disk
   without it gives an unstyled page. Don't re-inline to "restore" `file://`.
   What stays in the app's own `<style>`, after the link so it still wins:
-  `color-scheme` per theme, the per-theme `--shadow` values and `--chrome-h`.
-  **The pack has no `--shadow` token at all**, so those are additions, not
-  overrides.
+  `color-scheme` per theme and `--chrome-h`. **There were per-theme `--shadow`
+  values too, and they went on 2026-08-23** with every other elevation shadow in
+  the family — four apps had invented one, none of them a pack token, for
+  something nobody could see once a modal backdrop sat over it. Pack hard rule 14,
+  enforced by its `check_consumers.py`. The `box-shadow: inset` on the
+  current-row marker is not a shadow and stays: it is a border drawn where a real
+  `border` would move the cell.
 - **THE SAMPLE DATA IS THE DEMO, and a feature isn't finished until it reaches
   it.** `loadSample()` (section 9c) is what someone sent a share link explores and
   what the app is shown with, so every feature must be visible from it. Adding one
