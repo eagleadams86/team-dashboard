@@ -749,7 +749,32 @@ summary of them.
 - **`.tile-help:hover` moved the other way**, `--surface` → `--surface-alt`. Every surface that
   button now sits on is `--surface` — a tile, a chart card's name row, an All Teams heading — so
   the old fill was a visible hover on a tile and no fill at all on a chart card. The one place the
-  two backgrounds differing was doing any work, and it was doing it backwards.
+  two backgrounds differing was doing any work, and it was doing it backwards. **This hover is
+  now the family's** (2026-08-23): Money Map reached for `--focus-border` instead, which says
+  "focused" to anybody reading the two states side by side, and this one won the sweep.
+- **THE INFO DOT AND THE HELP WINDOW ARE FAMILY-WIDE BLOCKS, DECLARED PROPERTY BY PROPERTY, AND
+  THE SAME IN EVERY APP THAT HAS ONE (2026-08-23).** A change to either belongs in all of them.
+  - The dot is a 16px outlined circled **"i"** — `.tile-help`, `min-height: 0`, `margin-left: 7px`,
+    and a 24px tap target from an unpainted `::after` so the line's height never moves. Golf
+    Handicap and the NY calculator drew a "?" in a filled 18px pill until that date; "i" won
+    because "?" is the glyph a browser already puts on its own help cursor and in a form's
+    validation bubble, and it asks a question where this thing answers one.
+  - The window is sized by its TEXT: `#helpBody` capped at a 66-character measure and
+    `#helpDialog` at `width: fit-content`, so the window takes the measure as its width — 666px
+    with 624px of text, the same figure in every app. Both rules or neither. **This app's half of
+    the drift was the type**: the help ran at `--fs-xs` (13px, the size of its chrome and its
+    table headings) across the full 560px, about 80 characters a line, while Money Map capped its
+    text at 66 characters and Sprint Predictability at 46. The block pins `--fs-sm`.
+  - **`#helpBody { white-space: pre-line; }` is this app's own and must NOT travel.** The help
+    here is written with `textContent`, which is why a note can quote a reader's own label
+    safely, so a blank line is the only paragraph break it has. The siblings build real `<p>`
+    tags from template literals, and `pre-line` there would break every sentence at the source's
+    own newlines.
+  - **`tests.html` deliberately does not cross-check dots against entries, unlike the sibling
+    suites.** This app passes the key as a variable — `helpBtn(helpKey, label)`,
+    `helpBtn(c.help, c.label)` — so a scan for quoted keys finds one of twenty-one and would go
+    green on nothing. What is pinned instead is the guard that makes a wrong key harmless:
+    `helpBtn` returns `''` when the table has no entry, so a bad key draws no dot at all.
 - **THIS IS A DELIBERATE DIVERGENCE FROM SPRINT PREDICTABILITY**, which shares this tile and keeps
   `--bg-card-alt`. It is not drift and it should not be "fixed" by mirroring without thinking: the
   sibling has a `.tile.hero`, which stands out from its neighbours *by being the card surface*.
@@ -1189,8 +1214,10 @@ that means concretely, and what a later edit must not tidy back:
 
 - **`#manageDialog` is 1100px**, matched to the sibling's — which took it from Money Map's own
   wide dialog, so the three apps' working windows are one width. The app default of 560 is right
-  for Back up and the help sheet, which are a few lines each, and wrong for a table of teams: at
-  560 a row's name box, picker, count and delete were shouldered into each other.
+  for Back up, which is a few lines, and wrong for a table of teams: at 560 a row's name box,
+  picker, count and delete were shouldered into each other. **The help window no longer takes
+  that default at all** — since 2026-08-23 it is sized by its own text (see below), which comes
+  out at 666px.
 - **No `thead` on either table.** There is nothing a heading would add — a count says
   "217 items", a picker shows the train it is set to, and a name box is a name box. Each control
   keeps its own `aria-label`, which a visible heading was never going to give it.

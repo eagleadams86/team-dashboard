@@ -593,25 +593,38 @@ select { cursor: pointer; }
 .tile .value { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.02em; margin-top: 2px; }
 .tile .foot { font-size: var(--fs-xs); color: var(--text-secondary); margin-top: 2px; }
 
-/* The ⓘ help button, straight from the sibling app: the circle is sized to the
-   label's own line so adding it never makes the row taller, and the pointer
-   target grows to WCAG's 24px through an unpainted pseudo-element instead. The
-   margin keeps the circle off the last letter — flush against the word, it
-   reads as part of it rather than as a control you can press. */
-.tile-help { position: relative; margin-left: 7px;
-  flex: none; width: 16px; height: 16px; padding: 0; border-radius: 50%;
-  border: 1px solid var(--border-control); background: transparent;
-  color: var(--text-secondary); font-size: var(--fs-xs); font-weight: 700; line-height: 1;
-  font-family: inherit; text-transform: none; cursor: pointer; }
-.tile-help::after { content: ''; position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%, -50%); width: 24px; height: 24px; }
-/* `--surface-alt` because every surface this button now sits on is `--surface`:
-   a tile, a chart card's name row, an All Teams heading. It used to fill with
-   `--surface`, which was a visible hover on a tile and no fill at all on a chart
-   card — the one place the two backgrounds differing was doing any work, and it
-   was doing it backwards. */
-.tile-help:hover { color: var(--text-primary); background: var(--surface-alt);
-  border-color: var(--text-secondary); }
+/* ── The info dot ────────────────────────────────────────────────────────────
+   A circled "i" beside a label, opening the help window rather than a hover
+   tooltip so it works the same on a phone. THE SAME BLOCK IS IN EVERY APP THAT
+   HAS ONE, PROPERTY BY PROPERTY (2026-08-23) — Golf Handicap and the NY
+   calculator drew a "?" in a filled 18px pill until that date, and the three
+   apps that already drew an "i" each declared it slightly differently. "i" is
+   the glyph that survives: "?" is what a browser already puts on its own help
+   cursor and in a form's validation bubble, and it asks a question where this
+   thing answers one.
+   The circle is sized to the label's own line so adding it never makes the row
+   taller; ::after grows the pointer target to WCAG 2.2's 24px without painting
+   anything, which is why the line's height is untouched; the margin keeps the
+   circle off the last letter — flush against the word, it reads as part of it
+   rather than as a control you can press.
+   The hover fills with `--surface-alt` and NOT with `--focus-border`, which is
+   what Money Map used to reach for: a hover that borrows the focus colour says
+   "focused" to anybody reading the two states side by side. `--surface-alt`
+   because every surface this button sits on is `--surface` — a tile, a chart
+   card's name row, an All Teams heading. It used to fill with `--surface`,
+   which was a visible hover on a tile and no fill at all on a chart card: the
+   one place the two backgrounds differing was doing any work, and it was doing
+   it backwards. A change to any of it belongs in all of them. */
+.tile-help { display: inline-flex; align-items: center; justify-content: center;
+  position: relative; box-sizing: border-box; flex: none;
+  width: 16px; height: 16px; min-height: 0; padding: 0; margin-left: 7px;
+  border: 1px solid var(--border-control); border-radius: 50%;
+  background: transparent; color: var(--text-secondary);
+  font-family: inherit; font-size: var(--fs-xs); font-weight: 700;
+  line-height: 1; text-transform: none; cursor: pointer; vertical-align: 1px; }
+.tile-help:hover { background: var(--surface-alt); border-color: var(--text-secondary);
+  color: var(--text-primary); }
+.tile-help::after { content: ''; position: absolute; inset: -4px; }
 /* A tile label is a flex row whose own gap pins the button to the far right,
    so there the margin would only be dead space. */
 .tile .label .tile-help { margin-left: 0; }
@@ -1258,13 +1271,37 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
 @media (max-width: 620px) { .spark { display: none; } .spark-val { margin-left: 0; } }
 dialog h2 { font-size: var(--fs-md); margin-bottom: 12px; }
 dialog p { color: var(--text-secondary); font-size: var(--fs-xs); }
-/* The help sheet's body is written into #helpBody with textContent — never
-   markup, which is the whole reason a note can quote a reader's own label safely
-   — so the only paragraph break available to it is a newline. Left at
-   `normal`, a blank line between paragraphs collapses to one space and a note
-   written as three paragraphs arrives as one wall of text, which is what the
-   throughput trend note did. `pre-line` honours the breaks and still collapses
-   the ordinary wrapping whitespace, so nothing else here changes. */
+/* ── The help window ─────────────────────────────────────────────────────────
+   THE SAME TWO RULES ARE IN EVERY APP THAT HAS ONE (2026-08-23), and they are
+   about the TEXT sizing the window rather than the window holding the text.
+   This is the one dialog that is nothing but prose, so `#helpBody` is capped at
+   a 66-character reading measure and `fit-content` makes the window take that
+   cap as its width. Both or neither: the cap alone leaves the paragraph hugging
+   the left of a window sized for tables with the rest of it empty (which is how
+   Money Map's looked until this date), and `fit-content` alone lets the lines
+   run the full width — here that was 518px of 13px text, about 80 characters a
+   line, half again what anybody reads comfortably.
+   The type is declared in the block: `dialog p` sets `--fs-xs` for the notes at
+   the top of the working dialogs, and this is not one of those — it is the only
+   thing in its window, and the family's reading size for a paragraph is 15px.
+   `max-width` is restated because the base `dialog` rule's `width` is what is
+   being overridden; on a phone the window is still the screen less its margin. */
+#helpDialog { width: fit-content; max-width: calc(100% - 32px); }
+#helpBody { max-width: 66ch; font-size: var(--fs-sm); line-height: 1.55; }
+/* The third rule is for the siblings whose help text is paragraphs inside the
+   box rather than the box itself; here the box IS the paragraph, and it costs
+   nothing to carry the block whole. */
+#helpBody p, #helpBody li { font-size: inherit; line-height: inherit; }
+/* App-specific, and deliberately outside the shared block: this app's help is
+   written into #helpBody with textContent — never markup, which is the whole
+   reason a note can quote a reader's own label safely — so the only paragraph
+   break available to it is a newline. Left at `normal`, a blank line between
+   paragraphs collapses to one space and a note written as three paragraphs
+   arrives as one wall of text, which is what the throughput trend note did.
+   `pre-line` honours the breaks and still collapses the ordinary wrapping
+   whitespace. It must NOT travel to the siblings: theirs write real <p> tags
+   from template literals, and every newline in the source would become a break
+   in the middle of a sentence. */
 #helpBody { white-space: pre-line; }
 
 /* The toast is a POPOVER, so that it can be seen over an open modal dialog —

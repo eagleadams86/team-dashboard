@@ -290,7 +290,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
 /* The floor the run is measured against — see the check at the foot of run().
    1655 checks as of 2026-08-22 (typed stage times took 1623 to 1636; telling the target
    and the ageing threshold apart took it to 1643; the dialog grid sweep to 1655); Find
-   took it to 1721 on 2026-08-23.
+   took it to 1721 on 2026-08-23, and the info dot and help window to 1734.
 
    Deliberately LOOSER than the eight sibling suites, which pin their floor at
    the exact number they register. They count TESTS, and registration there is
@@ -299,7 +299,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 1710;
+const EXPECTED = 1723;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3147,6 +3147,72 @@ async function run(TD, win) {
      'the landing heading is quiet by default and rings only for the keyboard');
   ok(/let p = url\.pathname;/.test(SW_SRC) && /SHELL_PATHS\.has\(p\)/.test(SW_SRC),
      'shellKey matches on the path alone, so the cache-buster still hits the cached file');
+
+  /* ══════════════════════════════════════════════════════════
+     THE INFO DOT AND THE HELP WINDOW. Both became family-wide blocks on
+     2026-08-23 — the same declarations in every app that has one — and neither
+     is visible to any other assertion here, so the source is the guard.
+     This app's half of the drift was the window: the prose ran the full 560px
+     at 13px, about 80 characters a line, while Money Map capped its text at 66
+     and Sprint Predictability at 46. One measure now, and the window is sized
+     by it rather than the other way round. */
+  ok(/#helpDialog \{ width: fit-content; max-width: calc\(100% - 32px\); \}/.test(APP_SRC),
+     'the help window is sized by what is in it, and still fits a phone screen');
+  ok(/#helpBody \{ max-width: 66ch; font-size: var\(--fs-sm\); line-height: 1\.55; \}/.test(APP_SRC),
+     'the 66-character measure and the family reading size are what it is sized to');
+  ok(/#helpBody p, #helpBody li \{ font-size: inherit; line-height: inherit; \}/.test(APP_SRC),
+     'and the block is carried whole, including the rule the sibling apps need');
+  /* Both rules or neither: the cap alone leaves the paragraph hugging the left
+     of a window sized for tables, `fit-content` alone lets the lines run wide. */
+  ok(/#helpBody \{ white-space: pre-line; \}/.test(APP_SRC),
+     'pre-line survives the shared block — this app writes its help with textContent, '
+     + 'so a blank line is the only paragraph break it has');
+  ok(/\.tile-help \{[^}]*width: 16px; height: 16px; min-height: 0;/.test(APP_SRC)
+     && /\.tile-help \{[^}]*border-radius: 50%;/.test(APP_SRC)
+     && /\.tile-help \{[^}]*background: transparent;/.test(APP_SRC),
+     'the dot is the family circle: 16px, outlined, and opted out of any button floor');
+  ok(/\.tile-help::after \{ content: ''; position: absolute; inset: -4px; \}/.test(APP_SRC),
+     "the 24px tap target, WCAG 2.2's, and not the circle's own size");
+  ok(/\.tile-help:hover \{ background: var\(--surface-alt\); border-color: var\(--text-secondary\);/
+     .test(APP_SRC),
+     'and the hover fills rather than borrowing --focus-border, which would say '
+     + '"focused" to anybody reading the two states side by side');
+  {
+    const dots = stripComments(APP_SRC).match(/<button[^>]*class="tile-help"[\s\S]*?<\/button>/g) || [];
+    ok(/helpBtn\(key, label\)[\s\S]{0,240}>i<\/button>/.test(APP_SRC),
+       'every dot is rendered by one helper, and it draws an "i" — never a "?", which is '
+       + "the browser's own help cursor and asks where this answers");
+    ok(dots.every((d) => />i<\/button>/.test(d)),
+       'and no hand-written dot in the markup draws anything else');
+  }
+  {
+    /* Read off the source: METRIC_HELP is a `const` at the top level of a
+       classic script, so it is not on the frame's window, and every dot but a
+       handful is drawn on a tab this file never renders.
+       There is deliberately no dot-to-entry cross-check here, unlike the sibling
+       suites. This app passes the key as a VARIABLE — `helpBtn(helpKey, label)`,
+       `helpBtn(c.help, c.label)` — so a scan for quoted keys finds one of the
+       twenty-one and would go green on nothing. What can be pinned is the guard
+       that makes a wrong key harmless: helpBtn returns '' when the table has no
+       entry, so a bad key draws NO dot rather than a dot onto an empty window. */
+    const code = stripComments(APP_SRC);
+    const at = code.indexOf('const METRIC_HELP = {');
+    const table = code.slice(at, code.indexOf('\n};', at));
+    const entries = table.split(/\n  (?=\w+: \{)/).slice(1);
+    ok(entries.length > 15, 'the help table was found at all — ' + entries.length + ' entries');
+    is(entries.filter((e) => !/^\w+: \{ title: '.+',$/m.test(e.split('\n')[0]))
+       .map((e) => e.split(':')[0]), [],
+       'each entry is headed — the window has no fallback title');
+    /* Bodies are one string per line joined with +, so a short one is a stub
+       rather than a tersely written one. 120 characters is under every real one. */
+    is(entries.filter((e) => [...e.matchAll(/'((?:[^'\\]|\\.)*)'/g)]
+       .slice(1).map((q) => q[1]).join('').length < 120).map((e) => e.split(':')[0]), [],
+       'and each one actually explains something');
+    ok(/function helpBtn\(key, label\) \{\s*\n\s*if \(!METRIC_HELP\[key\]\) return '';/.test(code),
+       'a key with no entry draws no dot at all, which is what stands in for the '
+       + "cross-check the sibling suites can run");
+  }
+
 
   const KILL = stripComments(KILL_SRC);
   ok(/unregister\(\)/.test(KILL), 'sw-kill.js unregisters itself');
