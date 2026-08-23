@@ -772,11 +772,24 @@ summary of them.
     `--text-primary`, browser paragraph spacing is 1em rather than 10px, and each app's
     dialog padding decided the window's width. Nothing here moved except the padding, which
     was already 20px, so this app came out unchanged on screen.
-  - **`#helpBody { white-space: pre-line; }` is this app's own and must NOT travel.** The help
-    here is written with `textContent`, which is why a note can quote a reader's own label
-    safely, so a blank line is the only paragraph break it has. The siblings build real `<p>`
-    tags from template literals, and `pre-line` there would break every sentence at the source's
-    own newlines.
+  - **A HELP BODY IS AN ARRAY OF PARAGRAPHS, NOT A STRING** (2026-08-23), and a paragraph is an
+    array of runs: a plain string, or `b('…')` for bold. `renderHelpBody` walks it with
+    `createElement` and `textContent`, so **none of it is ever parsed as markup** — which is what
+    lets a note here quote a reader's own stage name safely, and is the same rule `pre-line` used
+    to be protecting. Money Map carries the identical pair; the other five apps write their help
+    as HTML literals and are right to.
+    Every entry was one block of 230 to 1,900 characters before this. Bold carries the thing
+    being defined or the load-bearing claim, **at most one per paragraph**, and `tests.html` pins
+    that: every entry is more than one paragraph, every entry bolds something, and no entry has
+    more bold runs than paragraphs.
+  - **`#helpBody { white-space: pre-line; }` IS GONE, and `#helpBody` is a `<div>`.** The rule
+    existed because the help was one string: a blank line was its only paragraph break, and at
+    `normal` a note written as three paragraphs arrived as one wall of text. The breaks are
+    structural now, so `pre-line` would only turn every wrapped line in the SOURCE into a break
+    on screen. A `<p>` cannot hold paragraphs, hence the `<div>`.
+  - **Two ALL-CAPS emphases in the Aged Work note became bold**, and the tests that pinned them
+    had to follow — a caps match proved the emphasis was there, and a `<strong>` is what proves
+    it now.
   - **`tests.html` deliberately does not cross-check dots against entries, unlike the sibling
     suites.** This app passes the key as a variable — `helpBtn(helpKey, label)`,
     `helpBtn(c.help, c.label)` — so a scan for quoted keys finds one of twenty-one and would go

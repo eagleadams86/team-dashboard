@@ -1303,17 +1303,13 @@ dialog p { color: var(--text-secondary); font-size: var(--fs-xs); }
   color: inherit; margin: 0 0 10px; }
 #helpBody p:last-child, #helpBody li:last-child { margin-bottom: 0; }
 #helpBody strong { color: var(--text-primary); }
-/* App-specific, and deliberately outside the shared block: this app's help is
-   written into #helpBody with textContent — never markup, which is the whole
-   reason a note can quote a reader's own label safely — so the only paragraph
-   break available to it is a newline. Left at `normal`, a blank line between
-   paragraphs collapses to one space and a note written as three paragraphs
-   arrives as one wall of text, which is what the throughput trend note did.
-   `pre-line` honours the breaks and still collapses the ordinary wrapping
-   whitespace. It must NOT travel to the siblings: theirs write real <p> tags
-   from template literals, and every newline in the source would become a break
-   in the middle of a sentence. */
-#helpBody { white-space: pre-line; }
+/* `white-space: pre-line` used to live here, and it is GONE (2026-08-23). The
+   help was one string written with textContent, so a blank line was the only
+   paragraph break it had; pre-line was what stopped a note written as three
+   paragraphs arriving as one wall of text. A body is now an array of paragraphs
+   rendered into real <p> elements, so the breaks are structural and pre-line
+   would only turn every wrapped line in the SOURCE into a break on screen. The
+   textContent rule it was protecting is untouched — see renderHelpBody. */
 
 /* The toast is a POPOVER, so that it can be seen over an open modal dialog —
    the reasoning is on window.toast itself. Half of what follows undoes the UA's
@@ -2678,7 +2674,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 <!-- ── What a figure means — one dialog, filled per ⓘ press ───────────────── -->
 <dialog id="helpDialog" aria-labelledby="helpTitle">
   <h2 id="helpTitle"></h2>
-  <p id="helpBody" style="margin:0"></p>
+  <div id="helpBody"></div>
   <div class="row" style="justify-content:flex-end;margin-top:18px">
     <button class="btn primary" id="helpCloseBtn" type="button">Got It</button>
   </div>
@@ -7792,243 +7788,290 @@ function renderTitle() {
    per, to, in, of, at — left lowercase unless they lead. These titles fill the
    help dialog's heading, so they follow the same rule as the headings written
    into the markup for every other dialog. */
+/* A body is an ARRAY OF PARAGRAPHS, and a paragraph is an array of RUNS: a plain
+   string, or b('…') for bold. renderHelpBody walks it with createElement and
+   textContent — NEVER innerHTML — which is the whole point of the shape and the
+   reason a note here can quote a reader's own stage name safely. Five sibling
+   apps write their help as HTML literals and are right to; this one and Money
+   Map hold the data that made textContent worth keeping in the first place.
+   Every entry was ONE block of 230 to 1,900 characters until 2026-08-23 (the
+   longest already broken by \n\n, which is why #helpBody carried pre-line).
+   Bold carries the thing being defined or the load-bearing claim, at most one
+   per paragraph: a page where half the words are bold has no emphasis left. */
+const b = (text) => ({ b: text });
 const METRIC_HELP = {
-  defectRate: { title: 'Defect Rate',
-    body: 'How much of what we finish is defect work? Plots items whose Type matches the '
-      + 'defect text in Settings as a share of everything completed. Lower is better — but '
-      + 'a rate near zero in a maturing team usually means defects are being logged '
-      + 'somewhere other than the board, not that there are none.' },
-  stageTime: { title: 'Time in Stage',
-    body: 'Where does the time actually go? Cycle time says an item took eleven days; this '
-      + 'says how many of them it spent waiting to be reviewed. The median is the typical '
-      + 'wait in that stage and the percentile is the one to plan against, exactly as they '
-      + 'are for cycle time — and the share column is of the time MEASURED here, not of '
-      + 'cycle time, because a status export counts days in statuses that sit outside the '
-      + 'started-to-finished span. These days are CALENDAR days as your export counted them: '
-      + 'they are worked out by Jira, so the working-days setting does not reach them. '
-      + 'Stages are ones you set up under Teams & Stages in the header — this app never stores the '
-      + 'status names out of your export, only the days and the stage name you chose.' },
-  cycleTime: { title: 'Cycle Time',
-    body: 'How long does an item take once work has actually started? The average of the '
-      + 'items completed in each period, in days. Steady and falling is the good direction — '
-      + 'and steady matters more than fast, because it is what makes a forecast possible. '
-      + 'Days here means calendar days, weekends included, unless you switch Settings to '
-      + 'working days only — every duration in the app follows that one setting together.' },
-  throughput: { title: 'Throughput',
-    body: 'What pace do we deliver at? The count of items completed in each period. Read the '
-      + 'trend line rather than any single point — throughput is naturally lumpy. The average '
-      + 'on the tile counts whole periods only: when your data stops part-way through a period '
-      + 'that last bar is still plotted, but it is left out of the average, because a period '
-      + 'that has not finished happening is an incomplete observation rather than a slow one. '
-      + 'The steady delivery tile reads the same whole periods.' },
-  cfd: { title: 'Raised, Started, Finished',
-    body: 'The cumulative flow diagram — the one chart that shows work arriving and work '
-      + 'leaving in the same picture. Every item this team holds is stacked at the end of each '
+  defectRate: { title: 'Defect Rate', body: [
+    ['How much of what we finish is defect work? Plots items whose Type matches the defect '
+      + 'text in Settings as ', b('a share of everything completed'), '.'],
+    ['Lower is better — but ', b('a rate near zero in a maturing team'), ' usually means '
+      + 'defects are being logged somewhere other than the board, not that there are none.'],
+  ] },
+  stageTime: { title: 'Time in Stage', body: [
+    ['Where does the time actually go? Cycle time says an item took eleven days; ', b('this '
+      + 'says how many of them it spent waiting to be reviewed'), '. The median is the '
+      + 'typical wait in that stage and the percentile is the one to plan against, exactly '
+      + 'as they are for cycle time.'],
+    ['The share column is of ', b('the time measured here'), ', not of cycle time, because a '
+      + 'status export counts days in statuses that sit outside the started-to-finished span.'],
+    ['These days are ', b('calendar days as your export counted them'), ': they are worked '
+      + 'out by Jira, so the working-days setting does not reach them. Stages are ones you '
+      + 'set up under Teams & Stages in the header — this app never stores the status names '
+      + 'out of your export, only the days and the stage name you chose.'],
+  ] },
+  cycleTime: { title: 'Cycle Time', body: [
+    ['How long does an item take ', b('once work has actually started'), '? The average of '
+      + 'the items completed in each period, in days.'],
+    ['Steady and falling is the good direction — and ', b('steady matters more than fast'),
+      ', because it is what makes a forecast possible. Days here means calendar days, '
+      + 'weekends included, unless you switch Settings to working days only — every duration '
+      + 'in the app follows that one setting together.'],
+  ] },
+  throughput: { title: 'Throughput', body: [
+    ['What pace do we deliver at? The count of items completed in each period. ', b('Read '
+      + 'the trend line rather than any single point'), ' — throughput is naturally lumpy.'],
+    ['The average on the tile counts ', b('whole periods only'), ': when your data stops '
+      + 'part-way through a period that last bar is still plotted, but it is left out of the '
+      + 'average, because a period that has not finished happening is an incomplete '
+      + 'observation rather than a slow one. The steady delivery tile reads the same whole '
+      + 'periods.'],
+  ] },
+  cfd: { title: 'Raised, Started, Finished', body: [
+    ['The cumulative flow diagram — the one chart that shows work arriving and work leaving '
+      + 'in the same picture. Every item this team holds is stacked at the end of each '
       + 'period: finished at the bottom, in progress above it, and raised-but-not-started on '
-      + 'top.\n\n'
-      + 'Read the BANDS, not the lines. The middle band is how much is in flight — the same '
-      + 'figure the work in progress chart plots — so a band that widens is work piling up '
-      + 'faster than it leaves, whatever the throughput tile says. The bottom band\u2019s slope '
-      + 'is delivery: flat means nothing finished that period. Two edges running parallel is a '
-      + 'team in balance, which is the shape to want.\n\n'
-      + 'The finished band starts at zero on the left edge: what this team delivered BEFORE '
-      + 'the window is not stacked underneath it, which on a long history would leave the two '
-      + 'bands that matter as a sliver at the top of the card. Nothing else moves for that — a '
-      + 'band is the gap between two curves, so subtracting the same figure from all three '
-      + 'leaves every thickness exactly as it was, and the in-progress band is still a real '
-      + 'count of open work rather than only of work opened inside the window. The top '
-      + 'band needs a Created column and is left off entirely without one, rather than drawn as '
-      + 'a flat zero claiming there is no backlog. An item with no start date has never '
-      + 'observably been in progress, so it goes straight to the bottom band on the day it '
-      + 'closed.' },
-  netFlow: { title: 'Net Flow',
-    body: 'Is our completion pace consistent? Items completed minus items started. '
-      + 'Around zero is the goal: persistently below zero means more work starts than '
-      + 'finishes and work in progress is piling up; persistently above zero drains it.' },
-  leadTime: { title: 'Lead Time',
-    body: 'How long from an idea being raised to the customer having it — the whole wait, '
-      + 'including the time an item sat in the backlog before anyone picked it up. Cycle '
-      + 'time only starts counting once work does, so lead time is always the longer of the '
-      + 'two, and the gap between them is queue. Needs a created date on each item — a '
-      + 'Created column in your paste, or the box on the item itself.' },
-  cycleTimePercentile: { title: '85th Percentile Cycle Time',
-    body: 'The number to forecast with. 85% of the items completed finished within this many '
-      + 'days, so it is a promise you can make about the next one — where an average is a '
-      + 'figure most work beats and a sixth of it misses badly. Watch the gap between this '
-      + 'line and the average: a wide gap means the work is unpredictable even when it is '
-      + 'quick on a good day, and predictability is usually worth more to whoever is asking '
-      + 'than speed. It is a real duration some item actually took, never an interpolation.\n\n'
-      + 'Set a target for the team under Teams & Stages in the header and this figure is read '
-      + 'against it: the target is drawn on the two scatter charts and the tile says whether it '
-      + 'was met. It is compared with this percentile rather than with the average on purpose — '
-      + 'a target is a promise about the next item, which is the one question an average cannot '
-      + 'answer. Leave it blank and the app states the figure without judging it.\n\n'
-      + 'That target is not the same thing as the ageing threshold in Settings, though the two '
-      + 'read alike. This one is checked against work that has FINISHED; the threshold flags '
-      + 'work that has not, and normally sits below the target so something is caught while '
-      + 'there is still time to act on it. See Aged Work.' },
-  throughputBand: { title: 'Steady Delivery',
-    body: 'Is our pace steady? The band most periods land in: ' + THROUGHPUT_HIGH_PERCENTILE
-      + '% of whole periods delivered at least the first figure, and ' + THROUGHPUT_HIGH_PERCENTILE
-      + '% delivered at most the second, so the middle '
-      + (THROUGHPUT_HIGH_PERCENTILE - THROUGHPUT_LOW_PERCENTILE)
-      + '% of them sat between the two. Two teams averaging five a week are not the same team if one '
-      + 'runs 4 to 6 and the other 0 to 15, and the average alone cannot tell them apart — a '
-      + 'narrow band is what makes a forecast possible, exactly as it does for cycle time. '
-      + 'Only whole periods count: a part-period is an incomplete observation rather than a '
-      + 'slow one, so the last bar on the chart is left out of the band when the data stops '
+      + 'top.'],
+    [b('Read the bands, not the lines.'), ' The middle band is how much is in flight — the '
+      + 'same figure the work in progress chart plots — so a band that widens is work piling '
+      + 'up faster than it leaves, whatever the throughput tile says. The bottom band’s '
+      + 'slope is delivery: flat means nothing finished that period. Two edges running '
+      + 'parallel is a team in balance, which is the shape to want.'],
+    ['The finished band ', b('starts at zero on the left edge'), ': what this team delivered '
+      + 'before the window is not stacked underneath it, which on a long history would leave '
+      + 'the two bands that matter as a sliver at the top of the card. Nothing else moves for '
+      + 'that — a band is the gap between two curves, so subtracting the same figure from all '
+      + 'three leaves every thickness exactly as it was, and the in-progress band is still a '
+      + 'real count of open work rather than only of work opened inside the window.'],
+    ['The top band needs a Created column and is ', b('left off entirely without one'),
+      ', rather than drawn as a flat zero claiming there is no backlog. An item with no start '
+      + 'date has never observably been in progress, so it goes straight to the bottom band '
+      + 'on the day it closed.'],
+  ] },
+  netFlow: { title: 'Net Flow', body: [
+    ['Is our completion pace consistent? ', b('Items completed minus items started'), '.'],
+    [b('Around zero is the goal'), ': persistently below zero means more work starts than '
+      + 'finishes and work in progress is piling up; persistently above zero drains it.'],
+  ] },
+  leadTime: { title: 'Lead Time', body: [
+    ['How long from an idea being raised to the customer having it — ', b('the whole wait'),
+      ', including the time an item sat in the backlog before anyone picked it up.'],
+    ['Cycle time only starts counting once work does, so lead time is always the longer of '
+      + 'the two, and ', b('the gap between them is queue'), '. Needs a created date on each '
+      + 'item — a Created column in your paste, or the box on the item itself.'],
+  ] },
+  cycleTimePercentile: { title: CYCLE_PERCENTILE + 'th Percentile Cycle Time', body: [
+    [b('The number to forecast with.'), ' ' + CYCLE_PERCENTILE + '% of the items completed '
+      + 'finished within this many days, so it is a promise you can make about the next one — '
+      + 'where an average is a figure most work beats and a sixth of it misses badly. It is a '
+      + 'real duration some item actually took, never an interpolation.'],
+    ['Watch ', b('the gap between this line and the average'), ': a wide gap means the work '
+      + 'is unpredictable even when it is quick on a good day, and predictability is usually '
+      + 'worth more to whoever is asking than speed.'],
+    ['Set a target for the team under Teams & Stages in the header and this figure is read '
+      + 'against it: the target is drawn on the two scatter charts and the tile says whether '
+      + 'it was met. It is ', b('compared with this percentile rather than with the average'),
+      ' on purpose — a target is a promise about the next item, which is the one question an '
+      + 'average cannot answer. Leave it blank and the app states the figure without judging '
+      + 'it.'],
+    ['That target is ', b('not the same thing as the ageing threshold'), ' in Settings, '
+      + 'though the two read alike. This one is checked against work that has finished; the '
+      + 'threshold flags work that has not, and normally sits below the target so something '
+      + 'is caught while there is still time to act on it. See Aged Work.'],
+  ] },
+  throughputBand: { title: 'Steady Delivery', body: [
+    ['Is our pace steady? The band most periods land in: ' + THROUGHPUT_HIGH_PERCENTILE
+      + '% of whole periods delivered at least the first figure, and '
+      + THROUGHPUT_HIGH_PERCENTILE + '% delivered at most the second, so ', b('the middle '
+      + (THROUGHPUT_HIGH_PERCENTILE - THROUGHPUT_LOW_PERCENTILE) + '% of them sat between '
+      + 'the two'), '.'],
+    ['Two teams averaging five a week are not the same team if one runs 4 to 6 and the other '
+      + '0 to 15, and the average alone cannot tell them apart — ', b('a narrow band is what '
+      + 'makes a forecast possible'), ', exactly as it does for cycle time.'],
+    [b('Only whole periods count'), ': a part-period is an incomplete observation rather than '
+      + 'a slow one, so the last bar on the chart is left out of the band when the data stops '
       + 'part-way through it. The average above counts the same whole periods, so the two '
-      + 'always agree about which periods they are describing.' },
-  startedCompleted: { title: 'Started vs Completed',
-    body: 'The two counts net flow is the difference of. A net figure of +2 reads the same '
-      + 'whether it came from 12 started and 10 completed or from 2 and 0, and those are very '
-      + 'different periods — one is a team at pace, the other is a team barely moving. Started '
-      + 'counts every item with a start date whether or not it has finished, so the pair also '
-      + 'says how much of what was picked up in this window is still open.' },
-  wip: { title: 'Work in Progress',
-    body: 'How much work is open at once? Counted at the end of each period from the same '
-      + 'start and completion dates as everything else, so it is a history rather than just '
-      + 'today’s number. The common coaching rule is to keep work in progress under half '
-      + 'a month’s throughput, and nearer a quarter for most teams — the WIP vs throughput '
-      + 'tile states that ratio. It is a rule of thumb, not a target this app holds you to, '
-      + 'which is why nothing here turns a colour when you cross it. Less work in progress '
-      + 'means shorter cycle times, for the same reason a shorter queue moves faster.\n\n'
-      + 'Set a limit for the team under Teams & Stages in the header and it is drawn flat '
-      + 'across this chart, with the tile saying whether today is inside it and by how much. '
-      + 'The bars are deliberately not recoloured where they cross the line: this app states '
-      + 'figures rather than judging them, and a period over the limit is something to look at '
-      + 'rather than a failure to mark. Leave it blank and no line is drawn.' },
-  agedWork: { title: 'Aged Work',
-    body: 'How many open items have been open too long? Anything still in progress beyond the '
-      + 'threshold in Settings — two weeks by default, and worth keeping under a month, '
-      + 'counted in whichever days the working-days setting says. Read '
-      + 'as of the newest date in your data rather than today, so a paste of last quarter’s '
-      + 'export reports that quarter.\n\n'
-      + 'This is the one chart here that can tell you something before it has happened, and '
-      + 'the threshold is what decides whether it does. It counts UNFINISHED work, so it is a '
-      + 'different question from a team’s 85% target, which is checked against work that '
-      + 'has already finished — and it is worth setting BELOW that target. An item that has '
-      + 'been open as long as you promised the whole thing would take has already missed; '
-      + 'flagged a few days earlier, it is still something you can swarm on, split or unblock. '
-      + 'If your promise is 10 days, a threshold around 6 is what turns this chart into a '
-      + 'warning rather than a post-mortem.\n\n'
-      + 'One caveat: the clean-up tool’s option to also remove '
-      + 'unfinished items deletes long-running work in progress, which is exactly what this '
-      + 'chart counts, so history before a clean-up like that will read low.' },
-  teamTrend: { title: 'Throughput Trend',
-    body: 'Which way this team\u2019s throughput has been going across the window on screen \u2014 '
-      + 'the same fitted line the chart above draws, one per team. The figure is what that line '
-      + 'rises or falls by from one end of the window to the other, in items per '
-      + 'bucket; the trace is the actual weekly counts, normalised to their own range so what '
-      + 'it shows is the SHAPE. Two teams with identical traces can be delivering at very '
-      + 'different rates \u2014 Per week beside it is the magnitude.\n\n'
-      + 'This is the column for the question the rest of the table cannot answer. Every other '
-      + 'figure here is a snapshot, so a team halfway down a decline reads exactly like a team '
-      + 'that was always that slow. Sort by it to put the steepest fallers at the top.\n\n'
-      + 'Check Data to before reading a fall as a slowdown: a team whose export stopped three '
-      + 'weeks ago has a trace that falls away to nothing for exactly the same reason it has a '
-      + 'stale date, and that is a reporting problem rather than a delivery one.' },
-  trainThroughput: { title: 'Throughput Across Every Team',
-    body: 'What pace is the whole train delivering at, week by week? The same count the '
-      + 'dashboard plots for one team, added up across every team in scope \u2014 a total is '
-      + 'the one figure here that genuinely is the sum of its parts. Read the trend line '
-      + 'rather than any single point: throughput is lumpy for one team and stays lumpy for '
-      + 'six. The thing to watch for is a dip that is one TEAM stopping rather than the train '
-      + 'slowing down, and the table below is what tells the two apart \u2014 check the Data '
+      + 'always agree about which periods they are describing.'],
+  ] },
+  startedCompleted: { title: 'Started vs Completed', body: [
+    ['The two counts net flow is the difference of. ', b('A net figure of +2 reads the same '
+      + 'whether it came from 12 started and 10 completed or from 2 and 0'), ', and those are '
+      + 'very different periods — one is a team at pace, the other is a team barely moving.'],
+    ['Started counts every item with a start date ', b('whether or not it has finished'),
+      ', so the pair also says how much of what was picked up in this window is still open.'],
+  ] },
+  wip: { title: 'Work in Progress', body: [
+    ['How much work is open at once? Counted at the end of each period from the same start '
+      + 'and completion dates as everything else, so it is ', b('a history rather than just '
+      + 'today’s number'), '.'],
+    ['The common coaching rule is to keep work in progress ', b('under half a month’s '
+      + 'throughput'), ', and nearer a quarter for most teams — the WIP vs throughput tile '
+      + 'states that ratio. It is a rule of thumb, not a target this app holds you to, which '
+      + 'is why nothing here turns a colour when you cross it. Less work in progress means '
+      + 'shorter cycle times, for the same reason a shorter queue moves faster.'],
+    ['Set a limit for the team under Teams & Stages in the header and it is drawn flat across '
+      + 'this chart, with the tile saying whether today is inside it and by how much. ',
+      b('The bars are deliberately not recoloured where they cross the line'), ': this app '
+      + 'states figures rather than judging them, and a period over the limit is something to '
+      + 'look at rather than a failure to mark. Leave it blank and no line is drawn.'],
+  ] },
+  agedWork: { title: 'Aged Work', body: [
+    ['How many open items have been open too long? Anything still in progress beyond ',
+      b('the threshold in Settings'), ' — two weeks by default, and worth keeping under a '
+      + 'month, counted in whichever days the working-days setting says. Read as of the '
+      + 'newest date in your data rather than today, so a paste of last quarter’s export '
+      + 'reports that quarter.'],
+    ['This is ', b('the one chart here that can tell you something before it has happened'),
+      ', and the threshold is what decides whether it does. It counts unfinished work, so it '
+      + 'is a different question from a team’s ' + CYCLE_PERCENTILE + '% target, which is '
+      + 'checked against work that has already finished.'],
+    ['It is worth setting ', b('below that target'), '. An item that has been open as long as '
+      + 'you promised the whole thing would take has already missed; flagged a few days '
+      + 'earlier, it is still something you can swarm on, split or unblock. If your promise '
+      + 'is 10 days, a threshold around 6 is what turns this chart into a warning rather than '
+      + 'a post-mortem.'],
+    ['One caveat: the clean-up tool’s option to also remove unfinished items deletes '
+      + 'long-running work in progress, which is exactly what this chart counts, so ',
+      b('history before a clean-up like that will read low'), '.'],
+  ] },
+  teamTrend: { title: 'Throughput Trend', body: [
+    ['Which way this team’s throughput has been going across the window on screen — the '
+      + 'same fitted line the chart above draws, one per team. ', b('The figure is what that '
+      + 'line rises or falls by'), ' from one end of the window to the other, in items per '
+      + 'bucket.'],
+    ['The trace is the actual weekly counts, normalised to their own range, so what it shows '
+      + 'is ', b('the shape'), '. Two teams with identical traces can be delivering at very '
+      + 'different rates — Per week beside it is the magnitude.'],
+    ['This is the column for the question the rest of the table cannot answer. ', b('Every '
+      + 'other figure here is a snapshot'), ', so a team halfway down a decline reads exactly '
+      + 'like a team that was always that slow. Sort by it to put the steepest fallers at the '
+      + 'top.'],
+    [b('Check Data to before reading a fall as a slowdown'), ': a team whose export stopped '
+      + 'three weeks ago has a trace that falls away to nothing for exactly the same reason '
+      + 'it has a stale date, and that is a reporting problem rather than a delivery one.'],
+  ] },
+  trainThroughput: { title: 'Throughput Across Every Team', body: [
+    ['What pace is the whole train delivering at, week by week? The same count the dashboard '
+      + 'plots for one team, added up across every team in scope — ', b('a total is the one '
+      + 'figure here that genuinely is the sum of its parts'), '. Read the trend line rather '
+      + 'than any single point: throughput is lumpy for one team and stays lumpy for six.'],
+    ['The thing to watch for is ', b('a dip that is one team stopping rather than the train '
+      + 'slowing down'), ', and the table below is what tells the two apart — check the Data '
       + 'to column first, because a team whose export is stale looks exactly like a team that '
-      + 'stopped delivering. It follows the train picker, so scoping to one ART redraws this '
-      + 'for that ART alone.' },
-  trainPercentile: { title: 'The Whole Train\u2019s ' + CYCLE_PERCENTILE + 'th Percentile',
-    body: 'The figure for every team at once, worked out over every item any of them '
-      + 'completed \u2014 NOT the average of their separate percentiles, which is not a '
-      + 'percentile of anything. Read it as the promise you could make about a piece of work '
-      + 'before you knew which team would pick it up. Because it pools items rather than '
-      + 'teams, it is weighted by how much each team delivers: a large fast team can hold '
-      + 'this figure down while a small team with a long tail sits well above it. That is '
-      + 'not a flaw in the figure \u2014 most work really does go through the fast teams '
-      + '\u2014 but it does mean this tile cannot tell you a team is struggling. The column '
+      + 'stopped delivering.'],
+    ['It follows the train picker, so scoping to one ART redraws this for that ART alone.'],
+  ] },
+  trainPercentile: { title: 'The Whole Train’s ' + CYCLE_PERCENTILE + 'th Percentile', body: [
+    ['The figure for every team at once, worked out over every item any of them completed — ',
+      b('not the average of their separate percentiles'), ', which is not a percentile of '
+      + 'anything. Read it as the promise you could make about a piece of work before you '
+      + 'knew which team would pick it up.'],
+    ['Because it pools items rather than teams, it is ', b('weighted by how much each team '
+      + 'delivers'), ': a large fast team can hold this figure down while a small team with a '
+      + 'long tail sits well above it. That is not a flaw in the figure — most work really '
+      + 'does go through the fast teams.'],
+    ['But it does mean ', b('this tile cannot tell you a team is struggling'), '. The column '
       + 'in the table below can, which is what it is there for: read the tile for a promise, '
-      + 'read the column to find who needs help.' },
-  teamDataEnd: { title: 'Data To',
-    body: 'The last date this team\u2019s own export runs to. Every other column is read over '
-      + 'the same window and as of the same date \u2014 the newest date any team has \u2014 '
-      + 'so the figures are comparable, and this column is how you know whether they are '
-      + 'worth comparing. A team three weeks behind everyone else has three weeks of zero '
-      + 'throughput dragging its rate down and three weeks of extra ageing on everything it '
-      + 'has open, and none of that shows in the numbers themselves. Paste a fresh export for '
-      + 'that team before drawing any conclusion about it.' },
-  cycleScatter: { title: 'Every Finished Item',
-    body: 'How long did each item actually take? One dot per item, at the time it took, on '
-      + 'the day it finished — where the chart beside it averages '
-      + 'within each period, which is exactly what hides the one item that took five months. '
-      + 'This is the only view here where a single item is a thing you can point at: a dot far '
-      + 'above the rest is a conversation, and the week it sits over tells you which one. The '
-      + 'two lines are this team\u2019s own finished work — half of it came in under the lower '
-      + 'one, ' + CYCLE_PERCENTILE + '% under the upper one — and they are the SAME two lines '
-      + 'the work item age chart draws, so the pair reads together: this shows where finished '
-      + 'work landed, that shows where open work has got to. What you are looking for is the '
-      + 'SPREAD rather than the average. A tight band means the next item is predictable; a '
-      + 'long tail means it is a lottery however good the typical case looks, and that is what '
-      + 'makes a forecast wide. Dots are translucent, so several items finishing on one day at '
-      + 'the same speed show as a darker mark rather than as one. Point at one and it names '
-      + 'the item \u2014 its issue key if your paste had a Key column, and otherwise its work '
-      + 'type and the date it finished.' },
-  itemAge: { title: 'Work Item Age',
-    body: 'What do I do today? Every item still in progress, plotted at the age it has '
-      + 'reached so far \u2014 not how long it took, because none of these has finished. '
-      + 'The aged work chart beside it counts how many were stale at the end of each '
-      + 'period; this one names them. Three lines give the dots their meaning: half of '
-      + 'your finished work took less than the lower one, ' + CYCLE_PERCENTILE + '% took '
-      + 'less than the middle one, and the top one is the ageing threshold you set. An '
-      + 'item above the ' + CYCLE_PERCENTILE + '% line has already outlasted almost '
-      + 'everything this team has ever delivered, which is a much stronger signal than '
-      + '\u201cit looks old\u201d \u2014 it is very unlikely to finish normally now, and it '
-      + 'is the one to talk about first.\n\n'
-      + 'Columns are your WORKFLOW STAGES when your export has a Status column \u2014 what is '
-      + 'sitting in each part of the workflow and how long it has been there, which is the '
+      + 'read the column to find who needs help.'],
+  ] },
+  teamDataEnd: { title: 'Data To', body: [
+    ['The last date this team’s own export runs to. Every other column is read over the '
+      + 'same window and as of the same date — the newest date any team has — so the figures '
+      + 'are comparable, and ', b('this column is how you know whether they are worth '
+      + 'comparing'), '.'],
+    ['A team three weeks behind everyone else has ', b('three weeks of zero throughput '
+      + 'dragging its rate down'), ' and three weeks of extra ageing on everything it has '
+      + 'open, and none of that shows in the numbers themselves. Paste a fresh export for '
+      + 'that team before drawing any conclusion about it.'],
+  ] },
+  cycleScatter: { title: 'Every Finished Item', body: [
+    ['How long did each item actually take? ', b('One dot per item'), ', at the time it took, '
+      + 'on the day it finished — where the chart beside it averages within each period, '
+      + 'which is exactly what hides the one item that took five months.'],
+    ['This is ', b('the only view here where a single item is a thing you can point at'),
+      ': a dot far above the rest is a conversation, and the week it sits over tells you '
+      + 'which one. The two lines are this team’s own finished work — half of it came in '
+      + 'under the lower one, ' + CYCLE_PERCENTILE + '% under the upper one — and they are '
+      + 'the same two lines the work item age chart draws, so the pair reads together: this '
+      + 'shows where finished work landed, that shows where open work has got to.'],
+    ['What you are looking for is ', b('the spread rather than the average'), '. A tight band '
+      + 'means the next item is predictable; a long tail means it is a lottery however good '
+      + 'the typical case looks, and that is what makes a forecast wide.'],
+    ['Dots are translucent, so several items finishing on one day at the same speed show as a '
+      + 'darker mark rather than as one. Point at one and it names the item — its issue key '
+      + 'if your paste had a Key column, and otherwise its work type and the date it '
+      + 'finished.'],
+  ] },
+  itemAge: { title: 'Work Item Age', body: [
+    [b('What do I do today?'), ' Every item still in progress, plotted at the age it has '
+      + 'reached so far — not how long it took, because none of these has finished. The aged '
+      + 'work chart beside it counts how many were stale at the end of each period; this one '
+      + 'names them.'],
+    ['Three lines give the dots their meaning: half of your finished work took less than the '
+      + 'lower one, ' + CYCLE_PERCENTILE + '% took less than the middle one, and the top one '
+      + 'is the ageing threshold you set. ', b('An item above the ' + CYCLE_PERCENTILE + '% '
+      + 'line has already outlasted almost everything this team has ever delivered'), ', '
+      + 'which is a much stronger signal than “it looks old” — it is very unlikely to '
+      + 'finish normally now, and it is the one to talk about first.'],
+    ['Columns are your ', b('workflow stages'), ' when your export has a Status column — what '
+      + 'is sitting in each part of the workflow and how long it has been there, which is the '
       + 'question a cycle time figure cannot answer. They run in the order you arranged them '
       + 'under Teams & Stages, because a workflow has a direction, and each tick carries its '
       + 'count. An item whose status matches none of your stages goes into a No stage column '
       + 'at the right-hand end, which is usually a part of your workflow you have not set up '
-      + 'yet. Without a Status column the columns are WORK TYPES instead, busiest first \u2014 '
+      + 'yet.'],
+    ['Without a Status column the columns are ', b('work types'), ' instead, busiest first — '
       + 'a board where the defects age and the stories do not is a different problem from one '
       + 'where everything ages. There is no picker: the work-type reading is a filter away, '
-      + 'and scoping the strip to Defects asks where defects get stuck.\n\n'
-      + 'Point at a dot and it names the item: its issue key if your '
-      + 'paste had a Key column, and otherwise its work type and start date, which is '
-      + 'what finds it again in the export you pasted. The key is the ONLY thing out of '
-      + 'your work system this app keeps \u2014 no summary, no status, no names \u2014 and '
-      + 'it is checked against the shape of a key rather than trimmed to fit, so a '
-      + 'mismapped column stores nothing at all.' },
-  forecastWhen: { title: 'Time to Finish',
-    body: 'When will a batch of work be done? It deals this team\u2019s own completed '
-      + 'periods out again at random ' + FORECAST_TRIALS.toLocaleString() + ' times, and '
-      + 'reports how often each answer came up \u2014 so it forecasts from the pace you '
-      + 'actually worked at rather than from anybody\u2019s estimate. Nothing is sized and '
-      + 'no story points are involved; it only counts how many things finished. Read the '
-      + 'answer you can live with being wrong about: 50% is a coin toss, 85% is the one '
-      + 'worth promising, 95% is what you say when being late is expensive. The spread on '
-      + 'the chart is the real output \u2014 a wide one means the date is a guess whichever '
-      + 'row you pick, and the fix for that is steadier delivery, not a later date.' },
-  forecastHowMany: { title: 'Items by a Date',
-    body: 'How much will be finished by a date you have been given? The same '
-      + FORECAST_TRIALS.toLocaleString() + ' runs, asked the other way round. Note the '
-      + 'answers count DOWN as you get more confident, where the dates above count up: '
-      + 'a smaller number is the safer promise, so 95% confidence buys you a lower figure, '
-      + 'not a higher one. Every row says \u201cat least\u201d for that reason. It counts '
-      + 'items, not points or value, so it is only as good as your items being roughly '
-      + 'comparable in size \u2014 which, on a board whose cycle times cluster, they '
-      + 'usually are.' },
-  forecastSamples: { title: 'Whole Periods Behind the Forecast',
-    body: 'How many completed periods the forecast had to deal from. It is the same set '
-      + 'the completed-per-period and steady delivery tiles read: whole periods only, '
-      + 'because a period that has not finished happening is an incomplete observation '
-      + 'rather than a slow one, and dealing one into a forecast deals a bad week that '
-      + 'never occurred. Below ' + FORECAST_MIN_PERIODS + ' the forecast refuses to draw '
-      + 'anything at all \u2014 with a handful of observations the answer describes which '
-      + 'periods you happen to hold rather than the team. More history is steadier, but '
-      + 'not always better: a window stretching back past a reorganisation forecasts a '
-      + 'team that no longer exists.' }
+      + 'and scoping the strip to Defects asks where defects get stuck.'],
+    ['Point at a dot and it names the item: its issue key if your paste had a Key column, and '
+      + 'otherwise its work type and start date, which is what finds it again in the export '
+      + 'you pasted. ', b('The key is the only thing out of your work system this app keeps'),
+      ' — no summary, no status, no names — and it is checked against the shape of a key '
+      + 'rather than trimmed to fit, so a mismapped column stores nothing at all.'],
+  ] },
+  forecastWhen: { title: 'Time to Finish', body: [
+    ['When will a batch of work be done? It deals this team’s own completed periods out '
+      + 'again at random ' + FORECAST_TRIALS.toLocaleString() + ' times, and reports how '
+      + 'often each answer came up — so it ', b('forecasts from the pace you actually worked '
+      + 'at'), ' rather than from anybody’s estimate. Nothing is sized and no story points '
+      + 'are involved; it only counts how many things finished.'],
+    ['Read ', b('the answer you can live with being wrong about'), ': 50% is a coin toss, '
+      + '85% is the one worth promising, 95% is what you say when being late is expensive.'],
+    [b('The spread on the chart is the real output'), ' — a wide one means the date is a '
+      + 'guess whichever row you pick, and the fix for that is steadier delivery, not a later '
+      + 'date.'],
+  ] },
+  forecastHowMany: { title: 'Items by a Date', body: [
+    ['How much will be finished by a date you have been given? The same '
+      + FORECAST_TRIALS.toLocaleString() + ' runs, asked the other way round.'],
+    ['Note the answers ', b('count down as you get more confident'), ', where the dates above '
+      + 'count up: a smaller number is the safer promise, so 95% confidence buys you a lower '
+      + 'figure, not a higher one. Every row says “at least” for that reason.'],
+    ['It counts items, not points or value, so it is ', b('only as good as your items being '
+      + 'roughly comparable in size'), ' — which, on a board whose cycle times cluster, they '
+      + 'usually are.'],
+  ] },
+  forecastSamples: { title: 'Whole Periods Behind the Forecast', body: [
+    ['How many completed periods the forecast had to deal from. It is the same set the '
+      + 'completed-per-period and steady delivery tiles read: ', b('whole periods only'),
+      ', because a period that has not finished happening is an incomplete observation rather '
+      + 'than a slow one, and dealing one into a forecast deals a bad week that never '
+      + 'occurred.'],
+    ['Below ' + FORECAST_MIN_PERIODS + ' ', b('the forecast refuses to draw anything at all'),
+      ' — with a handful of observations the answer describes which periods you happen to '
+      + 'hold rather than the team.'],
+    [b('More history is steadier, but not always better'), ': a window stretching back past a '
+      + 'reorganisation forecasts a team that no longer exists.'],
+  ] },
 };
 
 function helpBtn(key, label) {
@@ -9924,6 +9967,22 @@ CHART_TABS.forEach(t => {
   });
 });
 
+/* A help body is an array of paragraphs of runs — see METRIC_HELP. Built with
+   createElement and textContent, never innerHTML, which is what lets a note
+   here quote a reader's own stage name without escaping anything. */
+function renderHelpBody(box, paras) {
+  box.textContent = '';
+  for (const runs of paras) {
+    const para = document.createElement('p');
+    for (const run of runs) {
+      if (typeof run === 'string') { para.appendChild(document.createTextNode(run)); continue; }
+      const strong = document.createElement('strong');
+      strong.textContent = run.b;
+      para.appendChild(strong);
+    }
+    box.appendChild(para);
+  }
+}
 /* ⓘ help + the header dialogs. One delegated listener picks up every [data-help]
    button wherever a render puts it. textContent only — never markup. */
 document.addEventListener('click', e => {
@@ -9932,7 +9991,7 @@ document.addEventListener('click', e => {
   const h = METRIC_HELP[btn.dataset.help];
   if (!h) return;
   $('helpTitle').textContent = h.title;
-  $('helpBody').textContent = h.body;
+  renderHelpBody($('helpBody'), h.body);
   openModal($('helpDialog'));
 });
 $('helpCloseBtn').addEventListener('click', () => $('helpDialog').close());
