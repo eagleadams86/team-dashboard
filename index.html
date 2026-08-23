@@ -9526,6 +9526,7 @@ const MAXI_ICON = {
 
 let maxiCard = null;    /* the card currently filling the window, or null */
 let maxiSlot = null;    /* the hidden placeholder holding its seat in the grid */
+let maxiScrollY = 0;    /* where the page was, to put it back on the way out */
 
 /* Every card that draws something. #cardStageTime is a table and is deliberately
    not one of them: there is nothing in it that a bigger box would show more of,
@@ -9599,6 +9600,22 @@ function openMaxi(card) {
   if (maxiCard) closeMaxi();
   if (!maxiReady(card)) return;
 
+  /* THE PAGE GOES TO THE TOP FIRST, and this is an iOS fix, not tidiness. This
+     overlay starts below the sticky header precisely so the team picker and the
+     rest of the menu stay usable — but `body { overflow: hidden }` below stops
+     the body being a scroll container, and a `position: sticky` header in a
+     container that no longer scrolls goes back to its place in the document
+     flow. Maximise from halfway down a phone screen and the header is then
+     off-screen above, leaving the strip this overlay deliberately kept clear
+     showing page content instead of the menu — which is the whole feature.
+     At scroll 0 the header's natural place IS the top of the viewport, so it
+     stays where the layout assumes. The scroll is put back on the way out.
+     Visible only on a real iOS device — Chromium keeps the header pinned either
+     way — and found in the Simulator on 2026-08-23, while porting this feature
+     to the starter. */
+  maxiScrollY = window.scrollY;
+  window.scrollTo(0, 0);
+
   maxiSlot = document.createElement('div');
   maxiSlot.className = 'chart-slot';
   maxiSlot.hidden = true;
@@ -9633,6 +9650,9 @@ function closeMaxi() {
   ov.classList.remove('open');
   ov.removeAttribute('aria-label');
   document.body.classList.remove('maxi-open');
+  /* After the overflow comes off, or the body is not a scroll container yet and
+     the position is dropped on the floor. */
+  window.scrollTo(0, maxiScrollY);
   document.querySelector('.shell').inert = false;
   if (maxiHeaderWatch) maxiHeaderWatch.disconnect();
   dressMaxiBtn(card);
