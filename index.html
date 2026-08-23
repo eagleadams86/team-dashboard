@@ -6460,7 +6460,8 @@ const valueLabels = {
     const meta = chart.getDatasetMeta(0);
     const ctx = chart.ctx;
     ctx.save();
-    ctx.font = '600 10px ' + token('--font-sans');
+    const fs = fsPx('xs');
+    ctx.font = '600 ' + fs + 'px ' + token('--font-sans');
     ctx.fillStyle = opts.color;
     ctx.textAlign = 'center';
     meta.data.forEach((pt, i) => {
@@ -6469,7 +6470,10 @@ const valueLabels = {
       const prev = ds.data[i - 1], next = ds.data[i + 1];
       const isTrough = (prev == null || prev > v) && (next == null || next > v);
       ctx.textBaseline = isTrough ? 'top' : 'bottom';
-      ctx.fillText(opts.format(v), pt.x, pt.y + (isTrough ? 7 : -7));
+      /* The gap from the point scales with the label, same reasoning as the
+         chip above: 7 against a 10px label is 0.7 of it. */
+      const off = Math.round(fs * 0.7);
+      ctx.fillText(opts.format(v), pt.x, pt.y + (isTrough ? off : -off));
     });
     ctx.restore();
   }
@@ -6520,9 +6524,15 @@ const refLabels = {
     const lines = opts && opts.lines;
     if (!lines || !lines.length) return;
     const ctx = chart.ctx, area = chart.chartArea, y = chart.scales.y;
-    const PAD = 5, CHIP = 15, GAP = 2;
+    /* CHIP is derived from the font rather than fixed, so the box keeps holding
+       the words when the reader's text size moves. It was a flat 15 against a
+       hard-coded 10px label — the same 1.5x this expresses — and a chip that
+       stayed 15 while the text grew would put descenders through its own edge,
+       which is the one thing the chip exists to stop the dashes doing. */
+    const FS = fsPx('xs');
+    const PAD = 5, CHIP = Math.round(FS * 1.5), GAP = 2;
     ctx.save();
-    ctx.font = '600 10px ' + token('--font-sans');
+    ctx.font = '600 ' + FS + 'px ' + token('--font-sans');
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     const surface = token('--surface');

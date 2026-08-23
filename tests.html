@@ -298,7 +298,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 1666;
+const EXPECTED = 1676;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -4114,6 +4114,41 @@ group('ARTs — the grouping, and the boundary it crosses');
      && !/rgba?\(/.test(printBlock),
      'and the print block names no colour at all — that half is done by swapping theme',
      printBlock);
+
+  /* ────────────────────────────────────────────────────────── */
+  group('nothing painted on a canvas sits under the pack\u2019s floor');
+
+  /* A canvas inherits nothing: every size in a Chart.js config, and every
+     ctx.font string, is a raw number of pixels — which is the one thing the rem
+     ramp exists to keep out of the page. The axis ticks and legends were already
+     going through fsPx(); two hand-drawn label plugins were not, and both were
+     hard-coded at 10px. tokens.json puts minSizePx at 12, so they were under the
+     pack's own hard floor, and deaf to a reader who has raised their browser's
+     default text size. */
+  const CANVAS_SRC = await (await bustFetch('index.html')).text();
+  const fonts = CANVAS_SRC.match(/ctx\.font\s*=\s*[^;]+;/g) || [];
+  ok(fonts.length >= 2, 'the two label plugins still draw their own text', fonts.join(' | '));
+  fonts.forEach(f => ok(!/\b\d+px\b/.test(f),
+    'no hard-coded pixel size in: ' + f.trim()));
+  fonts.forEach(f => ok(/fsPx\(|\bfs\b|\bFS\b/.test(f),
+    'comes off the ramp: ' + f.trim()));
+
+  /* The boxes those labels sit in have to scale with them, or the words grow
+     through their own edges — which is the one thing the chip exists to stop the
+     dashed reference lines doing. */
+  ok(/const FS = fsPx\('xs'\)/.test(CANVAS_SRC), 'the chip reads the step once');
+  ok(/CHIP = Math\.round\(FS \* 1\.5\)/.test(CANVAS_SRC),
+     'and derives its height from it, rather than the flat 15 that matched a 10px label');
+  ok(!/CHIP = \d+/.test(CANVAS_SRC), 'and no fixed chip height has come back');
+
+  /* Measured, not just read: the value the app would actually paint with. */
+  ok(win.fsPx('xs') >= 12,
+     'fsPx(xs) is ' + win.fsPx('xs') + 'px, and the pack\u2019s hard floor is 12');
+  is(Math.round(win.fsPx('xs')),
+     Math.round(parseFloat(win.getComputedStyle(win.document.documentElement)
+       .getPropertyValue('--fs-xs')) * parseFloat(win.getComputedStyle(
+       win.document.documentElement).fontSize)),
+     'and it tracks the live root size, which is what rem bought and px could not');
 
   /* ────────────────────────────────────────────────────────── */
   group('the custom window on screen — two boxes that appear with the option');
