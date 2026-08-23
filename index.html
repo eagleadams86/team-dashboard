@@ -181,7 +181,17 @@
    defaults — equal specificity, so the later rule winning is load-bearing. */
 :root { color-scheme: dark;   /* midnight, the default */
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
-  --chrome-h: 30px; }
+  --chrome-h: 30px;
+  /* ONE number, read by BOTH .wrap/.shell and .headbar. They have to be the same
+     or the brand stops lining up with the left edge of the first card — which is
+     exactly why it is a token and not two literals, and it WAS two literals here
+     until 2026-08-23. Every other app in the family already had the token; these
+     two wrote 1500px twice each.
+     THERE ARE TWO WIDTHS IN THE FAMILY AND ONLY TWO: 1500px here, Flow Metrics,
+     Golf Handicap and both lottery pages; 2400px ultra-wide for Money Map,
+     PAPTrack and the dashboard. A new app picks one, and does not invent a third. */
+  --page-w: 1500px;
+}
 [data-theme="dark"]  { color-scheme: dark; }
 [data-theme="light"] { color-scheme: light;
   --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04); }
@@ -210,7 +220,7 @@ p { margin: 0; }
 code { font-family: var(--font-mono); font-size: var(--fs-xs); }
 button, select, input, textarea { font: inherit; color: inherit; }
 
-.shell { max-width: 1500px; margin: 0 auto; padding: 0 16px 64px; }
+.shell { max-width: var(--page-w); margin: 0 auto; padding: 0 16px 64px; }
 
 /* Boot, before the script at the foot of the page has filled anything in. See
    the reasoning in the <head> script that sets the flag. */
@@ -222,7 +232,7 @@ html[data-booting] .shell { visibility: hidden; }
    a min-width and a placeholder option for that reason. */
 header { position: sticky; top: 0; z-index: 20; background: var(--surface);
   border-bottom: 1px solid var(--border); padding: 10px 0; margin-bottom: 20px; }
-.headbar { max-width: 1500px; margin: 0 auto; padding: 0 16px;
+.headbar { max-width: var(--page-w); margin: 0 auto; padding: 0 16px;
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 /* The auto right margin is what pushes the control cluster to the right edge; it
    moved back onto .brand on 2026-08-20, when the .applink left the header for the
