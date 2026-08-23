@@ -289,7 +289,8 @@ function near(actual, expected, name, eps) {
 function ok(cond, name, msg) { record(!!cond, name, msg); }
 /* The floor the run is measured against — see the check at the foot of run().
    1655 checks as of 2026-08-22 (typed stage times took 1623 to 1636; telling the target
-   and the ageing threshold apart took it to 1643; the dialog grid sweep to 1655).
+   and the ageing threshold apart took it to 1643; the dialog grid sweep to 1655); Find
+   took it to 1721 on 2026-08-23.
 
    Deliberately LOOSER than the eight sibling suites, which pin their floor at
    the exact number they register. They count TESTS, and registration there is
@@ -298,7 +299,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 1676;
+const EXPECTED = 1710;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -745,6 +746,115 @@ async function run(TD, win) {
      plant. The ROUTE (matching is exact, on aliases that already exist, and the
      matched heading is discarded) is what makes the storage claim true.
      ══════════════════════════════════════════════════════════ */
+  group('searchApp — what Find reaches');
+
+  /* Pure over the state it is handed, so this fixture IS the app as far as
+     these go: nothing here touches the live state, the dialog or the view.
+     Dates are Date objects because that is what hydrateRows leaves on a row. */
+  const S_STATE = {
+    arts: [{ id: 'a1', name: 'Delivery ART' }],
+    stages: [{ id: 'g1', name: 'Review', match: ['Ready for Code Review', 'Code Review'] },
+             { id: 'g2', name: 'Build', match: [] }],
+    teams: [
+      { id: 't1', name: 'Kestrel', artId: 'a1', rows: [
+        { key: 'DAE-1', type: 'Story', completed: D(2026, 1, 10), started: D(2026, 1, 2), created: null },
+        { key: 'DAE-2', type: 'Bug', completed: D(2026, 3, 4), started: D(2026, 3, 1), created: null },
+        { key: '', type: 'Bug', completed: null, started: D(2026, 4, 1), created: null },
+      ] },
+      { id: 't2', name: 'Otter', rows: [
+        { key: 'OTT-9', type: 'Story', completed: D(2026, 2, 20), started: null, created: null },
+      ] },
+    ],
+  };
+  const sFind = (q, st) => win.tdSearch.searchApp(st === undefined ? S_STATE : st, q);
+  const sWhere = (q, st) => sFind(q, st).hits.map(h => h.where);
+
+  is(sFind('D').hits, [], 'one character finds nothing — it would match half the app');
+  is(sFind('').hits, [], 'and neither does an empty box');
+  is(sFind('   ').hits, [], 'nor does whitespace');
+  is(sFind(null).hits, [], 'nor does junk');
+  ok(sFind('Ke').hits.length > 0, 'two characters is the minimum, and it works');
+
+  is(sWhere('kestrel')[0], 'Kestrel — team',
+     'a team comes before its own items — it is what the picker would have found');
+  is(sWhere('KESTREL')[0], 'Kestrel — team', 'matching ignores case');
+  is(sFind('kestrel').hits[0].snippet, 'on Delivery ART', 'a team hit names its train');
+  is(sFind('otter').hits[0].snippet, '', 'and a team on no train says nothing rather than guessing');
+  is(sFind('kestrel').hits[0].view, 'dashboard', 'a team hit lands on the dashboard');
+
+  is(sWhere('delivery'), ['Delivery ART — ART'], 'an ART is found by name');
+  is(sFind('delivery').hits[0].snippet, '1 team',
+     'and counts the teams on it — singular at one, because a count that reads as '
+     + 'a typo is a count nobody trusts');
+  is(sFind('delivery').hits[0].view, 'allteams', 'an ART hit lands on All Teams');
+  is(sFind('delivery').hits[0].artId, 'a1', 'carrying the filter it is about to set');
+
+  is(sWhere('review'), ['Review — workflow stage'], 'a stage is found by its own name');
+  is(sWhere('code review'), ['Review — workflow stage'],
+     'and by an ALIAS — which is typed once in a dialog and then never shown again');
+  is(sFind('code review').hits[0].snippet, 'matches Ready for Code Review, Code Review',
+     'the aliases are the answer to the question that brought you here');
+  is(sFind('build').hits[0].snippet, 'no aliases yet',
+     'a stage matching nothing says so — that IS the finding');
+  is(sFind('code review').hits[0].view, 'stage', 'a stage hit opens Teams & Stages');
+
+  is(sWhere('DAE-1'), ['DAE-1 — Kestrel'], 'an item is found by its issue key');
+  is(sWhere('dae-1'), ['DAE-1 — Kestrel'], 'and the key search is case-insensitive too');
+  is(sFind('DAE-1').hits[0].view, 'data', 'an item hit lands on Your Data');
+  is(sFind('DAE-1').hits[0].teamId, 't1', 'with the team that holds it');
+  is(sFind('DAE-1').hits[0].index, 0, 'and the index openItemDialog takes');
+  is(sFind('OTT-9').hits[0].index, 0,
+     'the index is into ITS OWN team’s rows, not into a flattened list of every team’s');
+  is(sFind('DAE-2').hits[0].snippet, 'Bug · 2026-03-04',
+     'the snippet is the work type and when it finished');
+  is(sFind('DAE-1').hits[0].snippet, 'Story · 2026-01-10');
+
+  is(sWhere('bug'), ['Bug — Kestrel', 'DAE-2 — Kestrel'],
+     'a work type reaches its items, and a keyless row falls back to its type');
+  is(sFind('bug').hits[0].snippet, 'in progress',
+     'an unfinished item says so rather than showing a blank where a date goes, and it '
+     + 'sorts on the date it HAS — started, here, which is later than DAE-2 finishing');
+  is(sWhere('story'), ['OTT-9 — Otter', 'DAE-1 — Kestrel'],
+     'newest first across every team, not team by team');
+
+  const CAP = win.tdSearch.SEARCH_CAP;
+  const manyRows = [];
+  for (let i = 0; i < CAP + 5; i++) manyRows.push({ key: '', type: 'Chore', completed: null });
+  const capped = sFind('chore', { teams: [{ id: 'x', name: 'Big', rows: manyRows }], arts: [], stages: [] });
+  is(capped.hits.length, CAP, 'the cap holds');
+  is(capped.more, 5, 'and what it dropped is counted, so the cap is never silent');
+
+  is(sFind('ke', {}).hits, [], 'an empty state never throws');
+  is(sFind('ke', { teams: 'nope', arts: 42, stages: null }).hits, [],
+     'and neither does a state whose lists are not lists');
+  is(sFind('ke', { teams: [{ id: 'z', name: 'Kestrel', rows: 'nope' }], arts: [], stages: [] })
+       .hits.map(h => h.where), ['Kestrel — team'],
+     'a team whose rows are not a list still finds the team');
+
+  Object.keys(win.tdSearch.SEARCH_VIEW_LABEL).forEach((v) => {
+    ok(v === 'stage' || !!win.document.getElementById('tab-' + v),
+       'SEARCH_VIEW_LABEL names "' + v + '", which must be a real tab (or the stage dialog)');
+  });
+  win.tdVisibleTabs().forEach((v) => {
+    ok(!!win.tdSearch.SEARCH_VIEW_LABEL[v],
+       'the tab "' + v + '" has no label for the Find list');
+  });
+
+  /* The button itself: the family's ⌕, aria-hidden like every other glyph in
+     that row, and a title that says which keys open it. Its POSITION in the row
+     is pinned by the header-order sweep further down. */
+  const findBtn = win.document.getElementById('findBtn');
+  ok(!!findBtn, 'the header carries a Find button');
+  is(findBtn.querySelector('[aria-hidden="true"]').textContent, '\u2315',
+     'wearing the family\u2019s find glyph, hidden from a screen reader');
+  ok(/\u2318K/.test(findBtn.title) && /Ctrl\+K/.test(findBtn.title),
+     'and saying which keys open it, since nothing on screen otherwise does');
+  ok(!!win.document.getElementById('searchDialog'), 'and the window it opens exists');
+  is(win.document.getElementById('searchCount').getAttribute('role'), 'status',
+     'the COUNT is the live region, not the results list — a screen reader hears '
+     + '"12 results" per keystroke rather than the whole list re-read');
+
+  /* ────────────────────────────────────────────────────────── */
   group('workflow stages — the day count guard');
 
   const SD = TD.cleanStageDays;
@@ -4282,7 +4392,7 @@ group('ARTs — the grouping, and the boundary it crosses');
      is the invariant — a new control added in the middle is exactly the change
      that should have to come back and say where it goes. */
   is([...sBtn.parentElement.children].filter(e => e.id).map(e => e.id),
-     ['teamSel', 'manageBtn', 'settingsBtn', 'dataBtn', 'shareBtn', 'themeSel'],
+     ['findBtn', 'teamSel', 'manageBtn', 'settingsBtn', 'dataBtn', 'shareBtn', 'themeSel'],
      'in the family\u2019s header order, with the theme picker last of all');
   /* The glyph is Money Map's own for this action, and aria-hidden like every
      other one in this row: the word beside it is already the whole label. */
@@ -4320,8 +4430,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   ok(!sDlg.open, 'Done closes it');
   /* Every dialog in this app closes on a backdrop click. This one is in the
      list; the sync dialog that used to be the exception went with sync. */
-  ok(/'itemDialog',\s*\n?\s*'settingsDialog'\]/.test(APP_SRC)
-     || /'settingsDialog'/.test((APP_SRC.match(/closeOnBackdropClick[\s\S]{0,400}/) || [''])[0]),
+  ok(/'itemDialog',\s*\n?\s*'settingsDialog', 'searchDialog'\]/.test(APP_SRC),
      'and on a click outside it, like every other dialog here');
 
   /* A visitor to a shared link cannot change somebody else's settings, so the

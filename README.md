@@ -1545,6 +1545,37 @@ A few details:
 - On a phone it is worth more, not less: the header takes two or three rows and the chart gets
   everything under it, which is roughly twice the height a card gives it.
 
+## Find (⌘K)
+
+**⌕ Find** in the header — or **⌘K** / **Ctrl-K** from anywhere — opens a search box over
+everything the app holds. Type two characters, and clicking a result takes you to it.
+
+It's the same window, in the same place, with the same shortcut as
+[Money Map's](https://github.com/eagleadams86/financial-plan) and
+[Sprint Predictability's](https://github.com/eagleadams86/sprint-velocity) — one habit
+across the family rather than three.
+
+What it reaches:
+
+- **A work item by its issue key.** `DAE-1023` finds it whichever team holds it, and the
+  result opens straight into that item's editor. Until now the only way back to one item was
+  to know its team, open that team's *Your Data* tab and read down the table.
+- **A work item by its type** — every `Bug`, newest first, across every team.
+- **A workflow stage, by its name or by any of its
+  [aliases](#where-the-time-goes-time-in-stage).** The aliases are typed once in a dialog and
+  then never shown again, and they are the usual answer to *"why is nothing landing in
+  Review?"* — so the result lists them.
+- **A team, or an ART**, when the picker has more of them than you can scan.
+
+Results are capped at 80, and the list says how many more matched so the cap is never
+silent. A shared read-only link searches only teams and trains, because the item editor and
+the stages window aren't there.
+
+**Find stores nothing and reads nothing new.** A team name, a stage name, an alias, a work
+type and a key-shaped issue key are the only words this app keeps at all — see
+[What Isn't Here, and Why](#what-isnt-here-and-why) — and Find can only reach what those
+boundaries already let in.
+
 ## Taking a Table off the Page
 
 All three tables of figures — **All Teams**, the **Loaded Data** list on Your Data, and

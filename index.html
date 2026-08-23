@@ -1053,6 +1053,33 @@ dialog { background: var(--surface); color: var(--text-primary);
    Asked for on 2026-08-22, alongside the share windows — these were all 560px,
    so the same dialog opened narrower here than in the app beside it. */
 #dataDialog { max-width: 700px; }
+/* ── Find ───────────────────────────────────────────────────────────────────
+   Money Map's Find window, ported here and to Sprint Predictability on
+   2026-08-23 so ⌘K reaches the same thing in whichever app is open. Its own
+   width and a narrow one: what it holds is a text box and a column of short
+   lines, and at any of the widths above it was the widest thing on screen for
+   the least content in it. */
+#searchDialog { max-width: 360px; }
+/* `max-width` rather than a flat width so it still shrinks with the dialog on
+   a phone. */
+#searchBox { width: 320px; max-width: 100%; margin-top: 4px; }
+.searchresults { max-height: 50vh; overflow-y: auto; margin-top: 10px; }
+/* A hit is a full-width button so the keyboard reaches it — Tab walks the list,
+   Enter opens. Left-aligned prose, not button chrome. */
+.searchresults .hit { display: block; width: 100%; text-align: left;
+  background: none; border: none; border-bottom: 1px solid var(--border);
+  padding: 8px 10px; cursor: pointer; color: var(--text-primary);
+  font-size: var(--fs-xs); border-radius: 0; }
+.searchresults .hit:hover, .searchresults .hit:focus-visible {
+  background: var(--accent-bg); }
+.searchresults .hitwhere { font-weight: 600; display: block; }
+/* --text-secondary, not the hint colour: this line sits on --accent-bg when the
+   hit is hovered or focused, and the quieter grey fails AA there. */
+.searchresults .hitsnip { display: block; color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.searchresults .hittab { display: block; font-size: var(--fs-sm);
+  color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em;
+  margin-top: 2px; }
 #manageDialog { max-width: 1100px; }
 /* The same width as the window above, because it is laid out as that window's
    twin — one section per thing you set, the Add button in its heading row. It
@@ -1259,6 +1286,10 @@ main:focus { outline: none; }
          time. Bump it on both references whenever make_favicon.py is re-run. -->
     <h1 class="brand"><img src="favicon.ico?v=1" width="22" height="22" alt=""
       >Flow&nbsp;Metrics <span>· Charlie’s Epic Flow Clinic</span></h1>
+    <!-- Find is "everything else" in the family's header order below, so it sits
+         to the LEFT of the record picker, at the end of the row that grows into
+         space rather than shoving the furniture sideways. -->
+    <button class="btn small" id="findBtn" type="button" title="Search your teams, trains, workflow stages and work items by key (⌘K / Ctrl+K)"><span aria-hidden="true">⌕</span> Find</button>
     <label class="sr-only" for="teamSel">Team</label>
     <select id="teamSel" title="Which team you're looking at"><option>—</option></select>
     <!-- "Teams & Stages", not "Teams", and the sibling app is why: its button has
@@ -1929,6 +1960,21 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
      reasonable instinct — most people support one train — but the sibling shows
      its three sections flat, the two dialogs are read side by side, and a
      section somebody has to open is a section they have to find first. -->
+<!-- ── Find ──────────────────────────────────────────────────────────────── -->
+<dialog id="searchDialog" aria-labelledby="searchDialogTitle">
+  <h3 id="searchDialogTitle">Find</h3>
+  <p class="hint">Your teams, the trains they are on, your workflow stages and the aliases
+    they match — and any work item, by its issue key or its type. An item opens straight
+    into its editor.</p>
+  <label class="sr-only" for="searchBox">Search</label>
+  <input type="text" id="searchBox" autocomplete="off" spellcheck="false"
+    placeholder="At least two characters…">
+  <!-- The COUNT is the live region, not the list: a screen reader hears
+       "12 results" per keystroke rather than the whole list re-read. -->
+  <span id="searchCount" class="sr-only" role="status"></span>
+  <div id="searchResults" class="searchresults"></div>
+</dialog>
+
 <dialog id="manageDialog" aria-labelledby="manageDialogTitle">
   <h2 id="manageDialogTitle">Teams, ARTs &amp; Stages</h2>
 
@@ -9890,8 +9936,171 @@ function closeOnBackdropClick(dlg) {
    copy of your data to keep had to be a choice — and it went with sync on
    2026-08-20, so the rule is now simply "every dialog". */
 ['dataDialog', 'clearDialog', 'helpDialog', 'manageDialog', 'multiDialog', 'itemDialog',
- 'settingsDialog']
+ 'settingsDialog', 'searchDialog']
   .forEach(id => closeOnBackdropClick($(id)));
+
+/* ── Find ───────────────────────────────────────────────────────────────────
+   Money Map's Find window, ported here and to the sibling app on 2026-08-23 so
+   ⌘K reaches the same thing in whichever of the three is open.
+
+   What it adds HERE that no control already does: **an item by its key**. The
+   issue key was allowed in on 2026-08-20 because it is structurally checkable
+   (see cleanIssueKey), and it is the one thing on a row that a person actually
+   remembers — but until now the only way back to DAE-1023 was to know which
+   team held it, open that team's data tab and read down a table. It also reaches
+   the stage ALIASES, which are typed once in a dialog and then never shown
+   again, and are the usual answer to "why is nothing landing in Review".
+
+   Pure over the state it is handed, so the matching is pinned by tests and the
+   dialog renders whatever this returns — the same arrangement as `searchPlan`
+   in Money Map and `searchApp` in Sprint Predictability, down to the
+   two-character minimum (one character matches half the app) and the hard cap,
+   counted so the cap is never silent.
+
+   NOTHING SEARCHED HERE IS FREE TEXT, and that is not an accident: a team name,
+   a stage name, an alias, a ≤40-char work type and a key-shaped key are the only
+   words this app stores at all (see the whitelists at hydrateRows /
+   sanitizeTeams). Find can only ever reach what those boundaries already let in
+   — it adds no field and stores nothing. */
+const SEARCH_CAP = 80;
+const SEARCH_VIEW_LABEL = { dashboard: 'Dashboard', allteams: 'All Teams',
+  data: 'Your Data', stage: 'Teams & Stages' };
+function searchApp(st, query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (q.length < 2) return { hits: [], more: 0 };
+  const hits = [];
+  let dropped = 0;
+  const has = (t) => t && String(t).toLowerCase().includes(q);
+  const push = (r) => { if (hits.length < SEARCH_CAP) hits.push(r); else dropped++; };
+  const teams  = Array.isArray(st.teams)  ? st.teams  : [];
+  const arts   = Array.isArray(st.arts)   ? st.arts   : [];
+  const stages = Array.isArray(st.stages) ? st.stages : [];
+  const artName = (id) => (arts.find(a => a.id === id) || {}).name || '';
+
+  /* Teams and trains first: they are what the picker above would have found, so
+     a reader who typed a team's name wants the team before forty of its items. */
+  for (const t of teams)
+    if (has(t.name))
+      push({ view: 'dashboard', teamId: t.id, where: t.name + ' — team',
+             snippet: t.artId ? 'on ' + artName(t.artId) : '' });
+  for (const a of arts)
+    if (has(a.name)) {
+      const n = teams.filter(t => t.artId === a.id).length;
+      push({ view: 'allteams', artId: a.id, where: a.name + ' — ART',
+             snippet: n + ' team' + (n === 1 ? '' : 's') });
+    }
+  /* A stage matches on its name OR on any alias, and the snippet is the alias
+     list — which is the answer to the question that brought you here. */
+  for (const stg of stages) {
+    const aliases = Array.isArray(stg.match) ? stg.match : [];
+    if (!has(stg.name) && !aliases.some(has)) continue;
+    push({ view: 'stage', stageId: stg.id, where: stg.name + ' — workflow stage',
+           snippet: aliases.length ? 'matches ' + aliases.join(', ') : 'no aliases yet' });
+  }
+  /* Items across every team, newest first — a key is unique, so the usual search
+     returns one row, and a work type returns however many there are. The INDEX
+     into its own team's rows travels with the hit, because that is what
+     openItemDialog takes; it is read back against the same team it was found in,
+     so a render that renumbers another team's rows cannot move it. */
+  const found = [];
+  for (const t of teams)
+    (Array.isArray(t.rows) ? t.rows : []).forEach((r, i) => {
+      if (!has(r.key) && !has(r.type)) return;
+      found.push({ team: t, row: r, index: i });
+    });
+  const when = (r) => r.completed || r.started || r.created || null;
+  found.sort((a, b) => (when(b.row) || 0) - (when(a.row) || 0));
+  for (const f of found) {
+    /* The SORT reads whichever date the row has; the snippet reads the completion
+       date and nothing else. An in-progress row shown as its start date reads as
+       a row that finished that day, which is the one thing this line must not
+       say — so it says "in progress", the same words the data table uses. */
+    push({ view: 'data', teamId: f.team.id, index: f.index,
+           where: (f.row.key || f.row.type || 'Item') + ' — ' + f.team.name,
+           snippet: [f.row.key ? f.row.type : '',
+                     f.row.completed ? isoOf(f.row.completed) : 'in progress']
+             .filter(Boolean).join(' · ') });
+  }
+  return { hits, more: dropped };
+}
+
+let searchHits = [];
+function renderSearchResults() {
+  const box = $('searchBox'), out = $('searchResults');
+  const all = searchApp(state, box.value);
+  /* The fence for a shared view, applied HERE rather than only at navigation:
+     a visitor has no data tab and no manage dialog, so an item or a stage hit
+     would be a row that looks clickable and silently does nothing. Filtered
+     hits don't count against the cap and don't inflate `more`. */
+  const hits = viewOnly ? all.hits.filter(h => h.view === 'dashboard' || h.view === 'allteams')
+    : all.hits;
+  const more = all.more;
+  searchHits = hits;
+  /* Announced through the count span (role="status") — the toast pattern's
+     quiet cousin. The list itself stays out of the live region. */
+  const count = $('searchCount');
+  if (count) count.textContent = box.value.trim().length < 2 ? ''
+    : hits.length ? hits.length + (more ? ' of ' + (hits.length + more) : '')
+        + ' result' + (hits.length === 1 && !more ? '' : 's')
+    : 'Nothing matches';
+  out.innerHTML = hits.length
+    ? hits.map((h, i) => '<button type="button" class="hit" data-hit="' + i + '">'
+        + '<span class="hitwhere">' + escapeHtml(h.where) + '</span>'
+        + (h.snippet ? '<span class="hitsnip">' + escapeHtml(String(h.snippet).slice(0, 120)) + '</span>' : '')
+        + '<span class="hittab">' + escapeHtml(SEARCH_VIEW_LABEL[h.view] || h.view)
+        + '</span></button>').join('')
+      + (more ? '<p class="hint" style="padding:8px 10px">…and ' + more
+          + ' more — narrow the search.</p>' : '')
+    : box.value.trim().length >= 2
+      ? '<p class="hint" style="padding:8px 10px">Nothing matches.</p>'
+      : '<p class="hint" style="padding:8px 10px">Type at least two characters.</p>';
+}
+function goToSearchHit(h) {
+  $('searchDialog').close();
+  if (h.view === 'stage') { openModal($('manageDialog')); return; }
+  if (h.teamId && state.teams.some(t => t.id === h.teamId)) {
+    view.activeTeamId = h.teamId;
+    saveView();
+  }
+  if (h.artId) { view.artFilter = h.artId; saveView(); }
+  /* renderAll() BEFORE the tab switch, so the team picker, the tables and the
+     charts are the ones this hit asked for by the time the panel is revealed. */
+  renderAll();
+  selectTab(h.view);
+  /* An item hit opens straight into its editor — the row found is the row on
+     screen. The index is into the team just switched to, which is why the team
+     is set first. */
+  if (h.view === 'data' && typeof h.index === 'number') openItemDialog(h.index);
+}
+$('findBtn').addEventListener('click', () => {
+  const dlg = $('searchDialog');
+  /* Through openModal like every other dialog — and the focus() below then
+     takes it back, on a phone as much as anywhere. Typing IS the reason this
+     window opens, so it is the one place the keyboard should arrive with it. */
+  openModal(dlg);
+  $('searchBox').value = '';
+  renderSearchResults();
+  $('searchBox').focus();
+});
+$('searchBox').addEventListener('input', renderSearchResults);
+$('searchResults').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-hit]');
+  if (btn && searchHits[+btn.dataset.hit]) goToSearchHit(searchHits[+btn.dataset.hit]);
+});
+document.addEventListener('keydown', (e) => {
+  if ((e.key !== 'k' && e.key !== 'K') || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey)
+    return;
+  /* Never over the top of another window, and a second press closes it. */
+  const open = document.querySelector('dialog[open]');
+  if (open && open.id !== 'searchDialog') return;
+  e.preventDefault();
+  if (open) open.close();
+  else $('findBtn').click();
+});
+/* Dev hook for tests.html, which loads this page in a same-origin iframe: the
+   function declaration above is already reachable as a window property, this is
+   for the two consts beside it. Nothing in the app reads it. */
+window.tdSearch = { searchApp, SEARCH_CAP, SEARCH_VIEW_LABEL };
 
 /* theme. AUTO is the default: never having chosen, or an unrecognised saved id,
    both land there, so a first run follows the reader's system. Midnight is still the
@@ -11761,6 +11970,7 @@ async function openSharedView() {
 function renderShareError(reason) {
   document.querySelector('.tabs').hidden = true;
   $('teamSel').hidden = true;
+  $('findBtn').hidden = true;   // nothing loaded to search
   $('panel-dashboard').innerHTML = reason === 'newer'
     ? '<div class="card empty">' +
       '<h2>This Link Was Made by a Newer Version</h2>' +
