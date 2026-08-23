@@ -278,6 +278,26 @@ header { position: sticky; top: 0; z-index: 20; background: var(--surface);
   border: 1px solid var(--border-control); border-radius: var(--radius-sm);
   padding: 4px 9px; font-size: var(--fs-xs); cursor: pointer; min-height: var(--chrome-h); }
 #teamSel:hover, #themeSel:hover { border-color: var(--text-muted); }
+/* ── The header row on TOUCH ─────────────────────────────────────────────────
+   theme.css puts every <select> at 16px on a coarse pointer (pack rule 10, the
+   iOS focus-zoom floor) and rightly leaves <button> alone — a button raises no
+   keyboard, so it has no zoom to avoid. What that left, in every app in the
+   family at once, is a header row whose PICKERS carry a label a size bigger than
+   the buttons beside them, and stand a pixel taller with it. The rule is right;
+   the apps never answered it.
+
+   So on touch the row's buttons take the same 16px, and the height everything in
+   the row is pinned to grows 30px → 34px, which is exactly what 16px text
+   measures in the 4px/9px box the row already uses (24px line + 8px padding +
+   2px border). Mouse sizes are untouched, which is where the chrome height
+   actually reads — pack rule 10 says so in as many words.
+
+   The cost is stated rather than hidden: this sticky header on a 375px phone
+   goes from 132px to 139px. Fixed in all six apps on 2026-08-23. */
+@media (pointer: coarse) {
+  :root { --chrome-h: 34px; }
+  .btn.small { font-size: var(--fs-base); }
+}
 #teamSel { min-width: 140px; }
 /* Set by the boot script in <head> when nothing is saved yet, so a first run
    never paints a team picker it is about to hide. renderEmptyState() clears the
