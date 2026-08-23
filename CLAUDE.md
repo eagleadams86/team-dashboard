@@ -723,6 +723,32 @@ TD's don't? they are all just kinda black and gray."
 - Pinned across all four themes by the assertion that names the bug — a data series is never
   `--text-primary` — plus a source check, and a rule check on `.spark`.
 
+## A Tile Row Never Strands a Tile (2026-08-23) — family-wide
+
+**A `.tiles.group` row fills ONE line when the line has room for every tile, and splits into
+EQUAL rows when it does not.** Money Map hit this first — six net-worth tiles came out five
+across with the sixth alone underneath — and every app in the family with a variable-count tile
+row now answers it the same way. Here it was Flow's five tiles at four across: four figures and
+then one, reading as an afterthought rather than as the fifth answer.
+
+- **The COUNT comes from `:has(> :nth-child(N):last-child)`** — "exactly N children". The panels
+  differ by design: five tiles on Flow, four on Delivery, three on Health and Forecast.
+- **The WIDTH comes from a CONTAINER query, never the viewport.** `:has(> .tiles.group)` makes
+  the chart panel the named container `tiles`, so the row is measured as it actually sits, card
+  padding already off. Where no container is found the row keeps the plain auto-fit line.
+- **The thresholds are the 200px minimum tile and the 12px gap multiplied out**: 2→412, 3→624,
+  4→836, 5→1048, 6→1260, 7→1472, 8→1684. Narrowest first, so the widest rule that matches wins.
+  tests.html reads those two numbers back out of the CSS and checks every threshold against
+  them, so raising the minimum tile fails the suite rather than quietly making a row too tight.
+- **Only counts that leave rows differing by at most one tile are offered, and never a row
+  holding a single tile.** Five go 5, or 3 + 2, or one per line — never 2 + 2 + 1. Seven go 7 or
+  4 + 3. Where the only alternative would strand one tile the row drops to a single column.
+- **THE FOUR DASHBOARD TILES ARE THE DELIBERATE EXCEPTION AND STAY ONE.** `.tiles` without
+  `.group` is always exactly four, one per dimension; spelled-out columns and its two media
+  queries are already gap-free at every width, and a test asserts nothing counts children on
+  plain `.tiles`. Sprint Predictability has the same block against its own `.tiles`, with a
+  160px floor — the counts there vary, which is the whole difference.
+
 ## One Surface for the Whole Page (2026-08-21) — a divergence from the sibling
 
 `.tile` moved from `--surface-alt` to `--surface`, the ground the chart cards and the tables are

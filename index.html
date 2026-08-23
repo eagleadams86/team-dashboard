@@ -562,10 +562,75 @@ select { cursor: pointer; }
    vary in count, so auto-fit is still right there. */
 @media (max-width: 720px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 400px) { .tiles { grid-template-columns: 1fr; } }
-/* A tile row inside a chart group. Here the count DOES vary by group, so this is
-   the auto-fit case the rule above excludes, and it spans both chart columns. */
+/* A tile row inside a chart group. Here the count DOES vary by group — five on
+   Flow, four on Delivery, three on Health and Forecast — so this is the auto-fit
+   case the rule above excludes, and it spans both chart columns. */
 .tiles.group { grid-column: 1 / -1; margin-bottom: 4px;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+/* AND A VARYING COUNT IS EXACTLY WHERE AUTO-FIT STRANDS A TILE. The family rule
+   (2026-08-23, Money Map first, then Sprint Predictability): a tile row fills
+   ONE line when the line has room for every tile, and splits into EQUAL rows
+   when it does not — never a full row with a lone tile under it. Flow's five
+   tiles at four across was that: four figures and then one, reading as an
+   afterthought rather than as the fifth answer.
+
+   The COUNT comes from `:has(> :nth-child(N):last-child)`, which is "exactly N
+   children"; the WIDTH from a CONTAINER query, so the row answers the panel it
+   is actually in rather than the viewport. That is also why the four dashboard
+   tiles above keep their spelled-out rule and their media queries: that row is
+   always exactly four, and four is already gap-free at every width.
+
+   The thresholds are the 200px minimum tile and the 12px gap multiplied out:
+   2→412, 3→624, 4→836, 5→1048, 6→1260, 7→1472, 8→1684. Narrowest first, so the
+   widest rule that matches wins. Only counts that leave rows differing by at
+   most one tile are offered, and never a row holding a single tile: five go 5,
+   3 + 2, or one per line, never 2 + 2 + 1. tests.html reads the 200 and the 12
+   back out of this file and checks every threshold against them, so raising the
+   minimum tile fails the suite instead of quietly making a row too tight. */
+@container tiles (min-width: 412px) {
+  .tiles.group:has(> :nth-child(3):last-child),
+  .tiles.group:has(> :nth-child(5):last-child),
+  .tiles.group:has(> :nth-child(7):last-child) {
+    grid-template-columns: minmax(0, 1fr); }
+  .tiles.group:has(> :nth-child(4):last-child),
+  .tiles.group:has(> :nth-child(6):last-child),
+  .tiles.group:has(> :nth-child(8):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container tiles (min-width: 624px) {
+  .tiles.group:has(> :nth-child(3):last-child),
+  .tiles.group:has(> :nth-child(5):last-child),
+  .tiles.group:has(> :nth-child(6):last-child),
+  .tiles.group:has(> :nth-child(8):last-child) {
+    grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container tiles (min-width: 836px) {
+  .tiles.group:has(> :nth-child(4):last-child),
+  .tiles.group:has(> :nth-child(7):last-child),
+  .tiles.group:has(> :nth-child(8):last-child) {
+    grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@container tiles (min-width: 1048px) {
+  .tiles.group:has(> :nth-child(5):last-child) {
+    grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@container tiles (min-width: 1260px) {
+  .tiles.group:has(> :nth-child(6):last-child) {
+    grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@container tiles (min-width: 1472px) {
+  .tiles.group:has(> :nth-child(7):last-child) {
+    grid-template-columns: repeat(7, minmax(0, 1fr)); }
+}
+@container tiles (min-width: 1684px) {
+  .tiles.group:has(> :nth-child(8):last-child) {
+    grid-template-columns: repeat(8, minmax(0, 1fr)); }
+}
+/* The row's own parent is what those queries measure — the chart panel, whose
+   content box is the width the tiles actually get. NAMED, so a container added
+   elsewhere later cannot start answering them by accident; where no container is
+   found the row keeps the auto-fit line above, which is what it always had. */
+:has(> .tiles.group) { container: tiles / inline-size; }
 /* `--surface`, the same ground the chart cards and the tables are drawn on, and
    NOT the `--surface-alt` this shipped with. A tile and a chart card are the
    same kind of thing — a figure in a box on the page — and giving them two

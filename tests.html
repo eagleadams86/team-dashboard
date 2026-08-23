@@ -292,7 +292,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    and the ageing threshold apart took it to 1643; the dialog grid sweep to 1655); Find
    took it to 1721 on 2026-08-23, the info dot and help window to 1734, pinning that
    window's type and colour to 1737, breaking the help into paragraphs to 1742,
-   and the backdrop sweep to 1745.
+   the backdrop sweep to 1745, and the tile rows to 1802.
 
    Deliberately LOOSER than the eight sibling suites, which pin their floor at
    the exact number they register. They count TESTS, and registration there is
@@ -301,7 +301,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 1734;
+const EXPECTED = 1790;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3209,6 +3209,52 @@ async function run(TD, win) {
        + "the browser's own help cursor and asks where this answers");
     ok(dots.every((d) => />i<\/button>/.test(d)),
        'and no hand-written dot in the markup draws anything else');
+  }
+  group('The tile rows');
+  /* A tile row fills ONE line when the line has room for every tile, and splits
+     into EQUAL rows when it does not — the family rule, 2026-08-23. It applies
+     to `.tiles.group`, whose count varies by panel; the four dashboard tiles
+     keep their spelled-out columns. The two numbers the thresholds were worked
+     out from live in a different rule, so both are read back out of the CSS and
+     the thresholds checked AGAINST them rather than pinned here a second time. */
+  {
+    const floor = APP_SRC.match(/\.tiles\.group \{[^}]*minmax\((\d+)px/);
+    const gapM = APP_SRC.match(/\.tiles \{ display: grid; gap: (\d+)px/);
+    ok(floor && gapM, 'the auto-fit fallback still states a smallest tile, and .tiles a gap');
+    const min = floor ? +floor[1] : 0, gap = gapM ? +gapM[1] : 0;
+    const blocks = [...APP_SRC.matchAll(/@container tiles \(min-width: (\d+)px\) \{([\s\S]*?)\n\}/g)];
+    ok(blocks.length >= 5, 'the container queries are still there — ' + blocks.length + ' of them');
+    let checked = 0;
+    for (const [, atStr, body] of blocks) {
+      const at = +atStr;
+      for (const rule of body.split('}').filter((r) => r.includes('grid-template-columns'))) {
+        const counts = [...rule.matchAll(/nth-child\((\d+)\):last-child/g)].map((m) => +m[1]);
+        ok(counts.length > 0, 'every rule says which tile counts it answers');
+        const cols = rule.match(/grid-template-columns: repeat\((\d+),/);
+        const c = cols ? +cols[1] : 1;
+        ok(c * min + (c - 1) * gap <= at,
+           c + ' columns need ' + (c * min + (c - 1) * gap) + 'px of tiles and gaps, and the '
+           + 'query lets them in at ' + at + 'px');
+        counts.forEach((n) => {
+          ok(n >= c, n + ' tiles can never fill ' + c + ' columns');
+          ok(c === 1 || n % c !== 1,
+             n + ' tiles across ' + c + ' columns leaves one tile alone on the last row');
+          checked++;
+        });
+      }
+    }
+    ok(checked >= 16, 'and every count from three to eight is still answered');
+    ok(/:has\(> \.tiles\.group\) \{ container: tiles \/ inline-size; \}/.test(APP_SRC),
+       "the row's own parent is the named container — without it every query above matches "
+       + 'nothing and the counts silently stop applying');
+    ok([...APP_SRC.matchAll(/\.tiles\.group:has\(> :nth-child/g)].length >= 16,
+       'and the count rules are still written against .tiles.group');
+    /* The dashboard row is the deliberate exception, and it stays one: exactly
+       four tiles, spelled-out columns, and no `:has()` rule reaching it. */
+    ok(/\.tiles \{ display: grid; gap: \d+px; grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/
+       .test(APP_SRC), 'the four dashboard tiles keep their spelled-out four columns');
+    ok(!/(?:^|[^.])\.tiles:has\(/.test(APP_SRC),
+       'and nothing counts children on plain .tiles, which would take that row over');
   }
   {
     /* Read off the source: METRIC_HELP is a `const` at the top level of a
