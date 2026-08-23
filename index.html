@@ -1000,7 +1000,7 @@ label.checkline { display: flex; gap: 8px; align-items: center; font-size: var(-
 /* "Start again" inside the backup dialog. Folded away deliberately: the one
    irreversible action in the app should take a deliberate open, not sit a
    mis-click away from Download backup. Same pattern in the sibling apps. */
-details.danger-zone { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+details.danger-zone { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
 details.danger-zone > summary { cursor: pointer; font-size: var(--fs-xs); font-weight: 600;
   color: var(--text-secondary); }
 details.danger-zone > summary:hover { color: var(--text-primary); }
@@ -1010,6 +1010,18 @@ details.danger-zone > summary:hover { color: var(--text-primary); }
    answers together on the right, and on a phone gives the backup button a row of
    its own rather than wrapping its label in half beside them. (Asked for
    2026-08-23, with the five dialogs lined up side by side.) */
+/* ── Back Up & Restore: the family's window ──────────────────────────────────
+   One window across six apps (2026-08-23) — PAPTrack's, to the pixel. What
+   varies between the apps is the CONTENT (what a backup holds, which extra
+   buttons the app offers), never the frame around it. Keep this block in step
+   with PAPTrack, Sprint Predictability, Golf Handicap, Money Map and the
+   starter. The 700px was set family-wide on 2026-08-22. */
+#dataDialog { max-width: 700px; padding: 18px; }
+#dataDialog p { font-size: var(--fs-xs); color: var(--text-secondary); margin: 0 0 12px; }
+#dataDialog hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
+#dataDialog .datarow { display: flex; gap: 10px; flex-wrap: wrap; margin: 0; }
+#dataDialog details.danger-zone > p { margin: 10px 0 12px; }
+#dataDialog .datafoot { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 14px; }
 #clearDialog { padding: 18px; }
 .clearfoot { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 14px; }
 .clearfoot .safety { margin-right: auto; }
@@ -1071,10 +1083,7 @@ dialog { background: var(--surface); color: var(--text-primary);
    the row holding Item alone (no stages set up) spans rather than leaving a
    gap where a control should be. */
 #itemDialog { max-width: 640px; }
-/* THE SAME WIDTH AS MONEY MAP'S BACK UP WINDOW: 700px, its --dialog-w-narrow.
-   Asked for on 2026-08-22, alongside the share windows — these were all 560px,
-   so the same dialog opened narrower here than in the app beside it. */
-#dataDialog { max-width: 700px; }
+/* Back Up's width is declared with the rest of its block, further down. */
 /* ── Find ───────────────────────────────────────────────────────────────────
    Money Map's Find window, ported here and to Sprint Predictability on
    2026-08-23 so ⌘K reaches the same thing in whichever app is open. Its own
@@ -2250,34 +2259,32 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 <!-- ── Backup / restore — opened from the header, like the sibling app ────── -->
 <dialog id="dataDialog" aria-labelledby="dataDialogTitle">
   <h2 id="dataDialogTitle">Back Up &amp; Restore</h2>
-  <p>
-    One JSON file holding every team, their work items and your shared settings — a copy
+  <p>One JSON file holding every team, their work items and your shared settings — a copy
     you keep, independent of this browser. It is the only copy of your data that exists
-    anywhere else, so it is worth taking one.
-  </p>
-  <div class="btn-row" style="margin-top:12px">
+    anywhere else, so it is worth taking one.</p>
+  <div class="datarow">
     <button class="btn" id="btnExport" type="button"><span aria-hidden="true">⬇︎</span> Download Backup (JSON)</button>
     <button class="btn" id="btnImport" type="button"><span aria-hidden="true">⬆︎</span> Restore from Backup…</button>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
   </div>
-  <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
+  <hr>
   <!-- A PLAIN PARAGRAPH, not a `.note info` box. It was the only bordered strip
-       in any of the five Back Up windows — "one even has an extra box for no
+       in any of the six Back Up windows — "one even has an extra box for no
        reason" — and a box is this app's device for a note that explains a
        SECTION of a working page, not for the one sentence of small print under
        a pair of buttons that every sibling states plainly. -->
-  <p style="margin-top:12px">Restoring <strong>replaces every team in this browser</strong>.
+  <p>Restoring <strong>replaces every team in this browser</strong>.
     You'll see what the file holds and be asked to confirm first. A backup file is also how
     you move your data to another device — download it here, and restore it there.</p>
   <details class="danger-zone">
     <summary>Start Again</summary>
-    <p style="margin-top:10px">Deletes every team and every work item in this browser. Your
+    <p>Deletes every team and every work item in this browser. Your
       settings and your theme are kept.</p>
-    <div class="row" style="margin-top:10px">
+    <div class="datarow">
       <button class="btn danger" id="clearBtn" type="button">Delete All Data</button>
     </div>
   </details>
-  <div class="row" style="justify-content:flex-end;margin-top:18px">
+  <div class="datafoot">
     <button class="btn primary" id="dataCloseBtn" type="button">Close</button>
   </div>
 </dialog>
