@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="midnight">
+<html lang="en" data-theme="auto">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,8 +32,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- The installed window's title bar takes its colour from here. It holds the
-     manifest's midnight to start with, because that is the default theme and
-     this has to be right before any script runs; the theme picker rewrites it
+     manifest's midnight to start with, because this has to be right before any
+     script runs — the boot script below nudges it to Light when Auto, the
+     default, resolves that way; the theme picker rewrites it
      from the theme pack's own --bg whenever the theme changes, so a Light window
      doesn't keep a midnight bar above it. No colour is invented — it is read
      back out of theme.css. -->
@@ -96,12 +97,26 @@
 <script>
   /* Set the theme before first paint so the page never flashes the wrong palette.
      Deliberately duplicated rather than shared with THEMES below, because this
-     has to run before any other script. */
+     has to run before any other script.
+
+     THE DEFAULT IS 'auto' — a reader who has never touched the picker follows their
+     system, and a retired id lands there too. <html data-theme="auto"> in the markup
+     covers the case where this script never runs at all. */
   (function () {
     var t = localStorage.getItem('td-theme');
     if (t === 'slate') t = 'dark';                       /* legacy id, same palette */
-    document.documentElement.setAttribute('data-theme',
-      ['auto', 'midnight', 'dark', 'light', 'sepia'].indexOf(t) >= 0 ? t : 'midnight');
+    var id = ['auto', 'midnight', 'dark', 'light', 'sepia'].indexOf(t) >= 0 ? t : 'auto';
+    document.documentElement.setAttribute('data-theme', id);
+    /* And the installed window's title bar with it. The literal above is Midnight's,
+       and Auto resolves to LIGHT on a light system — without this an installed app
+       opens with a midnight bar over a light page until paintThemeColor() runs at the
+       foot of the file. matchMedia is answerable this early; --bg is not, because
+       theme.css has not loaded yet, which is why the one value is written out. Keep
+       it in step with theme.css's Light --bg. */
+    if (id === 'auto' && !matchMedia('(prefers-color-scheme: dark)').matches) {
+      var bar = document.querySelector('meta[name="theme-color"]');
+      if (bar) bar.setAttribute('content', '#f5f5f3');
+    }
     /* A browser with nothing saved has exactly one (empty) team, so the team
        picker is not a choice — renderEmptyState() hides it. That runs at the
        foot of the page, though, which would paint the picker and then take it
@@ -1290,10 +1305,10 @@ main:focus { outline: none; }
          Midnight is pre-selected to match the theme the boot script in <head>
          has already applied. THEMES is read back off these options. -->
     <select id="themeSel" title="Change the colour theme">
-      <option value="auto">◐ Auto</option>
+      <option value="auto" selected>◐ Auto</option>
       <option value="dark">☾ Dark</option>
       <option value="light">☀ Light</option>
-      <option value="midnight" selected>✦ Midnight</option>
+      <option value="midnight">✦ Midnight</option>
       <option value="sepia">📜 Sepia</option>
     </select>
   </div>
@@ -9868,15 +9883,17 @@ function closeOnBackdropClick(dlg) {
  'settingsDialog']
   .forEach(id => closeOnBackdropClick($(id)));
 
-/* theme */
+/* theme. AUTO is the default: never having chosen, or an unrecognised saved id,
+   both land there, so a first run follows the reader's system. Midnight is still the
+   base palette — what :root holds and what Auto means by "dark". */
 const THEMES = [...$('themeSel').options].map(o => o.value);
 $('themeSel').value = (() => {
   let t = localStorage.getItem(LS.theme);
   if (t === 'slate') t = 'dark';
-  return THEMES.includes(t) ? t : 'midnight';
+  return THEMES.includes(t) ? t : 'auto';
 })();
-/* The installed window's title bar. The <head> holds the default theme's
-   background as a literal, because that has to be right before any script runs;
+/* The installed window's title bar. The <head> holds Midnight's background as a
+   literal, because that has to be right before any script runs;
    from then on it is read back out of the theme pack's own --bg, so no colour is
    invented here and a Light window never keeps a midnight bar above it. Called
    at boot as well as on a change: the theme is restored from localStorage before

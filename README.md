@@ -2027,7 +2027,9 @@ diff. Re-run it with `python3 make_favicon.py`, then bump the `?v=` on every `fa
 reference — browsers hold on to an icon for a long time. The install PNGs are versioned by
 `sw.js`'s `CACHE` constant instead; bump that too.
 
-Four themes — Midnight (default), Dark, Light, Sepia — from the shared theme pack. Palette
+Four themes — Midnight, Dark, Light, Sepia — from the shared theme pack, plus **Auto, which is
+the default**: with nothing saved the app follows your own system, Light or Midnight, and changes
+with it while the page is open. Midnight is the base palette and what Auto means by "dark". Palette
 changes belong in the pack, not here. 
 
 ## Origins

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="midnight">
+<html lang="en" data-theme="auto">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'">
@@ -8,12 +8,16 @@
 <link rel="icon" href="favicon.ico?v=1">
 <script>
   /* The same boot as index.html: honour the saved theme before first paint, so
-     this page doesn't open midnight on someone who chose Light or Sepia. */
+     this page doesn't open midnight on someone who chose Light or Sepia.
+
+     THE DEFAULT IS 'auto' (2026-08-22): with nothing saved — and on this page that is
+     the common case, since it can be linked to directly — the reader follows their own
+     system. <html data-theme="auto"> above covers the same case with script disabled. */
   (function () {
     var t = localStorage.getItem('td-theme');
     if (t === 'slate') t = 'dark';                       /* legacy id, same palette */
     document.documentElement.setAttribute('data-theme',
-      ['auto', 'midnight', 'dark', 'light', 'sepia'].indexOf(t) >= 0 ? t : 'midnight');
+      ['auto', 'midnight', 'dark', 'light', 'sepia'].indexOf(t) >= 0 ? t : 'auto');
   })();
 </script>
 <link rel="stylesheet" href="theme.css">

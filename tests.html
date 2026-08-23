@@ -298,7 +298,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 1626;
+const EXPECTED = 1666;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -3121,6 +3121,31 @@ async function run(TD, win) {
      to rewrite it — from the pack's own --bg, never from a colour of its own. */
   ok(/function paintThemeColor\(\)/.test(APP_SRC) && /token\('--bg'\)/.test(APP_SRC),
      'and the theme picker repaints it from the pack\u2019s --bg rather than a literal of its own');
+
+  /* ── The default theme ──────────────────────────────────────────────────────
+     It moved from midnight to auto on 2026-08-22, so a reader who has never touched
+     the picker follows their own system. That default lives in THREE places which
+     have to agree, and none of them can see the other two: the <html> attribute (what
+     a browser with script disabled paints), the boot script (what a reader with
+     nothing, or something retired, saved gets), and the picker's `selected` (what the
+     header ROW reads while both of those happen). Any one left on midnight is a
+     silent disagreement, and silent in the direction that hides it — on a dark-mode
+     machine every combination looks identical. */
+  ok(/<html[^>]*\sdata-theme="auto"/.test(APP_SRC),
+     'the markup must carry data-theme="auto", or a script-less load falls back to '
+     + ":root's midnight");
+  const bootTheme = stripComments(APP_SRC)
+    .match(/\['auto', 'midnight', 'dark', 'light', 'sepia'\]\.indexOf\(t\) >= 0 \? t : '([a-z]+)'/);
+  ok(!!bootTheme, 'the boot script no longer normalises an unknown or missing saved theme id');
+  is(bootTheme && bootTheme[1], 'auto', 'nothing saved, or a retired id, must land on the default');
+  ok(/<option value="auto" selected>/.test(APP_SRC),
+     'auto must carry `selected` in the picker markup, or the row names another theme '
+     + 'until the script at the foot of the file runs');
+  is((APP_SRC.match(/<option value="(?:auto|midnight|dark|light|sepia)" selected>/g) || []).length, 1,
+     'exactly one theme option may carry `selected`');
+  const themeInit = stripComments(APP_SRC).match(/THEMES\.includes\(t\) \? t : '([a-z]+)'/);
+  is(themeInit && themeInit[1], 'auto',
+     'and the picker\u2019s own initial value must agree, or a retired saved id reopens midnight');
 
   const manRes = await bustFetch('manifest.webmanifest');
   ok(manRes.ok, 'manifest.webmanifest is missing');
