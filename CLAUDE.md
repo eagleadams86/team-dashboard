@@ -764,7 +764,14 @@ summary of them.
     with 624px of text, the same figure in every app. Both rules or neither. **This app's half of
     the drift was the type**: the help ran at `--fs-xs` (13px, the size of its chrome and its
     table headings) across the full 560px, about 80 characters a line, while Money Map capped its
-    text at 66 characters and Sprint Predictability at 46. The block pins `--fs-sm`.
+    text at 66 characters and Sprint Predictability at 46. The block pins `--fs-sm` — and,
+    since a second pass on 2026-08-23, the heading (`--fs-md`/600), the prose colour
+    (`--text-secondary`), the paragraph margins, `#helpBody strong` and the window's own
+    `padding: 20px` as well. Four things were still riding on inheritance across the family:
+    an unset heading weight defaults to bold, an unset paragraph colour lands on
+    `--text-primary`, browser paragraph spacing is 1em rather than 10px, and each app's
+    dialog padding decided the window's width. Nothing here moved except the padding, which
+    was already 20px, so this app came out unchanged on screen.
   - **`#helpBody { white-space: pre-line; }` is this app's own and must NOT travel.** The help
     here is written with `textContent`, which is why a note can quote a reader's own label
     safely, so a blank line is the only paragraph break it has. The siblings build real `<p>`
