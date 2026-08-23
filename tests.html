@@ -291,7 +291,8 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    1655 checks as of 2026-08-22 (typed stage times took 1623 to 1636; telling the target
    and the ageing threshold apart took it to 1643; the dialog grid sweep to 1655); Find
    took it to 1721 on 2026-08-23, the info dot and help window to 1734, pinning that
-   window's type and colour to 1737, and breaking the help into paragraphs to 1742.
+   window's type and colour to 1737, breaking the help into paragraphs to 1742,
+   and the backdrop sweep to 1745.
 
    Deliberately LOOSER than the eight sibling suites, which pin their floor at
    the exact number they register. They count TESTS, and registration there is
@@ -300,7 +301,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 1731;
+const EXPECTED = 1734;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -4229,6 +4230,40 @@ group('ARTs — the grouping, and the boundary it crosses');
   ok(/ageing threshold/.test(uiDoc.getElementById('helpBody').textContent),
      'and the percentile note points back at it, so the pair is explained from either end');
   uiDoc.getElementById('helpDialog').close();
+
+  /* EVERY dialog closes on a click off it, and this tests the BEHAVIOUR rather
+     than the registration list. A source scan only ever proves an id is on a
+     list; it cannot see a dialog wired through a variable, and a hand-written
+     list checked by a hand-written test agrees with itself forever. Both of
+     those bit on 2026-08-23 — the lottery portfolio's help window had no
+     handler at all and Money Map's compare window was simply left off the list.
+     Far outside rather than a few pixels: what this cannot check in a frame is
+     the padding case — a click just INSIDE the frame must NOT close it — so
+     that one is verified by hand in a browser.
+     Nothing here is exempt: the sync "which copy of your data?" dialog that was
+     the family's one exception went with sync on 2026-08-20. The list is
+     carried anyway, so this suite says the same thing as its siblings. */
+  {
+    const EXEMPT = ['syncChoiceDialog'];
+    const dialogs = [...uiDoc.querySelectorAll('dialog')];
+    ok(dialogs.length >= 8, 'the dialogs were found — ' + dialogs.length);
+    const stuck = [], leaky = [];
+    for (const d of dialogs) {
+      if (d.open) d.close();
+      d.showModal();
+      for (const type of ['pointerdown', 'mousedown', 'click']) {
+        const E = type === 'pointerdown' ? win.PointerEvent : win.MouseEvent;
+        d.dispatchEvent(new E(type, { clientX: -1000, clientY: -1000,
+          bubbles: true, cancelable: true }));
+      }
+      const closed = !d.open;
+      d.close();
+      if (EXEMPT.includes(d.id)) { if (closed) leaky.push(d.id); }
+      else if (!closed) stuck.push(d.id);
+    }
+    is(stuck, [], 'a dialog you cannot dismiss by clicking off it');
+    is(leaky, [], 'and any exception must still refuse to be dismissed');
+  }
 
   win.renderAll();
   const wipChart = win.tdCharts().chartWip;
