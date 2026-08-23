@@ -743,6 +743,12 @@ then one, reading as an afterthought rather than as the fifth answer.
 - **Only counts that leave rows differing by at most one tile are offered, and never a row
   holding a single tile.** Five go 5, or 3 + 2, or one per line — never 2 + 2 + 1. Seven go 7 or
   4 + 3. Where the only alternative would strand one tile the row drops to a single column.
+- **A short last row is STRETCHED to finish the line**, never left with a hole at the end of it:
+  `lcm(columns, last row)` tracks, the full rows' tiles spanning `lcm/columns` and the last
+  row's `lcm/last row`, so Flow's 3 + 2 is six tracks at span 2 and span 3. Golf Handicap's
+  hand-counted grid, generalised to every count. The stretch is undone at the width where the
+  tiles all fit on one line, and on BOTH selectors — `:nth-child` out-ranks a bare `> *` and
+  would otherwise carry its span into the wider layout.
 - **THE FOUR DASHBOARD TILES ARE THE DELIBERATE EXCEPTION AND STAY ONE.** `.tiles` without
   `.group` is always exactly four, one per dimension; spelled-out columns and its two media
   queries are already gap-free at every width, and a test asserts nothing counts children on
