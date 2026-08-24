@@ -794,7 +794,11 @@ Everything the charts depend on, shared by all your teams:
   deliberately stores no text of that kind. Throughput, net flow, work in progress and the
   defect rate are counts rather than durations, so they don't move.
 - **Same-day cycle time** — what an item that starts and finishes on one day is worth
-  (`1` day: it still occupied someone for that day)
+  (`0.5` days since 21 Aug 2026: a whole day made an item opened and closed inside one day
+  indistinguishable from one that genuinely took a full day, in every average and percentile)
+- **Ignore items that took unusually long** — off by default.
+  [Its own section below](#ignoring-major-outliers).
+
 - **Word for defects on charts** (`Defect` by default — singular, because it reads as
   "Defect rate") and the **word for cycle time** (Cycle Time / Time in Process / TiP /
   In Process Time)
@@ -885,7 +889,100 @@ One structural note: the target is **per team** and the threshold is **shared by
 with more than one team they cannot all match anyway. A promise is made by the people who keep it;
 the threshold is closer to a house convention.
 
+## Ignoring Major Outliers
+
+**Off by default, and most boards should leave it off.** One item that sat open for a year can
+drag the *average* cycle time far enough that the tile stops describing anything the team
+recognises. This is the switch for that — with a caveat worth reading before you reach for it.
+
+### You Probably Don't Need It
+
+This dashboard already resists a long tail, on purpose. It leads with the **median** and the
+**85th percentile**, and 85 was chosen precisely so that the one item that took five months
+doesn't set the number. If a single enormous item is spoiling your picture, **the average is the
+only figure it is spoiling** — and the median sitting right beside it is the better number to
+read. Turning this on to fix the mean is fixing the one figure that was never the one to trust.
+
+### What It Does, and What It Deliberately Doesn't
+
+An ignored item **still counts as delivered**. That is the whole design. You cannot fix an average
+by claiming the team shipped one fewer item, so:
+
+| Moves | Does not move |
+| --- | --- |
+| Average cycle time | Throughput and the steady-delivery band |
+| Average lead time | Net flow, started vs completed |
+| 85th percentile and median cycle time | The cumulative flow diagram |
+| Time in stage | Work in progress |
+| The two lines on the item-age chart | **Aged work** |
+| | Defect rate |
+| | Both forecasts |
+
+**Work still in progress is never ignored, however long it has been open.** Everything the setting
+touches measures *finished* work, and something still in flight has no cycle time to be an outlier
+of. An item that has sat open for three hundred days is the single most actionable thing on the
+screen — a setting that quietly stopped counting it would be the one genuinely harmful thing this
+feature could do, so the aged-work figures are pinned untouched by a test.
+
+### The Three Settings
+
+- **Off** — count every item. Identical numbers to an app without this feature.
+- **Automatically, from this team's own spread** — the cutoff is **the upper quartile plus three
+  interquartile ranges** of what finished in the window on screen. That is the standard test for
+  an *extreme* outlier. The usual textbook fence is 1.5 interquartile ranges; this app uses 3
+  because cycle times are strongly right-skewed — most work finishes quickly and a thin tail runs
+  long — and a 1.5 fence would eat a good slice of a perfectly legitimate tail, quietly reshaping
+  the 85th percentile you forecast with. It needs **at least 12 finished items** before it will
+  offer an opinion, because quartiles off a handful are noise.
+- **Anything over a number I set** — your own cutoff in days. No twelve-item floor: a typed fence
+  isn't derived from the data, so a small sample can't make it wrong.
+
+### It Always Says What It Did
+
+The note above the charts gains **"ignoring 4 items over 87 days"** — the count *and* the cutoff,
+because a count alone is a claim you can only take on trust and a cutoff is one you can check.
+Every cycle-time, lead-time and stage-time card repeats it. If the rule catches nothing, nothing
+is said: a fence nothing crossed changed no number.
+
+Watch the count against the total. **2 of 190 is a long tail; 60 of 190 is a distribution**, and
+this is the wrong tool for it.
+
+### The Ignored Items Are Still on the Chart
+
+On **Every Finished Item**, an ignored item is drawn as a **hollow ring** above a dotted line at
+the cutoff, rather than removed. That chart's whole job is showing the spread, and a feature that
+dealt with a long tail by deleting the tail from the picture of the tail would be hiding its own
+working. Click one to copy its key, exactly like any other dot.
+
+### A Target Can't Be Met by Ignoring the Items That Broke It
+
+If you've set an [85% ≤ target](#your-own-limit-and-your-own-target), the **met / not met** verdict
+counts the ignored items. A target is a promise about real work, and the items that broke it are
+exactly the ones an outlier rule takes out — read over the fenced pool, a promise would start
+passing the moment somebody flipped a switch in Settings. So the percentile on the tile and the
+verdict beside it can legitimately disagree, and the tile says which is which: *"7.0 … target 10.0
+— not met, counting the ignored items"*.
+
+### On All Teams, Each Team Gets Its Own Fence
+
+A platform team whose ordinary work runs sixty days and a support team whose ordinary work runs
+three do not have the same idea of *unusual*. One cutoff over both would ignore half of one team's
+board and none of the other's. So each row draws its fence over its own spread — which also means
+a team's figures are identical on the All Teams table and on its own dashboard.
+
+The bottom **All teams** row uses the whole estate's pooled fence, which is wider than any one
+team's, so it will usually ignore less. The note under the strip says how many items the rows
+ignored between them.
+
+### It Travels in a Share Link
+
+The setting is part of Settings, so it rides into a [share link](#sharing-a-read-only-link) and a
+backup with everything else — a recipient sees the figures you saw, under the same note saying
+
+what was ignored.
+
 ## What Isn't Here, and Why
+
 
 **Blocked time** — how long an item couldn't move because something was in its way. A plain
 Jira export doesn't carry it: "Flagged" is a state, not a duration, and reconstructing the
@@ -945,8 +1042,9 @@ re-entered:
 Rows gained an optional created date (`k` on the wire, backup `version: 3`, `schema: 3` in the
 saved state; the working-days setting later took both markers to `4`, ARTs to `5`,
 the issue key to `6`, the per-team project id to `7`, workflow stages to `8`, the per-row
-current stage to `9` and the per-team [limit and target](#your-own-limit-and-your-own-target)
-to `10`). A row without one is left exactly as it was — no `k` key is written —
+current stage to `9`, the per-team [limit and target](#your-own-limit-and-your-own-target)
+to `10` and [ignoring outliers](#ignoring-major-outliers) to `11`). A row without one is left exactly as it was
+ — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before. **The issue key
 (`i` on the wire) follows exactly the same rule**: absent unless there is one, so a team whose
 export has no key column saves byte-identically to before that field existed, and the first save
@@ -1030,6 +1128,12 @@ worth knowing:
   that falls entirely inside a weekend is zero working days and takes the same-day value, which
   is the same statement that setting always makes. The ageing threshold moves with it: 14
   working days is nearly three calendar weeks, so items age later and the Aged work count drops.
+- **A duration can be left out of the pool without the item leaving the count.** With
+  [ignoring outliers](#ignoring-major-outliers) on, an item past the cutoff contributes no cycle
+  time, no lead time and no stage times, while still counting as delivered, started, raised and —
+  before it closed — in progress. That is the same shape the app already had for an item finished
+  with no start date: a duration of *null*, not zero, which every average and percentile skips.
+
 - **The 85th percentile is the number to forecast with**, which is why it, rather than the
   average, is the cycle time figure in the headline row. 85% of the items completed finished
   within it, so it is a promise you can make about the next one. An average is not: on a

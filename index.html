@@ -2398,10 +2398,60 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       not known to this app</strong> and still count as working days, wherever you are.
     </p>
   </div>
+  <!-- Ignoring outliers. On its own line with room for a hint, under the rule
+       stated at the top of this dialog: a setting that needs more than a label
+       does not belong in the grid. The number box sits beside the select rather
+       than under it because it is the select's third option spelled out, and
+       putting a two-digit box on a line of its own would be the dead space the
+       aged-days pair above already avoids. -->
+  <div class="grid two pairs" style="margin-top:var(--sp-6)">
+    <div>
+      <!-- The one ⓘ inside a dialog. The delegated [data-help] listener picks it
+           up wherever it sits, and the help dialog opens on top of this one —
+           both are modal, so the top layer stacks them and closing the help
+           returns you here with the select still where you left it. The hints
+           below say what the setting does; this says what to make of it, which
+           is the same division of labour every tile on the dashboard follows. -->
+      <label for="setOutlierMode">Ignore items that took unusually long<button type="button"
+        class="tile-help" data-help="outliers"
+        aria-label="What does ignoring outliers mean?">i</button></label>
+
+      <select id="setOutlierMode">
+        <option value="off">Off &mdash; count every item</option>
+        <option value="auto">Automatically, from this team&rsquo;s own spread</option>
+        <option value="days">Anything over a number I set</option>
+      </select>
+    </div>
+    <div>
+      <label for="setOutlierDays" id="setOutlierDaysLabel">Ignore items over (days)</label>
+      <input type="number" id="setOutlierDays" step="1" min="1" placeholder="90">
+    </div>
+  </div>
+  <p class="hint" style="margin-top:var(--sp-3)">
+    An ignored item <strong>still counts as delivered</strong> &mdash; throughput, net flow,
+    the cumulative flow diagram, work in progress and the defect rate do not move. Only its
+    cycle time, lead time and time in stage stop counting. Work that is still
+    <strong>in progress is never ignored</strong>, however long it has been open, so the aged
+    work figures are untouched.
+  </p>
+  <p class="hint" style="margin-top:var(--sp-3)">
+    <strong>Automatically</strong> ignores anything more than three interquartile ranges above
+    the upper quartile of what finished in the window on screen &mdash; the standard test for
+    an extreme outlier &mdash; and needs at least 12 finished items before it will offer an
+    opinion. Narrowing the date picker changes what counts, because an outlier is only
+    unusual next to the work beside it.
+  </p>
+  <div class="note info" style="margin-top:var(--sp-5)">
+    Most boards should leave this off. The <strong>median</strong> and <strong>85%</strong>
+    figures this dashboard leads with already shrug off a long tail &mdash; if one enormous
+    item is spoiling the picture, the average is the only figure it is spoiling, and the
+    median beside it is the better number to read.
+  </div>
   <div class="note info" style="margin-top:var(--sp-6)">
     Anything whose Type is blank, or doesn't match the defect text above, counts as
     ordinary planned work.
   </div>
+
 
   <div class="row spread" style="margin-top:20px">
     <strong class="manage-head">Work Type Filter List</strong>
@@ -4287,6 +4337,55 @@ function percentileOf(values, p) {
 }
 const CYCLE_PERCENTILE = 85;
 
+/* ── Ignoring the one item that took a year ─────────────────────────────────
+   The cutoff, in days, above which a finished item's DURATION stops counting.
+   Null means nothing is excluded, which is the default and the answer to every
+   malformed input below.
+
+   What this returns is a single number, and that is the whole point of doing it
+   this way rather than with a tick box per item: "ignoring 4 items over 87 days"
+   is a sentence a reader can check against the scatter chart and argue with,
+   where a hand-curated list of exclusions is a judgement nobody else can see.
+
+   THREE MODES, and only three:
+     'off'   nothing is excluded — identical figures to an app without this.
+     'auto'  Q3 + 3 x the interquartile range, the textbook EXTREME outlier
+             fence.
+     'days'  the number the reader typed.
+
+   Why 3 x IQR and not the usual 1.5: cycle times are strongly right-skewed —
+   most work finishes quickly and a thin tail runs long — so the ordinary 1.5
+   fence flags a good slice of a perfectly legitimate tail. This app's headline
+   figure is the 85th percentile, which LIVES in that tail, so a 1.5 fence would
+   quietly reshape the number the team forecasts with. 3 x IQR catches what was
+   actually asked for: the major ones. Anyone wanting stricter types their own.
+
+   THE TWELVE-ITEM FLOOR is not a nicety. Quartiles off a handful of items are
+   noise, and a cutoff derived from four numbers would exclude an item on the
+   strength of nothing at all. Below the floor the automatic rule declines to
+   have an opinion. A TYPED cutoff has no floor — it is not derived from the
+   data, so a small sample cannot make it wrong. */
+const OUTLIER_MODES = ['off', 'auto', 'days'];
+const OUTLIER_IQR_MULTIPLIER = 3;
+const OUTLIER_MIN_SAMPLE = 12;
+function outlierCutoffOf(values, mode, typedDays) {
+  if (mode === 'days') {
+    const n = Number(typedDays);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  if (mode !== 'auto') return null;
+  if (!Array.isArray(values) || values.length < OUTLIER_MIN_SAMPLE) return null;
+  const q1 = percentileOf(values, 25);
+  const q3 = percentileOf(values, 75);
+  if (q1 == null || q3 == null) return null;
+  const iqr = q3 - q1;
+  /* Every item the same length is a team with no spread, not a team whose every
+     item is an outlier: a zero IQR puts the fence on Q3 itself, which would
+     exclude nothing above it and is the honest answer. */
+  return q3 + OUTLIER_IQR_MULTIPLIER * iqr;
+}
+
+
 /* ── Time in stage ──────────────────────────────────────────────────────────
    PURE, and deliberately NAMELESS: it returns figures keyed by stage id and
    never touches state.stages, so the one place a stage's name is decided stays
@@ -4910,11 +5009,16 @@ function derive(rows, settings, view, stages) {
   const hasCreated = withCreated > 0;
 
   /* Bucket once, read many times. */
+  /* ONE map of rows per completed bucket, not three of pre-computed durations.
+     It used to keep cycleByWeek and leadByWeek alongside this one, filled in the
+     same walk; the durations are now taken from these rows in the series loop
+     below, because ignoring an outlier is a decision about an ITEM and a bare
+     list of numbers cannot say which item any of them came from. Two calls to
+     cycleTimeOf per item instead of one is not a cost worth a third map. */
   const byCompletedWeek = new Map();   /* keyed on the bucket start */
   const byStartedWeek   = new Map();   /* keyed on the bucket start */
-  const cycleByWeek     = new Map();   /* keyed on the bucket start too */
-  const leadByWeek      = new Map();   /* lead times, by completed bucket */
   const defectsRaised   = new Map();   /* defects by the bucket they were RAISED in */
+
 
   for (const r of items) {
     /* Started counts every item that has a start date, finished or not. */
@@ -4934,27 +5038,79 @@ function derive(rows, settings, view, stages) {
     const ck = bucketKey(bucketStart(r.completed, bucket), bucket);
     if (!byCompletedWeek.has(ck)) byCompletedWeek.set(ck, []);
     byCompletedWeek.get(ck).push(r);
+  }
 
-    const ct = cycleTimeOf(r, sameDay, workingDays);
-    if (ct != null) {
-      if (!cycleByWeek.has(ck)) cycleByWeek.set(ck, []);
-      cycleByWeek.get(ck).push(ct);
+  /* ── The one item that took a year ────────────────────────────────────────
+     Which finished items are so far outside this team's own spread that their
+     DURATION stops counting. Read the comment on outlierCutoffOf for the rule;
+     what matters here is the two properties of it that this block enforces.
+
+     OVER THE WINDOW, not over every row the team holds. An outlier is a
+     statement relative to the sample being described, so the set of items on
+     screen has to be the set the fence is drawn from — otherwise a reader
+     narrowing the picker to a quiet month would see items excluded by a
+     threshold derived from data that month cannot see. It is also the rule the
+     stage times card had to learn: see the comment above stageTimes for the one
+     card on this dashboard that did not move when the picker did.
+
+     A DECISION ABOUT AN ITEM, made once. The excluded row's cycle time, lead
+     time and per-stage times all leave together, because "this item took an
+     anomalously long time" is one sentence and three different answers to it
+     would be unreadable. Same shape as outsideWindow down in the clean-up code:
+     one decision, in one place, used by everything that needs it.
+
+     WHAT IT DOES NOT TOUCH, and must never touch: the item still counts as
+     delivered, started, raised, in progress and — if it is a defect — as
+     unplanned. Throughput, net flow, the cumulative flow diagram, work in
+     progress, the defect rate and the forecast are all read off the rows
+     themselves and are deliberately blind to this set. You cannot fix an
+     average by claiming the team delivered one fewer item.
+
+     AGED WORK IS OUT OF SCOPE ON PURPOSE. Everything above measures finished
+     work, and ageing measures work still in flight, which has no cycle time to
+     be an outlier of. An item that has sat open for three hundred days is the
+     single most actionable thing on this screen, and a setting that quietly
+     stopped counting it would be the one genuinely harmful thing this feature
+     could do. Do not "finish the job" by filtering agedCounts. */
+  const windowCycleTimes = [];
+  for (const ws of weekStarts) {
+    for (const r of byCompletedWeek.get(bucketKey(ws, bucket)) || []) {
+      const ct = cycleTimeOf(r, sameDay, workingDays);
+      if (ct != null) windowCycleTimes.push(ct);
     }
-
-    const lt = leadTimeOf(r, sameDay, workingDays);
-    if (lt != null) {
-      if (!leadByWeek.has(ck)) leadByWeek.set(ck, []);
-      leadByWeek.get(ck).push(lt);
+  }
+  const outlierMode = OUTLIER_MODES.includes(settings.outlierMode) ? settings.outlierMode : 'off';
+  const outlierCutoff = outlierCutoffOf(windowCycleTimes, outlierMode, settings.outlierDays);
+  /* A Set of ROWS, so identity decides — two items that took the same number of
+     days are not the same item, and only one of them may be the one over the
+     fence. Empty whenever there is no cutoff, which is what makes every reader
+     below it a plain `has()` with no mode to check. */
+  const excluded = new Set();
+  if (outlierCutoff != null) {
+    for (const ws of weekStarts) {
+      for (const r of byCompletedWeek.get(bucketKey(ws, bucket)) || []) {
+        const ct = cycleTimeOf(r, sameDay, workingDays);
+        if (ct != null && ct > outlierCutoff) excluded.add(r);
+      }
     }
   }
 
-  const weeks = [], bucketLabels = [], throughput = [], unplannedRate = [],
+  const weeks = [], bucketLabels = []
+, throughput = [], unplannedRate = [],
         avgCycleTime = [], netFlow = [], started = [],
         avgLeadTime = [], defectCreatedRate = [], p85CycleTime = [];
   /* Every individual cycle time inside the window, pooled — the summary tile
      averages these rather than the per-bucket means, so an empty bucket (stored
      as 0 in the series to keep the line unbroken) can't drag it down. */
   const windowCycles = [], windowLeads = [];
+  /* The same pool WITHOUT the outlier exclusion applied — every finished item in
+     the window that has a cycle time. Exactly one figure is read off it: whether
+     the team's target was met. See summary.sleMet for why that one refuses to
+     see the setting. Nothing else may use this: a second figure taken over the
+     unexcluded pool and labelled like an excluded one is the confusion this
+     whole feature has to avoid. */
+  const windowCyclesAll = [];
+
   /* The ITEMS the window covers, as against the durations pooled beside them.
      Collected here rather than re-derived, so anything reading it describes
      exactly the set the charts above are drawn from. */
@@ -4978,8 +5134,23 @@ function derive(rows, settings, view, stages) {
     unplannedRate.push(unplanned > 0 ? unplanned / (planned + unplanned) : 0);
     unplannedTotal += unplanned;
 
-    const cts = cycleByWeek.get(key) || [];
+    /* Both durations for this bucket, taken from the rows rather than from a
+       map filled earlier, so the excluded set can be consulted per item. An
+       item over the fence contributes NEITHER — one decision, one item — while
+       still sitting in `done` above, where it goes on counting as delivered. */
+    const cts = [], lts = [];
+    for (const r of done) {
+      const ct = cycleTimeOf(r, sameDay, workingDays);
+      if (ct != null) windowCyclesAll.push(ct);
+      if (excluded.has(r)) continue;
+      if (ct != null) cts.push(ct);
+      const lt = leadTimeOf(r, sameDay, workingDays);
+      if (lt != null) lts.push(lt);
+    }
+
+
     avgCycleTime.push(cts.length ? mean(cts) : 0);
+
     /* Null, not 0, where nothing finished: unlike the mean beside it this series
        is new, so it has no legacy padding to preserve, and a break is honest
        where a zero would claim everything finished instantly. */
@@ -4998,8 +5169,8 @@ function derive(rows, settings, view, stages) {
     /* The created-date series break rather than pad. A lead time of zero days is
        impossible, so a 0 would be a claim, not a gap — and linearTrend already
        skips nulls, so a break doesn't drag the trend line. */
-    const lts = leadByWeek.get(key) || [];
     avgLeadTime.push(lts.length ? mean(lts) : null);
+
     windowLeads.push(...lts);
 
     /* Defects raised against items completed. Null — not 0 — where nothing was
@@ -5148,7 +5319,11 @@ function derive(rows, settings, view, stages) {
      figures lines up on the decimal point; on a chart every character is a
      character the label's chip covers, and a percentile is a duration some real
      item actually took, so it is usually a whole number anyway. */
+  /* The target's percentile, over everything. Taken here beside the two the
+     charts draw so all three come out of one place. */
+  const p85All = percentileOf(windowCyclesAll, CYCLE_PERCENTILE);
   const ageMedian = percentileOf(windowCycles, 50);
+
   const ageP85 = percentileOf(windowCycles, CYCLE_PERCENTILE);
   const ageShort = (v) => Number.isInteger(v) ? String(v) : num1(v);
 
@@ -5182,8 +5357,16 @@ function derive(rows, settings, view, stages) {
            every reader of this treats that as "no name" rather than drawing an
            empty label — a paste without a key column must look exactly as it
            did before this field existed. */
-        key: r.key || ''
+        key: r.key || '',
+        /* Whether this item's duration has been ignored as an outlier. The dot
+           IS STILL HERE, and that is the point: this is the one chart whose
+           whole job is showing the spread, and a setting that dealt with a long
+           tail by deleting it from the picture of the tail would be hiding its
+           own working. The chart layer draws these apart instead — see
+           chartCycleScatter — under the cutoff line they sit above. */
+        excluded: excluded.has(r)
       });
+
     });
   });
 
@@ -5207,6 +5390,15 @@ function derive(rows, settings, view, stages) {
      it draws over the two it is being compared with. */
   if (sleDays != null) scatterLines.push({ key: 'sle', value: sleDays,
     text: 'target ' + ageShort(sleDays) });
+  /* The fence, where one is in force. It goes on the scatter and nowhere else:
+     this is the only chart drawing one dot per item, so it is the only one where
+     a horizontal line at the cutoff says something a reader can act on — every
+     dot above it is an item this screen has stopped counting the duration of,
+     and they are all still drawn. On the AGE chart the same line would be a
+     claim about work in progress, which this setting never touches. */
+  if (outlierCutoff != null) scatterLines.push({ key: 'outlier', value: outlierCutoff,
+    text: 'ignoring over ' + ageShort(outlierCutoff) });
+
 
   /* Written before the points leave derive, so how crowded a dot is is a pinned
      property of the data rather than something the tooltip works out on the
@@ -5218,6 +5410,8 @@ function derive(rows, settings, view, stages) {
     lines: scatterLines,
     median: ageMedian,
     p85: ageP85,
+    cutoff: outlierCutoff,
+
     /* Where each bucket starts, in the same day-index units as the points, so
        the axis can carry the bucket labels the rest of the app uses. */
     tickAt: weekStarts.map(ws => diffDays(ws, weekStarts[0])),
@@ -5365,8 +5559,21 @@ function derive(rows, settings, view, stages) {
   /* The threshold joins the two lines both charts share. It belongs to this one
      alone: it is a rule about work in progress, and nothing on the scatter is
      still in progress. */
-  const ageLines = cycleScatter.lines.concat(
+  /* The age chart borrows the scatter's lines so the two can be read against
+     each other — but NOT the outlier fence. Nothing on this chart has finished,
+     so nothing on it has a cycle time, so a line saying which cycle times are
+     being ignored would be an answer to a question this chart never asks. It
+     would also put the setting's mark on the one picture that must stay blind
+     to it: work in progress is never ignored, however long it has been open.
+
+     Filtered by key rather than left to the chart layer to skip, because the
+     chart layer looks each key up in a style table and an unknown one took the
+     whole dashboard down with "cannot read properties of undefined" the first
+     time this line existed. One list, one owner: if a line does not belong on
+     both charts, it does not go into this array. */
+  const ageLines = cycleScatter.lines.filter(l => l.key !== 'outlier').concat(
     [{ key: 'threshold', value: agedDays, text: 'aged after ' + agedDays }]);
+
 
   const ageing = {
     points: agePoints,
@@ -5491,7 +5698,16 @@ function derive(rows, settings, view, stages) {
      charts, so the card's "over N items" and the note cannot disagree. An open
      item has no completion and so no bucket, which is why it is added here
      rather than falling out of the walk above. */
-  const stageWindow = windowItems.concat(items.filter(r => !r.completed));
+  /* Excluded items drop out here too. A stage table is a table of durations, and
+     an item whose overall duration this screen has stopped counting cannot go on
+     setting the median of the stages it spent that duration in — a card saying
+     "half of everything sat 4 days in Review" beside a tile that has just
+     ignored the item that sat there for eight months would be two answers to one
+     question. Only the FINISHED half can be excluded: nothing still in flight
+     has a cycle time, so nothing still in flight is ever in the set. */
+  const stageWindow = windowItems.filter(r => !excluded.has(r))
+    .concat(items.filter(r => !r.completed));
+
 
   /* Computed before the wording below, which states how many items it covers.
 
@@ -5524,7 +5740,19 @@ function derive(rows, settings, view, stages) {
        `workingDays` and `dayNoun` follow, so a line on a chart and the sentence
        under it can never disagree about what the target is. Null is "not set". */
     wipLimit, sleDays,
-    /* Keyed by stage id and carrying no names — see stageTimesOf. Read over the
+    /* Ignoring outliers, returned the same way and for the same reason: what
+       was USED, not what was asked for. `outlierCutoff` is null whenever
+       nothing is being ignored — the mode is off, the reader has not typed a
+       number yet, or the automatic rule declined on too small a sample — so
+       every sentence on the screen tests that one field rather than re-deriving
+       the rule, and no label can state a fence the figures beside it were not
+       taken under. `outlierCount` is how many items it actually caught, which
+       is the half a reader needs to judge whether the setting is doing
+       something reasonable: 2 of 190 is a long tail, 60 of 190 is a
+       distribution and this is the wrong tool for it. */
+    outlierMode, outlierCutoff, outlierCount: excluded.size,
+    /* Keyed by stage id and carrying no names
+ — see stageTimesOf. Read over the
        same window AND the same work-type filter every figure above it is read
        over, so the two controls at the top of the page reach it exactly as they
        reach everything else on the screen. */
@@ -5586,8 +5814,30 @@ function derive(rows, settings, view, stages) {
          target is a promise about the next item, which is the one question an
          average cannot answer. */
       sleDays,
-      sleMet: sleDays == null || percentileOf(windowCycles, CYCLE_PERCENTILE) == null
-        ? null : percentileOf(windowCycles, CYCLE_PERCENTILE) <= sleDays,
+      /* JUDGED OVER EVERY FINISHED ITEM, ignored ones included — the one figure
+         in this object that deliberately refuses to see the outlier setting.
+
+         A target is a promise about real work: "85% of our items finish within
+         ten days" is a statement to whoever is waiting for them, and the items
+         that broke it are exactly the ones an outlier rule takes out. Read over
+         the excluded pool this flips from "not met" to "met" the moment somebody
+         turns the setting on, which would make a switch in Settings the easiest
+         way to pass a service level nobody actually hit. Nothing else here can
+         be gamed that way and this must not be either.
+
+         The percentile stated on the tile beside it IS the excluded one, so the
+         two can legitimately disagree — 7 days against a 10-day target, marked
+         not met. That reads as a contradiction unless the label says which
+         population each came from, and it does: see the tile's foot. */
+      sleMet: sleDays == null || p85All == null ? null : p85All <= sleDays,
+      /* Whether that verdict and the percentile above it came from different
+         populations, so the tile can say so rather than leaving a reader to
+         wonder why 7 is not inside 10. False when nothing is being ignored,
+         which is when the two agree and there is nothing to explain. */
+
+      sleJudgedIncludesIgnored: outlierCutoff != null && excluded.size > 0,
+
+
       agedNow: agedCount.length ? agedCount[agedCount.length - 1] : 0,
       asOf: endDate,
       monthlyThroughput,
@@ -5767,6 +6017,17 @@ function deriveTeams(teams, settings, view, stages) {
        — the one thing on this screen that is per team rather than per window.
        The train above deliberately gets neither: a limit belongs to a board, and
        adding eight of them up would invent a figure nobody agreed to. */
+    /* IGNORING OUTLIERS IS PER TEAM TOO, and it arrives here by doing nothing at
+       all: each row derives over its own rows, so each draws its fence over its
+       own spread. Do NOT "fix" this into a shared cutoff the way asOf above is
+       shared. A shared date is a fairness rule — reading eight teams as of eight
+       different days is not a comparison. A shared FENCE is the opposite: a
+       platform team whose ordinary work runs sixty days and a support team whose
+       ordinary work runs three do not have the same idea of unusual, and one
+       cutoff over both would ignore half of one team's board and none of the
+       other's. It also keeps a team's figures identical on this table and on its
+       own dashboard, which a shared fence would quietly break. */
+
     rows: list.map(t => ({ id: t.id, name: t.name,
       d: derive(t.rows || [], settings,
         Object.assign({}, shared, { wipLimit: t.wipLimit, sleDays: t.sleDays }), stages) }))
@@ -5821,6 +6082,12 @@ window.TD = {
   dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
   soleProjectId, PROJECT_ID_ADOPT_MIN,
   cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, deriveTeams, utcDate,
+  /* The outlier fence on its own, so a test can hand it a sample it wrote and
+     check the rule rather than only reading the answer back off derive(). A
+     hoisted function declaration and three consts — the consts are declared
+     above this literal, which is the only reason naming them here is safe. */
+  outlierCutoffOf, OUTLIER_MODES, OUTLIER_IQR_MULTIPLIER, OUTLIER_MIN_SAMPLE,
+
   /* The forecast's pure pieces, so a test can deal a sample set it wrote itself
      rather than only reading the answers back off derive(). */
   seededRandom, forecastPeriodsFor, forecastItemsIn, forecastHistogram,
@@ -5903,6 +6170,20 @@ const DEFAULT_SETTINGS = {
      setting. */
   workingDays: false,
   cycleTimeLabel: 'Cycle Time',
+  /* OFF, and it should stay off for most boards. The median and the 85th
+     percentile this dashboard leads with already resist a long tail by
+     construction — see percentileOf, which picked 85 for exactly that reason —
+     so a team reaching for this is usually reading the MEAN cycle time tile and
+     would be better served by reading the median beside it. The setting exists
+     because a team that wants its mean to mean something is asking a fair
+     question, not because the dashboard needs it. The hint in Settings says so.
+     'off' | 'auto' | 'days' — see outlierCutoffOf. */
+  outlierMode: 'off',
+  /* The typed cutoff in days, used only when outlierMode is 'days'. Null is
+     "not set", never 0: a cutoff of zero days would exclude every item that
+     ever finished. */
+  outlierDays: null,
+
   /* TWO ROWS, and this trims a list of five. It used to ship Spikes, Stories and
      Tasks as well, on the reasoning that they are "the four types a Jira board
      actually produces, so the dashboard filter is useful on the first paste
@@ -6371,7 +6652,24 @@ function normalizeSettings(raw) {
      silently, so a setting that became undefined would read as "never set" on
      the next load rather than announcing itself. */
   s.workingDays = s.workingDays === true;
-  /* Only the keys this app knows leave this function — the same whitelist rule
+  /* Three literals and nothing else. This one matters more than the scalars
+     above it: settings ride into a SHARE LINK, so every field here is
+     attacker-controlled, and a mode this app doesn't know would fall through
+     outlierCutoffOf's final `return null` and simply read as off — but it would
+     also ride along in every saved copy for ever, which is what the whitelist
+     at the foot of this function exists to stop. Pinned to the list rather than
+     to `!== 'off'` so adding a fourth mode later is one edit in one place. */
+  if (!OUTLIER_MODES.includes(s.outlierMode)) s.outlierMode = DEFAULT_SETTINGS.outlierMode;
+  /* Positive or null, never 0 and never NaN — a zero cutoff would exclude every
+     finished item there has ever been, and the mode select can be on 'days'
+     while the box beside it is still empty, which is the state a reader passes
+     through on the way to typing a number. Null there means "no cutoff yet",
+     and outlierCutoffOf returns null for it, so the figures stay unexcluded
+     until there is a real number to exclude by. */
+  const o = Number(s.outlierDays);
+  s.outlierDays = Number.isFinite(o) && o > 0 ? o : null;
+  /* Only the keys this app knows leave this function
+ — the same whitelist rule
      rows and teams already live by (hydrateRows and sanitizeTeams both build
      fresh objects). Without this, any stray key on a hand-edited backup or
      share link would ride along into every saved copy for ever, which is
@@ -6383,7 +6681,10 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 10 added the two figures a team sets rather than measures — a
+/* SCHEMA 11 added the two settings behind ignoring major outliers — a mode and
+   an optional typed cutoff, both shared by every team like the rest of
+   `settings`; 10 added the two figures a team sets rather than measures — a
+
    work-in-progress limit and a cycle time target, both per team and both
    optional; 9 added the per-row CURRENT stage (`w`), read from an ordinary Status
    column; 8 added workflow stages — `state.stages` and a `g` of day counts on
@@ -6400,7 +6701,8 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 10;
+const SCHEMA = 11;
+
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
    hydrateState() keeps only the keys it knows, which is right for a hostile
@@ -7622,8 +7924,10 @@ function drawCharts(d) {
       /* The chip is painted in the line's own colour, so the same three-way
          reading applies here as it does to the dashes above. */
       colour: l.key === 'sle' ? seriesAlt
-        : l.key === 'median' ? token('--text-muted') : token('--text-secondary')
+        : l.key === 'median' ? token('--text-muted')
+        : l.key === 'outlier' ? token('--text-muted') : token('--text-secondary')
     })) };
+
     /* The item's key leads the tooltip when the paste carried one — this is the
        chart the key was added for, and the point of it is that a dot far above
        the rest can be named and then looked up. Without a key it reads exactly
@@ -7637,8 +7941,14 @@ function drawCharts(d) {
     scatOpts.plugins.tooltip.callbacks = {
       title: (its) => dotName(its[0].raw) + ' \u00b7 finished '
         + prettyDate(its[0].raw.completed),
-      label: (c) => num1(c.raw.y) + ' ' + d.dayNoun + ' from start to finish',
+      /* An ignored dot says so where its figure is read. Without this the
+         tooltip would state a cycle time in the same words as every other dot,
+         for an item that contributed nothing to any of the figures around it —
+         the one place the picture could actively mislead. */
+      label: (c) => num1(c.raw.y) + ' ' + d.dayNoun + ' from start to finish'
+        + (c.raw.excluded ? ' — ignored as an outlier' : ''),
       afterBody: dotTipFooter
+
     };
     dotsCopyKeys(scatOpts);
 
@@ -7653,18 +7963,45 @@ function drawCharts(d) {
       data: {
         datasets: [{
           label: 'Finished items',
-          data: scat.points,
+          data: scat.points.filter(p => !p.excluded),
           backgroundColor: 'rgba(' + ar + ',' + ag + ',' + ab + ',0.55)',
           borderColor: seriesMain,
           borderWidth: 1,
           pointRadius: 3.5,
           pointHoverRadius: 7,
           order: 1
+        },
+        /* THE IGNORED ITEMS ARE STILL DRAWN, and this is the whole reason they
+           get a dataset of their own rather than being filtered out of the one
+           above. This is the only chart in the app with a dot per item, so it
+           is the only place a reader can see what the setting is doing; a
+           feature that dealt with a long tail by deleting the tail from the
+           picture of the tail would be hiding its own working, and the tile
+           beside it would be the only evidence any of this happened.
+
+           Told apart by SHAPE as well as colour — a hollow ring against filled
+           circles — which is the rule the defect, cycle time and age charts all
+           follow. Nothing here sits on the red-green axis and nothing is
+           coloured "bad": these are ordinary items the reader asked the screen
+           to stop counting, not mistakes. Drawn under the fence line they sit
+           above, which is what makes the pair readable. */
+        {
+          label: 'Ignored as outliers',
+          data: scat.points.filter(p => p.excluded),
+          backgroundColor: 'transparent',
+          borderColor: token('--text-muted'),
+          borderWidth: 1.5,
+          pointRadius: 4,
+          pointHoverRadius: 7,
+          order: 2
         }].concat(scat.lines.map(l => refLine(l.value,
           l.key === 'sle' ? seriesAlt
-            : l.key === 'median' ? token('--text-muted') : token('--text-secondary'),
+            : l.key === 'median' ? token('--text-muted')
+            : l.key === 'outlier' ? token('--text-muted') : token('--text-secondary'),
           l.key === 'sle' ? [4, 2, 1, 2]
-            : l.key === 'median' ? [6, 4] : [2, 3])))
+            : l.key === 'median' ? [6, 4]
+            : l.key === 'outlier' ? [1, 3] : [2, 3])))
+
       },
       options: scatOpts
     });
@@ -7933,8 +8270,50 @@ function itemsInWindow(d) {
     + ' item' + (all === 1 ? '' : 's');
 }
 
+/* What the screen says about items whose duration it has stopped counting, and
+   '' when it is counting all of them. Every surface that states the exclusion
+   goes through here, so the wording cannot drift between the note above the
+   charts and the foot of a tile.
+
+   IT NAMES THE CUTOFF, not just the count. "Ignoring 4 items" is a claim a
+   reader can only take on trust; "ignoring 4 items over 87 days" is one they
+   can check against the scatter chart in front of them, and disagree with. The
+   count comes first because it is the figure that says whether the setting is
+   behaving — a rule catching a third of the board is not finding outliers.
+
+   Silent when nothing was caught, even with the setting on: a fence nothing
+   crossed changed no number on the screen, and a note about it would be a
+   caveat attached to figures that do not need one. */
+function outlierPhrase(d) {
+  if (!d || d.outlierCutoff == null || !d.outlierCount) return '';
+  /* Whole numbers plain
+, the rest to one decimal — the same shape the scatter
+     chart's own lines are labelled in, so the note and the line a reader checks
+     it against state the cutoff identically. dayNoun comes off the derive that
+     produced the figure, never out of settings, so the note cannot say "days"
+     about a fence measured in working ones. */
+  const cut = Number.isInteger(d.outlierCutoff) ? String(d.outlierCutoff) : num1(d.outlierCutoff);
+  return 'ignoring ' + d.outlierCount + ' item' + (d.outlierCount === 1 ? '' : 's')
+    + ' over ' + cut + ' ' + d.dayNoun;
+}
+
+/* The same sentence in the two places it is read, with the punctuation each one
+   needs. The note above the charts is a list of middot-separated facts; a tile
+   foot is one clause among others, so it takes a semicolon like they do. Both
+   go through outlierPhrase, so the wording cannot drift between them. */
+function outlierNote(d) {
+  const p = outlierPhrase(d);
+  return p ? ' &middot; ' + p : '';
+}
+function outlierFoot(d) {
+  const p = outlierPhrase(d);
+  return p ? '; ' + p : '';
+}
+
+
 function currentFilterValue() {
-  const chosen = state.settings.filters.find(f => f.display === view.filterDisplay);
+  const chosen
+ = state.settings.filters.find(f => f.display === view.filterDisplay);
   /* "All" or nothing means no filter at all. */
   if (!chosen || !chosen.value || chosen.value.toLowerCase() === 'all') return '';
   return chosen.value;
@@ -7997,7 +8376,30 @@ const METRIC_HELP = {
       + 'weekends included, unless you switch Settings to working days only — every duration '
       + 'in the app follows that one setting together.'],
   ] },
+  outliers: { title: 'Ignoring Outliers', body: [
+    ['Settings can ask this dashboard to stop counting how long the most extreme items took. '
+      + 'An ignored item ', b('still counts as delivered'), ' — throughput, net flow, the '
+      + 'cumulative flow diagram, work in progress and the defect rate do not move. Only its '
+      + 'cycle time, lead time and time in stage stop counting.'],
+    ['Set to automatic, the cutoff is drawn from your own finished work in the window on '
+      + 'screen: anything more than three interquartile ranges above the upper quartile, '
+      + 'which is the standard test for an extreme outlier. It needs at least 12 finished '
+      + 'items before it will offer an opinion, and ', b('narrowing the dates changes what '
+      + 'counts'), ' — an item is only unusual next to the work beside it.'],
+    ['Every ignored item is still drawn on the Every Finished Item chart, as a hollow ring '
+      + 'above the dotted cutoff line, and clicking one copies its key. Work that is still '
+      + b('in progress is never ignored'), ' however long it has been open, so the aged work '
+      + 'figures are untouched — an item that has sat open for months is the finding, not '
+      + 'the noise.'],
+    ['On All Teams each team is measured against ', b('its own spread'), ', not the whole '
+      + 'estate’s: a team whose ordinary work runs sixty days and one whose ordinary '
+      + 'work runs three do not have the same idea of unusual.'],
+    ['Most boards should leave this off. The median and 85% figures already shrug off a long '
+      + 'tail — if one enormous item is spoiling the picture, ', b('the average is the only '
+      + 'figure it is spoiling'), '.'],
+  ] },
   throughput: { title: 'Throughput', body: [
+
     ['What pace do we deliver at? The count of items completed in each period. ', b('Read '
       + 'the trend line rather than any single point'), ' — throughput is naturally lumpy.'],
     ['The average on the tile counts ', b('whole periods only'), ': when your data stops '
@@ -8638,8 +9040,9 @@ function renderDashboard() {
   if (activeTab === 'dashboard') printHead((team && team.name.trim()) || 'This team', d);
   if (activeTab === 'dashboard') $('windowNote').innerHTML = span + customNote(d) + '<br>' +
     d.buckets.length + ' ' + (d.buckets.length === 1 ? d.bucketNoun : d.bucketNounPlural) +
-    ' &middot; ' + itemsInWindow(d) +
+    ' &middot; ' + itemsInWindow(d) + outlierNote(d) +
     (d.inProgressCount ? ' (' + d.inProgressCount + ' in progress)' : '') +
+
     (d.partial ? '<br>Last ' + d.bucketNoun + ' covers ' + d.partial.daysCovered
       + ' of ' + d.partial.daysInBucket + ' days' : '');
 
@@ -8676,13 +9079,26 @@ function renderDashboard() {
       s.p85CycleTime == null ? '—' : num1(s.p85CycleTime),
       d.cyclePercentile + '% of items finished within this'
         + (s.medianCycleTime == null ? '' : '; half within ' + num1(s.medianCycleTime))
+        + outlierFoot(d)
+
         /* The promise, stated in WORDS and never in a colour. Nothing in this
            palette sits on the red-green axis, and a tile that turned a shade
            would be the app grading a team where the sentence lets them read the
            two figures and decide. "met" and "past" rather than good and bad, for
            the same reason. */
+        /* The target names its own population whenever that differs from the
+           figure above it. Without this the tile reads "7.0 … target 10.0 — not
+           met", which looks like the app cannot compare two numbers; with it,
+           the sentence says the promise counted the items the percentile did
+           not. No count: the pool is finished items that HAVE a cycle time,
+           which is not the same as the finished total stated elsewhere on this
+           screen, and a number here that matched neither would raise a question
+           instead of answering one. */
         + (s.sleMet == null ? ''
-          : '; target ' + num1(s.sleDays) + (s.sleMet ? ' — met' : ' — not met')),
+          : '; target ' + num1(s.sleDays) + (s.sleMet ? ' — met' : ' — not met')
+            + (s.sleJudgedIncludesIgnored ? ', counting the ignored items' : '')),
+
+
       'cycleTimePercentile') +
     tile('Work in progress', String(s.currentWip),
       'open items as of ' + prettyDate(s.asOf)
@@ -8700,7 +9116,15 @@ function renderDashboard() {
     $('name' + cap).innerHTML = '<span>' + escapeHtml(name) + '</span>' + helpBtn(key, name);
     $('title' + cap).textContent = text;
   };
-  Object.keys(d.names).forEach(k => setTitle(k, d.names[k], d.titles[k]));
+  /* The cards whose figures the outlier setting actually moves — the two
+     duration charts and the stage table. The other six are counts and rates and
+     are untouched by it, so a caveat on them would be a warning about nothing.
+     Appended here rather than inside derive: the titles are domain text and
+     this is a sentence about how the screen is currently set. */
+  const OUTLIER_TITLED = ['cycleTime', 'leadTime', 'stageTime', 'cycleScatter'];
+  Object.keys(d.names).forEach(k => setTitle(k, d.names[k],
+    d.titles[k] + (OUTLIER_TITLED.includes(k) ? outlierFoot(d) : '')));
+
 
   /* The Flow group's own tiles: the two averages, each beside the chart that
      plots it. The average cycle time sits here rather than in the headline row
@@ -8711,9 +9135,10 @@ function renderDashboard() {
   $('tilesFlow').innerHTML =
     tile('Avg ' + (state.settings.cycleTimeLabel || 'cycle time'),
       s.avgCycleTime == null ? '—' : num1(s.avgCycleTime),
-      d.dayNoun + ' from start to finish', 'cycleTime') +
+      d.dayNoun + ' from start to finish' + outlierFoot(d), 'cycleTime') +
     tile('Avg lead time', s.avgLeadTime == null ? '—' : num1(s.avgLeadTime),
-      d.dayNoun + ' from raised to delivered', 'leadTime');
+      d.dayNoun + ' from raised to delivered' + outlierFoot(d), 'leadTime');
+
 
   /* The Delivery group's own tiles. None restates a headline tile: the band
      answers "is it steady", which the average up there cannot; net flow says
@@ -9177,7 +9602,16 @@ function renderAllTeams() {
       customFrom: view.customFrom, customTo: view.customTo },
     state.stages);
   const train = all.train;
+  /* How many items the per-team rows ignored between them. Summed from the rows
+     rather than read off the train, because they are different questions: the
+     train's own fence is drawn over every team's work pooled together, which is
+     a wider spread and so a higher cutoff than any one team's. A quiet team's
+     outlier can sit comfortably inside the estate's fence and still be the one
+     thing distorting that team's own average, which is exactly why the rows are
+     derived per team and not sliced out of the train. */
+  const teamOutliers = all.rows.reduce((n, r) => n + (r.d.outlierCount || 0), 0);
   const table = $('allTeamsTable');
+
   const none = $('allTeamsNone');
   const artName = scope && scope !== ART_NONE
     ? (state.arts.find(a => a.id === scope) || {}).name : '';
@@ -9252,7 +9686,17 @@ function renderAllTeams() {
   $('windowNote').innerHTML = span + customNote(train) + '<br>' + 'every team, as of the same date' +
     '<br>' + itemsInWindow(train) + ' across ' +
     inScope.length + ' team' + (inScope.length === 1 ? '' : 's') +
-    (scope ? ' ' + escapeHtml(scopePhrase) : '');
+    (scope ? ' ' + escapeHtml(scopePhrase) : '') +
+    /* NOT outlierNote(train). Every row in this table ignores its own team's
+       outliers, measured against its own spread — see the comment in
+       deriveTeams — so there is no single cutoff to state here, and quoting the
+       train's would put one number under a column of figures none of them were
+       taken with. The count is the sum of what the rows actually ignored; the
+       train row in the <tfoot> is the one line that uses the train's own fence,
+       and its cell says so on hover. */
+    (teamOutliers ? '<br>each team ignoring its own outliers &mdash; '
+      + teamOutliers + ' item' + (teamOutliers === 1 ? '' : 's') + ' in total' : '');
+
 
   const s = train.summary;
   /* The train's own four, in the same order and with the same meanings as the
@@ -9576,7 +10020,23 @@ function renderSettingsForm() {
      the one place the two measures could be read as coexisting. */
   $('setAgedDaysLabel').textContent = 'Count an in-progress item as aged after ('
     + (state.settings.workingDays === true ? 'working days' : 'days') + ')';
+  $('setOutlierMode').value = state.settings.outlierMode;
+  /* Null is an EMPTY box, not a zero. A number input handed null renders "0",
+     which would read as a cutoff of no days at all — the one value
+     normalizeSettings refuses — under a label saying it was set. */
+  $('setOutlierDays').value = state.settings.outlierDays == null
+    ? '' : state.settings.outlierDays;
+  /* The typed cutoff belongs to one of the three modes, so it is dead in the
+     other two. Disabled rather than hidden: a control that vanishes takes the
+     line's layout with it, and the reader needs to see that a number is what
+     the third option is going to ask for before they choose it. Its label
+     follows the day measure for the same reason the ageing box's does. */
+  const typed = state.settings.outlierMode === 'days';
+  $('setOutlierDays').disabled = !typed;
+  $('setOutlierDaysLabel').textContent = 'Ignore items over ('
+    + (state.settings.workingDays === true ? 'working days' : 'days') + ')';
   renderFilterRows();
+
 }
 
 /* Nothing on screen that has nothing behind it. A first run is a paste box and
@@ -11549,12 +12009,18 @@ $('bucketSel').addEventListener('change', e => {
 /* settings — shared by every team */
 /* Coerced to a non-negative number on the way in; everything else is a capped
    label, never free text. */
-const NUMERIC_SETTINGS = new Set(['sameDayValue', 'agedDays']);
+const NUMERIC_SETTINGS = new Set(['sameDayValue', 'agedDays', 'outlierDays']);
+/* Emptying the box is "no cutoff", not "a cutoff of zero" — the one numeric
+   setting here where a blank is a meaningful value rather than a half-typed
+   one, because the mode above it can legitimately be on 'days' before a number
+   exists. The other two floor at a number instead; see the listener below. */
+const NULLABLE_SETTINGS = new Set(['outlierDays']);
 const SETTING_INPUTS = {
   setCycleLabel: 'cycleTimeLabel', setUnplannedType: 'unplannedType',
   setSameDay: 'sameDayValue', setUnplannedLabel: 'unplannedLabel',
-  setAgedDays: 'agedDays'
+  setAgedDays: 'agedDays', setOutlierDays: 'outlierDays'
 };
+
 /* Every keystroke here tears down and rebuilds every chart. That was tolerable
    at four; it is not once a group holds several. The save stays immediate — only
    the redraw waits for a pause in the typing. */
@@ -11567,12 +12033,24 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
        the number inputs' min attributes don't stop a typed minus sign. Aged
        days floors at 1 to match derive(), which treats 0 as "use the default"
        — without the floor the box could say 0 while the charts say 14. */
-    state.settings[key] = NUMERIC_SETTINGS.has(key)
-      ? Math.max(key === 'agedDays' ? 1 : 0, parseFloat(e.target.value) || 0)
-      : e.target.value.slice(0, 120);
+    state.settings[key] = NULLABLE_SETTINGS.has(key)
+      /* Blank, junk or zero all mean the same thing: no cutoff. Null rather
+         than 0 so it matches what normalizeSettings would make of it, and so
+         JSON.stringify keeps it — an undefined would be dropped silently and
+         read as "never set" on the next load. */
+      ? (parseFloat(e.target.value) > 0 ? parseFloat(e.target.value) : null)
+      : NUMERIC_SETTINGS.has(key)
+        ? Math.max(key === 'agedDays' ? 1 : 0, parseFloat(e.target.value) || 0)
+        : e.target.value.slice(0, 120);
+
     save();
     clearTimeout(settingsRedrawTimer);
-    settingsRedrawTimer = setTimeout(() => { renderDataTable(); renderDashboard(); }, 150);
+    /* renderViews, not renderDashboard: Settings is a dialog and can be opened
+       from any tab, so a reader who narrows the ageing threshold or the outlier
+       cutoff while standing on All Teams was left looking at figures taken
+       under the old setting until they switched tabs and back. */
+    settingsRedrawTimer = setTimeout(() => { renderDataTable(); renderViews(); }, 150);
+
   });
 });
 
@@ -11587,6 +12065,21 @@ $('setWorkingDays').addEventListener('change', e => {
   renderDataTable();
   renderDashboard();
 });
+
+/* The other control that isn't text or a number, and it renders the form again
+   for the same reason the toggle above does: choosing the third option is what
+   wakes the number box beside it up. No debounce — it is a select. renderViews
+   rather than renderDashboard, because All Teams reads this setting too and a
+   reader who changed it while standing on that tab would otherwise be looking
+   at figures taken under the old rule. */
+$('setOutlierMode').addEventListener('change', e => {
+  state.settings.outlierMode = OUTLIER_MODES.includes(e.target.value) ? e.target.value : 'off';
+  save();
+  renderSettingsForm();
+  renderDataTable();
+  renderViews();
+});
+
 
 $('filterRows').addEventListener('input', e => {
   const t = e.target;

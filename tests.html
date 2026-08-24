@@ -292,7 +292,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    and the ageing threshold apart took it to 1643; the dialog grid sweep to 1655); Find
    took it to 1721 on 2026-08-23, the info dot and help window to 1734, pinning that
    window's type and colour to 1737, breaking the help into paragraphs to 1742,
-   the backdrop sweep to 1745, and the tile rows to 2024.
+   the backdrop sweep to 1745, and the tile rows to 2024; ignoring outliers took
+   it to 2106 on 2026-08-24.
+
 
    Deliberately LOOSER than the eight sibling suites, which pin their floor at
    the exact number they register. They count TESTS, and registration there is
@@ -301,7 +303,8 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 2019;
+const EXPECTED = 2100;
+
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -1133,7 +1136,8 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 10, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 11, 'SCHEMA was bumped in the same commit as the whitelist widening');
+
 
   /* ══════════════════════════════════════════════════════════
      THE CURRENT STAGE — the half a plain Jira export can feed.
@@ -1666,8 +1670,9 @@ async function run(TD, win) {
   is('smuggled' in strayS, false, 'a stray settings key is dropped at the boundary');
   is(strayS.agedDays, 21, 'while every known key still comes through');
   is(Object.keys(strayS).sort().join(','),
-     'agedDays,cycleTimeLabel,filters,sameDayValue,unplannedLabel,unplannedType,workingDays',
+     'agedDays,cycleTimeLabel,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,workingDays',
      'and the surviving keys are exactly the known set');
+
   is(d.names.wip, 'Work in progress', 'the rest are the standard metric names');
   is(d.titles.cycleTime, 'Cycle Time per Week — Average and 85th Percentile',
      'the cycle time title names both series, in Title Case like every heading');
@@ -1752,7 +1757,219 @@ async function run(TD, win) {
      'a filter that matches nothing means empty');
 
   /* ────────────────────────────────────────────────────────── */
+  /* ── Ignoring outliers ────────────────────────────────────────────────────
+     Six groups, and the second is the one that matters: the whole design rests
+     on an ignored item still counting as delivered, so the test that pins it
+     asserts EQUALITY on nine things rather than movement on three. */
+  group('outlierCutoffOf — the fence on its own');
+  {
+    const twelve = [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3];   /* q1 1, q3 3, iqr 2 */
+    is(TD.outlierCutoffOf(twelve, 'off', null), null,
+       'off is off — no fence, whatever the numbers say');
+    is(TD.outlierCutoffOf(twelve, 'auto', null), 9,
+       'auto is the upper quartile plus three interquartile ranges');
+    is(TD.OUTLIER_IQR_MULTIPLIER, 3,
+       'three, not the usual 1.5 — cycle times are right-skewed and 85th percentile lives in the tail');
+    is(TD.OUTLIER_MIN_SAMPLE, 12, 'and it wants twelve finished items before it will have an opinion');
+    is(TD.outlierCutoffOf(twelve.slice(0, 11), 'auto', null), null,
+       'eleven is not enough — quartiles off a handful are noise');
+    is(TD.outlierCutoffOf(new Array(12).fill(5), 'auto', null), 5,
+       'every item the same length is a team with no spread, not a team of outliers');
+    is(TD.outlierCutoffOf([], 'days', 42), 42, 'a typed cutoff is the number, with no sample at all');
+    is(TD.outlierCutoffOf([1, 2], 'days', 30), 30,
+       'and no floor — a typed fence is not derived from the data, so a small sample cannot make it wrong');
+    is(TD.outlierCutoffOf([], 'days', 0), null, 'zero days is refused — it would ignore everything ever finished');
+    is(TD.outlierCutoffOf([], 'days', -3), null, 'so is a negative');
+    is(TD.outlierCutoffOf([], 'days', 'abc'), null, 'so is text');
+    is(TD.outlierCutoffOf(twelve, 'wat', null), null, 'and an unknown mode reads as off rather than throwing');
+    is(TD.OUTLIER_MODES, ['off', 'auto', 'days'], 'three modes and no more');
+  }
+
+  group('ignoring an outlier removes a duration, never a delivery');
+  {
+    /* Twenty-four ordinary items and one monster, so the fence has a sample to
+       work from and exactly one thing to catch. */
+    const day = 86400000, base = Date.UTC(2026, 0, 5), rows = [];
+    for (let i = 0; i < 24; i++) {
+      const s = new Date(base + i * 3 * day);
+      rows.push({ started: s, completed: new Date(s.getTime() + (2 + i % 8) * day),
+        created: new Date(s.getTime() - 2 * day), type: 'Story', key: 'AA-' + (100 + i),
+        stages: null, stage: '' });
+    }
+    const mon = new Date(base + 5 * day);
+    rows.push({ started: mon, completed: new Date(mon.getTime() + 400 * day),
+      created: new Date(mon.getTime() - 2 * day), type: 'Story', key: 'AA-999',
+      stages: null, stage: '' });
+
+    const v = { filterValue: '', months: 'all', bucket: 'week' };
+    const off = TD.derive(rows, Object.assign({}, SAMPLE_SETTINGS, { outlierMode: 'off' }), v, []);
+    const on  = TD.derive(rows, Object.assign({}, SAMPLE_SETTINGS, { outlierMode: 'auto' }), v, []);
+
+    is(off.outlierCutoff, null, 'with the setting off there is no fence');
+    is(off.outlierCount, 0, 'and nothing is ignored');
+    ok(on.outlierCutoff > 0 && on.outlierCutoff < 400, 'with it on there is one', String(on.outlierCutoff));
+    is(on.outlierCount, 1, 'and it catches the one item that took over a year');
+
+    ok(on.summary.avgCycleTime < off.summary.avgCycleTime / 3,
+       'the mean cycle time drops sharply — this is the figure the feature exists for',
+       off.summary.avgCycleTime + ' -> ' + on.summary.avgCycleTime);
+    ok(on.summary.avgLeadTime < off.summary.avgLeadTime, 'lead time follows it');
+    ok(on.summary.p85CycleTime < off.summary.p85CycleTime, 'and so does the percentile');
+
+    /* THE GROUP'S REASON FOR EXISTING. Every one of these is a count or a rate,
+       and not one of them may move: an item whose duration stopped counting was
+       still delivered, still started, still raised and still in progress before
+       it closed. Break any of these and the feature has started lying about
+       what the team shipped. */
+    is(on.throughput, off.throughput, 'throughput is untouched — the item was still delivered');
+    is(on.netFlow, off.netFlow, 'net flow is untouched');
+    is(on.started, off.started, 'and the started count with it');
+    is(on.wip, off.wip, 'work in progress is untouched');
+    is(on.agedCount, off.agedCount, 'aged work is untouched');
+    is(on.cfd, off.cfd, 'the cumulative flow diagram is untouched');
+    is(on.unplannedRate, off.unplannedRate, 'the defect rate is untouched — a share is a count over a count');
+    is(on.summary.completedTotal, off.summary.completedTotal, 'and the delivered total is the same number');
+    is(on.summary.startedTotal, off.summary.startedTotal, 'as is the started total');
+    is(on.forecast, off.forecast, 'the forecast is untouched — it runs on throughput, which did not move');
+
+    /* The dot is still drawn. Deleting the tail from the picture OF the tail is
+       the one thing this feature must never do. */
+    is(on.cycleScatter.points.length, off.cycleScatter.points.length,
+       'every finished item is still on the scatter — the ignored ones are marked, not removed');
+    is(on.cycleScatter.points.filter(pt => pt.excluded).map(pt => pt.key), ['AA-999'],
+       'and the ignored one is the one that took a year');
+    is(off.cycleScatter.points.filter(pt => pt.excluded).length, 0,
+       'with the setting off no dot claims to be ignored');
+    ok(on.cycleScatter.lines.some(l => l.key === 'outlier'),
+       'the scatter gains a line at the fence, so the dots above it have a stated meaning');
+    is(on.cycleScatter.cutoff, on.outlierCutoff, 'and the chart is handed the same figure the tiles state');
+  }
+
+  group('work in progress is never ignored, however long it has been open');
+  {
+    /* The one genuinely harmful thing this feature could do, pinned shut. An
+       item open for 300 days is the finding, not the noise — and the fence is
+       typed absurdly low here so that if ageing could see it at all, it would. */
+    const day = 86400000, base = Date.UTC(2026, 0, 5), rows = [];
+    for (let i = 0; i < 24; i++) {
+      const s = new Date(base + i * 3 * day);
+      rows.push({ started: s, completed: new Date(s.getTime() + (2 + i % 8) * day),
+        created: new Date(s.getTime() - 2 * day), type: 'Story', key: 'AA-' + (100 + i),
+        stages: null, stage: '' });
+    }
+    rows.push({ started: new Date(base - 300 * day), completed: null,
+      created: new Date(base - 302 * day), type: 'Story', key: 'AA-OPEN', stages: null, stage: '' });
+
+    const v = { filterValue: '', months: 'all', bucket: 'week' };
+    const off = TD.derive(rows, Object.assign({}, SAMPLE_SETTINGS, { outlierMode: 'off' }), v, []);
+    const on  = TD.derive(rows, Object.assign({}, SAMPLE_SETTINGS,
+      { outlierMode: 'days', outlierDays: 5 }), v, []);
+
+    ok(on.outlierCount > 0, 'the fence is biting hard on finished work', String(on.outlierCount));
+    is(on.agedCount, off.agedCount, 'and the aged series has not moved a point');
+    is(on.summary.agedNow, off.summary.agedNow, 'nor the aged tile');
+    is(on.ageing.count, off.ageing.count, 'every item in flight is still on the age chart');
+    is(on.ageing.oldest, off.ageing.oldest, 'including the one that has been open for 300 days');
+    is(on.inProgressCount, off.inProgressCount, 'and the in-progress count is the same');
+    is(on.ageing.lines.filter(l => l.key === 'outlier').length, 0,
+       'the fence line stays OFF the age chart — nothing on it has a cycle time to be an outlier of');
+  }
+
+  group('a target cannot be met by ignoring the items that broke it');
+  {
+    /* The one figure that deliberately refuses to see the setting. Without this
+       a switch in Settings would be the cheapest way to pass a service level. */
+    const day = 86400000, base = Date.UTC(2026, 0, 5), rows = [];
+    for (let i = 0; i < 24; i++) {
+      const s = new Date(base + i * 3 * day);
+      rows.push({ started: s, completed: new Date(s.getTime() + (2 + i % 4) * day),
+        created: new Date(s.getTime() - 2 * day), type: 'Story', key: 'AA-' + (100 + i),
+        stages: null, stage: '' });
+    }
+    /* Six items far past a ten-day promise — enough that the true 85th
+       percentile misses it while the fenced one comfortably clears it. */
+    for (let i = 0; i < 6; i++) {
+      const s = new Date(base + (i + 1) * 5 * day);
+      rows.push({ started: s, completed: new Date(s.getTime() + 90 * day),
+        created: new Date(s.getTime() - 2 * day), type: 'Story', key: 'BB-' + (200 + i),
+        stages: null, stage: '' });
+    }
+    const v = { filterValue: '', months: 'all', bucket: 'week', sleDays: 10 };
+    const off = TD.derive(rows, Object.assign({}, SAMPLE_SETTINGS, { outlierMode: 'off' }), v, []);
+    const on  = TD.derive(rows, Object.assign({}, SAMPLE_SETTINGS, { outlierMode: 'auto' }), v, []);
+
+    ok(on.outlierCount > 0, 'the fence caught the slow items', String(on.outlierCount));
+    ok(on.summary.p85CycleTime <= 10,
+       'the percentile on the tile now sits inside the target', String(on.summary.p85CycleTime));
+    is(off.summary.sleMet, false, 'the target was not met');
+    is(on.summary.sleMet, false, 'AND IT IS STILL NOT MET — the verdict counts the ignored items');
+    is(on.summary.sleJudgedIncludesIgnored, true,
+       'the tile is told to say so, or 7 against a target of 10 marked "not met" reads as a bug');
+    is(off.summary.sleJudgedIncludesIgnored, false, 'and told not to when the two populations are the same');
+  }
+
+  group('an outlier is unusual next to the work beside it');
+  {
+    const day = 86400000, base = Date.UTC(2026, 0, 5), rows = [];
+    for (let i = 0; i < 60; i++) {
+      const s = new Date(base + i * 3 * day);
+      rows.push({ started: s, completed: new Date(s.getTime() + (2 + i % 8) * day),
+        created: new Date(s.getTime() - 2 * day), type: 'Story', key: 'AA-' + (100 + i),
+        stages: null, stage: '' });
+    }
+    const st = Object.assign({}, SAMPLE_SETTINGS, { outlierMode: 'auto' });
+    const wide   = TD.derive(rows, st, { filterValue: '', months: 'all', bucket: 'week' }, []);
+    const narrow = TD.derive(rows, st, { filterValue: '', months: '1',   bucket: 'week' }, []);
+    ok(wide.outlierCutoff !== narrow.outlierCutoff,
+       'narrowing the date picker moves the fence — it is drawn over what is on screen',
+       wide.outlierCutoff + ' vs ' + narrow.outlierCutoff);
+  }
+
+  group('each team is measured against its own spread, never the estate’s');
+  {
+    const day = 86400000, base = Date.UTC(2026, 0, 5);
+    const mk = (ct0, prefix) => {
+      const r = [];
+      for (let i = 0; i < 24; i++) {
+        const s = new Date(base + i * 3 * day);
+        r.push({ started: s, completed: new Date(s.getTime() + (ct0 + i % 8) * day),
+          created: new Date(s.getTime() - 2 * day), type: 'Story', key: prefix + '-' + (100 + i),
+          stages: null, stage: '' });
+      }
+      return r;
+    };
+    /* A platform team whose ordinary work runs 55 days, and a support team whose
+       ordinary work runs 2 — plus one 45-day item on the support team, which is
+       an outlier there and an ordinary Tuesday on the other. */
+    const slow = mk(55, 'SL'), fast = mk(2, 'FA');
+    const s2 = new Date(base + 5 * day);
+    fast.push({ started: s2, completed: new Date(s2.getTime() + 45 * day),
+      created: new Date(s2.getTime() - 2 * day), type: 'Story', key: 'FA-999', stages: null, stage: '' });
+
+    const teams = [{ id: 't1', name: 'Slow', rows: slow, wipLimit: null, sleDays: null },
+                   { id: 't2', name: 'Fast', rows: fast, wipLimit: null, sleDays: null }];
+    const st = Object.assign({}, SAMPLE_SETTINGS, { outlierMode: 'auto' });
+    const v = { filterValue: '', months: 'all', bucket: 'week' };
+    const all = TD.deriveTeams(teams, st, v, []);
+    const soloFast = TD.derive(fast, st, v, []);
+    const soloSlow = TD.derive(slow, st, v, []);
+
+    ok(all.rows[0].d.outlierCutoff > all.rows[1].d.outlierCutoff,
+       'the slow team gets a higher fence than the fast one, because its ordinary work is slower',
+       all.rows[0].d.outlierCutoff + ' vs ' + all.rows[1].d.outlierCutoff);
+    is(all.rows[1].d.outlierCount, 1, 'the 45-day item is an outlier on the fast team');
+    is(all.rows[0].d.outlierCount, 0, 'and nothing is an outlier on the slow team');
+    is(all.train.outlierCount, 0,
+       'the train’s own pooled fence catches NOTHING — which is exactly why the rows are not sliced out of it');
+    is(all.rows[1].d.outlierCutoff, soloFast.outlierCutoff,
+       'a team’s fence on All Teams is the same one its own dashboard uses');
+    is(all.rows[0].d.outlierCutoff, soloSlow.outlierCutoff, 'for every team, not just the interesting one');
+    is(all.rows[1].d.summary.avgCycleTime, soloFast.summary.avgCycleTime,
+       'so its figures cannot differ between the two screens');
+  }
+
   group('derive() — settings actually change the numbers');
+
 
   const dSameDay = TD.derive(
     TD.parsePastedRows('2015-02-09\t2015-02-09\t', 'auto').rows,
@@ -2578,7 +2795,8 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 10, 'the schema marker is 10 — the version that added the per-team limit and target');
+  is(St.SCHEMA, 11, 'the schema marker is 11 — the version that added ignoring outliers');
+
 
   /* ────────────────────────────────────────────────────────── */
   group('Work in progress — started but not finished');
@@ -2721,6 +2939,22 @@ async function run(TD, win) {
      'a current value wins over a leftover old one');
   is(S.normalizeSettings({ teamName: 'Kraken' }).teamName, undefined,
      'the v1 teamName field is dropped — teams carry their own names now');
+
+  /* The outlier pair. These ride into a SHARE LINK like every other setting, so
+     both arrive from outside and both are coerced here or not at all. */
+  is(S.normalizeSettings({ outlierMode: 'auto' }).outlierMode, 'auto', 'a known outlier mode is kept');
+  is(S.normalizeSettings({ outlierMode: 'wat' }).outlierMode, 'off',
+     'an unknown one reads as off rather than riding along in every saved copy for ever');
+  is(S.normalizeSettings({ outlierMode: ['auto'] }).outlierMode, 'off', 'so does an array pretending to be one');
+  is(S.normalizeSettings({ outlierMode: '__proto__' }).outlierMode, 'off', 'and the usual key');
+  is(S.normalizeSettings({ outlierDays: 30 }).outlierDays, 30, 'a positive cutoff is kept');
+  is(S.normalizeSettings({ outlierDays: '30' }).outlierDays, 30, 'a numeric string becomes a number');
+  is(S.normalizeSettings({ outlierDays: 0 }).outlierDays, null,
+     'zero is refused — it would ignore every item that ever finished');
+  is(S.normalizeSettings({ outlierDays: -5 }).outlierDays, null, 'so is a negative');
+  is(S.normalizeSettings({ outlierDays: 'abc' }).outlierDays, null, 'so is text');
+  is(S.normalizeSettings({ outlierDays: Infinity }).outlierDays, null, 'and so is infinity');
+
   /* The out-of-the-box settings. Pinned because they are a deliberate choice —
      what a real board settled on — and a silent edit to any of them changes
      what every new browser measures. SAMPLE_SETTINGS above is deliberately
@@ -3061,6 +3295,40 @@ async function run(TD, win) {
   is(win.tdGet().settings.unplannedType.length, 120,
      'a settings label typed too long is capped at 120 as it is written');
   typeInto(typeInput, prevType);
+
+  /* The outlier cutoff, which is the one numeric setting where an EMPTY box is
+     a real value rather than a half-typed one — the mode can legitimately sit
+     on "days" before a number exists. Null and not 0, because 0 would be a
+     cutoff that ignored every item ever finished, and because JSON.stringify
+     drops an undefined silently. */
+  {
+    const daysBox = doc.getElementById('setOutlierDays');
+    const modeSel = doc.getElementById('setOutlierMode');
+    const prevMode = modeSel.value, prevDays = daysBox.value;
+
+    modeSel.value = 'days';
+    modeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(daysBox.disabled, false, 'choosing a typed cutoff wakes the number box beside it');
+
+    typeInto(daysBox, '25');
+    is(win.tdGet().settings.outlierDays, 25, 'a typed cutoff is written as a number');
+    typeInto(daysBox, '');
+    is(win.tdGet().settings.outlierDays, null, 'emptying the box is no cutoff — null, never 0');
+    typeInto(daysBox, '-4');
+    is(win.tdGet().settings.outlierDays, null, 'and a negative is refused at the point it is typed');
+    typeInto(daysBox, '0');
+    is(win.tdGet().settings.outlierDays, null, 'as is zero, which would ignore everything');
+
+    modeSel.value = 'off';
+    modeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(daysBox.disabled, true, 'and turning it off puts the box back to sleep');
+    is(win.tdGet().settings.outlierMode, 'off', 'the mode is written as it is chosen');
+
+    typeInto(daysBox, prevDays);
+    modeSel.value = prevMode;
+    modeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  }
+
 
   const sameDayInput = doc.getElementById('setSameDay');
   const prevSameDay = typeInto(sameDayInput, '-3');
