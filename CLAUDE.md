@@ -22,7 +22,12 @@ file records what is specific to this repo and what must never regress.
   don't add one.** A team carries a name, an optional `artId`, an optional
   project id — added 2026-08-20 and guarded by the same shape as the front of a
   key — and, since 2026-08-22, two optional NUMBERS it sets rather than measures:
-  a work-in-progress limit and a cycle time target. See the project id section below. `state.stages` carries names
+  a work-in-progress limit and a cycle time target. `state.settings` gained a
+  third number and a THREE-VALUE ENUM on 2026-08-24 (`outlierMode`,
+  `outlierDays`) — the enum is pinned to a literal list in `normalizeSettings`,
+  which is what keeps it a switch rather than a place to put a word.
+  See the project id section below. `state.stages` carries names
+
   and aliases the reader typed; **nothing on a row is ever a word** — see the
   workflow stages section, which is the longest one in this file for a reason.
 - **The issue key was added on 2026-08-20 at Charles's explicit request**, and it
@@ -126,7 +131,85 @@ file records what is specific to this repo and what must never regress.
 - **Which tab you were on IS remembered, for the two number views only.** `view.activeTab`, restored at boot. It used to be deliberately not saved — the old comment said "a reload should open on the dashboard" — which was out of step with both siblings (Sprint Predictability keeps `settings.view`, Money Map keeps `ui.activeTab`) and with the fact that All Teams is where somebody with several teams works. Changed 2026-08-21 after it was reported as annoying. Settings and Your Data are NOT remembered, on purpose. No new guard was needed: `selectTab` already refuses a hidden or unknown tab and falls back to the dashboard, which is exactly the All-Teams-disappears-below-two-teams case.
 - **The All Teams Throughput trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **The header names the metric** — it shipped as a bare "Trend" and that was not enough beside eight other columns that each name theirs. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart.
 
+## Ignoring Major Outliers (2026-08-24) — SCHEMA 10 → 11
+
+Asked for by Charles: a way to stop one enormous item wrecking the figures across
+the app. Two decisions were taken before any code, and both are load-bearing.
+
+**1. It is a rule, not a per-item tick box.** `settings.outlierMode` is
+`'off' | 'auto' | 'days'` and `settings.outlierDays` is the typed cutoff. Nothing
+is stored per row, so there is no new wire letter and no hydrate whitelist entry —
+only `normalizeSettings`, which coerces both (settings ride into a SHARE LINK, so
+both arrive attacker-controlled). The rule collapses to ONE stateable number,
+which is why the screen can say *"ignoring 4 items over 87 days"* — a claim a
+reader can check against the scatter and argue with, where a hand-curated list of
+exclusions is a judgement nobody else can see.
+
+**2. It removes a DURATION, never a DELIVERY.** An ignored item still counts as
+delivered, started, raised, in progress and (if a defect) unplanned. Only its
+cycle time, lead time and stage times leave the pool. Throughput, net flow, the
+CFD, WIP, aged work, the defect rate and both forecasts are pinned byte-identical
+by a test with nine equality assertions. **You cannot fix an average by claiming
+the team shipped one fewer item.** This is also what made the change small: the
+app already had a "this item has no cycle time" path (`cycleTimeOf` returns null
+for an item with no start date) and every consumer already handled it.
+
+### Three things that must not regress
+
+- **Aged work and the Work Item Age chart are out of scope, permanently.** They
+  measure work in flight, which has no cycle time to be an outlier of. An item
+  open for 300 days is the finding; a setting that quietly stopped counting it
+  would be the one genuinely harmful thing here. `ageLines` filters the `outlier`
+  key out of the scatter's lines it borrows — and note that leaving it in did not
+  merely look wrong, it took the whole dashboard down, because the age chart looks
+  each line's key up in a style table and an unknown key is `undefined.colour`.
+- **`summary.sleMet` deliberately refuses to see the setting.** It is computed
+  over `windowCyclesAll` — every finished item, ignored ones included. A target is
+  a promise about real work and the items that broke it are exactly what an
+  outlier rule takes out; read over the fenced pool, a team's 85% ≤ target flipped
+  from "not met" to "met" the moment the setting went on, which would make a
+  switch in Settings the cheapest way to pass a service level. The tile's foot
+  carries `sleJudgedIncludesIgnored` so "7.0 … target 10.0 — not met" reads as a
+  statement about two populations rather than as a bug.
+- **The fence is PER TEAM on All Teams, never shared.** Do not "fix" this into a
+  shared parameter the way `asOf` is shared. A shared date is a fairness rule; a
+  shared fence is the opposite — a platform team at sixty days and a support team
+  at three do not have the same idea of unusual, and the estate's pooled fence is
+  wide enough to catch neither. It also keeps a team's figures identical on the
+  table and on its own dashboard. A test pins all of it.
+
+### The rule itself
+
+`outlierCutoffOf(values, mode, typedDays)` — Q3 + **3** × IQR, not the textbook
+1.5. Cycle times are strongly right-skewed and this app's headline figure is the
+85th percentile, which *lives* in the tail; a 1.5 fence eats a legitimate tail and
+quietly reshapes the number teams forecast with. Twelve-item floor on `auto` only
+— a typed fence is not derived from the data, so a small sample cannot make it
+wrong. Scoped to the **window**, like every other figure (see the stage-times
+comment for the card that had to learn this).
+
+### What it says, and where
+
+`outlierPhrase` / `outlierNote` / `outlierFoot` — one wording, three punctuations.
+The window note, the four duration cards' titles and the cycle/lead/percentile
+tile feet. Silent when the fence caught nothing. On the scatter the ignored dots
+are **still drawn**, as hollow rings under a dotted line at the cutoff, and they
+stay clickable to copy a key — the one chart whose job is showing the spread must
+not hide the spread. Shape, not colour alone, per the family rule.
+
+**No Loaded Data column**, and that was a deliberate reversal during the build:
+that table lists stored rows with no window or filter in view, so marking a row
+there would state a window-relative fact on a screen with no window. The scatter
+is the identification surface, and it already names and copies.
+
+### One thing fixed in passing
+
+The debounced settings listener called `renderDashboard()`, so a setting changed
+while standing on All Teams left that tab stale until you switched away and back.
+Now `renderViews()`. Pre-existing; it affected `agedDays` too.
+
 ## Six Gaps Closed (2026-08-22) — SCHEMA 9 → 10
+
 
 Asked for as a set, after a review that listed what the app was missing. Five features and one
 piece of plumbing. The two that touch storage are first; the rest change no saved field.
