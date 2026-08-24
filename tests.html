@@ -3070,7 +3070,16 @@ async function run(TD, win) {
      only ever public files, and that it stays small and same-origin. Cache
      Storage is origin-wide, shared with Sprint Velocity and financial-plan, so
      "nothing private is ever cached" is the single promise holding that up. */
-  const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  /* Loop until the source stops changing. A SINGLE pass is fooled by a comment that
+   contains a comment opener: one sweep over `/* a /* b */` leaves a live `/*` behind,
+   and a helper that can be wrong about what is commented out is one that can miss a
+   live off-origin script — which is the whole reason these suites read the source. */
+const stripComments = (src) => {
+  let out = src, prev;
+  do { prev = out; out = out.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''); }
+  while (out !== prev);
+  return out;
+};
   const [swRes, killRes, appRes] = await Promise.all(
     [bustFetch('sw.js'), bustFetch('sw-kill.js'), bustFetch('index.html')]);
   ok(swRes.ok, 'sw.js is missing');
@@ -3196,8 +3205,9 @@ async function run(TD, win) {
      && /\.tile-help \{[^}]*border-radius: 50%;/.test(APP_SRC)
      && /\.tile-help \{[^}]*background: transparent;/.test(APP_SRC),
      'the dot is the family circle: 16px, outlined, and opted out of any button floor');
-  ok(/\.tile-help::after \{ content: ''; position: absolute; inset: -4px; \}/.test(APP_SRC),
-     "the 24px tap target, WCAG 2.2's, and not the circle's own size");
+  ok(/\.tile-help::after \{ content: ''; position: absolute; inset: -5px; \}/.test(APP_SRC),
+     "a true 24px tap target: -5px, because `inset` grows from the PADDING box "
+       + "and the 1px border made -4px a 22px target");
   ok(/\.tile-help:hover \{ background: var\(--surface-alt\); border-color: var\(--text-secondary\);/
      .test(APP_SRC),
      'and the hover fills rather than borrowing --focus-border, which would say '
