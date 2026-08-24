@@ -365,6 +365,35 @@ this file was written to keep out. **Read this whole section before changing any
   the strength of column order. A date, type or key role also **wins a contested column
   outright**, and the stage that wanted it goes into `columns.stageClash` so the report can say
   so — otherwise a stage aliased `Created` simply reports nothing and nobody can see why.
+- **A duration column may not take a date role, and it takes TWO guards to stop it (2026-08-24).**
+  A real Jira-changelog export names its columns `Days in Backlog`, `Days in Ready for Work`,
+  `Days in In Progress`, `Days in SIT`, `Days in Done`, `Days Blocked` — and the date patterns
+  here are loose on purpose, because a date column can be called almost anything. So
+  `/in.?progress/` matches `Days in In Progress` and `/done/` matches `Days in Done`: for one
+  export the ONLY thing keeping the completion date off a column of day counts was `Resolved`
+  happening to sit earlier in the row. The failure is silent — a day count is not a date, so
+  every row comes out unfinished and the throughput reads zero with nothing on screen saying
+  why. `detectColumns` now runs each heading-matched role in **two passes**:
+  1. **fussy** — the stage columns are hidden (`stageSkip`), and a *date* role additionally
+     declines any column that has values and whose values are not dates (`datey`);
+  2. **the old matcher, untouched** — every heading a candidate again.
+
+  Both halves are load-bearing and neither covers the other. The stage skip cannot protect
+  `Days in Done`, because that column must be **aliased to nothing** (see below) and so is
+  invisible to it; the value test cannot protect a stage column that is legitimately empty in
+  this particular export. And the second pass is what keeps the guard a *preference* rather
+  than a rule: a `Resolved` column full of dates this app cannot parse still lands in the
+  completed role and still reports its unreadable cells, instead of vanishing into "no
+  completion column" and taking the diagnostic with it. `datey` passes an entirely EMPTY
+  column deliberately — an export of nothing but work in flight has an empty `Resolved`, and
+  that is still the completion date.
+- **Two columns of a changelog export must NOT be aliased to a stage, and both look like they
+  should be.** `Days in Done` is an open interval that runs to the moment the export was taken,
+  so it grows on every re-run — alias it and the biggest stage on the chart is one that means
+  "how long ago did this finish". `Days Blocked` is the **Flagged** flag, which runs
+  *concurrently* with whatever status the item is sitting in — on a real row the four real
+  stages already summed to the item's entire age, and adding blocked time took the total 15%
+  past it. Neither is a stage; the first is not a duration at all and the second is an overlay.
 - **The report names columns BY POSITION and stages by the reader's own name — never the
   heading out of the export.** This report has never echoed a pasted cell and a heading is a
   pasted cell. Somebody matching up a column reads the heading off the export they still have

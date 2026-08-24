@@ -301,7 +301,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 2010;
+const EXPECTED = 2019;
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
    strip does not reach. So the comments come out before the page is matched
@@ -974,6 +974,66 @@ async function run(TD, win) {
      'an alias naming a date column loses to the date, and the clash is reported');
   is(clashPaste.columns.created, 1, 'the created date is still read from it');
   is(clashPaste.columns.stages.map(c => c.index), [7], 'the stage keeps its other column');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('workflow stages — a duration column may not take a date role');
+
+  /* The shape a Jira-changelog export has (Charles's, 2026-08-24), and the case
+     both guards in detectColumns exist for. Three of its headings answer a date
+     role's regex without being a date: "Days in In Progress" offers
+     /in.?progress/ to started, "Days in Done" offers /done/ to completed, and
+     both are columns of day counts. Days in Done is aliased to NOTHING on
+     purpose — it is an open interval that grows until the export is re-run, so
+     it must never be a stage, which is exactly why hiding the stage columns
+     cannot be the whole guard. */
+  const flowStages = [
+    { id: 'fb', name: 'Backlog',  match: ['Days in Backlog', 'Backlog'] },
+    { id: 'fw', name: 'Ready',    match: ['Days in Ready for Work', 'Ready for Work'] },
+    { id: 'fp', name: 'Progress', match: ['Days in In Progress', 'In Progress'] },
+    { id: 'fs', name: 'SIT',      match: ['Days in SIT', 'SIT'] }
+  ];
+  const roles = c => ({ completed: c.completed, started: c.started, created: c.created,
+                        type: c.type, key: c.key, status: c.status });
+
+  const flow = TD.parsePastedRows([
+    'Issue Type\tIssue key\tStatus\tResolved\tActual Start Date\tCreated'
+      + '\tDays in Backlog\tDays in Ready for Work\tDays in In Progress\tDays in SIT\tDays in Done',
+    'Story\tDAE-1441\tDone\t2026-07-30\t2026-07-22\t2026-07-21\t0.01\t1.06\t3.84\t4.16\t25.01',
+    'Story\tDAE-1440\tDone\t2026-07-24\t2026-07-21\t2026-07-21\t0\t0\t3.17\t0\t30.9'
+  ].join('\n'), 'auto', flowStages);
+  is(roles(flow.columns), { completed: 3, started: 4, created: 5, type: 0, key: 1, status: 2 },
+     'the changelog export reads clean: every role lands on the column it names');
+  is(flow.columns.stages.map(c => c.index), [6, 7, 8, 9],
+     'the four aliased stages keep their columns');
+  is(flow.columns.stageClash, [], 'and nothing is set aside, because nothing was contested');
+  is(flow.rows[0].stages, { fb: 0.01, fw: 1.06, fp: 3.84, fs: 4.16 },
+     'the day counts land against stage ids, and the unaliased Days in Done is not stored');
+
+  /* THE regression this is for. Column order is the exporter's choice and it
+     already moved once between two runs of the same script. With the dates
+     AFTER the durations the old matcher read 3.84 as the start date and 25.01 as
+     the completion date; every row came out unfinished, and the dashboard showed
+     a throughput of zero with nothing on screen to say why. */
+  const moved = TD.parsePastedRows([
+    'Issue Type\tIssue key\tStatus\tDays in In Progress\tDays in Done\tResolved\tActual Start Date',
+    'Story\tDAE-1441\tDone\t3.84\t25.01\t2026-07-30\t2026-07-22',
+    'Story\tDAE-1440\tDone\t3.17\t30.9\t2026-07-24\t2026-07-21'
+  ].join('\n'), 'auto', flowStages);
+  is(moved.columns.completed, 5,
+     'a column of day counts headed "Days in Done" is not the completion date');
+  is(moved.columns.started, 6, 'nor is "Days in In Progress" the start date');
+  is(moved.rows[0].stages, { fp: 3.84 }, 'the stage still reads its own column');
+  is(moved.rows.length, 2, 'and both rows are read as completed work, not silently dropped');
+
+  /* The second, unfussy pass, proved. A date role PREFERS a column of dates; it
+     does not require one, or a Resolved column this app cannot parse would stop
+     being the completion column and take its own error report with it. */
+  const unreadable = TD.parsePastedRows([
+    'Issue key\tResolved\tIn Progress',
+    'DAE-1\tyesterday\t2026-07-22'
+  ].join('\n'), 'auto', []);
+  is(unreadable.columns.completed, 1,
+     'a completion column whose dates are unreadable is still found, not skipped past');
 
   /* ────────────────────────────────────────────────────────── */
   group('workflow stages — the storage boundary');

@@ -3166,10 +3166,18 @@ const HEADER_PATTERNS = {
   status:    [/^\s*(current\s*)?status\s*$/i]
 };
 
-function matchHeader(header, field) {
+/* Both extra arguments are optional, and with neither passed this is exactly the
+   matcher it has always been — which is what the second, unfussy pass in
+   detectColumns wants. `skip` holds the column indices a stage alias has already
+   claimed; `accept` is a per-column test the match must also satisfy. See
+   detectColumns for why a role looks past those columns, and at the values, on
+   the way in. */
+function matchHeader(header, field, skip, accept) {
   if (!header) return -1;
   for (const pattern of HEADER_PATTERNS[field]) {
-    const i = header.findIndex(h => pattern.test(String(h || '')));
+    const i = header.findIndex((h, idx) =>
+      (!skip || !skip.has(idx)) && (!accept || accept(idx))
+      && pattern.test(String(h || '')));
     if (i >= 0) return i;
   }
   return -1;
@@ -3213,24 +3221,83 @@ function columnStats(rows, order) {
  */
 function detectColumns(rows, header, order, stages) {
   const stats = columnStats(rows, order);
+  /* The stage columns are worked out FIRST, and every heading-matched role below
+     then looks PAST them before it looks at them.
+
+     The two kinds of match are not equally trustworthy, and that is the whole
+     reason. A stage column is only ever a heading that EXACTLY equals an alias
+     the reader typed by hand. A date role is a loose regex that may match
+     anywhere inside a heading — deliberately, because a date column can be
+     called almost anything. Put a real changelog export in front of the old
+     order and the loose one wins a column it has no business in: a file with
+     "Days in In Progress" and "Days in Done" in it offers /in.?progress/ and
+     /done/ a match each, and only the accident of a genuine Resolved column
+     appearing EARLIER in the row kept the completion date off a column of day
+     counts. That failure is silent, which is what makes it worth code: a day
+     count is not a date, so every row would simply come out unfinished and the
+     throughput would read zero with nothing on screen to say why.
+
+     Looking past a stage column is not the same as forbidding it, which is why
+     the second pass exists. An alias reading "Created" against an export whose
+     only created column is that one must still give the date its column, or a
+     stage set up months ago quietly costs a reader their lead time. That case is
+     unchanged — the date still wins, and stageClash below still reports it. What
+     has changed is that it now happens only when the role has nowhere else to
+     go. */
+  const stageCols = stageColumnsFor(header, stages);
+  const stageSkip = new Set(stageCols.map(sc => sc.index));
+  /* The second half of the same guard, and the half the first cannot do without.
+     Hiding the stage columns only protects a heading the reader has ALREADY
+     claimed, and the heading most likely to steal a date role is one they were
+     told to leave alone: "Days in Done" is an open interval that grows until the
+     export is re-run, so it must never be a stage — and being no stage, nothing
+     above hides it from /done/. So a date role also declines a column that HAS
+     values and whose values are not dates. A column of day counts is then not a
+     completion date whatever its heading says.
+
+     `filled === 0` passes deliberately: an export of nothing but work in flight
+     has an empty Resolved column, and that column is still the completion date.
+     One parsed date in four hundred rows is enough — a mostly-unfinished export
+     is the normal case here, not the odd one. */
+  const datey = (i) => !stats[i] || stats[i].filled === 0 || stats[i].dateRate > 0;
+  const DATE_ROLE = { completed: true, started: true, created: true };
+  /* Two passes, and the second is the old matcher untouched: every heading is a
+     candidate again, values and stage claims included. So the guard only ever
+     changes which column a role PREFERS, never whether the role is found at all
+     — a paste whose one Resolved column holds dates this app cannot read still
+     lands there and still reports its unreadable cells, rather than vanishing
+     into "no completion column" and taking the diagnostic with it. */
+  const roleAt = (field) => {
+    const clear = matchHeader(header, field, stageSkip,
+      DATE_ROLE[field] ? datey : null);
+    return clear >= 0 ? clear : matchHeader(header, field);
+  };
   /* Only the strict start patterns — "In Progress"/"Start"/"Begin" — so that a
      Created column can be recognised as created first, and then fall back into
-     the started slot only if nothing better claimed it. */
-  const startedStrict = header
-    ? header.findIndex(h => /start|begin|in.?progress/i.test(String(h || ''))) : -1;
+     the started slot only if nothing better claimed it. Two passes over the
+     stage columns for the same reason as roleAt, and this is the role that
+     needed it most: "In Progress" is both the commonest start heading there is
+     and the commonest stage name on a board. */
+  const startAt = (skip, fussy) => header
+    ? header.findIndex((h, i) =>
+        !skip.has(i) && (!fussy || datey(i))
+        && /start|begin|in.?progress/i.test(String(h || '')))
+    : -1;
+  const startedClear = startAt(stageSkip, true);
+  const startedStrict = startedClear >= 0 ? startedClear : startAt(new Set(), false);
   const map = {
-    completed: matchHeader(header, 'completed'),
+    completed: roleAt('completed'),
     started:   startedStrict,
     created:   -1,
-    type:      matchHeader(header, 'type'),
-    key:       matchHeader(header, 'key'),
+    type:      roleAt('type'),
+    key:       roleAt('key'),
     /* Found whether or not any stage will claim a value in it, and that is
        deliberate: a Status column is a short repeated label, which is exactly
        what the work-type detector below hunts for, and "Ready for Code Review"
        is under cleanWorkType's 40-character cap. Before this role existed a
        headerless-type export could have its statuses filed as work types.
        Naming the column takes it out of taken()'s reach. */
-    status:    matchHeader(header, 'status'),
+    status:    roleAt('status'),
     /* Stage columns are found by HEADING ONLY, and there is no headerless
        fallback for them — deliberately. Every other role here can be found from
        the values when a heading is missing, because a date looks like a date and
@@ -3239,9 +3306,9 @@ function detectColumns(rows, header, order, stages) {
        somebody's review time to their test stage on the strength of column
        order. A stage column is only ever a column whose heading matches an alias
        the reader typed. */
-    stages: stageColumnsFor(header, stages)
+    stages: stageCols
   };
-  const createdByHeader = matchHeader(header, 'created');
+  const createdByHeader = roleAt('created');
   if (createdByHeader >= 0 && createdByHeader !== map.completed && createdByHeader !== map.started) {
     map.created = createdByHeader;
   }

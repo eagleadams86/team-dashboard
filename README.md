@@ -1220,6 +1220,51 @@ status — but it is **exact, never a partial match**. An alias of `Testing` wil
 swallow a *Waiting on Testing Env* column and add somebody's environment queue to your test
 time. If two stages list the same status, the app says so as you type rather than picking one.
 
+### If Your Export Names Its Columns "Days in …"
+
+A changelog-derived export — the kind a script builds from Jira's own history rather than from a
+marketplace field — usually names its columns for the status they measure: `Days in Backlog`,
+`Days in Ready for Work`, `Days in In Progress`, `Days in SIT`. Give each stage **two aliases**,
+the column heading and the bare status name:
+
+| Stage | Aliases |
+|---|---|
+| Backlog | `Days in Backlog`, `Backlog` |
+| Ready for Work | `Days in Ready for Work`, `Ready for Work` |
+| In Progress | `Days in In Progress`, `In Progress` |
+| SIT | `Days in SIT`, `SIT` |
+
+The second one is not redundant. The same list does two jobs: it matches the **column headings**,
+which carry the durations, and it matches the **Status cell** on work still in flight, which is
+what puts an item on the [work item age](#work-item-age-what-to-do-this-morning) chart. One
+without the other gets you half the feature.
+
+**Two columns such an export almost always has should be aliased to nothing at all**, and both
+look like they should be:
+
+- **`Days in Done`** is not a duration. It counts from the moment the item finished to the moment
+  you took the export, so it grows every time you re-run the script. Alias it and the biggest
+  stage on your chart is one that means "how long ago did this finish".
+- **`Days Blocked`** is usually the *Flagged* flag, and a flag runs **at the same time** as
+  whatever status the item is sitting in — the item is blocked *and* in SIT, not blocked
+  *instead of* SIT. Its days are already inside the other columns, so counting it as a stage
+  counts them twice.
+
+Leave both out of your aliases and the app ignores them. You do not need to delete them from the
+file.
+
+Two more things about that kind of export, neither of them the app's doing:
+
+- **A cancelled item usually carries a resolution date**, which means the dashboard reads it as
+  delivered work — inflating throughput and putting a cycle time on something nobody finished.
+  Filter it out where you build the export (`AND status != Cancelled`, or your board's
+  equivalent).
+- **The day counts are calendar days.** They come out of Jira's own history, which does not know
+  about your weekends, so *Count working days only* in Settings cannot reach them. It still
+  applies to cycle and lead time, which this app measures from your dates — so on a board with
+  both, those two figures are on a different clock from the Time in Stage table. Worth knowing
+  before the two are read side by side.
+
 **Deleting a stage takes its figures with it, and the confirm counts them both ways** — the
 time items spent in it, and the items sitting in it right now, which on an ordinary Status-only
 export is all there is. No work item is deleted, and re-pasting the same export brings the
