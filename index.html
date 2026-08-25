@@ -503,12 +503,37 @@ select { cursor: pointer; }
    exactly what the orphaned-field rule forbids. Explicit columns give the two
    boxes a sensible cap on a wide window and one full-width column on a narrow
    one, with nothing left over either way. */
+/* AUTO-FIT since the scope and counting-from pickers joined the row (2026-08-25).
+   It was three explicit columns — two boxes and the caveat — which is exactly the
+   shape that strands a field the moment a fourth one appears, and two of these
+   four come and go with the data. Auto-fit lets however many are on screen share
+   the line evenly and drop to one column on a phone with nothing left over. */
 .forecast-ask { grid-column: 1 / -1; display: grid; gap: 12px 16px; align-items: end;
-  grid-template-columns: minmax(0, 200px) minmax(0, 200px) minmax(200px, 1fr); }
-@media (max-width: 720px) { .forecast-ask { grid-template-columns: minmax(0, 1fr); } }
-/* The caveat takes what is left of the row beside the boxes, and its own row
-   under them once the columns collapse. */
-.forecast-ask .hint { margin: 0 0 4px; }
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+/* The prose takes a row of its own rather than a column, because it is a
+   sentence about all of the boxes rather than about the one beside it. */
+.forecast-ask .hint, .forecast-ask .note { grid-column: 1 / -1; margin: 0; }
+
+/* ── The scenario block ────────────────────────────────────────────────────
+   A <details> spanning the whole group. Its own surface so the knobs read as a
+   thing you are setting rather than as more of the answer. */
+.forecast-scenario { grid-column: 1 / -1; border: 1px solid var(--border-control);
+  border-radius: var(--radius); padding: 12px 16px; background: var(--surface); }
+.forecast-scenario > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 600;
+  color: var(--text-secondary); list-style-position: outside; }
+.forecast-scenario[open] > summary { margin-bottom: var(--sp-5); }
+/* Says WHAT is on when the block is shut, so a closed scenario is never hiding
+   an adjustment. */
+.forecast-scenario > summary .on { font-weight: 400; color: var(--text-muted); }
+/* Two number boxes reading "3 to 7", which is one control rather than two —
+   hence one label above the pair and an aria-label on each half. */
+.row-pair { display: flex; align-items: center; gap: 8px; }
+.row-pair input { min-width: 0; }
+.row-pair .to { color: var(--text-muted); font-size: var(--fs-xs); flex: none; }
+/* The assumptions, under the tiles. */
+#fcAssumptions { grid-column: 1 / -1; }
+#fcAssumptions ul { margin: var(--sp-3) 0 0; padding-left: 18px; }
+#fcAssumptions li { margin-bottom: 2px; }
 
 /* The ART scope row: the picker, and beside it the sentence saying what it is
    leaving out. Same grid reasoning as the forecast's own row — an explicit
@@ -2242,6 +2267,117 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
                from the charts above, and that has to be findable rather than
                buried at the end of a paragraph nobody finishes. -->
           <p class="note info" id="fcStale" hidden></p>
+        </div>
+
+        <!-- ── The scenario ─────────────────────────────────────────────────
+             Everything a reader can say about how the NEXT few periods will
+             differ from the last few. Behind a <details> because every knob in
+             it defaults to doing nothing: somebody who wants the plain forecast
+             — which is most people, most of the time — should not have to read
+             past seven controls to reach it. The summary line says whether any
+             of them is on, so a closed block is never hiding an adjustment.
+
+             It is not in the header strip and not in Settings, for the same
+             reason the two question boxes are not: it changes nothing outside
+             this group. -->
+        <details class="forecast-scenario" id="fcScenario">
+          <summary><span id="fcScenarioSummary">Adjust for what you know</span></summary>
+
+          <div class="grid two pairs">
+            <div>
+              <label for="scGrowthLo">Each known feature grows by (%)</label>
+              <div class="row-pair">
+                <input type="number" id="scGrowthLo" min="0" max="200" step="1"
+                       inputmode="numeric" aria-label="Scope growth, lowest">
+                <span class="to">to</span>
+                <input type="number" id="scGrowthHi" min="0" max="200" step="1"
+                       inputmode="numeric" aria-label="Scope growth, highest">
+              </div>
+            </div>
+            <div id="scExtraWrap">
+              <label for="scExtraLo">Features discovered later (%)</label>
+              <div class="row-pair">
+                <input type="number" id="scExtraLo" min="0" max="200" step="1"
+                       inputmode="numeric" aria-label="Extra features, lowest">
+                <span class="to">to</span>
+                <input type="number" id="scExtraHi" min="0" max="200" step="1"
+                       inputmode="numeric" aria-label="Extra features, highest">
+              </div>
+            </div>
+          </div>
+          <p class="hint" id="scScopeNote" hidden></p>
+
+          <div class="grid two pairs" style="margin-top:var(--sp-5)">
+            <div id="scClarityWrap">
+              <label for="scClarity">How well understood are they</label>
+              <select id="scClarity"></select>
+            </div>
+            <div>
+              <label for="scConfidence">The team doing the work</label>
+              <select id="scConfidence"></select>
+            </div>
+            <div id="scParallelWrap">
+              <label for="scParallel">Features worked at once</label>
+              <input type="number" id="scParallel" min="1" max="10" step="1" inputmode="numeric">
+            </div>
+            <div>
+              <label for="scUnavailable" id="scUnavailableLabel">Periods nobody is delivering</label>
+              <input type="number" id="scUnavailable" min="0" max="26" step="1" inputmode="numeric">
+            </div>
+          </div>
+
+          <div style="margin-top:var(--sp-5)">
+            <label class="checkline" for="scEstOn">
+              <input type="checkbox" id="scEstOn"><span id="scEstLabel">Use a typed pace instead of this history</span>
+            </label>
+            <div class="grid two pairs" id="scEstWrap" style="margin-top:var(--sp-3)" hidden>
+              <div>
+                <label for="scEstLo" id="scEstRangeLabel">Items finished per period</label>
+                <div class="row-pair">
+                  <input type="number" id="scEstLo" min="0" max="500" step="1"
+                         inputmode="numeric" aria-label="Estimated pace, lowest">
+                  <span class="to">to</span>
+                  <input type="number" id="scEstHi" min="0" max="500" step="1"
+                         inputmode="numeric" aria-label="Estimated pace, highest">
+                </div>
+              </div>
+              <p class="hint" style="margin:0">For a team with no history to resample.
+                <strong>A typed range spreads less than real periods do</strong> &mdash; it has no
+                quiet weeks and no spikes in it &mdash; so treat its confidence as the most
+                generous reading, not the safest one. The team setting above is switched off
+                while this is on: multiplying a guess by a guess compounds two people&rsquo;s
+                pessimism.</p>
+            </div>
+          </div>
+
+          <div class="row spread" style="margin-top:var(--sp-5)">
+            <button class="btn small" type="button" id="scReset">Reset to No Adjustments</button>
+            <span></span>
+          </div>
+        </details>
+
+        <!-- Under the tiles rather than inside an ⓘ, which is the standard the
+             forecast hint already sets: somebody reading a number off a shared
+             screen has to meet the assumptions behind it too. -->
+        <div class="note info" id="fcAssumptions" hidden></div>
+
+        <!-- ── The delivery schedule ────────────────────────────────────────
+             FEATURE VIEW ONLY, and it is the only thing the parallelism control
+             changes — the date they are all done is the same whatever it is set
+             to, which is the finding rather than a limitation. A table, because
+             the answer is one date per feature and a chart of six dates says
+             less than the six dates do. Wide, like the stage-time card. -->
+        <div class="chart-card wide" id="cardSchedule" hidden>
+          <div class="chart-name" id="nameSchedule"></div>
+          <div class="chart-title" id="titleSchedule"></div>
+          <div class="row spread" style="margin-bottom:var(--sp-4)">
+            <span></span>
+            <span id="scheduleExport"></span>
+          </div>
+          <div class="table-scroll">
+            <table class="data" id="scheduleTable"></table>
+          </div>
+          <p class="note info" id="scheduleNote"></p>
         </div>
 
         <div class="tiles group" id="tilesForecast"></div>
@@ -5009,6 +5145,174 @@ function forecastPeriodsFor(samples, items, trials) {
    to six days and make the answer jump as the date crossed a boundary. The
    trial's total is floored, because two thirds of an item is not an item
    anybody receives. */
+/* ── The scenario ───────────────────────────────────────────────────────────
+   Everything a reader can say about how the NEXT few periods will differ from
+   the last few. Every knob defaults to an exact no-op, so a scenario nobody has
+   touched produces the answer this app has always produced — and there is a test
+   asserting the scoped samplers return arrays DEEP-EQUAL to the unscoped ones at
+   defaults, which is the strongest form that promise can take.
+
+   TWO RULES GOVERN ALL OF IT, and both are easy to break by accident.
+
+   1. ONE GENERATOR, AND EVERY KNOB DRAWS UNCONDITIONALLY — even at its default,
+      where the range collapses to exactly 1. If a defaulted knob skipped its
+      draw, turning any one knob on would shift the whole downstream stream and
+      every other number on the card would move for a reason the reader cannot
+      see. `lerp(lo, hi, u)` with lo === hi consumes the draw and returns lo
+      exactly. The cost is about five extra mulberry32 calls per trial.
+
+   2. THE EXISTING SAMPLERS ARE NOT TOUCHED. forecastPeriodsFor and
+      forecastItemsIn are pinned by tests written before any of this existed.
+      The scenario-aware versions are NEW functions beside them. */
+
+const lerp = (lo, hi, u) => (lo === hi ? lo : lo + (hi - lo) * u);
+
+/* How much less certain a feature's size is than the finished ones it is being
+   sized from. It WIDENS the drawn size rather than inflating it — that is the
+   difference between "we are less sure" and "it will be bigger", and only one of
+   them is what a reader means by "this one isn't well understood".
+
+   The ranges are the cone of uncertainty, deliberately compressed, for two
+   reasons. The sizes being multiplied ALREADY carry this board's own spread, so
+   a full textbook cone on top double-counts the variance the size distribution
+   measured directly — this is a RESIDUAL uncertainty knob, not an estimation
+   cone from nothing. And a 4x upper bound makes the 95th so large that the
+   spread guard below refuses every time, which would be shipping a control whose
+   only output is a refusal.
+
+   The asymmetry is intentional and is not a bug: the median rises as the steps
+   go on, because software uncertainty is one-tailed — features come in bigger
+   than expected far more often than smaller. A symmetric range would imply half
+   of all vague features land at half their size, which nobody has observed. */
+const CLARITY_STEPS = [
+  { label: 'Well understood', lo: 1, hi: 1 },
+  { label: 'Mostly clear', lo: 0.9, hi: 1.4 },
+  { label: 'Roughly sized', lo: 0.8, hi: 2 },
+  { label: 'Barely understood', lo: 0.7, hi: 3 }
+];
+
+/* How much the team that will do the work differs from the team whose history is
+   being resampled. Answers "the pace I am dealing from was set by a different
+   team from the one that will deliver this".
+
+   NO STEP GOES MEANINGFULLY ABOVE 1, and that is a deliberate refusal rather
+   than an oversight. An upper end well above 1 would let somebody forecast a
+   SPEED-UP out of a reorganisation, which is the most-abused claim in this
+   domain, and this app should not supply the arithmetic for it. If the team is
+   unchanged, the default is the honest setting. */
+const TEAM_CONFIDENCE_STEPS = [
+  { label: 'Established team', lo: 1, hi: 1 },
+  { label: 'Recently changed', lo: 0.8, hi: 1.05 },
+  { label: 'Brand new', lo: 0.5, hi: 0.9 }
+];
+
+const SCOPE_GROWTH_MAX = 200;      /* per cent; above this you are inventing */
+const EST_THROUGHPUT_MAX = 500;
+const FORECAST_MAX_UNAVAILABLE = 26;
+const FORECAST_MAX_PARALLEL = 10;
+/* Past ten, a schedule is indistinguishable from "everything at once". */
+
+const DEFAULT_SCENARIO = { growthLo: 0, growthHi: 0, extraLo: 0, extraHi: 0,
+  clarity: 0, confidence: 0, estOn: false, estLo: 0, estHi: 0,
+  parallel: 1, unavailable: 0 };
+
+/* Read out of `view`, where a hand-edited copy can say anything, and pinned to
+   something sane at the point of use like every other view field. */
+function scenarioFrom(raw) {
+  const s = Object.assign({}, DEFAULT_SCENARIO, (raw && typeof raw === 'object') ? raw : {});
+  const pct = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, Math.min(SCOPE_GROWTH_MAX, n)) : 0;
+  };
+  /* Clamped at zero on the low side deliberately. A negative low would let
+     somebody forecast their way to a date by typing "scope shrinks 40%", and
+     scope shrink is not a risk anybody plans for. */
+  s.growthLo = pct(s.growthLo); s.growthHi = pct(s.growthHi);
+  if (s.growthHi < s.growthLo) s.growthHi = s.growthLo;
+  s.extraLo = pct(s.extraLo); s.extraHi = pct(s.extraHi);
+  if (s.extraHi < s.extraLo) s.extraHi = s.extraLo;
+  const step = (v, list) => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) && n >= 0 && n < list.length ? n : 0;
+  };
+  s.clarity = step(s.clarity, CLARITY_STEPS);
+  s.confidence = step(s.confidence, TEAM_CONFIDENCE_STEPS);
+  s.estOn = s.estOn === true;
+  const est = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.min(EST_THROUGHPUT_MAX, n) : 0;
+  };
+  s.estLo = est(s.estLo); s.estHi = est(s.estHi);
+  if (s.estHi < s.estLo) s.estHi = s.estLo;
+  /* A typed range with no numbers in it is not a throughput estimate. */
+  if (!(s.estLo > 0)) s.estOn = false;
+  /* Clamped when it is a number out of range, defaulted when it is not a number
+     at all — the split forecastItems already draws. A typed 20 means "as many as
+     you can", which is the cap; a typed "banana" means nothing, which is the
+     default. Resetting an over-range number to the default would silently turn
+     "everything at once" into "one at a time", which is the opposite answer. */
+  const int = (v, lo, hi, dflt) => {
+    const n = Math.round(Number(v));
+    if (!Number.isFinite(n)) return dflt;
+    return Math.max(lo, Math.min(hi, n));
+  };
+  s.parallel = int(s.parallel, 1, FORECAST_MAX_PARALLEL, 1);
+  s.unavailable = int(s.unavailable, 0, FORECAST_MAX_UNAVAILABLE, 0);
+  return s;
+}
+
+const scenarioIsDefault = (s) =>
+  !!s && Object.keys(DEFAULT_SCENARIO).every(k => s[k] === DEFAULT_SCENARIO[k]);
+
+/* Every knob that is NOT at its default, in words, for the list under the tiles.
+   Built here rather than in the renderer so a test can pin that a default
+   scenario produces an empty array — the other half of the no-op promise. */
+function scenarioAssumptions(s, unitMany) {
+  if (!s) return [];
+  const out = [];
+  const many = unitMany || 'items';
+  const range = (lo, hi) => lo === hi ? lo + '%' : lo + '% to ' + hi + '%';
+  if (s.estOn) out.push({ key: 'est', label: 'Estimated pace',
+    value: s.estLo === s.estHi ? String(s.estLo) : s.estLo + '\u2013' + s.estHi,
+    wording: 'dealt from a typed range of ' + (s.estLo === s.estHi ? s.estLo
+      : s.estLo + ' to ' + s.estHi) + ' ' + many + ' a period instead of from history' });
+  if (s.growthHi > 0) out.push({ key: 'growth', label: 'Scope growth',
+    value: range(s.growthLo, s.growthHi),
+    wording: 'each known feature grows by ' + range(s.growthLo, s.growthHi) });
+  if (s.extraHi > 0) out.push({ key: 'extra', label: 'Features discovered later',
+    value: range(s.extraLo, s.extraHi),
+    wording: range(s.extraLo, s.extraHi) + ' more features turn up than are counted' });
+  if (s.clarity > 0) out.push({ key: 'clarity', label: 'Feature clarity',
+    value: CLARITY_STEPS[s.clarity].label,
+    wording: 'each feature sized ' + CLARITY_STEPS[s.clarity].lo + '\u00d7 to '
+      + CLARITY_STEPS[s.clarity].hi + '\u00d7 what your finished ones took' });
+  if (s.confidence > 0) out.push({ key: 'confidence', label: 'Team confidence',
+    value: TEAM_CONFIDENCE_STEPS[s.confidence].label,
+    wording: 'the pace scaled ' + TEAM_CONFIDENCE_STEPS[s.confidence].lo + '\u00d7 to '
+      + TEAM_CONFIDENCE_STEPS[s.confidence].hi + '\u00d7 each period' });
+  if (s.unavailable > 0) out.push({ key: 'unavailable', label: 'Periods unavailable',
+    value: String(s.unavailable),
+    wording: s.unavailable + ' period' + (s.unavailable === 1 ? '' : 's')
+      + ' of no delivery inside the window' });
+  if (s.parallel > 1) out.push({ key: 'parallel', label: 'Features in parallel',
+    value: String(s.parallel),
+    wording: s.parallel + ' features worked at once \u2014 changes each feature\u2019s date, '
+      + 'not the date they are all done' });
+  return out;
+}
+
+/* The combined effect on scope, said as ONE line. Scope growth and extra
+   features are relabelled to be genuinely orthogonal — one is growth WITHIN the
+   features you counted, the other is features you did not count — but a reader
+   who sets both is still entitled to see what they multiply to, because "+20%"
+   and "+20%" reads like +40% and is +44%. */
+function scenarioScopeRange(s) {
+  if (!s) return null;
+  const lo = (1 + s.growthLo / 100) * (1 + s.extraLo / 100) * CLARITY_STEPS[s.clarity].lo;
+  const hi = (1 + s.growthHi / 100) * (1 + s.extraHi / 100) * CLARITY_STEPS[s.clarity].hi;
+  return (lo === 1 && hi === 1) ? null : { lo, hi };
+}
+
 /* ── Forecasting FEATURES, by decomposition ────────────────────────────────
    The obvious approach — resample how many features completed per period — is
    the wrong one on nearly every real board, and it fails in a way the existing
@@ -5131,9 +5435,16 @@ function featureForecastOf(o) {
   const sizes = o.sizes || [], samples = o.itemSamples || [];
   const wanted = Math.max(1, Math.min(Math.round(o.featureCount) || 1, FORECAST_MAX_FEATURES));
 
+  const sc = scenarioFrom(o.scenario);
+  const plain = scenarioIsDefault(sc);
+
   const reason =
-      samples.length < FORECAST_MIN_PERIODS ? 'few-periods'
-    : !samples.some(v => v > 0) ? 'no-throughput'
+      /* A typed estimate supplies its own pace, so the history floors do not
+         reach it — that is the whole point of the control. The SIZE floors still
+         do: a feature forecast cannot be built without knowing how big a feature
+         is, whatever the pace comes from. */
+      (!sc.estOn && samples.length < FORECAST_MIN_PERIODS) ? 'few-periods'
+    : (!sc.estOn && !samples.some(v => v > 0)) ? 'no-throughput'
     /* Checked BEFORE the size count, because a thin join is why the size count
        is low — reporting the symptom would send the reader to find more
        finished features when the column they need is missing. */
@@ -5141,16 +5452,21 @@ function featureForecastOf(o) {
     : sizes.length < FEATURE_MIN_SIZES ? 'few-sizes'
     : null;
 
+  /* The same dispatch derive() uses: at defaults, the original sampler runs. */
   const whenPeriods = reason ? null
-    : forecastFeaturePeriods(samples, sizes, wanted, FORECAST_TRIALS);
+    : plain ? forecastFeaturePeriods(samples, sizes, wanted, FORECAST_TRIALS)
+            : forecastFeaturePeriodsScoped(samples, sizes, wanted, sc, FORECAST_TRIALS);
   const whenTrials = whenPeriods
     && whenPeriods.map(p => periodsToDays(o.countFrom, p, o.bucket));
   const manyTrials = reason ? null
-    : forecastFeaturesIn(samples, sizes, o.horizonPeriods, FORECAST_TRIALS);
+    : plain ? forecastFeaturesIn(samples, sizes, o.horizonPeriods, FORECAST_TRIALS)
+            : forecastFeaturesInScoped(samples, sizes, o.horizonPeriods, sc, FORECAST_TRIALS);
 
   const beyond = !!whenPeriods
     && percentileOf(whenPeriods, FORECAST_CONFIDENCE[FORECAST_CONFIDENCE.length - 1])
        >= FORECAST_MAX_PERIODS;
+  const spread = whenTrials ? spreadRatioOf(whenTrials, true) : null;
+  const tooWide = !plain && spread != null && spread >= FORECAST_SPREAD_MAX;
 
   return {
     reason,
@@ -5172,18 +5488,396 @@ function featureForecastOf(o) {
     countingFromToday: !!o.countingFromToday,
     lostPeriods: o.lostPeriods || 0,
     coverageEnd: o.coverageEnd || null,
-    when: (whenTrials && !beyond) ? {
+    scenario: sc,
+    assumptions: scenarioAssumptions(sc, 'features'),
+    scopeRange: scenarioScopeRange(sc),
+    estimated: sc.estOn,
+    spread, tooWide, spreadMax: FORECAST_SPREAD_MAX,
+    widestKnob: tooWide ? widestScenarioKnob(sc) : null,
+    when: (whenTrials && !beyond && !tooWide) ? {
       rows: FORECAST_CONFIDENCE.map(c => {
         const days = daysAtConfidence(whenTrials, c);
         return { confidence: c, days, date: addDays(o.countFrom, days) };
       }),
       hist: forecastHistogram(whenTrials, true)
     } : null,
-    howMany: manyTrials ? {
+    howMany: (manyTrials && !tooWide) ? {
       rows: FORECAST_CONFIDENCE.map(c => ({ confidence: c, count: countAtConfidence(manyTrials, c) })),
       hist: forecastHistogram(manyTrials, false)
     } : null
   };
+}
+
+/* ── The scenario-aware samplers ───────────────────────────────────────────
+   New functions beside the originals, never edits to them.
+
+   HOW THE NO-OP PROMISE IS ACTUALLY KEPT, because the obvious way does not work.
+   The plan for this was that a defaulted scenario would produce an array
+   deep-equal to the unscoped sampler's, on the strength of every knob drawing
+   unconditionally so the stream stayed aligned. That cannot hold: these
+   functions draw MORE per trial than the originals do — a growth draw per trial
+   and a confidence draw per period — so the stream is a different length
+   whatever the knobs say, and the arrays cannot match.
+
+   So the promise is kept by DISPATCH instead, which is a stronger guarantee and
+   a simpler one: when the scenario is at its defaults the caller runs the
+   ORIGINAL sampler, untouched and unpinned-by-anything-new. Today's answers are
+   not approximately the same, they are the same code. `scenarioIsDefault` is the
+   switch and a test pins both halves of it.
+
+   Within these functions the unconditional-draw rule still matters, for the
+   reason it always did: turning knob A on must not move the answer knob B was
+   giving. So every knob draws every trial, even at the setting where its range
+   collapses to 1 — never inside an `if`. */
+
+/* One period's delivery, under the scenario. Either dealt from history and
+   scaled by the team-confidence range, or drawn from a typed range instead.
+   BOTH paths consume exactly one throughput draw and one confidence draw, so the
+   stream is the same length whichever is on. */
+function scenarioDeal(samples, n, sc, rnd) {
+  const base = sc.estOn ? lerp(sc.estLo, sc.estHi, rnd()) : samples[(rnd() * n) | 0];
+  /* Team confidence is DISABLED under a typed estimate — multiplying a guess by
+     a guess compounds two people's pessimism, and "3 to 7 a week" already
+     carries whatever uncertainty the person typing it meant. The draw is still
+     taken, so the stream does not shift. */
+  const conf = lerp(TEAM_CONFIDENCE_STEPS[sc.confidence].lo,
+                    TEAM_CONFIDENCE_STEPS[sc.confidence].hi, rnd());
+  return sc.estOn ? base : base * conf;
+}
+
+/* Whether there is any pace at all to deal from. A typed estimate supplies its
+   own, so the history floors do not apply to it — that is the whole point of the
+   control, and the eight-period refusal stays the DEFAULT outcome rather than
+   the only one. */
+const scenarioHasPace = (samples, sc) => sc.estOn
+  ? sc.estLo > 0
+  : (Array.isArray(samples) && samples.length >= FORECAST_MIN_PERIODS
+     && samples.some(v => v > 0));
+
+function forecastPeriodsForScoped(samples, items, sc, trials) {
+  if (!scenarioHasPace(samples, sc)) return null;
+  if (!(items > 0)) return null;
+  const rnd = seededRandom(FORECAST_SEED);
+  const n = (samples || []).length, out = new Array(trials);
+  for (let t = 0; t < trials; t++) {
+    /* Scope growth: work you have not counted yet is work, so ceil rather than
+       round. At the default the multiplier is exactly 1 and ceil(n*1) === n for
+       an integer n, which is what keeps this an exact no-op. */
+    const target = Math.ceil(items * (1 + lerp(sc.growthLo, sc.growthHi, rnd()) / 100));
+    let done = 0, periods = 0;
+    while (done < target && periods < FORECAST_MAX_PERIODS) {
+      const dealt = scenarioDeal(samples, n, sc, rnd);
+      done += dealt; periods++;
+      if (done >= target && dealt > 0) { periods -= (done - target) / dealt; break; }
+    }
+    /* Periods nobody is working. Added flat rather than inserted at random: a
+       zero period contributes nothing and shifts everything after it by exactly
+       one, so where it lands makes no difference to the completion period. The
+       random version is more realistic-LOOKING and costs a second stream for an
+       identical answer. It assumes the shutdown falls inside the window, which
+       the card says. */
+    out[t] = periods + sc.unavailable;
+  }
+  return out;
+}
+
+function forecastItemsInScoped(samples, periods, sc, trials) {
+  if (!scenarioHasPace(samples, sc)) return null;
+  if (!(periods > 0)) return null;
+  const rnd = seededRandom(FORECAST_SEED);
+  const n = (samples || []).length, out = new Array(trials);
+  /* The unavailable periods come off the horizon here rather than being added to
+     it — the date is fixed and the working time inside it is what shrinks. */
+  const usable = Math.max(0, periods - sc.unavailable);
+  const capped = Math.min(usable, FORECAST_MAX_PERIODS);
+  const full = Math.floor(capped), frac = capped - full;
+  for (let t = 0; t < trials; t++) {
+    let total = 0;
+    for (let p = 0; p < full; p++) total += scenarioDeal(samples, n, sc, rnd);
+    if (frac > 0) total += scenarioDeal(samples, n, sc, rnd) * frac;
+    out[t] = Math.floor(total);
+  }
+  return out;
+}
+
+/* The target scope of one trial, in work items: a size per feature, each widened
+   by the clarity range, then the whole thing grown by the scope-growth range.
+
+   CLARITY DRAWS ONCE PER FEATURE, NOT ONCE PER TRIAL, and that is what makes it
+   WIDEN rather than SHIFT. Independent draws across features model independent
+   vagueness — some come in bigger, some smaller, and they partly cancel. A
+   single per-trial multiplier applied to all of them models one correlated
+   shock, never cancels, and overstates the spread on the sum badly. */
+function scenarioTarget(sizes, featureCount, sc, rnd) {
+  const m = sizes.length;
+  const cl = CLARITY_STEPS[sc.clarity];
+  /* Features nobody has written down yet. Ceil, like scope growth, and at the
+     default the multiplier is exactly 1. */
+  const count = Math.min(FORECAST_MAX_FEATURES,
+    Math.ceil(featureCount * (1 + lerp(sc.extraLo, sc.extraHi, rnd()) / 100)));
+  let target = 0;
+  for (let k = 0; k < count; k++) {
+    const drawn = sizes[(rnd() * m) | 0] * lerp(cl.lo, cl.hi, rnd());
+    /* Never below one item: a feature is at least one piece of work, and a
+       fractional size would make the walk's arithmetic meaningless. */
+    target += Math.max(1, Math.round(drawn));
+  }
+  return { target: Math.ceil(target * (1 + lerp(sc.growthLo, sc.growthHi, rnd()) / 100)),
+           count };
+}
+
+function forecastFeaturePeriodsScoped(samples, sizes, featureCount, sc, trials) {
+  if (!scenarioHasPace(samples, sc)) return null;
+  if (!Array.isArray(sizes) || sizes.length < FEATURE_MIN_SIZES) return null;
+  if (!(featureCount > 0)) return null;
+  const rnd = seededRandom(FORECAST_SEED);
+  const n = (samples || []).length, out = new Array(trials);
+  const wanted = Math.min(featureCount, FORECAST_MAX_FEATURES);
+  for (let t = 0; t < trials; t++) {
+    const { target } = scenarioTarget(sizes, wanted, sc, rnd);
+    let done = 0, periods = 0;
+    while (done < target && periods < FORECAST_MAX_PERIODS) {
+      const dealt = scenarioDeal(samples, n, sc, rnd);
+      done += dealt; periods++;
+      if (done >= target && dealt > 0) { periods -= (done - target) / dealt; break; }
+    }
+    out[t] = periods + sc.unavailable;
+  }
+  return out;
+}
+
+function forecastFeaturesInScoped(samples, sizes, periods, sc, trials) {
+  if (!scenarioHasPace(samples, sc)) return null;
+  if (!Array.isArray(sizes) || sizes.length < FEATURE_MIN_SIZES) return null;
+  if (!(periods > 0)) return null;
+  const rnd = seededRandom(FORECAST_SEED);
+  const n = (samples || []).length, m = sizes.length, out = new Array(trials);
+  const cl = CLARITY_STEPS[sc.clarity];
+  const usable = Math.max(0, periods - sc.unavailable);
+  const capped = Math.min(usable, FORECAST_MAX_PERIODS);
+  const full = Math.floor(capped), frac = capped - full;
+  for (let t = 0; t < trials; t++) {
+    let budget = 0;
+    for (let p = 0; p < full; p++) budget += scenarioDeal(samples, n, sc, rnd);
+    if (frac > 0) budget += scenarioDeal(samples, n, sc, rnd) * frac;
+    /* Scope growth applies to the WORK, so it is cheaper to shrink the budget
+       than to inflate every size — the same multiplier either way, and it keeps
+       the draw count identical to the other direction. */
+    budget /= (1 + lerp(sc.growthLo, sc.growthHi, rnd()) / 100);
+    let count = 0;
+    while (count < FORECAST_MAX_FEATURES) {
+      const size = Math.max(1, Math.round(sizes[(rnd() * m) | 0] * lerp(cl.lo, cl.hi, rnd())));
+      if (size > budget) break;
+      budget -= size;
+      count++;
+    }
+    out[t] = count;
+  }
+  return out;
+}
+
+/* ── Features in parallel, and the schedule it produces ────────────────────
+   WHAT PARALLELISM DOES, AND WHAT IT DOES NOT. Throughput is a property of the
+   team and is dealt per period whatever it is being spent on, so under ANY
+   schedule that never leaves the team idle the total time to finish a fixed set
+   of work is the same. Parallelism changes each feature's OWN date and leaves
+   the date they are all done exactly where it was. Series gives early wins and a
+   long tail; everything at once delivers nothing until the end.
+
+   That is not a quirk to work around, it is the finding: a room arguing about
+   whether to run three features at once is arguing about WHICH feature lands
+   first, not about when the release is ready. A test pins the all-done 85th
+   percentile as invariant across 1, 3 and 20 in parallel, which is the cheapest
+   strong check there is on the claim.
+
+   IT ALSO MEANS THIS MODEL HAS NOTHING TO SAY ABOUT THE COST OF SPLITTING
+   ATTENTION, and the card must say so. Little's Law ties cycle time to WIP, and
+   real throughput usually FALLS as more is started at once; this holds it
+   constant, so parallelism looks free here and is not. The alternative — a
+   per-feature maximum rate — would break the invariance above and would need a
+   parameter nobody can supply from their own data.
+
+   Trials at FORECAST_SCHEDULE_TRIALS rather than the full ten thousand: these
+   answers are dates printed to the day, and the standard error of an 85th
+   percentile from two thousand draws is comfortably under half a day. It also
+   keeps the completion matrix at a few hundred KB instead of a few MB. Do not
+   "improve" this back to 10,000 without a reason better than symmetry. */
+const FORECAST_SCHEDULE_TRIALS = 2000;
+
+function forecastFeatureSchedule(samples, sizes, featureCount, sc, trials) {
+  if (!scenarioHasPace(samples, sc)) return null;
+  if (!Array.isArray(sizes) || sizes.length < FEATURE_MIN_SIZES) return null;
+  if (!(featureCount > 0)) return null;
+  const runs = trials || FORECAST_SCHEDULE_TRIALS;
+  const count = Math.min(Math.round(featureCount), FORECAST_MAX_FEATURES);
+  const rnd = seededRandom(FORECAST_SEED);
+  const n = (samples || []).length, m = sizes.length;
+  const cl = CLARITY_STEPS[sc.clarity];
+  const parallel = Math.max(1, Math.min(sc.parallel, count));
+  /* ONE flat typed array with strided indexing, not an array of arrays. At two
+     thousand trials and sixty features the naive version allocates 2,000 small
+     arrays per render and GC-pauses on every keystroke that reaches here. */
+  const matrix = new Float64Array(runs * count);
+  const remaining = new Float64Array(count);
+
+  for (let t = 0; t < runs; t++) {
+    /* Sizes for this trial, drawn exactly as the headline forecast draws them so
+       the two can never disagree about how big a feature is. */
+    const growth = 1 + lerp(sc.growthLo, sc.growthHi, rnd()) / 100;
+    for (let k = 0; k < count; k++) {
+      remaining[k] = Math.max(1, Math.round(sizes[(rnd() * m) | 0] * lerp(cl.lo, cl.hi, rnd())))
+        * growth;
+    }
+    let nextToOpen = Math.min(parallel, count);
+    const open = [];
+    for (let k = 0; k < nextToOpen; k++) open.push(k);
+    let finished = 0, periods = 0;
+
+    while (finished < count && periods < FORECAST_MAX_PERIODS) {
+      const dealt = scenarioDeal(samples, n, sc, rnd);
+      periods++;
+      let left = dealt, spent = 0;
+      /* SPILLOVER, and it is what makes the invariance above true. A feature
+         needing less than its equal share hands the remainder back to the others
+         inside the same period; without it the team idles whenever one feature is
+         nearly done, the makespan grows with parallelism, and the claim this is
+         all built on stops holding. */
+      let guard = 0;
+      while (left > 1e-9 && open.length && guard++ < count + parallel + 2) {
+        const share = left / open.length;
+        let used = 0;
+        for (let i = open.length - 1; i >= 0; i--) {
+          const k = open[i];
+          const take = Math.min(share, remaining[k]);
+          remaining[k] -= take; used += take; spent += take;
+          if (remaining[k] <= 1e-9) {
+            /* Where in the period it closed, so a schedule is dates rather than
+               period numbers — the same reason the headline answer interpolates
+               its crossing period. */
+            matrix[t * count + k] = periods - 1 + (dealt > 0 ? spent / dealt : 1);
+            open.splice(i, 1);
+            finished++;
+            if (nextToOpen < count) open.push(nextToOpen++);
+          }
+        }
+        left -= used;
+        if (used <= 1e-12) break;
+      }
+    }
+    /* Anything the walk ran out of road for is pinned at the limit, so a
+       percentile over it still reports rather than holding a zero. */
+    for (let k = 0; k < count; k++) {
+      if (matrix[t * count + k] === 0 && remaining[k] > 1e-9) {
+        matrix[t * count + k] = FORECAST_MAX_PERIODS;
+      }
+      matrix[t * count + k] += sc.unavailable;
+    }
+  }
+  return { matrix, count, trials: runs, parallel };
+}
+
+/* Per-feature percentiles across trials.
+
+   TAKEN PER FEATURE INDEPENDENTLY, never by picking the trials where the whole
+   set landed at the 85th and reading the features off those — that is a
+   conditional distribution and gives artificially narrow per-feature spreads.
+
+   The consequence has to be on the card: these dates are MARGINALS and are not
+   jointly achievable. Each is an 85% answer for its own feature; the chance that
+   every one of them lands on time is far below 85%. Only the LAST feature's date
+   also means "everything by then".
+
+   Not routed through percentileOf, which slices and sorts with a comparator per
+   call — sixty features times two thousand trials is sixty allocations and sixty
+   comparator sorts. One reused scratch buffer, sorted with the typed array's own
+   numeric sort, read three times. */
+function scheduleRows(sched, confidences) {
+  if (!sched) return null;
+  const { matrix, count, trials } = sched;
+  const scratch = new Float64Array(trials);
+  const out = [];
+  for (let k = 0; k < count; k++) {
+    for (let t = 0; t < trials; t++) scratch[t] = matrix[t * count + k];
+    const sorted = scratch.slice().sort();
+    out.push(confidences.map(c => {
+      const i = Math.max(0, Math.ceil((c / 100) * trials) - 1);
+      return { confidence: c, periods: sorted[i] };
+    }));
+  }
+  return out;
+}
+
+/* When every one of them is done — the figure parallelism does NOT move. Read
+   per trial as the last feature to close, then percentiled, which is the only
+   order that gives an answer about the SET rather than about its slowest member
+   on average. */
+function scheduleAllDone(sched, confidences) {
+  if (!sched) return null;
+  const { matrix, count, trials } = sched;
+  const last = new Float64Array(trials);
+  for (let t = 0; t < trials; t++) {
+    let mx = 0;
+    for (let k = 0; k < count; k++) { const v = matrix[t * count + k]; if (v > mx) mx = v; }
+    last[t] = mx;
+  }
+  const sorted = last.slice().sort();
+  return confidences.map(c => ({ confidence: c,
+    periods: sorted[Math.max(0, Math.ceil((c / 100) * trials) - 1)] }));
+}
+
+/* ── When the spread has stopped being an answer ───────────────────────────
+   The cautious answer over the middle one. Read the same way for both
+   questions — for a DATE the safe end is the 95th and the middle the 50th; for a
+   COUNT the safe end is low, so the ratio is taken the other way up. Both come
+   out as "how many times the middle answer is the careful one".
+
+   THE THRESHOLD IS 2.5, AND THE FIRST NUMBER WRITTEN HERE WAS 3 ON A FALSE
+   PREMISE. The reasoning was "three is about where three stacked knobs land".
+   Measured on a real board, that is simply not true, and the reason is the
+   central limit theorem: a forecast SUMS many feature sizes and WALKS many
+   periods, and both of those concentrate the result. Ten features on this app's
+   own demo data, at 4,000 trials:
+
+       plain                                   1.30
+       + scope growth 0-150%                   1.55
+       + clarity "barely understood"           1.37
+       + brand new team                        1.29
+       all three at once                       1.65
+       all three, on ONE feature               2.95
+
+   So at 3 the guard was effectively unreachable — a control whose only output is
+   never firing. The ratio only grows when there is little to average over, which
+   is exactly the case where a forecast is least worth trusting.
+
+   2.5 fires on the last row and clears every realistic multi-feature scenario by
+   a wide margin, and it is nowhere near the 1.3 an unadjusted forecast produces.
+   If these ranges are ever retuned, re-measure — do not reason about it. */
+const FORECAST_SPREAD_MAX = 2.5;
+/* The knob with the widest configured range, as a fraction of its own low end —
+   the one most likely to be what widened the answer, and so the one to name when
+   the guard fires. Cheap and approximate on purpose; see the note at the call
+   site for the exact version and what it would cost. */
+function widestScenarioKnob(s) {
+  const cands = [];
+  if (s.growthHi > 0) cands.push({ key: 'growth', label: 'Scope growth',
+    width: (100 + s.growthHi) / (100 + s.growthLo) });
+  if (s.extraHi > 0) cands.push({ key: 'extra', label: 'Features discovered later',
+    width: (100 + s.extraHi) / (100 + s.extraLo) });
+  if (s.clarity > 0) cands.push({ key: 'clarity', label: 'Feature clarity',
+    width: CLARITY_STEPS[s.clarity].hi / CLARITY_STEPS[s.clarity].lo });
+  if (s.confidence > 0) cands.push({ key: 'confidence', label: 'Team confidence',
+    width: TEAM_CONFIDENCE_STEPS[s.confidence].hi / TEAM_CONFIDENCE_STEPS[s.confidence].lo });
+  if (s.estOn && s.estHi > s.estLo) cands.push({ key: 'est', label: 'Estimated pace',
+    width: s.estHi / s.estLo });
+  if (!cands.length) return null;
+  return cands.reduce((best, c) => c.width > best.width ? c : best);
+}
+function spreadRatioOf(trials, safeHigh) {
+  if (!trials || !trials.length) return null;
+  const mid = percentileOf(trials, 50);
+  if (safeHigh) return mid > 0 ? percentileOf(trials, 95) / mid : null;
+  const safe = percentileOf(trials, 5);
+  return safe > 0 ? mid / safe : null;
 }
 
 /* Direct feature throughput — the fallback, used only when the join is too thin
@@ -6262,10 +6956,19 @@ function derive(rows, settings, view, stages) {
      answer changes unit on the way out. The conversion happens once here rather
      than inside the sampler, which stays in the units it deals in so a test can
      hand it a sample set and check the arithmetic without a calendar. */
-  const whenPeriods = forecastPeriodsFor(fcSamples, fcItems, FORECAST_TRIALS);
+  /* THE DISPATCH. At defaults this is literally the sampler this app has always
+     run, so today's answers are the same code rather than approximately the same
+     numbers. See the comment on the scoped samplers. */
+  const sc = scenarioFrom(view.scenario);
+  const plain = scenarioIsDefault(sc);
+  const whenPeriods = plain
+    ? forecastPeriodsFor(fcSamples, fcItems, FORECAST_TRIALS)
+    : forecastPeriodsForScoped(fcSamples, fcItems, sc, FORECAST_TRIALS);
   const whenTrials = whenPeriods
     && whenPeriods.map(p => periodsToDays(countFrom, p, bucket));
-  const manyTrials = forecastItemsIn(fcSamples, fcHorizon, FORECAST_TRIALS);
+  const manyTrials = plain
+    ? forecastItemsIn(fcSamples, fcHorizon, FORECAST_TRIALS)
+    : forecastItemsInScoped(fcSamples, fcHorizon, sc, FORECAST_TRIALS);
 
   /* Why the forecast might have nothing to say, so the cards can name the
      control that fixes it rather than going blank.
@@ -6282,7 +6985,11 @@ function derive(rows, settings, view, stages) {
      window controls in front of the reader, and the other by re-exporting a
      team or narrowing the scope. Reported only when the trim is what caused
      the shortfall — an untrimmed window this short was always few-periods. */
-  const fcReason = fcSamples.length < FORECAST_MIN_PERIODS
+  /* A typed throughput estimate supplies its own pace, so none of the history
+     floors apply to it — that is the whole point of the control. The eight-period
+     refusal stays the DEFAULT outcome rather than the only one. */
+  const fcReason = sc.estOn ? null
+    : fcSamples.length < FORECAST_MIN_PERIODS
       ? (fcLost > 0 && wholeThroughput.length >= FORECAST_MIN_PERIODS
           ? 'stale-team' : 'few-periods')
     : !fcSamples.some(v => v > 0) ? 'no-throughput'
@@ -6291,9 +6998,16 @@ function derive(rows, settings, view, stages) {
   /* A backlog bigger than this team's recorded pace can clear inside the walk's
      limit. The trials are all pinned at the cap, so every answer would read the
      same absurd number — say so instead. */
+  /* Re-checked AFTER the scenario, not before: a scope multiplier can push a
+     backlog that was reachable past the walk's limit, and the old check ran on
+     the unmultiplied count. */
   const fcBeyond = !!whenPeriods
     && percentileOf(whenPeriods, FORECAST_CONFIDENCE[FORECAST_CONFIDENCE.length - 1])
        >= FORECAST_MAX_PERIODS;
+  /* And the spread guard, which only ever fires under a scenario: unadjusted,
+     this ratio sits between 1.15 and 1.4 on a typical team. */
+  const fcSpread = whenTrials ? spreadRatioOf(whenTrials, true) : null;
+  const fcTooWide = !plain && fcSpread != null && fcSpread >= FORECAST_SPREAD_MAX;
 
   const forecast = {
     reason: fcReason,
@@ -6314,20 +7028,33 @@ function derive(rows, settings, view, stages) {
     coverageEnd: fcLost > 0 ? fcCoverage : null,
     countFrom,
     countingFromToday: countFromToday,
+    scenario: sc,
+    assumptions: scenarioAssumptions(sc, units),
+    scopeRange: scenarioScopeRange(sc),
+    estimated: sc.estOn,
     trials: FORECAST_TRIALS,
     minPeriods: FORECAST_MIN_PERIODS,
     items: fcItems,
     targetDate: fcTarget,
     horizonPeriods: fcHorizon,
     beyondReach: fcBeyond,
-    when: (whenTrials && !fcBeyond) ? {
+    spread: fcSpread,
+    tooWide: fcTooWide,
+    spreadMax: FORECAST_SPREAD_MAX,
+    /* Which knob to turn back first: the one whose configured range is widest as
+       a fraction. A proxy rather than an answer — the exact version re-runs the
+       forecast once per knob with that knob defaulted and reports whichever
+       removal shrinks the ratio most, which is about five extra runs at 2,000
+       trials and entirely affordable if this ever proves not good enough. */
+    widestKnob: fcTooWide ? widestScenarioKnob(sc) : null,
+    when: (whenTrials && !fcBeyond && !fcTooWide) ? {
       rows: FORECAST_CONFIDENCE.map(c => {
         const days = daysAtConfidence(whenTrials, c);
         return { confidence: c, days, date: addDays(countFrom, days) };
       }),
       hist: forecastHistogram(whenTrials, true)
     } : null,
-    howMany: manyTrials ? {
+    howMany: (manyTrials && !fcTooWide) ? {
       rows: FORECAST_CONFIDENCE.map(c => ({ confidence: c, count: countAtConfidence(manyTrials, c) })),
       hist: forecastHistogram(manyTrials, false)
     } : null
@@ -6796,6 +7523,13 @@ window.TD = {
      without a paste box or a team list on screen. */
   dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
   soleProjectId, PROJECT_ID_ADOPT_MIN,
+  scenarioFrom, scenarioIsDefault, scenarioAssumptions, scenarioScopeRange, lerp,
+  forecastPeriodsForScoped, forecastItemsInScoped,
+  forecastFeaturePeriodsScoped, forecastFeaturesInScoped,
+  spreadRatioOf, widestScenarioKnob,
+  forecastFeatureSchedule, scheduleRows, scheduleAllDone, FORECAST_SCHEDULE_TRIALS,
+  DEFAULT_SCENARIO, CLARITY_STEPS, TEAM_CONFIDENCE_STEPS,
+  FORECAST_SPREAD_MAX, FORECAST_MAX_PARALLEL, FORECAST_MAX_UNAVAILABLE,
   featureBreakdown, featureForecastOf, forecastFeaturePeriods, forecastFeaturesIn,
   featureNonZeroPeriods,
   FEATURE_MIN_SIZES, FEATURE_MIN_NONZERO, FEATURE_JOIN_MIN, FORECAST_MAX_FEATURES,
@@ -7020,7 +7754,13 @@ const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', act
   forecastScope: '',
   /* Where the walk starts: 'data' (the end of the export, which is what every
      other figure here is read as of) or 'today'. Anything else means 'data'. */
-  countFrom: 'data' };
+  countFrom: 'data',
+  /* The scenario: every knob a reader can turn to say how the next few periods
+     will differ from the last few. All numbers and small integers, so it is the
+     same class of thing as the two forecast questions beside it — and it lives
+     here with them, off the schema and out of the stored document. Normalised at
+     its point of use by scenarioFrom(), like every other view field. */
+  scenario: null };
 
 const LS = {
   state: 'td-state', view: 'td-view', theme: 'td-theme',
@@ -9240,6 +9980,19 @@ const METRIC_HELP = {
     ['Lower is better — but ', b('a rate near zero in a maturing team'), ' usually means '
       + 'defects are being logged somewhere other than the board, not that there are none.'],
   ] },
+  schedule: { title: 'When Each Feature Lands', body: [
+    ['The same forecast, read one feature at a time. ', b('Working more features at once does '
+      + 'not finish them sooner'), ' — the team delivers what it delivers, however it is spread '
+      + 'about — so this changes which feature lands FIRST, and leaves the date they are all '
+      + 'done exactly where it was.'],
+    [b('The dates are not all achievable at once.'), ' Each is an 85% answer for that feature '
+      + 'on its own. The chance that every one of them lands on time is far lower than 85%, and '
+      + 'only the last row also means "everything by then".'],
+    ['It does not charge for splitting attention. Real throughput usually ', b('falls'),
+      ' as more work is started at once; this model holds it constant, so parallelism looks '
+      + 'free here and is not. The order is the one you would work them in — the app has none '
+      + 'of its own to offer.'],
+  ] },
   featureSize: { title: 'Items per Feature', body: [
     ['How much work does a feature turn out to be on this board? One bar per size, counted '
       + 'over the features that have actually finished — so it is ', b('what features here '
@@ -9909,6 +10662,13 @@ function renderDashboard() {
          asked yet. */
       wipLimit: featureUnit() ? null : (team && team.wipLimit),
       sleDays: featureUnit() ? null : (team && team.sleDays),
+      /* The forecast's other two answers. This object is a LITERAL rather than
+         the view itself — derive() takes a question, not the app's state — which
+         means a field added to `view` and not added here silently never arrives.
+         countFrom did exactly that for a day: it worked on a pooled scope, which
+         goes through deriveTeams and its own object, and did nothing on a single
+         team. If you add a view field the forecast reads, add it in BOTH places. */
+      countFrom: view.countFrom, scenario: view.scenario,
       /* Only so the wording follows — see the unit block in derive(). The
          figures are decided entirely by which list was handed in. */
       unit: featureUnit() ? 'features' : 'items' },
@@ -10145,13 +10905,13 @@ function renderDashboard() {
      and produces a NARROWER spread than reality, which understates risk. If
      anyone ever proposes summing the teams as an optimisation, this is why not. */
   const fcScope = currentForecastScope();
-  let fcDerived = d, fcStale = [], fcCoverage = null;
+  let fcDerived = d, fcStale = [], fcCoverage = null, fcSchedule = null;
   if (fcScope.kind !== 'team' && fcScope.teams.length) {
     const pooled = deriveTeams(fcScope.teams, state.settings,
       { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket,
         customFrom: view.customFrom, customTo: view.customTo,
         forecastItems: view.forecastItems, forecastDate: view.forecastDate,
-        countFrom: view.countFrom,
+        countFrom: view.countFrom, scenario: view.scenario,
         unit: featureUnit() ? 'features' : 'items' },
       state.stages);
     /* An empty pool has no forecast to draw; fall back to the team's own, which
@@ -10178,6 +10938,9 @@ function renderDashboard() {
     const fcTeams = fcScope.teams.length ? fcScope.teams : (team ? [team] : []);
     const items = fcTeams.flatMap(t => t.rows || []);
     const feats = fcTeams.flatMap(t => t.features || []);
+    /* Deliberately WITHOUT the scenario: this derive exists only to produce the
+       item throughput sample set, and featureForecastOf applies the scenario to
+       it itself. Applying it here as well would scale the pace twice. */
     const itemView = { filterValue: currentFilterValue(), months: view.months,
       bucket: view.bucket, customFrom: view.customFrom, customTo: view.customTo,
       countFrom: view.countFrom };
@@ -10195,10 +10958,22 @@ function renderDashboard() {
         featureCount: f.items, targetDate: f.targetDate,
         horizonPeriods: f.horizonPeriods, countFrom: f.countFrom,
         countingFromToday: f.countingFromToday, bucket: fcDerived.bucket,
-        lostPeriods: f.lostPeriods, coverageEnd: f.coverageEnd })
+        lostPeriods: f.lostPeriods, coverageEnd: f.coverageEnd,
+        scenario: view.scenario })
     });
+    /* The schedule, built from the same two samples the headline answer is —
+       so the last row of the table and the tile above it cannot disagree about
+       when everything is done. Only when there is an answer to schedule. */
+    fcSchedule = fcDerived.forecast.when
+      ? forecastFeatureSchedule(
+          itemDerive.empty ? [] : itemDerive.forecast.sampleSet,
+          bd.sizes, fcDerived.forecast.items,
+          fcDerived.forecast.scenario, FORECAST_SCHEDULE_TRIALS)
+      : null;
   }
   renderForecast(fcDerived, fcScope, fcStale);
+  renderScenario(fcDerived);
+  renderSchedule(fcDerived, fcSchedule);
   renderStageTime(d);
   /* The join needs both of the team's lists, so it is worked out here where both
      are in hand rather than inside derive(), which only ever sees one. Null in
@@ -10348,6 +11123,109 @@ function renderFeatureCards(d, bd) {
         + '<td class="num">' + (f.total ? Math.round((f.done / f.total) * 100) + '%' : '\u2014') + '</td>'
         + '<td>' + (f.started ? escapeHtml(prettyDate(f.started)) : 'not started') + '</td></tr>'
       ).join('') + '</tbody>';
+}
+
+/* ── The scenario's own controls ───────────────────────────────────────────
+   Written back from the NORMALISED scenario, never from the raw view, so a box
+   always shows the value that is actually being used — a typed 900% that the
+   clamp pinned to 200 has to say 200, or the reader is looking at a control that
+   contradicts the answer under it. */
+function renderScenario(d) {
+  const f = d.forecast, sc = f.scenario || scenarioFrom(null);
+  const feature = d.unit === 'features';
+
+  const opts = (list, sel) => list.map((s, i) =>
+    '<option value="' + i + '"' + (i === sel ? ' selected' : '') + '>'
+    + escapeHtml(s.label) + '</option>').join('');
+  $('scClarity').innerHTML = opts(CLARITY_STEPS, sc.clarity);
+  $('scConfidence').innerHTML = opts(TEAM_CONFIDENCE_STEPS, sc.confidence);
+
+  $('scGrowthLo').value = String(sc.growthLo);
+  $('scGrowthHi').value = String(sc.growthHi);
+  $('scExtraLo').value = String(sc.extraLo);
+  $('scExtraHi').value = String(sc.extraHi);
+  $('scParallel').value = String(sc.parallel);
+  $('scUnavailable').value = String(sc.unavailable);
+  $('scEstOn').checked = sc.estOn;
+  $('scEstLo').value = sc.estLo ? String(sc.estLo) : '';
+  $('scEstHi').value = sc.estHi ? String(sc.estHi) : '';
+  $('scEstWrap').hidden = !sc.estOn;
+  $('scEstRangeLabel').textContent = d.Units + ' finished per ' + d.bucketNoun;
+  $('scUnavailableLabel').textContent = d.bucketNounPlural.charAt(0).toUpperCase()
+    + d.bucketNounPlural.slice(1) + ' nobody is delivering';
+
+  /* Three of the seven are about FEATURES and mean nothing over work items. Two
+     controls that do nothing is the orphaned-control complaint this app has had
+     before; hiding them keeps the block the size of what it can actually do. */
+  ['scExtraWrap', 'scClarityWrap', 'scParallelWrap'].forEach(id => { $(id).hidden = !feature; });
+
+  /* The combined effect, on one line, whenever two knobs multiply. "+20%" and
+     "+20%" reads like +40% and is +44%, and a reader who set both is entitled
+     to see which. */
+  const range = f.scopeRange;
+  $('scScopeNote').hidden = !range;
+  if (range) {
+    $('scScopeNote').textContent = 'Together these multiply the scope by '
+      + range.lo.toFixed(2) + '\u00d7 to ' + range.hi.toFixed(2) + '\u00d7.';
+  }
+
+  /* A shut block must never hide an adjustment. */
+  const on = f.assumptions.length;
+  $('fcScenarioSummary').innerHTML = on
+    ? 'Adjusted for what you know <span class="on">\u2014 ' + on + ' setting'
+      + (on === 1 ? '' : 's') + ' on</span>'
+    : 'Adjust for what you know';
+
+  /* Under the tiles, in words, every time. */
+  $('fcAssumptions').hidden = !on;
+  if (on) {
+    $('fcAssumptions').innerHTML = '<strong>This is not the plain forecast.</strong> '
+      + 'It has been adjusted:<ul>'
+      + f.assumptions.map(a => '<li>' + escapeHtml(a.label) + ' \u2014 '
+          + escapeHtml(a.wording) + '</li>').join('')
+      + '</ul>';
+  }
+}
+
+/* The delivery schedule — the only thing the parallelism knob moves. */
+function renderSchedule(d, sched) {
+  const card = $('cardSchedule');
+  card.hidden = !sched;
+  if (!sched) { $('scheduleTable').innerHTML = ''; $('scheduleExport').innerHTML = ''; return; }
+  const f = d.forecast;
+  const rows = scheduleRows(sched, [50, 85]);
+  const allDone = scheduleAllDone(sched, [50, 85]);
+  const toDate = (periods) => addDays(f.countFrom,
+    periodsToDays(f.countFrom, periods, d.bucket));
+
+  $('nameSchedule').innerHTML = '<span>When each feature lands</span>'
+    + helpBtn('schedule', 'When each feature lands');
+  $('titleSchedule').textContent = sched.parallel === 1
+    ? 'One Feature at a Time, in the Order Below'
+    : sched.parallel + ' Features Worked at Once';
+
+  $('scheduleExport').innerHTML = exportButtons('scheduleTable', 'feature-schedule');
+  $('scheduleTable').innerHTML =
+    '<thead><tr><th>Feature</th><th>50% confident</th><th>85% confident</th></tr></thead><tbody>'
+    + rows.map((r, i) =>
+        '<tr><td>Feature ' + (i + 1) + '</td>'
+        + '<td>' + escapeHtml(prettyDate(toDate(r[0].periods))) + '</td>'
+        + '<td>' + escapeHtml(prettyDate(toDate(r[1].periods))) + '</td></tr>').join('')
+    + '</tbody><tfoot><tr><td>All ' + rows.length + ' done</td>'
+    + '<td>' + escapeHtml(prettyDate(toDate(allDone[0].periods))) + '</td>'
+    + '<td>' + escapeHtml(prettyDate(toDate(allDone[1].periods))) + '</td></tr></tfoot>';
+
+  /* Both sentences are load-bearing and neither belongs in the ⓘ. The first is
+     the most likely misreading on this card; the second is the honesty of the
+     whole control. */
+  $('scheduleNote').innerHTML =
+    '<strong>These dates are not all achievable at once.</strong> Each is an 85% answer for '
+    + 'that feature on its own; the chance that every one of them lands on time is far lower. '
+    + 'Only the last row also means \u201ceverything by then\u201d. '
+    + '<strong>Nor does this model the cost of splitting attention</strong> \u2014 real '
+    + 'throughput usually falls as more is started at once, and this holds it constant, so the '
+    + 'all-done date will not move however you set it. What changes is which feature lands '
+    + 'first. The order is the one you would work them in; the app has none of its own.';
 }
 
 function renderStageTime(d) {
@@ -10530,6 +11408,14 @@ function renderForecast(d, scope, stale) {
   }
 
   const conf85 = 85;
+  /* A non-empty scenario changes the answer's LABEL, not just the note beside
+     it. Somebody who screenshots one tile has to still be told it is not the
+     plain forecast — "85% of runs" and "85% of adjusted runs" are different
+     claims, and only one of them is true here. */
+  const runWord = f.assumptions && f.assumptions.length ? 'adjusted runs'
+    : (f.estimated ? 'estimated runs' : 'runs');
+  const noAnswerFoot = f.tooWide ? 'too uncertain to answer'
+    : f.estimated ? 'no pace to draw from' : 'not enough history to forecast';
   const whenRow = f.when && f.when.rows.find(r => r.confidence === conf85);
   const manyRow = f.howMany && f.howMany.rows.find(r => r.confidence === conf85);
 
@@ -10541,12 +11427,12 @@ function renderForecast(d, scope, stale) {
   $('tilesForecast').innerHTML =
     tile(f.items + ' ' + d.unitOne + (f.items === 1 ? '' : 's') + ' finished by',
       whenRow ? escapeHtml(prettyDate(whenRow.date)) : '&mdash;',
-      whenRow ? '85% of runs were done within ' + whenRow.days
-        + (whenRow.days === 1 ? ' day' : ' days') : 'not enough history to forecast',
+      whenRow ? '85% of ' + runWord + ' were done within ' + whenRow.days
+        + (whenRow.days === 1 ? ' day' : ' days') : noAnswerFoot,
       'forecastWhen') +
     tile(d.Units + ' by ' + prettyDate(f.targetDate),
       manyRow ? 'at least ' + manyRow.count : '&mdash;',
-      manyRow ? '85% of runs completed this many or more' : 'not enough history to forecast',
+      manyRow ? '85% of ' + runWord + ' completed this many or more' : noAnswerFoot,
       'forecastHowMany') +
     /* In the feature view this tile names BOTH halves of the model, because a
        feature answer rests on two samples and a reader owed one number is owed
@@ -10582,6 +11468,19 @@ function renderForecast(d, scope, stale) {
       return 'A forecast needs at least ' + f.minPeriods + ' whole ' + d.bucketNounPlural
         + ' of history to resample, and this window holds ' + f.samples + '. '
         + 'Group by a shorter period, or widen the date window, and it will fill in.';
+    /* The spread guard. It only ever fires under a scenario — unadjusted, this
+       ratio sits between 1.15 and 1.4 on a typical team — so it is always
+       actionable: something the reader turned on made the answer this wide, and
+       the message names which one to turn back first. */
+    if (f.tooWide) {
+      const worst = f.widestKnob;
+      return 'The careful answer is ' + f.spread.toFixed(1) + ' times the middle one, which is '
+        + 'too wide to promise from: any decision that range supports would have been made the '
+        + 'same way without it. '
+        + (worst ? 'Narrow ' + worst.label.toLowerCase() + ' first \u2014 it is the widest '
+            + 'range you have set. ' : '')
+        + 'Or press Reset to No Adjustments to see the plain forecast.';
+    }
     /* The two feature-only floors. Each names the ONE thing that fixes it — they
        are not degrees of "not enough data", they are two different missing
        things with two different answers. */
@@ -13466,6 +14365,42 @@ $('unitSel').addEventListener('change', e => {
   });
 });
 
+/* ── The scenario's knobs ──────────────────────────────────────────────────
+   One delegated handler over the whole block rather than a listener each: they
+   all do the same thing, and a per-control list is a list somebody adds a
+   control without joining.
+
+   `change`, not `input`. Every one of these re-runs ten thousand simulations, so
+   an `input` handler would run the forecast against 1, 12 and 120 on the way to
+   typing 1200. A select fires change once per choice; a number box fires it on
+   blur or Enter, which is exactly when the reader has finished saying what they
+   meant. */
+$('fcScenario').addEventListener('change', () => {
+  const num = (id) => {
+    const v = $(id).value;
+    return v === '' ? 0 : Number(v);
+  };
+  view.scenario = scenarioFrom({
+    growthLo: num('scGrowthLo'), growthHi: num('scGrowthHi'),
+    extraLo: num('scExtraLo'), extraHi: num('scExtraHi'),
+    clarity: Number($('scClarity').value), confidence: Number($('scConfidence').value),
+    estOn: $('scEstOn').checked, estLo: num('scEstLo'), estHi: num('scEstHi'),
+    parallel: num('scParallel'), unavailable: num('scUnavailable')
+  });
+  saveView();
+  renderDashboard();
+});
+
+/* Essential rather than a nicety: these knobs persist to localStorage with the
+   rest of the view, so without one way to clear them all somebody opens the app
+   tomorrow and reads yesterday's scenario as today's forecast. */
+$('scReset').addEventListener('click', () => {
+  view.scenario = null;
+  saveView();
+  renderDashboard();
+  window.toast('Scenario reset \u2014 this is the plain forecast again');
+});
+
 /* settings — shared by every team */
 /* Coerced to a non-negative number on the way in; everything else is a capped
    label, never free text. */
@@ -14347,7 +15282,36 @@ function buildSharePayload(teamIds, win) {
     sharedAt: Date.now(),
     label: teams.map(t => t.name).join(', '),
     teams,
-    settings: state.settings
+    settings: state.settings,
+    /* ── The forecast travels ────────────────────────────────────────────
+       The two questions and the scenario, added 2026-08-25 at Charles's
+       decision. They are the first things in a payload that describe a READING
+       rather than the data — `forecastItems` and `forecastDate` had deliberately
+       stayed out, on the reasoning that a recipient asks their own question.
+
+       That reasoning held while the answer depended only on the question. It
+       stops holding once a scenario can change what the numbers MEAN: a link is
+       how a forecast reaches a planning room, and a recipient seeing a different
+       forecast from the sender — with no way to know they differ — is worse than
+       useless. So the assumptions travel with the answer they belong to.
+
+       Every field is a number, a small integer or a date string, so the storage
+       policy is untouched: there is nothing here a regex could mistake for a
+       sentence. SHARE_PAYLOAD_V is NOT bumped, matching ARTs, keys, stages and
+       the two targets — an older cached build drops the block and draws the
+       plain forecast, which is graceful degradation rather than a wrong number.
+
+       The SCOPE deliberately does not travel. It names teams by id, and a link
+       carries only the teams it was asked to; a scope pointing at teams the
+       recipient does not have would fall back on read anyway, and sending an ART
+       id would name a train the link may not include. */
+    forecast: {
+      items: view.forecastItems,
+      date: view.forecastDate,
+      countFrom: view.countFrom,
+      unit: view.unit,
+      scenario: scenarioFrom(view.scenario)
+    }
   };
   if (arts.length) payload.arts = arts;
   if (stages.length) payload.stages = stages;
@@ -14410,6 +15374,22 @@ async function openSharedView() {
     state = hydrateState(p);
     if (!state.teams.length) throw new Error('empty payload');
     view.activeTeamId = state.teams[0].id;
+    /* The sender's forecast, so the recipient sees the answer that was sent
+       rather than the app's defaults over the sender's data. Everything here is
+       validated at its point of use exactly as the reader's own values are —
+       `scenarioFrom` clamps, `derive` pins the item count and the date — so a
+       hand-edited link is no more dangerous than a hand-edited localStorage.
+
+       Absent from a link made by an older build, in which case the defaults
+       stand and the recipient gets the plain forecast. */
+    const fc = p.forecast;
+    if (fc && typeof fc === 'object') {
+      if (Number(fc.items) > 0) view.forecastItems = Number(fc.items);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(fc.date || ''))) view.forecastDate = fc.date;
+      view.countFrom = fc.countFrom === 'today' ? 'today' : 'data';
+      view.unit = fc.unit === 'features' ? 'features' : 'items';
+      view.scenario = scenarioFrom(fc.scenario);
+    }
     $('shareBar').innerHTML = shareBanner();
     $('dashEmpty').innerHTML =
       '<h2>Nothing to Plot for This Team</h2><p>The shared copy has no work items for it.</p>';

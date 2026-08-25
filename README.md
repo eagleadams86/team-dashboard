@@ -1845,6 +1845,90 @@ The shading runs one way on one chart and the other way on the other, because th
 each is at a different edge — but the colour means the same thing on both, and the rows repeat
 it in words for anyone who would rather not read colour at all.
 
+### Adjusting for What You Know
+
+Every forecast above assumes the next few periods look like the last few. **Adjust for what you
+know** is where you say how they will not — seven controls, behind a fold, **each defaulting to
+doing exactly nothing**.
+
+That default is not a formality. When nothing is set, the app runs the *same sampler it always
+ran* — not an equivalent one, the same code — so the plain forecast is the plain forecast. Press
+**Reset to No Adjustments** and the answer returns to the number it was, exactly.
+
+| Knob | What it says |
+|---|---|
+| **Each known feature grows by** | The work you have counted turns out to be more than you counted. A percentage range. |
+| **Features discovered later** | Work you have not counted at all turns up. A percentage on the feature count. |
+| **How well understood are they** | Four steps, from *Well understood* to *Barely understood*. It **widens** the sizes drawn, it does not inflate them — the difference between "we are less sure" and "it will be bigger". |
+| **The team doing the work** | Established, recently changed, or brand new. Scales the pace being resampled. |
+| **Features worked at once** | See below — it changes each feature's date and not the last one. |
+| **Periods nobody is delivering** | A shutdown, a conference, a holiday fortnight. A plain number. |
+| **Use a typed pace instead of this history** | For a team with no history to resample. |
+
+**Two of these would double-count if they were named badly**, so they are named carefully. "Scope
+grows 20%" and "20% more features" are two ways of saying +44% on the same number, and a reader
+who set both because the labels sounded like different risks would get a compound they never
+intended. So one is growth *within* the features you counted and the other is features you did
+*not* count — genuinely different quantities — and the combined effect is printed as one line:
+*"Together these multiply the scope by 1.20× to 1.44×."*
+
+**No team setting can forecast a speed-up.** The steps run from 1.0 downwards, because a
+reorganisation making a team faster is the most-abused claim in this business and this app is not
+going to supply the arithmetic for it. If the team is unchanged, the default is the honest
+setting.
+
+**A typed pace replaces history rather than blending with it** — a blend is traceable to neither
+source — and the team setting is switched off while it is on, because multiplying a guess by a
+guess compounds two people's pessimism. It also spreads *less* than real periods do: no quiet
+weeks, no spikes. The card says so rather than fudging it.
+
+### It Says When It Has Been Adjusted, and When It Has Stopped Being an Answer
+
+**Nothing is hidden in an ⓘ.** A non-default scenario is listed in words under the tiles, the
+tiles themselves read *"85% of **adjusted** runs"*, and the folded block's summary says how many
+settings are on — so a shut panel is never concealing an adjustment and a screenshot of one tile
+still says it is not the plain forecast.
+
+**And there is a point past which it refuses.** The guard is the careful answer over the middle
+one. Unadjusted, that ratio sits around 1.3 on the demo's own data. At **2.5×** the forecast stops
+answering, and the refusal names the ratio and **which knob to turn back first**.
+
+That threshold is measured rather than reasoned. It was first set at 3× on the assumption that
+three stacked knobs would land about there — which turns out to be wrong, because a forecast sums
+many feature sizes and walks many periods and both of those concentrate the result. Ten features
+with scope growth, "barely understood" and a brand-new team all on measures **1.65**; the same
+three knobs on a *single* feature measures **2.95**. The ratio only grows where there is little to
+average over, which is exactly where a forecast is least worth trusting.
+
+### Features in Parallel — and What It Cannot Change
+
+**Working more features at once does not finish them sooner.** The team delivers what it
+delivers, however it is spread about, so under any schedule that never leaves it idle the date
+everything is done is identical. What changes is which feature lands **first**.
+
+That is the finding, not a limitation, and the card shows it. On the demo, five features one at a
+time: the first by late September, then roughly every three weeks, the last in mid-December. The
+same five all at once: nothing until late November, then all of them. **All five done: mid-December
+either way.**
+
+Two things the schedule says out loud, because both are easy to get wrong:
+
+- **The dates are not all achievable at once.** Each is an 85% answer for its own feature; the
+  chance every one lands on time is far lower. Only the last row also means "everything by then".
+- **It does not charge for splitting attention.** Real throughput usually *falls* as more is
+  started at once. This model holds it constant, so parallelism looks free here and is not.
+
+### A Forecast Travels in a Share Link
+
+The question, the scenario and the unit go into a [read-only link](#sharing-a-read-only-link)
+along with the data, so a recipient sees the forecast that was sent rather than the app's defaults
+over somebody else's numbers. The assumptions travel with the answer they belong to — a link is
+how a forecast reaches a planning room, and two people reading different numbers off the same link
+would be worse than useless.
+
+The **scope** deliberately does not travel: it names teams, and a link carries only the teams it
+was asked to.
+
 ### What It Assumes, and When It Refuses
 
 **It assumes the next few periods look like the ones on screen.** That is stated on the tab
