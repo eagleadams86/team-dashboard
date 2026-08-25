@@ -1720,6 +1720,51 @@ Both boxes sit inside the tab rather than in the control strip at the top of the
 because they change nothing outside this group. Everything in the strip *does* reach them: the
 team, the work type filter, the date window and the grouping all decide which periods get dealt.
 
+### Whose Pace — One Team, a Train, or All of Them
+
+With two or more teams the tab gains a **Whose pace** picker: the team on screen, any ART by
+name, the teams on no ART, or all of them. Everything else on the dashboard stays the team in the
+header — only the forecast widens.
+
+**It pools the work items, it does not add up the teams' answers.** One draw takes a calendar
+period and asks what the whole train delivered in it, so a week they all lost — a freeze, an
+incident, planning week, a holiday — is counted once, as it happened. Adding up independent
+per-team forecasts would assume those weeks were unrelated, and would produce a **narrower**
+spread than reality. A forecast that understates risk is the one kind this app must not draw.
+
+### A Stale Export Poisons a Pooled Forecast
+
+Every row of All Teams is read as of one shared date — the newest any team holds — because
+otherwise "the last three months" means a different three months per team. That fairness rule
+turns into a lie the moment you forecast with it: **a team whose export stopped three weeks ago
+contributes three periods of zero**, and those are not observations of a slow team, they are the
+absence of data. The app cannot tell the difference, because throughput is a count over rows that
+are not there.
+
+Worse than the pace it drops is the **spread** it adds. Those periods are systematically low
+rather than randomly low, so they fatten the slow tail exactly where the 85th and 95th
+percentiles are read. The forecast comes out both slower and less certain, and neither is a fact
+about delivery.
+
+So a pooled forecast is **dealt only from periods every team in scope still had data for**, and
+the card says which teams are behind, where the window stops, and how many periods that cost.
+Only the forecast's window moves; everything else stays read as of the newest date. If trimming
+leaves fewer than eight whole periods it **refuses under its own name** — the fix is a different
+one from "not enough history": re-export the teams that are behind, or narrow the scope to the
+ones that are current.
+
+### Counting From the End of the Data, or From Today
+
+Every figure in this app is read as of the newest date in your data, and the forecast has always
+followed. That is right while an export is current, and **flatters the plan by exactly its
+staleness** when it is not: an export that stopped nine days ago puts every forecast date nine
+days early, and nobody is going to deliver those nine days retrospectively.
+
+When your data ends before today, a **Counting from** picker appears with the gap named. The
+default stays *End of the data*, because changing it would make the forecast disagree with every
+tile beside it. Switching to *Today* leaves the simulated walk untouched — the same number of days
+— and moves every date it lands on by exactly how far behind the export is.
+
 ### Read the Confidence, Not the Percentile
 
 The two questions take their answers from **opposite ends of the distribution**, which is the

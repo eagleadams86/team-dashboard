@@ -303,7 +303,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 2200;
+const EXPECTED = 2225;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3288,6 +3288,150 @@ async function run(TD, win) {
     const backwards = TD.buildManualRow({ started: '2026-01-09', completed: '2026-01-02',
       type: 'Feature', key: 'DAE-12' }, [], true);
     ok(!!backwards.error, 'a feature that finished before it started is refused, like an item');
+  }
+
+
+  /* ────────────────────────────────────────────────────────── */
+  group('counting from — the anchor the plan is flattered by');
+  {
+    const S8 = { sameDayValue: 0.5, unplannedType: 'Bug', unplannedLabel: 'Defect',
+      cycleTimeLabel: 'Cycle Time', agedDays: 14, workingDays: false,
+      outlierMode: 'off', outlierDays: null, filters: [{ display: 'All', value: 'All' }] };
+    /* A fortnight of weekly history ending well in the past, so "today" is
+       unambiguously later than the data whenever this suite is run. */
+    const rows = [];
+    for (let w = 20; w >= 1; w--) for (let i = 0; i < 4; i++) {
+      const day = new Date(Date.UTC(2026, 0, 5) + (20 - w) * 7 * 86400000 + i * 86400000);
+      rows.push({ c: day.toISOString().slice(0, 10),
+                  s: new Date(day.getTime() - 2 * 86400000).toISOString().slice(0, 10),
+                  t: 'Story' });
+    }
+    const list = win.TDState.hydrateRows(rows);
+    const base = { months: 'all', bucket: 'week', forecastItems: 10 };
+    const fromData = TD.derive(list, S8, base, []);
+    const fromToday = TD.derive(list, S8, Object.assign({}, base, { countFrom: 'today' }), []);
+
+    is(iso(fromData.forecast.countFrom), iso(fromData.endDate),
+       'by default the walk starts where the data ends — what every other figure here is read as of');
+    ok(fromToday.forecast.countingFromToday,
+       'and it can be told to start from today instead');
+    ok(fromToday.forecast.countFrom > fromData.forecast.countFrom,
+       'which is later, because the data is behind');
+
+    /* THE point: the trials are the same walk, so only the anchor moves — but
+       every promised DATE moves with it. An export three weeks stale flatters
+       the plan by exactly three weeks. */
+    const a = fromData.forecast.when.rows.find(r => r.confidence === 85);
+    const b = fromToday.forecast.when.rows.find(r => r.confidence === 85);
+    is(a.days, b.days, 'the number of days is unchanged — it is the same walk');
+    ok(b.date > a.date, 'but the date it lands on is later');
+    is(Math.round((b.date - a.date) / 86400000),
+       Math.round((fromToday.forecast.countFrom - fromData.forecast.countFrom) / 86400000),
+       'by exactly how stale the export is');
+
+    /* Never EARLIER than the data, whatever the clock says. */
+    is(TD.derive(list, S8, Object.assign({}, base, { countFrom: 'nonsense' }), []).forecast
+         .countingFromToday, false, 'an unrecognised value means the end of the data');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a stale team poisons a pooled forecast, and the window is trimmed');
+  {
+    const S9 = { sameDayValue: 0.5, unplannedType: 'Bug', unplannedLabel: 'Defect',
+      cycleTimeLabel: 'Cycle Time', agedDays: 14, workingDays: false,
+      outlierMode: 'off', outlierDays: null, filters: [{ display: 'All', value: 'All' }] };
+    /* Two teams delivering the same amount every week. One stops four weeks
+       before the other. */
+    const weekly = (weeks, endWeekOffset) => {
+      const out = [];
+      for (let w = weeks; w >= 1; w--) for (let i = 0; i < 3; i++) {
+        const t = Date.UTC(2026, 0, 5) + ((weeks - w) + endWeekOffset) * 7 * 86400000
+                + i * 86400000;
+        out.push({ c: new Date(t).toISOString().slice(0, 10),
+                   s: new Date(t - 2 * 86400000).toISOString().slice(0, 10), t: 'Story' });
+      }
+      return out;
+    };
+    const teams = win.TDState.sanitizeTeams([
+      { id: 'cur', name: 'Current', rows: weekly(20, 0) },
+      { id: 'old', name: 'Behind', rows: weekly(16, 0) }        /* stops 4 weeks earlier */
+    ]);
+    const all = TD.deriveTeams(teams, S9, { months: 'all', bucket: 'week', forecastItems: 10 }, []);
+
+    ok(!!all.coverageEnd, 'the pool reports where every team still had data');
+    is(all.staleTeams.map(t => t.name), ['Behind'], 'and names the team that is behind');
+    ok(all.staleTeams[0].periods >= 3, 'with how many whole periods it is behind',
+       JSON.stringify(all.staleTeams));
+    ok(all.train.forecast.lostPeriods > 0,
+       'so the forecast is dealt from a shorter window than the charts above it');
+    is(iso(all.train.forecast.coverageEnd), iso(all.coverageEnd),
+       'and says where that window stops');
+    ok(all.train.forecast.samples < all.train.throughput.length,
+       'the samples really are fewer than the plotted periods');
+
+    /* The point of trimming at all: those trailing periods are not observations
+       of a slow train, they are the absence of one team's data — and they are
+       SYSTEMATICALLY low, so they fatten the slow tail exactly where the 85th
+       percentile is read. */
+    const untrimmed = TD.derive(teams[0].rows.concat(teams[1].rows), S9,
+      { months: 'all', bucket: 'week', forecastItems: 10 }, []);
+    const trimmedP85 = all.train.forecast.when.rows.find(r => r.confidence === 85).days;
+    const untrimmedP85 = untrimmed.forecast.when.rows.find(r => r.confidence === 85).days;
+    ok(untrimmedP85 >= trimmedP85,
+       'counting the missing weeks reads as no delivery and makes the answer slower',
+       'trimmed ' + trimmedP85 + ' vs untrimmed ' + untrimmedP85);
+
+    /* A single team is never trimmed — there is nobody to be behind. */
+    const one = TD.deriveTeams([teams[0]], S9,
+      { months: 'all', bucket: 'week', forecastItems: 10 }, []);
+    is(one.staleTeams, [], 'one team is never behind itself');
+    is(one.train.forecast.lostPeriods, 0, 'and its forecast is never trimmed');
+    is(one.train.forecast.coverageEnd, null, 'nor does it claim a coverage end');
+
+    /* Trimming below the floor REFUSES under its own name, because the fix is a
+       different one from the fix for too little history. */
+    const shortTeams = win.TDState.sanitizeTeams([
+      { id: 'cur', name: 'Current', rows: weekly(10, 0) },
+      { id: 'old', name: 'Behind', rows: weekly(4, 0) }
+    ]);
+    const short = TD.deriveTeams(shortTeams, S9,
+      { months: 'all', bucket: 'week', forecastItems: 10 }, []);
+    is(short.train.forecast.reason, 'stale-team',
+       'trimming past the floor refuses under its own name, not as few-periods');
+    is(short.train.forecast.when, null, 'and draws nothing');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('pooling a train is not summing its teams');
+  {
+    const SA = { sameDayValue: 0.5, unplannedType: 'Bug', unplannedLabel: 'Defect',
+      cycleTimeLabel: 'Cycle Time', agedDays: 14, workingDays: false,
+      outlierMode: 'off', outlierDays: null, filters: [{ display: 'All', value: 'All' }] };
+    const mk = (id, name, perWeek) => {
+      const rows = [];
+      for (let w = 12; w >= 1; w--) for (let i = 0; i < perWeek; i++) {
+        const t = Date.UTC(2026, 0, 5) + (12 - w) * 7 * 86400000 + i * 86400000;
+        rows.push({ c: new Date(t).toISOString().slice(0, 10),
+                    s: new Date(t - 2 * 86400000).toISOString().slice(0, 10), t: 'Story' });
+      }
+      return { id, name, rows };
+    };
+    const teams = win.TDState.sanitizeTeams([mk('a', 'A', 2), mk('b', 'B', 3)]);
+    const V = { months: 'all', bucket: 'week' };
+    const all = TD.deriveTeams(teams, SA, V, []);
+    const a = TD.derive(teams[0].rows, SA, V, []);
+    const b = TD.derive(teams[1].rows, SA, V, []);
+    /* The SERIES is additive — counting over a disjoint union is a sum. */
+    is(all.train.throughput,
+       a.throughput.map((v, i) => v + b.throughput[i]),
+       'the pooled series is the elementwise sum of the teams, under one shared window');
+    /* The DISTRIBUTION is not, and that is the reason for pooling rows rather
+       than convolving per-team samplers: one draw takes a calendar PERIOD, so
+       whatever the teams shared that week — a freeze, an incident, a planning
+       week — is carried rather than assumed away. */
+    is(all.train.summary.completedTotal,
+       a.summary.completedTotal + b.summary.completedTotal,
+       'and so are the totals');
   }
 
 

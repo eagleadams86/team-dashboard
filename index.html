@@ -2195,6 +2195,27 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
            work type, window and grouping all feed the sample this deals from. -->
       <div class="grid charts" id="spanel-forecast" role="tabpanel" aria-labelledby="stab-forecast" hidden>
         <div class="forecast-ask">
+          <!-- WHOSE pace is being dealt from. Its own control here rather than
+               in the strip at the top, on the rule the two boxes beside it
+               already follow: the strip changes every chart on both number
+               tabs, and this changes nothing outside this group.
+
+               Hidden below two teams, the same threshold the team picker and the
+               All Teams tab use — with one team there is nothing to pool. -->
+          <div class="field" id="fcScopeField" hidden>
+            <label for="fcScope">Whose pace</label>
+            <select id="fcScope"></select>
+          </div>
+          <!-- Shown only when the data ends before today, because that is the
+               only time the two answers differ. A control that never changes
+               anything is a control that teaches the reader it does nothing. -->
+          <div class="field" id="fcFromField" hidden>
+            <label for="fcFrom">Counting from</label>
+            <select id="fcFrom">
+              <option value="data">End of the data</option>
+              <option value="today">Today</option>
+            </select>
+          </div>
           <div class="field">
             <label for="fcItems" id="fcItemsLabel">Number of items to finish</label>
             <input type="number" id="fcItems" min="1" max="2000" step="1" inputmode="numeric">
@@ -2204,6 +2225,11 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <input type="date" id="fcDate">
           </div>
           <p class="hint" id="fcHint"></p>
+          <!-- Its own line rather than more sentences in the hint: it is the one
+               thing here that says a figure was computed over a DIFFERENT window
+               from the charts above, and that has to be findable rather than
+               buried at the end of a paragraph nobody finishes. -->
+          <p class="note info" id="fcStale" hidden></p>
         </div>
 
         <div class="tiles group" id="tilesForecast"></div>
@@ -5980,18 +6006,64 @@ function derive(rows, settings, view, stages) {
      looking at rather than an answer of "one or two". Counted from the end of
      the DATA, like every other window here, so a paste of last quarter's export
      forecasts from where that quarter stopped. */
-  const fcTarget = (fcStored && !isNaN(fcStored) && fcStored > endDate)
-    ? fcStored : edate(endDate, 3);
-  const fcHorizon = periodsBetween(endDate, fcTarget, bucket);
+  /* ── Counting from ───────────────────────────────────────────────────────
+     Every other figure in this app is read as of the newest date in the data,
+     and the forecast has always followed. That is right while an export is
+     current and FLATTERS THE PLAN by exactly its staleness when it is not: a
+     team whose export stopped nine days ago has every forecast date nine days
+     early, because the walk starts nine days before today. Nobody is going to
+     deliver those nine days retrospectively.
+
+     So the anchor is a choice, defaulting to the old behaviour — changing the
+     default would make the forecast disagree with every tile beside it. `max`
+     rather than a swap, so a future-dated export can never pull the anchor
+     EARLIER than the data ends. */
+  /* The reader's OWN calendar day, read as a UTC midnight so it compares with
+     the rows — the same split todayLocalISO already draws for the future-date
+     guard on the item form. A UTC "today" would be tomorrow for anyone far
+     enough east and would move every forecast date by a day. */
+  const today = new Date(todayLocalISO() + 'T00:00:00Z');
+  const countFromToday = view.countFrom === 'today' && today && today > endDate;
+  const countFrom = countFromToday ? today : endDate;
+
+  const fcTarget = (fcStored && !isNaN(fcStored) && fcStored > countFrom)
+    ? fcStored : edate(countFrom, 3);
+  const fcHorizon = periodsBetween(countFrom, fcTarget, bucket);
+
+  /* ── Periods a team in scope had no data for ─────────────────────────────
+     Only ever set by deriveTeams, and only for a pooled forecast. One shared
+     date is imposed on every team so the All Teams table is a fair comparison —
+     but for a FORECAST that fairness turns into a lie: a team whose export
+     stopped three weeks before the others contributes three periods of zero to
+     the pool, and those are not observations of a slow team, they are the
+     absence of data. `derive()` cannot tell the difference, because throughput
+     is a count over rows that are not there.
+
+     Worse than the level it drops, the SPREAD it adds: those periods are
+     systematically low rather than randomly low, so they fatten the slow tail
+     exactly where the 85th and 95th percentiles are read. The forecast comes out
+     both slower and less certain, and neither is a fact about delivery.
+
+     So the samples stop where every team in scope still had data. Only the
+     forecast's window moves; `asOf` stays the newest date for everything else. */
+  const fcCoverage = (view.forecastCoverageEnd instanceof Date && !isNaN(view.forecastCoverageEnd))
+    ? view.forecastCoverageEnd : null;
+  let fcSamples = wholeThroughput, fcLost = 0;
+  if (fcCoverage && fcCoverage < endDate) {
+    const keep = wholeThroughput.filter((v, i) =>
+      weekStarts[i] && bucketEnd(weekStarts[i], bucket) <= fcCoverage).length;
+    fcLost = wholeThroughput.length - keep;
+    fcSamples = wholeThroughput.slice(0, keep);
+  }
 
   /* Dealt in whole periods, reported in days — see periodsToDays for why the
      answer changes unit on the way out. The conversion happens once here rather
      than inside the sampler, which stays in the units it deals in so a test can
      hand it a sample set and check the arithmetic without a calendar. */
-  const whenPeriods = forecastPeriodsFor(wholeThroughput, fcItems, FORECAST_TRIALS);
+  const whenPeriods = forecastPeriodsFor(fcSamples, fcItems, FORECAST_TRIALS);
   const whenTrials = whenPeriods
-    && whenPeriods.map(p => periodsToDays(endDate, p, bucket));
-  const manyTrials = forecastItemsIn(wholeThroughput, fcHorizon, FORECAST_TRIALS);
+    && whenPeriods.map(p => periodsToDays(countFrom, p, bucket));
+  const manyTrials = forecastItemsIn(fcSamples, fcHorizon, FORECAST_TRIALS);
 
   /* Why the forecast might have nothing to say, so the cards can name the
      control that fixes it rather than going blank.
@@ -6003,8 +6075,15 @@ function derive(rows, settings, view, stages) {
      It is stated anyway because forecastPeriodsFor is a public, testable
      function whose contract allows an all-zero sample set, and a message that
      exists is better than a blank card if the axis rule ever moves. */
-  const fcReason = wholeThroughput.length < FORECAST_MIN_PERIODS ? 'few-periods'
-    : !wholeThroughput.some(v => v > 0) ? 'no-throughput'
+  /* `stale-team` is its own reason rather than folding into `few-periods`,
+     because the two have different fixes: one is answered by the grouping and
+     window controls in front of the reader, and the other by re-exporting a
+     team or narrowing the scope. Reported only when the trim is what caused
+     the shortfall — an untrimmed window this short was always few-periods. */
+  const fcReason = fcSamples.length < FORECAST_MIN_PERIODS
+      ? (fcLost > 0 && wholeThroughput.length >= FORECAST_MIN_PERIODS
+          ? 'stale-team' : 'few-periods')
+    : !fcSamples.some(v => v > 0) ? 'no-throughput'
     : null;
 
   /* A backlog bigger than this team's recorded pace can clear inside the walk's
@@ -6019,7 +6098,15 @@ function derive(rows, settings, view, stages) {
     /* Stated on the face wherever an answer is: every other figure in this app
        names the periods it was counted over, and a forecast has more reason to
        than most. */
-    samples: wholeThroughput.length,
+    samples: fcSamples.length,
+    /* How many whole periods the coverage trim took off the end, and where it
+       stopped — both stated on the card, because a figure must never move for
+       a reason that is not on the page. Zero and null for every single-team
+       forecast, which is every forecast this app drew before now. */
+    lostPeriods: fcLost,
+    coverageEnd: fcLost > 0 ? fcCoverage : null,
+    countFrom,
+    countingFromToday: countFromToday,
     trials: FORECAST_TRIALS,
     minPeriods: FORECAST_MIN_PERIODS,
     items: fcItems,
@@ -6029,7 +6116,7 @@ function derive(rows, settings, view, stages) {
     when: (whenTrials && !fcBeyond) ? {
       rows: FORECAST_CONFIDENCE.map(c => {
         const days = daysAtConfidence(whenTrials, c);
-        return { confidence: c, days, date: addDays(endDate, days) };
+        return { confidence: c, days, date: addDays(countFrom, days) };
       }),
       hist: forecastHistogram(whenTrials, true)
     } : null,
@@ -6366,15 +6453,57 @@ function deriveTeams(teams, settings, view, stages) {
   const listOf = (t) => (view && view.unit === 'features' ? (t.features || []) : (t.rows || []));
   const everything = [];
   for (const t of list) everything.push(...listOf(t));
-  const train = derive(everything, settings, view, stages);
+  /* Derived twice when a forecast is wanted, and only then. The first pass is
+     what it has always been and is what settles the shared date; the second
+     re-runs the train with the coverage end that date makes computable. Two
+     passes over one team's worth of pooled rows is cheap, and the alternative —
+     working the coverage out before deriving anything — would mean a second
+     implementation of "where does this team's data end". */
+  let train = derive(everything, settings, view, stages);
   /* Nothing anywhere has finished, so there is no window to compare within and
      no date to share. The rows would all be empty; say so once instead. */
-  if (train.empty) return { train, rows: [], asOf: null };
+  if (train.empty) return { train, rows: [], asOf: null, coverageEnd: null, staleTeams: [] };
+
+  /* ── Where every team in scope still had data ────────────────────────────
+     The earliest last-date among the teams that have any. Teams with NO rows are
+     excluded: one empty team would otherwise pull the coverage back to nothing
+     and refuse every forecast on the train, which is not what an empty team
+     means. `dataEnd` is read off the unfiltered rows and before `asOf` can move
+     anything, so it is a property of the export rather than of the window. */
+  /* ONE derive per team here, reused for both the coverage end and the stale
+     list below. Each team is derived again further down against the SHARED view,
+     which is a different question and cannot borrow this answer — but deriving
+     three times for two facts, as a first draft of this did, is a third of the
+     most expensive thing this app does thrown away. */
+  const preScan = list.map(t => ({ t, d: derive(listOf(t), settings, view, stages) }));
+  const ends = preScan.map(x => x.d.dataEnd).filter(Boolean);
+  const coverageEnd = ends.length ? new Date(Math.min(...ends.map(d => d.getTime()))) : null;
 
   const shared = Object.assign({}, view, { asOf: train.endDate });
+
+  /* Re-derive the train with the coverage end in hand, so its FORECAST stops
+     where every team still had data while everything else on it stays read as of
+     the newest date. Skipped entirely when nothing is behind, which is the
+     ordinary case and every single-team forecast. */
+  if (coverageEnd && coverageEnd < train.endDate) {
+    train = derive(everything, settings,
+      Object.assign({}, view, { forecastCoverageEnd: coverageEnd }), stages);
+  }
+
+  /* Which teams are behind, and by how many whole periods — named on the card,
+     because a forecast that quietly used a shorter window would be a figure
+     moving for a reason that is not on the page. The same fact the All Teams
+     "Data to" column reports, said where it changes an answer. */
+  const staleTeams = preScan.map(({ t, d }) => {
+    if (!d.dataEnd || d.dataEnd >= train.endDate) return null;
+    return { id: t.id, name: t.name, dataEnd: d.dataEnd,
+             periods: Math.floor(periodsBetween(d.dataEnd, train.endDate, train.bucket)) };
+  }).filter(Boolean).sort((a, b) => a.dataEnd - b.dataEnd);
   return {
     train,
     asOf: train.endDate,
+    coverageEnd,
+    staleTeams,
     /* In the picker's order, deliberately. Sorting is a thing the reader asks
        for by pressing a column; until they do, a team should be where they
        expect to find it rather than wherever its throughput put it today. */
@@ -6418,6 +6547,11 @@ function deriveTeams(teams, settings, view, stages) {
    a team structurally cannot be on two. The same shape as the sibling app, down
    to the field names, because the two apps are read side by side. */
 const ART_NONE = '~none';
+/* The forecast's "every team" scope. A tilde like ART_NONE for the same reason:
+   an ART id can never begin with one (ID_OK allows it, but newId() never emits
+   it and a hand-edited id that did would still not collide with this exact
+   string), so the sentinel cannot be mistaken for a train. */
+const FC_SCOPE_ALL = '~all';
 
 /* Both are pure — they take the list rather than reading `state` — so a share
    payload can be grouped before it is ever adopted, and tests can pin them. */
@@ -6664,7 +6798,16 @@ const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', act
      and what a browser that has never seen this setting gets. Falling back the
      other way would be the worse failure by a distance: a dashboard silently
      counting features while every reader assumes items. */
-  unit: 'items' };
+  unit: 'items',
+  /* Whose pace the forecast deals from: '' is the team on screen, an ART's id is
+     that train, and FC_SCOPE_ALL is every team. In `view` with the forecast's
+     other two questions, and validated at its point of use — an id pointing at a
+     deleted ART falls back to the team on screen, which is the scope that is
+     always available. */
+  forecastScope: '',
+  /* Where the walk starts: 'data' (the end of the export, which is what every
+     other figure here is read as of) or 'today'. Anything else means 'data'. */
+  countFrom: 'data' };
 
 const LS = {
   state: 'td-state', view: 'td-view', theme: 'td-theme',
@@ -9766,7 +9909,37 @@ function renderDashboard() {
       d.unit === 'features' ? 'not a feature-level figure' : 'share of completed work',
       'defectRate');
 
-  renderForecast(d);
+  /* ── The forecast may be about more than this team ───────────────────────
+     Everything else on this screen is the team in the picker. The forecast can
+     be a train or the whole estate, so it gets its own derive when the scope is
+     not just this team — pooled ROWS through the same `derive()`, never a sum of
+     per-team distributions.
+
+     Pooling is not an implementation shortcut, it is the correct model: dealing
+     a calendar PERIOD and taking what the whole train delivered in it carries
+     the correlation between teams — a freeze, an incident, a planning week, a
+     holiday. Adding up independent per-team draws sets that covariance to zero
+     and produces a NARROWER spread than reality, which understates risk. If
+     anyone ever proposes summing the teams as an optimisation, this is why not. */
+  const fcScope = currentForecastScope();
+  let fcDerived = d, fcStale = [], fcCoverage = null;
+  if (fcScope.kind !== 'team' && fcScope.teams.length) {
+    const pooled = deriveTeams(fcScope.teams, state.settings,
+      { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket,
+        customFrom: view.customFrom, customTo: view.customTo,
+        forecastItems: view.forecastItems, forecastDate: view.forecastDate,
+        countFrom: view.countFrom,
+        unit: featureUnit() ? 'features' : 'items' },
+      state.stages);
+    /* An empty pool has no forecast to draw; fall back to the team's own, which
+       is what the reader was looking at before they widened the scope. */
+    if (!pooled.train.empty) {
+      fcDerived = pooled.train;
+      fcStale = pooled.staleTeams || [];
+      fcCoverage = pooled.coverageEnd;
+    }
+  }
+  renderForecast(fcDerived, fcScope, fcStale);
   renderStageTime(d);
   /* The join needs both of the team's lists, so it is worked out here where both
      are in hand rather than inside derive(), which only ever sees one. Null in
@@ -10020,7 +10193,7 @@ function renderStageTime(d) {
 
    Everything below reads only `d.forecast` — the figures are worked out in
    derive() with the rest, so this function states them and nothing more. */
-function renderForecast(d) {
+function renderForecast(d, scope, stale) {
   const f = d.forecast;
   const periodNoun = n => (n === 1 ? d.bucketNoun : d.bucketNounPlural);
 
@@ -10038,10 +10211,53 @@ function renderForecast(d) {
 
   /* The one assumption, said plainly and every time — not folded into the ⓘ,
      where someone reading the number off a shared screen would never meet it. */
+  renderForecastScope();
+  /* The counting-from choice appears only when the two answers differ — when the
+     data ends before today. A control that never changes anything teaches the
+     reader it does nothing, and this one matters exactly as much as the export
+     is stale. */
+  const behindDays = Math.max(0, diffDays(new Date(todayLocalISO() + 'T00:00:00Z'), d.endDate));
+  $('fcFromField').hidden = behindDays < 1;
+  $('fcFrom').value = view.countFrom === 'today' ? 'today' : 'data';
+
+  const whose = (scope && scope.kind !== 'team')
+    ? ' Dealt from ' + scope.phrase + ' pooled \u2014 one draw takes what they all '
+      + 'delivered in the same ' + d.bucketNoun + ', so a quiet week they shared counts once.'
+    : '';
   $('fcHint').textContent = 'Both answers assume the next few ' + d.bucketNounPlural
     + ' look like the ' + f.samples + ' whole ' + periodNoun(f.samples)
     + ' on screen. Change the window or the work type filter and the forecast '
-    + 'follows. Counted from ' + prettyDate(d.endDate) + ', where your data ends.';
+    + 'follows.' + whose
+    + ' Counted from ' + prettyDate(f.countFrom)
+    + (f.countingFromToday
+        ? ', today \u2014 your data ends ' + behindDays + ' '
+          + (behindDays === 1 ? 'day' : 'days') + ' earlier, and those days are gone.'
+        : ', where your data ends.'
+          + (behindDays >= 1
+              ? ' That is ' + behindDays + ' ' + (behindDays === 1 ? 'day' : 'days')
+                + ' ago \u2014 every date below is that much early unless you count from today.'
+              : ''));
+
+  /* What the coverage trim took off, and who caused it. Said outright rather
+     than left to the reader to notice that a pooled window is shorter than the
+     charts above it: a figure must never move for a reason that is not on the
+     page. */
+  const staleList = (stale || []);
+  $('fcStale').hidden = !(f.lostPeriods > 0 || staleList.length);
+  if (!$('fcStale').hidden) {
+    const names = staleList.slice(0, 3).map(t => t.name).join(', ')
+      + (staleList.length > 3 ? ' and ' + (staleList.length - 3) + ' more' : '');
+    $('fcStale').textContent = f.lostPeriods > 0
+      ? staleList.length + ' team' + (staleList.length === 1 ? '\u2019s export stops' : 's\u2019 exports stop')
+        + ' before the others (' + names + '), so this forecast is dealt from the '
+        + f.samples + ' whole ' + periodNoun(f.samples) + ' up to '
+        + prettyDate(f.coverageEnd) + ' \u2014 ' + f.lostPeriods + ' '
+        + (f.lostPeriods === 1 ? 'period' : 'periods')
+        + ' short of the charts above. Counting those would read missing data as no delivery.'
+      : staleList.length + ' team' + (staleList.length === 1 ? '\u2019s export stops' : 's\u2019 exports stop')
+        + ' before the others (' + names + '). Re-export ' + (staleList.length === 1 ? 'it' : 'them')
+        + ' before promising anything from this.';
+  }
 
   const conf85 = 85;
   const whenRow = f.when && f.when.rows.find(r => r.confidence === conf85);
@@ -10063,7 +10279,8 @@ function renderForecast(d) {
       manyRow ? '85% of runs completed this many or more' : 'not enough history to forecast',
       'forecastHowMany') +
     tile('Drawn from', String(f.samples),
-      'whole ' + periodNoun(f.samples) + ' of throughput in this window',
+      'whole ' + periodNoun(f.samples) + ' of throughput'
+        + ((scope && scope.kind !== 'team') ? ' across ' + scope.phrase : ' in this window'),
       'forecastSamples');
 
   /* An answer row: the confidence, the answer, and the swatch tying it to its
@@ -10085,6 +10302,11 @@ function renderForecast(d) {
       return 'A forecast needs at least ' + f.minPeriods + ' whole ' + d.bucketNounPlural
         + ' of history to resample, and this window holds ' + f.samples + '. '
         + 'Group by a shorter period, or widen the date window, and it will fill in.';
+    if (f.reason === 'stale-team')
+      return 'Trimming this window back to where every team in scope still had data leaves '
+        + f.samples + ' whole ' + periodNoun(f.samples) + ', short of the '
+        + f.minPeriods + ' a forecast needs. Re-export the teams that are behind, narrow '
+        + 'the scope to the ones that are current, or widen the date window.';
     if (f.reason === 'no-throughput')
       return 'Nothing was completed in any whole ' + d.bucketNoun + ' of this window, '
         + 'so there is no pace to project forward.';
@@ -10197,6 +10419,67 @@ function teamColumns(train) {
    an empty table with no explanation. Falling back to every team is the only
    safe direction — a wrong scope that shows too much is visible, one that shows
    too little is not. */
+/* ── Whose pace the forecast deals from ────────────────────────────────────
+   Returns the teams AND a phrase naming them, so the scope is said in words
+   wherever it is used rather than re-derived — the rule `scopePhrase` already
+   follows on the All Teams view, for the same reason: four places saying the
+   same thing four ways is four chances to misread it.
+
+   Validated here, at the point of use, like every other view field. A scope
+   pointing at a deleted ART falls back to the team on screen, which is the one
+   scope that is always available: a forecast showing too little is visible where
+   one showing too much is not. */
+function currentForecastScope() {
+  const team = activeTeam();
+  const mine = { kind: 'team', teams: team ? [team] : [],
+                 phrase: team ? team.name : 'this team', value: '' };
+  const want = view.forecastScope || '';
+  if (!want) return mine;
+  /* Below two teams there is nothing to pool, and the picker is not on screen —
+     so a value saved when there were three teams cannot outlive the third. */
+  if (state.teams.length < 2) return mine;
+  if (want === FC_SCOPE_ALL) {
+    return { kind: 'all', teams: state.teams.slice(),
+             phrase: 'all ' + state.teams.length + ' teams', value: FC_SCOPE_ALL };
+  }
+  if (want === ART_NONE) {
+    const none = teamsInArt(state.teams, ART_NONE);
+    return none.length
+      ? { kind: 'art', teams: none, phrase: 'the teams on no ART', value: ART_NONE }
+      : mine;
+  }
+  const art = state.arts.find(a => a.id === want);
+  if (!art) return mine;
+  const teams = teamsInArt(state.teams, want);
+  return teams.length
+    ? { kind: 'art', teams, phrase: 'the ' + art.name, value: want }
+    : mine;
+}
+
+/* The picker itself. Rebuilt on every render because both what it can offer and
+   what it is set to move with the data — deleting the last team on a train has
+   to take that train out of the list AND put the reader back on their own. */
+function renderForecastScope() {
+  const offered = state.teams.length >= 2;
+  $('fcScopeField').hidden = !offered;
+  if (!offered) return;
+  const team = activeTeam();
+  const scope = currentForecastScope();
+  const opts = ['<option value="">' + escapeHtml(team ? team.name : 'This team') + '</option>'];
+  /* Trains with at least one team on them, in the reader's own ART order — the
+     order their groups appear in everywhere else. */
+  state.arts.forEach(a => {
+    if (teamsInArt(state.teams, a.id).length)
+      opts.push('<option value="' + escapeHtml(a.id) + '">' + escapeHtml(a.name) + '</option>');
+  });
+  if (teamsInArt(state.teams, ART_NONE).length && state.arts.length)
+    opts.push('<option value="' + ART_NONE + '">Teams on no ART</option>');
+  opts.push('<option value="' + FC_SCOPE_ALL + '">All '
+    + state.teams.length + ' teams</option>');
+  $('fcScope').innerHTML = opts.join('');
+  $('fcScope').value = scope.value;
+}
+
 function currentArtScope() {
   const want = view.artFilter || '';
   if (!want) return '';
@@ -12874,6 +13157,19 @@ $('unitSel').addEventListener('change', e => {
   view.unit = e.target.value === 'features' ? 'features' : 'items';
   saveView();
   renderAll();
+});
+
+/* The forecast's own two controls. renderDashboard rather than renderAll: they
+   change nothing outside this group — not the charts above, not the other tabs,
+   not the loaded data — which is the same reason they live inside the panel
+   rather than in the strip at the top. */
+['fcScope', 'fcFrom'].forEach(id => {
+  $(id).addEventListener('change', () => {
+    view.forecastScope = $('fcScope').value;
+    view.countFrom = $('fcFrom').value === 'today' ? 'today' : 'data';
+    saveView();
+    renderDashboard();
+  });
 });
 
 /* settings — shared by every team */
