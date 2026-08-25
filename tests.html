@@ -303,7 +303,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 2160;
+const EXPECTED = 2200;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3136,6 +3136,158 @@ async function run(TD, win) {
     is(S5.normalizeSettings({
       featureTypes: Array.from({ length: 40 }, (unused, i) => 'T' + i) }).featureTypes.length,
        TD.FEATURE_TYPES_MAX, 'and the list itself is capped');
+  }
+
+
+  /* ────────────────────────────────────────────────────────── */
+  group('featureBreakdown — the one join that needs both lists');
+  {
+    const D = (y, m, d) => new Date(Date.UTC(y, m - 1, d));
+    const feats = [
+      { key: 'F-1', completed: D(2026, 2, 1), started: D(2026, 1, 1) },
+      { key: 'F-2', completed: null, started: D(2026, 1, 5) },
+      { key: 'F-3', completed: D(2026, 2, 1), started: D(2026, 1, 1) }
+    ];
+    const items = [
+      { parentKey: 'F-1', completed: D(2026, 1, 10) },
+      { parentKey: 'F-1', completed: D(2026, 1, 20) },
+      /* AFTER its feature closed — reparented or added later, so not part of
+         what that feature turned out to take. */
+      { parentKey: 'F-1', completed: D(2026, 3, 1) },
+      { parentKey: 'F-2', completed: D(2026, 1, 12) },
+      { parentKey: 'F-2', completed: null },
+      { parentKey: 'F-2', completed: null },
+      /* Names a feature this team does not hold — an ordinary state of a real
+         export, not an error. */
+      { parentKey: 'ZZ-9', completed: D(2026, 1, 15) },
+      { parentKey: '', completed: D(2026, 1, 16) }
+    ];
+    const bd = TD.featureBreakdown(feats, items);
+    is(bd.sizes, [2], 'only FINISHED features are sized, and only their children that '
+      + 'finished at or before they did');
+    is(bd.open.map(f => f.key), ['F-2'], 'the open list is the features without a completion');
+    is(bd.open[0].total, 3, 'an open feature counts every child it has');
+    is(bd.open[0].done, 1, 'and how many of them are done');
+    is(bd.open[0].left, 2, 'and what is left');
+    /* SIX, not five: the item that finished after F-1 closed still NAMES a
+       feature this team holds, so it is joined. The two questions are different
+       and both are worth having — "did this item find its feature" is about the
+       export's coverage, where "does it count toward what that feature took" is
+       about delivery. Only the second censors. */
+    is(bd.joined, 6, 'an item that finished after its feature closed is still JOINED to it');
+    is(bd.orphans, 1, 'while one naming a feature this team does not hold is not');
+    near(bd.joinRate, 6 / 7, 'the join rate is the share of parented items that found a parent');
+    is(bd.sizes, [2], 'but only the uncensored two count toward what F-1 took');
+    /* F-3 finished with no children we can see. NOT a feature of size zero — a
+       zero here would pull every measure of size down for a reason that is
+       about the export rather than about the work. */
+    ok(!bd.sizes.includes(0), 'a finished feature with no visible children is left out, not zeroed');
+    is(TD.featureBreakdown(null, null).sizes, [], 'and it survives being handed nothing');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the unit switch — same maths, different list');
+  {
+    const S6 = { sameDayValue: 0.5, unplannedType: 'Bug', unplannedLabel: 'Defect',
+      cycleTimeLabel: 'Cycle Time', agedDays: 14, workingDays: false,
+      outlierMode: 'off', outlierDays: null, filters: [{ display: 'All', value: 'All' }] };
+    const rows = [
+      { c: '2026-01-09', s: '2026-01-06', t: 'Story', i: 'DAE-1' },
+      { c: '2026-01-16', s: '2026-01-12', t: 'Story', i: 'DAE-2' }
+    ];
+    const list = win.TDState.hydrateRows(rows);
+    const asItems = TD.derive(list, S6, { months: 'all', bucket: 'week' }, []);
+    const asFeats = TD.derive(list, S6, { months: 'all', bucket: 'week', unit: 'features' }, []);
+
+    /* THE point of the whole view: the same list gives the same numbers. Only
+       the words move. */
+    is(JSON.stringify(asFeats.throughput), JSON.stringify(asItems.throughput),
+       'the same list gives the same figures whatever it is called');
+    is(JSON.stringify(asFeats.summary), JSON.stringify(asItems.summary),
+       'including every summary figure');
+
+    is(asItems.unit, 'items', 'the unit is reported back');
+    is(asFeats.unit, 'features', 'both ways');
+    is(asItems.titles.throughput, 'Items Completed per Week', 'the item wording');
+    is(asFeats.titles.throughput, 'Features Completed per Week', 'and the feature wording');
+    is(asFeats.names.cycleScatter, 'Every finished feature', 'names follow it');
+    is(asFeats.axisTitles.wip, 'Features open at period end', 'and so do axis titles');
+    is(asFeats.names.forecastHowMany, 'Features by a date', 'and the forecast card names');
+
+    /* Anything unrecognised means items, which is what makes a stale saved value
+       safe. Falling back the other way would be a dashboard silently counting
+       features while every reader assumed items. */
+    is(TD.derive(list, S6, { months: 'all', bucket: 'week', unit: 'nonsense' }, []).unit,
+       'items', 'an unrecognised unit means items');
+    is(TD.derive(list, S6, { months: 'all', bucket: 'week' }, []).unit, 'items',
+       'and so does no unit at all — every caller written before this existed');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('deriveTeams follows the unit too');
+  {
+    const S7 = { sameDayValue: 0.5, unplannedType: 'Bug', unplannedLabel: 'Defect',
+      cycleTimeLabel: 'Cycle Time', agedDays: 14, workingDays: false,
+      outlierMode: 'off', outlierDays: null, filters: [{ display: 'All', value: 'All' }] };
+    const teams = win.TDState.sanitizeTeams([
+      { id: 'a', name: 'A',
+        rows: [{ c: '2026-01-09', s: '2026-01-06', t: 'Story' },
+               { c: '2026-01-10', s: '2026-01-06', t: 'Story' }],
+        features: [{ c: '2026-01-16', s: '2026-01-06', t: 'Feature', i: 'A-1' }] }]);
+    const byItem = TD.deriveTeams(teams, S7, { months: 'all', bucket: 'week' }, []);
+    const byFeat = TD.deriveTeams(teams, S7, { months: 'all', bucket: 'week', unit: 'features' }, []);
+    is(byItem.train.summary.completedTotal, 2, 'the train counts work items by default');
+    is(byFeat.train.summary.completedTotal, 1, 'and features when asked to');
+    is(byFeat.rows[0].d.summary.completedTotal, 1, 'the per-team rows follow it as well');
+
+    /* The limit and the target are promises about WORK ITEMS. Three features in
+       flight against a limit of six reading "inside it" would be a reassurance
+       about a promise nobody made. */
+    const withLimits = win.TDState.sanitizeTeams([
+      { id: 'a', name: 'A', wipLimit: 6, sleDays: 10,
+        rows: [{ c: '2026-01-09', s: '2026-01-06', t: 'Story' }],
+        features: [{ c: '2026-01-16', s: '2026-01-06', t: 'Feature', i: 'A-1' }] }]);
+    const li = TD.deriveTeams(withLimits, S7, { months: 'all', bucket: 'week' }, []);
+    const lf = TD.deriveTeams(withLimits, S7, { months: 'all', bucket: 'week', unit: 'features' }, []);
+    is(li.rows[0].d.summary.sleDays, 10, 'a target is read in the item view');
+    is(lf.rows[0].d.summary.sleDays, null, 'and deliberately NOT in the feature view');
+    is(lf.rows[0].d.summary.sleMet, null, 'so there is no verdict on a promise nobody made');
+    is(lf.rows[0].d.summary.overWipLimit, null, 'and none on the limit either');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('typing a feature in by hand');
+  {
+    /* The manual door. A feature that can only arrive by pasting a Jira export
+       is a feature the reader without a Jira cannot use — the rule this app
+       adopted when day counts got a box. */
+    const feat = TD.buildManualRow({ created: '2026-01-01', type: 'Feature', key: 'DAE-9' },
+      [], true);
+    ok(!feat.error, 'a feature with only a created date is accepted');
+    is(feat.row.key, 'DAE-9', 'and keeps its key');
+    is(feat.row.parentKey, '', 'a feature carries no parent of its own');
+
+    const item = TD.buildManualRow({ created: '2026-01-01', type: 'Story', key: 'DAE-10' }, []);
+    ok(!!item.error, 'an ITEM with only a created date is still refused — the rule is relaxed '
+      + 'for features and only for features');
+
+    const keyless = TD.buildManualRow({ created: '2026-01-01', type: 'Feature' }, [], true);
+    ok(!!keyless.error, 'a feature with no key is refused at the form');
+    ok(/key/i.test(keyless.error), 'and told why');
+
+    /* The parent key comes through the same guard as everywhere else. */
+    const parented = TD.buildManualRow({ started: '2026-01-02', completed: '2026-01-09',
+      type: 'Story', key: 'DAE-11', parentKey: 'DAE-9' }, []);
+    is(parented.row.parentKey, 'DAE-9', 'an item may name its feature on the form');
+    const badParent = TD.buildManualRow({ started: '2026-01-02', completed: '2026-01-09',
+      type: 'Story', parentKey: 'a sentence, not a key' }, []);
+    is(badParent.row.parentKey, '', 'and anything that is not a key shape is dropped whole');
+
+    /* Both doors still disagree deliberately about a bad ordering, and that split
+       must not be "made consistent" in either direction. */
+    const backwards = TD.buildManualRow({ started: '2026-01-09', completed: '2026-01-02',
+      type: 'Feature', key: 'DAE-12' }, [], true);
+    ok(!!backwards.error, 'a feature that finished before it started is refused, like an item');
   }
 
 

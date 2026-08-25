@@ -1714,6 +1714,24 @@ main:focus { outline: none; }
        strip is shared, so the sentence describing what is under it has to be
        whatever is actually under it. -->
   <div class="controls" id="viewControls" hidden>
+    <!-- FIRST in the strip, because it is the only control here that changes
+         WHAT is being counted rather than which slice of it — everything to its
+         right narrows a population, and this one chooses the population. It is
+         also why it sits outside the panels rather than on the Forecast tab
+         beside the two question boxes: it reaches every chart on both number
+         tabs, and a control that changed the whole dashboard from inside one
+         card would be a control nobody expected to find there.
+
+         HIDDEN ENTIRELY until some team has features. A switch with one usable
+         position is worse than no switch: it invites a press that does nothing
+         and leaves the reader wondering which of the two they are looking at. -->
+    <div class="field" id="unitField" hidden>
+      <label for="unitSel">Count</label>
+      <select id="unitSel">
+        <option value="items">Work items</option>
+        <option value="features">Features</option>
+      </select>
+    </div>
     <div class="field">
       <label for="filterSel">Work type filter</label>
       <select id="filterSel"></select>
@@ -1894,7 +1912,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
          box and nothing else. -->
     <div class="card" id="loadedCard" hidden>
       <div class="row spread">
-        <h2>Loaded Data <span class="hint" id="rowCount"></span></h2>
+        <h2 id="dataHeading">Loaded Data <span class="hint" id="rowCount"></span></h2>
         <span class="row" style="gap:6px">
           <button class="btn small" id="btnAddItem2" type="button">+ Add Item</button>
           <span id="dataExport"></span>
@@ -2026,6 +2044,27 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           </div>
         </div>
 
+        <!-- FEATURE VIEW ONLY, and it is the one card in the app that needs BOTH
+             of a team's lists — the features and the items naming them, joined on
+             the parent key. Everything else in the feature view is `derive()`
+             handed a different list.
+
+             It sits in Flow beside the cycle scatter because it answers the same
+             KIND of question about the same population: the scatter is how long
+             a thing took and this is how big it turned out, and both are a
+             spread rather than an average. It is also the chart the feature
+             forecast will be built on, so a reader meeting a forecast later has
+             already seen the distribution behind it.
+
+             `hidden` in the markup and revealed by the renderer, so an item view
+             is byte-for-byte the layout it always was. -->
+        <div class="chart-card" id="cardFeatureSize" hidden>
+          <div class="chart-name" id="nameFeatureSize"></div>
+          <div class="chart-title" id="titleFeatureSize"></div>
+          <div class="chart-wrap"><canvas id="chartFeatureSize"></canvas></div>
+          <div class="note info" id="featureSizeNone" hidden></div>
+        </div>
+
       </div>
 
       <div class="grid charts" id="spanel-delivery" role="tabpanel" aria-labelledby="stab-delivery" hidden>
@@ -2088,10 +2127,18 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           <div class="note info" id="itemAgeNone" hidden></div>
         </div>
 
-        <div class="chart-card">
+        <!-- It gained an id and an empty face when the feature view landed: a
+             defect is a kind of WORK ITEM, so over features this chart plots a
+             flat zero for every period — a claim of perfect quality, which is
+             the most misleading thing it could possibly say. The card explains
+             itself rather than disappearing, which is the rule the lead time
+             card already follows: the answer to "where did the defect rate go?"
+             belongs on screen. -->
+        <div class="chart-card" id="cardDefectRate">
           <div class="chart-name" id="nameDefectRate"></div>
           <div class="chart-title" id="titleDefectRate"></div>
           <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
+          <div class="note info" id="defectRateNone" hidden></div>
         </div>
 
         <!-- The only card in the app that is a TABLE rather than a chart, and it
@@ -2113,6 +2160,30 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           </div>
           <div class="note info" id="stageTimeNone" hidden></div>
         </div>
+
+        <!-- FEATURE VIEW ONLY. A table rather than a chart, for the reason the
+             stage-time card above it is one: the answer is a handful of rows
+             with a name against each, and a name is the whole point — "which
+             feature needs looking at" cannot be answered by a bar. It also
+             carries Copy and CSV, so a list of what is still open goes straight
+             into a planning note.
+
+             In Health rather than Flow because it answers Health's question —
+             what needs attention — where the size distribution answers Flow's.
+             It is also the ONLY place in the app a feature is listed by name,
+             which matters until features can be typed in by hand. -->
+        <div class="chart-card wide" id="cardFeatureProgress" hidden>
+          <div class="chart-name" id="nameFeatureProgress"></div>
+          <div class="chart-title" id="titleFeatureProgress"></div>
+          <div class="row spread" style="margin-bottom:var(--sp-4)">
+            <span></span>
+            <span id="featureProgressExport"></span>
+          </div>
+          <div class="table-scroll">
+            <table class="data" id="featureProgressTable"></table>
+          </div>
+          <div class="note info" id="featureProgressNone" hidden></div>
+        </div>
       </div>
 
       <!-- The only group that looks forward, and the only one with inputs of its
@@ -2125,7 +2196,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <div class="grid charts" id="spanel-forecast" role="tabpanel" aria-labelledby="stab-forecast" hidden>
         <div class="forecast-ask">
           <div class="field">
-            <label for="fcItems">Number of items to finish</label>
+            <label for="fcItems" id="fcItemsLabel">Number of items to finish</label>
             <input type="number" id="fcItems" min="1" max="2000" step="1" inputmode="numeric">
           </div>
           <div class="field">
@@ -2644,11 +2715,23 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     </div>
   </div>
 
-  <div class="grid two" style="margin-top:var(--sp-5)">
+  <div class="grid two pairs" style="margin-top:var(--sp-5)">
     <div>
-      <label for="itemKey">Item <span class="hint">(optional)</span></label>
+      <label for="itemKey" id="itemKeyLabel">Item <span class="hint">(optional)</span></label>
       <input type="text" id="itemKey" maxlength="17" spellcheck="false" autocomplete="off"
              placeholder="e.g. DAE-1552">
+    </div>
+    <!-- The other door onto the parent key, so the feature breakdown can be
+         built by hand and not only by a paste — the rule this app already holds
+         for stage times. Hidden while a FEATURE is being edited: nothing here
+         nests a feature inside another one, and a box offering it would invite a
+         hierarchy the joins cannot read. `.pairs` on the grid above so a hidden
+         neighbour never strands the box left behind. -->
+    <div id="itemParentWrap">
+      <label for="itemParent">Part of feature <span class="hint">(optional)</span></label>
+      <input type="text" id="itemParent" maxlength="17" spellcheck="false" autocomplete="off"
+             placeholder="e.g. DAE-1500" list="itemParentList">
+      <datalist id="itemParentList"></datalist>
     </div>
     <div id="itemStageWrap" hidden>
       <label for="itemStage">Sitting in <span class="hint">(optional)</span></label>
@@ -4227,7 +4310,13 @@ function parsePastedRows(text, order, stages, featureTypes) {
    with the ISO reader rather than through parseDate's ambiguity rules: there is
    no d/m/y to guess at, and that is half the reason this door exists. */
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-function buildManualRow(f, stages) {
+/* `isFeature` relaxes exactly the two rules a feature is exempt from, and
+   nothing else: it must have a KEY (items name it by key, so one without is a
+   record nothing can ever join to), and it may have only a created date (an
+   unstarted feature is the pipeline, where an unstarted item is untouched
+   backlog). Every other check below — the date ordering, the future guard, the
+   guards on the type and the key — applies unchanged to both. */
+function buildManualRow(f, stages, isFeature) {
   const iso = (v) => {
     const t = String(v == null ? '' : v).trim();
     if (!t) return null;
@@ -4240,10 +4329,25 @@ function buildManualRow(f, stages) {
     return { error: 'One of those dates could not be read. Use the date picker, or type it as '
       + 'YYYY-MM-DD.' };
   }
-  /* The parser's own rule: a row with neither date says nothing about flow. */
-  if (!completed && !started) {
-    return { error: 'An item needs a start date, a completed date, or both — every figure on '
-      + 'the dashboard keys off one of them.' };
+  /* The parser's own rule: a row with neither date says nothing about flow.
+     A feature is the one exemption — see hydrateFeatures — but it still needs a
+     date of SOME kind, so the rule is relaxed rather than dropped. */
+  if (isFeature ? (!completed && !started && !created) : (!completed && !started)) {
+    return { error: isFeature
+      ? 'A feature needs a created date, a start date or a completed date. Without one '
+        + 'there is nothing to place it on any chart.'
+      : 'An item needs a start date, a completed date, or both — every figure on '
+        + 'the dashboard keys off one of them.' };
+  }
+  /* A feature is named by its key or it is nothing: the whole reason the record
+     exists is that items point at it. Refused here where a paste merely counts
+     it, which is the split every guard in this app takes between the two doors —
+     a paste is hundreds of rows arriving unwatched, a form is one row with
+     somebody looking straight at it. */
+  if (isFeature && !cleanIssueKey(f.key)) {
+    return { error: 'A feature needs a key, in the shape of a Jira key — DAE-1552. '
+      + 'It is what the items belonging to it point at, so a feature without one can '
+      + 'never have anything joined to it.' };
   }
   if (started && completed && started > completed) {
     return { error: 'That item finished before it started. Check the two dates — work cannot '
@@ -4277,7 +4381,12 @@ function buildManualRow(f, stages) {
   }
   const row = { completed: completed || null, started: started || null,
                 created: created || null,
-                type: cleanWorkType(f.type), key: cleanIssueKey(f.key) };
+                type: cleanWorkType(f.type), key: cleanIssueKey(f.key),
+                /* The same guard as the key beside it, because it is the same
+                   shape of value. A feature carries none — nothing in this app
+                   nests a feature inside another one, and offering the box would
+                   invite a hierarchy the joins cannot read. */
+                parentKey: isFeature ? '' : cleanIssueKey(f.parentKey) };
   /* A stage says where an item IS, so it belongs only to work in flight — the
      same rule the parser applies to a Status column, stated once more here
      because this is a second door onto the same field. An id nothing answers to
@@ -4570,6 +4679,72 @@ function outlierCutoffOf(values, mode, typedDays) {
      there is no honest way to re-measure them Monday-to-Friday from a single
      total. Re-labelling them would be the one thing worse than not converting
      them. */
+/* ── How big a feature is, in work items ────────────────────────────────────
+   The one figure that needs BOTH of a team's lists: features on one side, the
+   items naming them on the other, joined on the parent key. Everything else in
+   the feature view is `derive()` handed a different list, which is why this is
+   the only new piece of maths the view needed.
+
+   PURE, and deliberately outside `derive()`. That function takes one list and
+   works out flow over it; giving it a second list so it could compute one card
+   would make every caller and every existing test pass an argument they have no
+   use for. When the forecast needs this join it can have its own way in.
+
+   `sizes` counts COMPLETED features only, and counts only the children that
+   finished at or before the feature did. An in-flight feature's item count is
+   censored — it is still growing — so including it would drag the measured size
+   down, which is the same reason cycle time counts only finished items. And a
+   child that completed AFTER its feature closed was reparented or added later;
+   counting it would inflate the size for a reason that is not about delivery.
+
+   `open` is the other half, and it is what the progress table draws: for a
+   feature still in flight, how much of it is done. Those counts are UNCENSORED —
+   every child, whenever it finished — because there the question is "how far
+   along is this", not "how big did it turn out". */
+function featureBreakdown(features, items) {
+  const feats = Array.isArray(features) ? features : [];
+  const rows = Array.isArray(items) ? items : [];
+  /* One pass over the items, so a team with 40 features and 400 items is 400
+     steps rather than 16,000. */
+  const kids = new Map();
+  for (const r of rows) {
+    if (!r.parentKey) continue;
+    if (!kids.has(r.parentKey)) kids.set(r.parentKey, []);
+    kids.get(r.parentKey).push(r);
+  }
+  const sizes = [], open = [];
+  let joined = 0, orphans = 0;
+  for (const r of rows) if (r.parentKey) {
+    if (feats.some(f => f.key === r.parentKey)) joined++; else orphans++;
+  }
+  for (const f of feats) {
+    const mine = kids.get(f.key) || [];
+    if (f.completed) {
+      const counted = mine.filter(r => r.completed && r.completed <= f.completed).length;
+      /* A completed feature with no children we can see is not a feature of
+         size zero — it is a feature whose items are outside this window, on
+         another team's board, or simply not in the paste. Left out of the
+         distribution rather than recorded as a zero, which would pull every
+         measure of size down for a reason that is about the export. */
+      if (counted > 0) sizes.push(counted);
+    } else {
+      const done = mine.filter(r => r.completed).length;
+      open.push({ key: f.key, started: f.started, created: f.created,
+                  total: mine.length, done, left: mine.length - done });
+    }
+  }
+  sizes.sort((a, b) => a - b);
+  /* Biggest remainder first: the feature with the most left in it is the one a
+     planning conversation is about. */
+  open.sort((a, b) => b.left - a.left || (a.key < b.key ? -1 : 1));
+  return { sizes, open, joined, orphans,
+           /* What share of the items that NAME a parent name one this team
+              holds. A low figure means the join is measuring export coverage
+              rather than work breakdown, and the card says so rather than
+              drawing a confident distribution over a tenth of the board. */
+           joinRate: (joined + orphans) ? joined / (joined + orphans) : 0 };
+}
+
 function stageTimesOf(items) {
   const perStage = new Map();
   let measured = 0;
@@ -5437,6 +5612,28 @@ function derive(rows, settings, view, stages) {
 
   const cycleLabel = settings.cycleTimeLabel || 'Cycle time';
 
+  /* ── What one of these things is called ──────────────────────────────────
+     `derive()` takes a LIST OF RECORDS and works out flow over them. It does not
+     know, and must not care, whether those records are work items or features:
+     that is the whole reason the feature view needed no new maths — the caller
+     hands it a different list and every figure follows.
+
+     What DOES have to follow is the wording. A chart headed "Items Completed per
+     Week" over a list of features is a chart that lies about what it is
+     counting, and it is the kind of lie nobody double-checks. So the unit's name
+     is worked out once, here, and every title, axis and tile reads it rather
+     than spelling "item" out.
+
+     `view.unit` is the caller's word for what it handed over. Anything other
+     than 'features' means items, so a caller that has never heard of the setting
+     — every test written before it, and the All Teams rows — gets exactly the
+     wording it always got. */
+  const unit = view.unit === 'features' ? 'features' : 'items';
+  const Unit = unit === 'features' ? 'Feature' : 'Item';
+  const Units = Unit + 's';
+  const unitOne = Unit.toLowerCase();
+  const units = unit === 'features' ? 'features' : 'items';
+
   /* The last bucket usually stops part-way through: the data ends on a Tuesday,
      the month it lands in has three more weeks to run. Its bars are therefore
      lower than a full period's and always will be. Weekly that is a small lie
@@ -6031,6 +6228,11 @@ function derive(rows, settings, view, stages) {
        can say what is actually being shown rather than letting the boxes imply
        something else. */
     customUsed: !!custom,
+    /* The unit these figures are about, and its name in the four forms the
+       renderers need. Returned rather than re-derived at each call site for the
+       reason `dayNoun` is: a label that works out its own noun is a label that
+       can disagree with the figure above it. */
+    unit, unitOne, unitMany: units, Unit, Units,
     /* What each chart IS, as against what it plots. Short enough to head a card
        — the sentence in `titles` carries the detail. Cycle time follows the
        "word to use for cycle time" setting, because that setting exists to
@@ -6050,14 +6252,14 @@ function derive(rows, settings, view, stages) {
       agedWork: 'Aged work',
       /* Named for what a dot IS rather than for the chart type — nobody at a
          stand-up asks for the scatter plot. */
-      itemAge: 'Work item age',
+      itemAge: 'Work ' + unitOne + ' age',
       /* Named for what a dot is, not for the chart type — the same rule the age
          chart follows: nobody at a stand-up asks for the scatter plot. */
-      cycleScatter: 'Every finished item',
+      cycleScatter: 'Every finished ' + unitOne + '',
       /* The two forecast cards. Named for the question each answers rather than
          for the method: nobody walks up to a board asking for a Monte Carlo. */
       forecastWhen: 'Time to finish',
-      forecastHowMany: 'Items by a date',
+      forecastHowMany: Units + ' by a date',
       /* Named for the question, like the two above it: nobody asks for the
          time-in-status table, they ask where the time goes. */
       stageTime: 'Time in stage'
@@ -6075,22 +6277,22 @@ function derive(rows, settings, view, stages) {
                (unplannedShare == null ? '—' : (unplannedShare * 100).toFixed(2) + '%') + ')',
       cycleTime: cycleLabel + ' per ' + Noun + ' — Average and '
         + CYCLE_PERCENTILE + 'th Percentile',
-      throughput: 'Items Completed per ' + Noun,
-      netFlow: 'Net Flow per ' + Noun + ' (Items Completed − Items Started)',
+      throughput: Units + ' Completed per ' + Noun,
+      netFlow: 'Net Flow per ' + Noun + ' (' + Units + ' Completed − ' + Units + ' Started)',
       cfd: 'Work Raised, Started and Finished in This Window, Stacked at the End of Each '
         + Noun + ' — the Cumulative Flow Diagram',
       leadTime: 'Average Lead Time per ' + Noun + ' (Raised to Delivered)',
       wip: 'Work in Progress at the End of Each ' + Noun,
-      agedWork: 'Items in Progress Longer Than ' + agedDays + ' ' + DayNoun,
-      itemAge: 'Age of Every Item Still in Progress on ' + prettyDate(endDate)
+      agedWork: Units + ' in Progress Longer Than ' + agedDays + ' ' + DayNoun,
+      itemAge: 'Age of Every ' + Unit + ' Still in Progress on ' + prettyDate(endDate)
         + (ageing.byStage ? ', by Workflow Stage' : ', by Work Type'),
-      cycleScatter: cycleLabel + ' of Each Item, on the ' + Noun + ' It Finished',
+      cycleScatter: cycleLabel + ' of Each ' + Unit + ', on the ' + Noun + ' It Finished',
       /* Both name the question's own input, so a card read on its own — in a
          screenshot, over someone's shoulder — still says what was asked. */
-      forecastWhen: 'How Many Days to Finish ' + fcItems + ' Item'
+      forecastWhen: 'How Many Days to Finish ' + fcItems + ' ' + Unit
         + (fcItems === 1 ? '' : 's') + ', over ' + FORECAST_TRIALS.toLocaleString()
         + ' Simulated Runs',
-      forecastHowMany: 'How Many Items Finished by ' + prettyDate(fcTarget) + ', over '
+      forecastHowMany: 'How Many ' + Units + ' Finished by ' + prettyDate(fcTarget) + ', over '
         + FORECAST_TRIALS.toLocaleString() + ' Simulated Runs',
       /* Says CALENDAR DAYS in the title itself rather than only in the ⓘ, and
          says it whichever way the working-days setting is set. It is the one
@@ -6098,7 +6300,7 @@ function derive(rows, settings, view, stages) {
          counted by Jira out of a status history this app never sees — and a
          reader who has turned working days on has every reason to assume it
          reached these too. */
-      stageTime: 'Where the Time Goes, over ' + stageTimes.measured + ' Item'
+      stageTime: 'Where the Time Goes, over ' + stageTimes.measured + ' ' + Unit
         + (stageTimes.measured === 1 ? '' : 's') + ' with Stage Data — Calendar Days'
     },
     axisTitles: {
@@ -6106,12 +6308,12 @@ function derive(rows, settings, view, stages) {
          screen, and the chart title above already says the rest. */
       defectRate: 'Defect rate',
       cycleTime: cycleLabel + ' (' + dayNoun + ')',
-      throughput: 'Count of closed items during ' + noun,
-      netFlow: 'Items completed − items started',
-      cfd: 'Items, counted from the start of the window',
+      throughput: 'Count of closed ' + units + ' during ' + noun,
+      netFlow: Units + ' completed − ' + units + ' started',
+      cfd: Units + ', counted from the start of the window',
       leadTime: 'Lead time (' + dayNoun + ')',
-      wip: 'Items open at period end',
-      agedWork: 'Items older than ' + agedDays + ' ' + dayNoun,
+      wip: Units + ' open at period end',
+      agedWork: Units + ' older than ' + agedDays + ' ' + dayNoun,
       itemAge: 'Age so far (' + dayNoun + ')',
       itemAgeX: ageing.byStage ? 'Workflow stage' : 'Work type',
       cycleScatter: cycleLabel + ' (' + dayNoun + ')',
@@ -6122,8 +6324,8 @@ function derive(rows, settings, view, stages) {
       forecastRuns: 'Simulated runs',
       /* Calendar days, always — the working-days setting governs how long work
          TOOK, and a forecast is a wait somebody is going to sit through. */
-      forecastWhenX: 'Days to finish ' + fcItems + ' item' + (fcItems === 1 ? '' : 's'),
-      forecastHowManyX: 'Items finished by ' + prettyDate(fcTarget),
+      forecastWhenX: 'Days to finish ' + fcItems + ' ' + unitOne + (fcItems === 1 ? '' : 's'),
+      forecastHowManyX: Units + ' finished by ' + prettyDate(fcTarget),
       x: bucket === 'month' ? 'Month'
         : bucket === 'fortnight' ? 'Year-Fortnight (week numbers)'
         : 'Year-Week Number'
@@ -6158,8 +6360,12 @@ function derive(rows, settings, view, stages) {
      train the same treatment a team gets, from the same code. */
 function deriveTeams(teams, settings, view, stages) {
   const list = Array.isArray(teams) ? teams : [];
+  /* Which of a team's two lists this run is about. PURE — it reads the view it
+     was handed rather than the app's, so the same rule serves the dashboard, a
+     shared link and a test, and nothing here has to reach for global state. */
+  const listOf = (t) => (view && view.unit === 'features' ? (t.features || []) : (t.rows || []));
   const everything = [];
-  for (const t of list) everything.push(...(t.rows || []));
+  for (const t of list) everything.push(...listOf(t));
   const train = derive(everything, settings, view, stages);
   /* Nothing anywhere has finished, so there is no window to compare within and
      no date to share. The rows would all be empty; say so once instead. */
@@ -6187,9 +6393,13 @@ function deriveTeams(teams, settings, view, stages) {
        other's. It also keeps a team's figures identical on this table and on its
        own dashboard, which a shared fence would quietly break. */
 
+    /* The limit and the target are dropped in the feature view for the reason
+       spelled out where the dashboard drops them: they are promises about work
+       items, and a verdict on a promise nobody made is worse than no verdict. */
     rows: list.map(t => ({ id: t.id, name: t.name,
-      d: derive(t.rows || [], settings,
-        Object.assign({}, shared, { wipLimit: t.wipLimit, sleDays: t.sleDays }), stages) }))
+      d: derive(listOf(t), settings, Object.assign({}, shared, {
+        wipLimit: view && view.unit === 'features' ? null : t.wipLimit,
+        sleDays: view && view.unit === 'features' ? null : t.sleDays }), stages) }))
   };
 }
 
@@ -6245,6 +6455,7 @@ window.TD = {
      without a paste box or a team list on screen. */
   dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
   soleProjectId, PROJECT_ID_ADOPT_MIN,
+  featureBreakdown,
   cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, deriveTeams, utcDate,
   /* The outlier fence on its own, so a test can hand it a sample it wrote and
      check the rule rather than only reading the answer back off derive(). A
@@ -6443,7 +6654,17 @@ const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', act
      no schema bump and no place in a share payload. Validated at their point of
      use in derive(), like every other view field: an incomplete or backwards
      pair simply means no custom window rather than an error. */
-  customFrom: '', customTo: '' };
+  customFrom: '', customTo: '',
+  /* Which unit the dashboard is counting: 'items' or 'features'. In `view` with
+     the rest of the reading controls, and for the same reason — what you are
+     looking AT is a position on this device, so it takes no schema bump and no
+     place in a share payload.
+
+     Anything unrecognised means items, which is what makes a stale value safe
+     and what a browser that has never seen this setting gets. Falling back the
+     other way would be the worse failure by a distance: a dashboard silently
+     counting features while every reader assumes items. */
+  unit: 'items' };
 
 const LS = {
   state: 'td-state', view: 'td-view', theme: 'td-theme',
@@ -7126,7 +7347,8 @@ function loadView() {
      validated at their point of use — bucket against BUCKET_NOUNS, chartTab in
      selectChartTab, filterDisplay in renderFilterSelect, activeTeamId at
      boot. */
-  for (const [k, id] of [['months', 'monthsSel'], ['dateOrder', 'dateOrder']]) {
+  for (const [k, id] of [['months', 'monthsSel'], ['dateOrder', 'dateOrder'],
+                        ['unit', 'unitSel']]) {
     if (![...$(id).options].some(o => o.value === String(view[k]))) view[k] = DEFAULT_VIEW[k];
   }
   /* The custom window's two ends go straight into a date box, which shows an
@@ -7178,6 +7400,24 @@ function activeTeam() {
   return state.teams.find(t => t.id === view.activeTeamId) || state.teams[0] || null;
 }
 const activeRows = () => { const t = activeTeam(); return t ? t.rows : []; };
+
+/* ── The unit the dashboard is counting ────────────────────────────────────
+   The whole feature view is these three functions and a <select>. `derive()`
+   takes a list of records and does not care what they are, so switching the
+   unit is switching WHICH LIST goes in — there is no second set of maths, no
+   flag threaded through the metrics engine, and nothing that can drift between
+   the two readings, because there is only one reading.
+
+   `featureUnit()` is the guard rather than `view.unit` itself: a saved view can
+   outlive the data it described. Delete every feature, or open a share link from
+   a sender who had them, and a stored 'features' would leave the dashboard
+   counting an empty list and reporting that the team had stopped delivering —
+   which looks exactly like a finding. So the unit is features only while there
+   are some, and the answer falls back to items rather than to an empty screen. */
+const anyFeatures = () => state.teams.some(t => (t.features || []).length);
+const featureUnit = () => view.unit === 'features' && anyFeatures();
+const unitRowsOf = (team) => !team ? []
+  : (featureUnit() ? (team.features || []) : (team.rows || []));
 
 /* "Is this file plainly one of ours?" — asked before a restore, never after.
    hydrateState() is deliberately forgiving: hand it {} and it hands back a valid
@@ -7864,11 +8104,39 @@ function drawCharts(d) {
       tension: 0, fill: false, spanGaps: false, order: 1
     });
   }
-  renderChart('chartDefectRate', {
-    type: 'line',
-    data: { labels: d.bucketLabels, datasets: defectSets },
-    options: qualOpts
-  });
+  /* ── Not over features ──────────────────────────────────────────────────
+     A defect is a kind of WORK ITEM. The defect work type matches nothing in a
+     list of features, so this chart would plot a flat zero across every period
+     and the tile beside it would read 0.00% — a claim of perfect quality, on a
+     board that may have plenty of bugs, made by a chart that simply cannot see
+     them. Of everything on this screen it is the one reading that would be
+     actively false rather than merely less useful, so it is the one card the
+     unit switch takes away.
+
+     It says so on its own face rather than vanishing, the rule the lead time and
+     scatter cards already follow: the answer to "where did the defect rate go?"
+     belongs on screen, and it names the switch that brings it back. */
+  const defectCard = $('cardDefectRate');
+  const defectNone = $('defectRateNone');
+  const defectsApply = d.unit !== 'features';
+  defectCard.querySelector('.chart-wrap').hidden = !defectsApply;
+  defectCard.classList.toggle('no-chart', !defectsApply);
+  defectNone.hidden = defectsApply;
+  defectNone.textContent = defectsApply ? ''
+    : 'A ' + (state.settings.unplannedLabel || 'defect').toLowerCase()
+      + ' is a kind of work item, so there is no such thing as the '
+      + (state.settings.unplannedLabel || 'defect').toLowerCase()
+      + ' rate of a feature. Set Count back to Work items to see it.';
+
+  if (!defectsApply) {
+    if (charts.chartDefectRate) { charts.chartDefectRate.destroy(); delete charts.chartDefectRate; }
+  } else {
+    renderChart('chartDefectRate', {
+      type: 'line',
+      data: { labels: d.bucketLabels, datasets: defectSets },
+      options: qualOpts
+    });
+  }
 
   /* ── Cycle time per week: the average, and the percentile you forecast with ──
      The average alone invites planning around a number most work beats and a
@@ -8616,6 +8884,29 @@ const METRIC_HELP = {
     ['Lower is better — but ', b('a rate near zero in a maturing team'), ' usually means '
       + 'defects are being logged somewhere other than the board, not that there are none.'],
   ] },
+  featureSize: { title: 'Items per Feature', body: [
+    ['How much work does a feature turn out to be on this board? One bar per size, counted '
+      + 'over the features that have actually finished — so it is ', b('what features here '
+      + 'have really taken'), ', not an estimate of what the next one might.'],
+    ['Only finished features are counted, for the same reason cycle time counts only '
+      + 'finished items: ', b('a feature still in flight is still growing'), ', so including '
+      + 'it would drag every measure of size down. A child that completed after its feature '
+      + 'closed is left out too — it was added or moved later, which is not about delivery.'],
+    ['The spread matters more than the median. ', b('A wide spread means a feature is not a '
+      + 'unit of anything'), ' — two of them can differ by a factor of ten — and that is the '
+      + 'single biggest reason a plan counted in features goes wrong.'],
+  ] },
+  featureProgress: { title: 'Features Still Open', body: [
+    ['Every feature without a completion date of its own, and how much of it is done. '
+      + b('Most left first'), ', because the feature with forty items outstanding is the one '
+      + 'a planning conversation is about.'],
+    ['A feature is open until ', b('it'), ' has a completion date — which is not the same as '
+      + 'all of its items being done. Integration, sign-off and a demo all happen after the '
+      + 'last story closes, and a board that closes the feature late is telling you that.'],
+    ['These counts are the ', b('whole feature, not the date window'), '. Every other figure '
+      + 'on this screen is read over the window you picked; a progress figure that moved when '
+      + 'you changed the date picker would be unreadable.'],
+  ] },
   stageTime: { title: 'Time in Stage', body: [
     ['Where does the time actually go? Cycle time says an item took eleven days; ', b('this '
       + 'says how many of them it spent waiting to be reviewed'), '. The median is the '
@@ -9227,8 +9518,10 @@ function renderFilterSelect() {
 function renderDashboard() {
   renderTitle();
 
-  const rows = activeRows();
   const team = activeTeam();
+  /* The list this whole render is about. Everything below reads `rows`, so the
+     unit switch happens once, here, and nothing downstream has to know. */
+  const rows = unitRowsOf(team);
   /* The forecast's two questions ride in with the rest of the view: derive() is
      the one place any figure is worked out, and validating them there is what
      lets renderForecast write the accepted values back into the boxes. */
@@ -9241,7 +9534,28 @@ function renderDashboard() {
     { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket,
       customFrom: view.customFrom, customTo: view.customTo,
       forecastItems: view.forecastItems, forecastDate: view.forecastDate,
-      wipLimit: team && team.wipLimit, sleDays: team && team.sleDays },
+      /* NEITHER TRAVELS INTO THE FEATURE VIEW, and this is the one place the
+         unit switch had to do more than change a noun.
+
+         Both are promises a team made about its BOARD: "we mean to have no more
+         than six items in flight" and "we mean an item to take no more than ten
+         days". Read against features they are not merely less useful, they are
+         WRONG — three features in flight against a limit of six reads
+         "inside it", which is a reassurance about a promise nobody made, and a
+         54-day feature cycle time against a 10-day target reads "not met",
+         which is a failure nobody signed up to. Null is "not set" everywhere in
+         this app, and not set is the truth here: no line on the charts, no
+         verdict on the tiles, exactly as for a team that has set neither.
+
+         The alternative — a second limit and a second target, per team, for
+         features — is a real thing somebody might want and is deliberately not
+         built. It is two more stored fields answering a question nobody has
+         asked yet. */
+      wipLimit: featureUnit() ? null : (team && team.wipLimit),
+      sleDays: featureUnit() ? null : (team && team.sleDays),
+      /* Only so the wording follows — see the unit block in derive(). The
+         figures are decided entirely by which list was handed in. */
+      unit: featureUnit() ? 'features' : 'items' },
     state.stages);
   const plottable = !d.empty && d.weeks.length > 0;
 
@@ -9332,12 +9646,12 @@ function renderDashboard() {
       s.avgThroughput == null ? '&mdash;' : num1(s.avgThroughput),
       s.avgThroughput == null
         ? 'needs one whole ' + d.bucketNoun + ' of data'
-        : 'items per ' + d.bucketNoun + ' over ' + s.wholePeriods + ' whole '
+        : d.unitMany + ' per ' + d.bucketNoun + ' over ' + s.wholePeriods + ' whole '
           + (s.wholePeriods === 1 ? d.bucketNoun : d.bucketNounPlural),
       'throughput') +
     tile(d.cyclePercentile + 'th percentile ' + (state.settings.cycleTimeLabel || 'cycle time').toLowerCase(),
       s.p85CycleTime == null ? '—' : num1(s.p85CycleTime),
-      d.cyclePercentile + '% of items finished within this'
+      d.cyclePercentile + '% of ' + d.unitMany + ' finished within this'
         + (s.medianCycleTime == null ? '' : '; half within ' + num1(s.medianCycleTime))
         + outlierFoot(d)
 
@@ -9361,7 +9675,7 @@ function renderDashboard() {
 
       'cycleTimePercentile') +
     tile('Work in progress', String(s.currentWip),
-      'open items as of ' + prettyDate(s.asOf)
+      'open ' + d.unitMany + ' as of ' + prettyDate(s.asOf)
         + (s.wipLimit == null ? ''
           : '; limit ' + s.wipLimit + (s.overWipLimit
             ? ' — over by ' + (s.currentWip - s.wipLimit) : ' — inside it')),
@@ -9413,14 +9727,14 @@ function renderDashboard() {
         : s.throughputLow + '&ndash;' + s.throughputHigh,
       s.throughputLow == null
         ? 'needs one whole ' + d.bucketNoun + ' of data'
-        : 'items per ' + d.bucketNoun + ' in most ' + d.bucketNounPlural + ' — '
+        : d.unitMany + ' per ' + d.bucketNoun + ' in most ' + d.bucketNounPlural + ' — '
           + bandLow + 'th to ' + bandHigh + 'th percentile of ' + s.wholePeriods + ' whole '
           + (s.wholePeriods === 1 ? d.bucketNoun : d.bucketNounPlural),
       'throughputBand') +
     tile('Net flow', (s.netFlowTotal > 0 ? '+' : '') + s.netFlowTotal,
       'completed − started; aim near 0', 'netFlow') +
     tile('Started vs completed', s.startedTotal + ' / ' + s.completedTotal,
-      'items started and items completed in this window', 'startedCompleted');
+      d.unitMany + ' started and ' + d.unitMany + ' completed in this window', 'startedCompleted');
 
   /* The Health group's own tiles. The counts these two read against — work in
      progress and aged work — are headline tiles now, so what is left here is
@@ -9443,12 +9757,23 @@ function renderDashboard() {
         : d.dayNoun + ' so far, against a median of ' + num1(ag.median)
           + ' for finished work',
       'itemAge') +
+    /* Reads a dash over features rather than 0.00%, for the reason the card
+       below it carries: a defect is a kind of work item, so the figure is not
+       zero, it does not exist. A dash is what this app shows for a figure it
+       cannot work out, and the card says why. */
     tile((state.settings.unplannedLabel || 'Unplanned') + ' rate',
-      s.unplannedShare == null ? '—' : pct1(s.unplannedShare),
-      'share of completed work', 'defectRate');
+      (d.unit === 'features' || s.unplannedShare == null) ? '—' : pct1(s.unplannedShare),
+      d.unit === 'features' ? 'not a feature-level figure' : 'share of completed work',
+      'defectRate');
 
   renderForecast(d);
   renderStageTime(d);
+  /* The join needs both of the team's lists, so it is worked out here where both
+     are in hand rather than inside derive(), which only ever sees one. Null in
+     the item view: the two cards hide themselves on it. */
+  renderFeatureCards(d, featureUnit()
+    ? featureBreakdown(team ? (team.features || []) : [], team ? (team.rows || []) : [])
+    : null);
 
   drawCharts(d);
   /* The panels' hidden state lives in the markup, so re-apply the chosen group
@@ -9472,6 +9797,127 @@ function renderDashboard() {
      • no stages set up at all — the feature has not been reached yet;
      • stages set up, no data — the paste had no matching columns;
      • data, but the work-type filter has taken every measured item out. */
+/* ── The two feature-view-only cards ────────────────────────────────────────
+   Both are drawn from `featureBreakdown`, the one join in the app that needs a
+   team's two lists at once. Both hide themselves entirely in the item view, so
+   the layouts a reader knows are unchanged when the switch is not thrown.
+
+   `bd` is null in the item view, which is how the callers say "not applicable"
+   without either card having to know what a unit is. */
+function renderFeatureCards(d, bd) {
+  const sizeCard = $('cardFeatureSize');
+  const progCard = $('cardFeatureProgress');
+  const on = !!bd;
+  sizeCard.hidden = !on;
+  progCard.hidden = !on;
+  /* Flow holds three cards in the item view and four in the feature view, so
+     which card is the odd one out changes with the switch. `solo` narrows the
+     third card to one column and centres it; with four there is no third. Left
+     on in the item view, taken off in the feature view. */
+  $('cardLeadTime').classList.toggle('solo', !on);
+  if (!on) {
+    if (charts.chartFeatureSize) { charts.chartFeatureSize.destroy(); delete charts.chartFeatureSize; }
+    $('featureProgressTable').innerHTML = '';
+    $('featureProgressExport').innerHTML = '';
+    return;
+  }
+
+  /* ── How big a feature turns out to be ──────────────────────────────────── */
+  const sizes = bd.sizes;
+  const enough = sizes.length > 0;
+  sizeCard.querySelector('.chart-wrap').hidden = !enough;
+  sizeCard.classList.toggle('no-chart', !enough);
+  const sizeNone = $('featureSizeNone');
+  sizeNone.hidden = enough;
+  sizeNone.textContent = enough ? ''
+    : 'No finished feature in this window has an item naming it, so there is nothing to '
+      + 'measure a size from. Paste an export with a Parent key column, or widen the date '
+      + 'window until it covers some finished features.';
+
+  const median = sizes.length ? sizes[Math.floor((sizes.length - 1) / 2)] : null;
+  const p85 = percentileOf(sizes, CYCLE_PERCENTILE);
+  $('nameFeatureSize').innerHTML = '<span>Items per feature</span>'
+    + helpBtn('featureSize', 'Items per feature');
+  $('titleFeatureSize').textContent = enough
+    ? 'How Many Work Items Each Finished Feature Took, over ' + sizes.length
+      + ' Feature' + (sizes.length === 1 ? '' : 's')
+      + ' — Median ' + median + ', ' + CYCLE_PERCENTILE + 'th Percentile ' + p85
+    : 'How Many Work Items Each Finished Feature Took';
+
+  if (enough) {
+    /* One bar per SIZE, not a fitted curve and not a box plot: the question a
+       reader brings here is "how big does a feature get on this board", and a
+       column of counts answers it in the shape they can point at. Binned only
+       when the spread is wide enough to need it, so a team whose features run
+       3 to 12 items gets a bar per number. */
+    const lo = sizes[0], hi = sizes[sizes.length - 1];
+    const width = Math.max(1, Math.ceil((hi - lo + 1) / 20));
+    const labels = [], counts = [];
+    for (let b = lo; b <= hi; b += width) {
+      const top = Math.min(b + width - 1, hi);
+      labels.push(width === 1 ? String(b) : b + '\u2013' + top);
+      counts.push(sizes.filter(v => v >= b && v <= top).length);
+    }
+    const opts = baseOptions('Features', int0, null, 'Work items in the feature', null);
+    opts.scales.y.beginAtZero = true;
+    opts.scales.y.ticks.precision = 0;
+    opts.interaction = { mode: 'nearest', intersect: true };
+    opts.plugins.tooltip.callbacks = {
+      title: it => it[0].label + (width === 1 ? ' item' : ' items') + ' each',
+      label: c => int0(c.parsed.y) + ' feature' + (c.parsed.y === 1 ? '' : 's')
+    };
+    renderChart('chartFeatureSize', { type: 'bar', data: { labels, datasets: [{
+        label: 'Features', data: counts,
+        backgroundColor: tint(token('--series-1'), 0.45),
+        borderColor: token('--series-1'), borderWidth: 1,
+        categoryPercentage: 1, barPercentage: 1 }] }, options: opts });
+  } else if (charts.chartFeatureSize) {
+    charts.chartFeatureSize.destroy(); delete charts.chartFeatureSize;
+  }
+
+  /* ── What is still open, and how far along ──────────────────────────────── */
+  const openRows = bd.open;
+  const table = $('featureProgressTable');
+  const progNone = $('featureProgressNone');
+  const hasOpen = openRows.length > 0;
+  table.hidden = !hasOpen;
+  progNone.hidden = hasOpen;
+  progCard.classList.toggle('no-chart', !hasOpen);
+  $('featureProgressExport').innerHTML = hasOpen
+    ? exportButtons('featureProgressTable', 'open-features') : '';
+  $('nameFeatureProgress').innerHTML = '<span>Features still open</span>'
+    + helpBtn('featureProgress', 'Features still open');
+  $('titleFeatureProgress').textContent = hasOpen
+    ? 'Every Feature Not Yet Finished, and How Much of It Is Done \u2014 Most Left First'
+    : 'Every Feature Not Yet Finished';
+  if (!hasOpen) {
+    table.innerHTML = '';
+    progNone.textContent = 'Every feature in this team is finished. A feature counts as open '
+      + 'until it has a completion date of its own \u2014 which is not the same as all of its '
+      + 'items being done.';
+    return;
+  }
+  /* The counts are the WHOLE feature, deliberately, where every other figure on
+     this screen is windowed: "how far along is this" is a question about the
+     thing, not about a slice of the calendar, and a progress figure that moved
+     when somebody changed the date picker would be unreadable. The title says
+     so by naming no window. */
+  table.innerHTML =
+    '<thead><tr><th>Feature</th><th class="num">Items</th><th class="num">Done</th>'
+    + '<th class="num">Left</th><th class="num">Done</th><th>Started</th></tr></thead><tbody>'
+    + openRows.map(f =>
+        '<tr><td>' + escapeHtml(f.key) + '</td>'
+        + '<td class="num">' + (f.total || '\u2014') + '</td>'
+        + '<td class="num">' + f.done + '</td>'
+        + '<td class="num">' + f.left + '</td>'
+        /* A plain number, not a bar and not a colour: this table is read off the
+           page by the CSV writer, so what is on screen is what lands in a
+           spreadsheet — the rule the All Teams trend column already follows. */
+        + '<td class="num">' + (f.total ? Math.round((f.done / f.total) * 100) + '%' : '\u2014') + '</td>'
+        + '<td>' + (f.started ? escapeHtml(prettyDate(f.started)) : 'not started') + '</td></tr>'
+      ).join('') + '</tbody>';
+}
+
 function renderStageTime(d) {
   const card = $('cardStageTime');
   const table = $('stageTimeTable');
@@ -9581,6 +10027,11 @@ function renderForecast(d) {
   /* The boxes. `min` on the date keeps the picker from offering a day the
      forecast would only reject — the first day it can say anything about is the
      one after the data ends. */
+  /* The box asks for a number of the thing being forecast, so its label has to
+     follow the unit as every title does — a box reading "Number of items" over a
+     card headed "Features by a date" is the one place the two could disagree
+     while both looked right. */
+  $('fcItemsLabel').textContent = 'Number of ' + d.unitMany + ' to finish';
   $('fcItems').value = String(f.items);
   $('fcDate').value = isoOf(f.targetDate);
   $('fcDate').min = isoOf(addDays(d.endDate, 1));
@@ -9602,12 +10053,12 @@ function renderForecast(d) {
      to be a promise worth making, low enough that one freak run does not set
      it — and the 50 and 95 answers are on the rows under each chart. */
   $('tilesForecast').innerHTML =
-    tile(f.items + ' item' + (f.items === 1 ? '' : 's') + ' finished by',
+    tile(f.items + ' ' + d.unitOne + (f.items === 1 ? '' : 's') + ' finished by',
       whenRow ? escapeHtml(prettyDate(whenRow.date)) : '&mdash;',
       whenRow ? '85% of runs were done within ' + whenRow.days
         + (whenRow.days === 1 ? ' day' : ' days') : 'not enough history to forecast',
       'forecastWhen') +
-    tile('Items by ' + prettyDate(f.targetDate),
+    tile(d.Units + ' by ' + prettyDate(f.targetDate),
       manyRow ? 'at least ' + manyRow.count : '&mdash;',
       manyRow ? '85% of runs completed this many or more' : 'not enough history to forecast',
       'forecastHowMany') +
@@ -9638,7 +10089,7 @@ function renderForecast(d) {
       return 'Nothing was completed in any whole ' + d.bucketNoun + ' of this window, '
         + 'so there is no pace to project forward.';
     if (f.beyondReach)
-      return 'That is more items than this team\u2019s recorded pace clears in any '
+      return 'That is more ' + d.unitMany + ' than this team\u2019s recorded pace clears in any '
         + 'reasonable time. Try a smaller number.';
     return '';
   };
@@ -9666,7 +10117,7 @@ function renderForecast(d) {
         '(' + r.days + (r.days === 1 ? ' day' : ' days') + ')')).join(''));
 
   face('cardForecastHowMany', 'rowsForecastHowMany', f.howMany, f.howMany && f.howMany.rows.map(r =>
-    row(r.confidence, 'at least ' + r.count + ' item' + (r.count === 1 ? '' : 's'), '')).join(''));
+    row(r.confidence, 'at least ' + r.count + ' ' + d.unitOne + (r.count === 1 ? '' : 's'), '')).join(''));
 }
 
 /* ── The All teams table ─────────────────────────────────────────────────────
@@ -9859,7 +10310,11 @@ function renderAllTeams() {
   const inScope = teamsInArt(state.teams, scope);
   const all = deriveTeams(inScope, state.settings,
     { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket,
-      customFrom: view.customFrom, customTo: view.customTo },
+      customFrom: view.customFrom, customTo: view.customTo,
+      /* The table follows the strip like everything else on it — a unit switch
+         that changed the dashboard and left this page counting something else
+         would be two screens disagreeing about what a team delivered. */
+      unit: featureUnit() ? 'features' : 'items' },
     state.stages);
   const train = all.train;
   /* How many items the per-team rows ignored between them. Summed from the rows
@@ -10085,15 +10540,34 @@ function renderAllTeams() {
 function renderViews() { renderDashboard(); renderAllTeams(); }
 
 function renderDataTable() {
-  const rows = activeRows();
-  $('rowCount').textContent = rows.length ? '(' + rows.length + ' item' + (rows.length === 1 ? '' : 's') + ')' : '';
+  /* Follows the unit switch, so the list on this tab is the list the dashboard
+     is counting — and so the editor it opens writes into the right place. It is
+     also the only surface that shows a FINISHED feature: the progress card on
+     the dashboard deliberately lists the open ones. */
+  const feature = featureUnit();
+  const rows = unitRowsOf(activeTeam());
+  const noun = feature ? 'feature' : 'item';
+  $('rowCount').textContent = rows.length
+    ? '(' + rows.length + ' ' + noun + (rows.length === 1 ? '' : 's') + ')' : '';
+  /* The heading names the list, because this tab does NOT carry the unit switch
+     — the strip at the top is for the two number views, and a work-type filter
+     or a date window means nothing to a raw list. So the reader who threw the
+     switch on the dashboard and came here needs the page itself to say which of
+     the two lists they are looking at; without it, a shorter table reads as
+     missing data. */
+  $('dataHeading').firstChild.textContent = feature ? 'Loaded Features ' : 'Loaded Data ';
   /* Only while there is a table to take. The card itself is already hidden until
      rows exist (renderEmptyState), but the buttons are drawn from here, so this
-     is where they have to stop. */
-  $('dataExport').innerHTML = rows.length ? exportButtons('dataItemsTable', 'work-items') : '';
+     is where they have to stop. The file is named for what is in it — a download
+     called work-items.csv holding features would be wrong on somebody's disk
+     long after the screen that produced it is gone. */
+  $('dataExport').innerHTML = rows.length
+    ? exportButtons('dataItemsTable', feature ? 'features' : 'work-items') : '';
+  $('btnAddItem').innerHTML = feature ? 'Add a Feature&hellip;' : 'Add an Item&hellip;';
 
   if (!rows.length) {
-    $('dataTable').innerHTML = '<div class="note info">Nothing loaded yet.</div>';
+    $('dataTable').innerHTML = '<div class="note info">'
+      + (feature ? 'No features loaded yet.' : 'Nothing loaded yet.') + '</div>';
     return;
   }
 
@@ -10391,7 +10865,23 @@ function renderEmptyState() {
   document.documentElement.toggleAttribute('data-welcome', firstRun);
 }
 
+/* The unit switch: whether it is offered at all, and which way it is set.
+   Called from renderAll rather than at boot, because both answers can change
+   with the data — a paste that brings the first feature in has to make the
+   control appear, and deleting the last one has to take it away and put the
+   reader back on items. */
+function renderUnitControl() {
+  const offered = anyFeatures();
+  $('unitField').hidden = !offered;
+  /* Read back through featureUnit() rather than off `view`, so the box always
+     shows what is actually being counted. A saved 'features' with no features
+     left is silently items everywhere else in the app; a select still reading
+     "Features" would be the one thing on screen contradicting that. */
+  $('unitSel').value = featureUnit() ? 'features' : 'items';
+}
+
 function renderAll() {
+  renderUnitControl();
   renderTeamSelect();
   renderTeamRows();
   renderArtRows();
@@ -10483,7 +10973,7 @@ TABS.forEach(t => {
    to which group is listed here rather than read from the DOM, because the
    resize on reveal has to know before the panel is measurable. */
 const CHART_GROUPS = {
-  flow:     ['chartCycleTime', 'chartCycleScatter', 'chartLeadTime'],
+  flow:     ['chartCycleTime', 'chartCycleScatter', 'chartLeadTime', 'chartFeatureSize'],
   delivery: ['chartThroughput', 'chartNetFlow'],
   health:   ['chartWip', 'chartAgedWork', 'chartItemAge', 'chartDefectRate'],
   /* Forecast is last because it is the only group that says anything about the
@@ -12374,6 +12864,18 @@ $('bucketSel').addEventListener('change', e => {
   view.bucket = e.target.value; saveView(); renderDataTable(); renderViews();
 });
 
+/* The unit. renderAll rather than renderViews, because this is the one control
+   in the strip that changes what the LOADED DATA table is listing as well as
+   what the charts are counting, and because whether the strip should be showing
+   this control at all can change with it — deleting the last feature while
+   standing on the feature view has to put the reader back on items AND take the
+   switch away. */
+$('unitSel').addEventListener('change', e => {
+  view.unit = e.target.value === 'features' ? 'features' : 'items';
+  saveView();
+  renderAll();
+});
+
 /* settings — shared by every team */
 /* Coerced to a non-negative number on the way in; everything else is a capped
    label, never free text. */
@@ -12865,13 +13367,38 @@ let editingItem = null;
 function openItemDialog(index) {
   const team = activeTeam();
   if (!team) return;
-  editingItem = (typeof index === 'number' && team.rows[index]) ? index : null;
-  const r = editingItem === null ? null : team.rows[editingItem];
+  /* WHICH LIST this dialog is editing, decided once on the way in and read
+     everywhere below. The unit switch is what chooses it, so the form always
+     edits whatever the table behind it is listing — a dialog opened from a list
+     of features and writing into the items would be the worst kind of wrong,
+     silently correct-looking. */
+  const editingFeature = featureUnit();
+  const list = editingFeature ? (team.features || (team.features = [])) : team.rows;
+  const One = editingFeature ? 'Feature' : 'Work Item';
+  const one = editingFeature ? 'feature' : 'item';
+  editingItem = (typeof index === 'number' && list[index]) ? index : null;
+  const r = editingItem === null ? null : list[editingItem];
 
-  $('itemTitle').textContent = r ? 'Edit This Work Item' : 'Add a Work Item';
+  $('itemTitle').textContent = r ? 'Edit This ' + One : 'Add a ' + One;
   $('itemIntro').textContent = r
-    ? 'Changing this item changes every figure it feeds.'
-    : 'One item, typed in. It lands in ' + team.name + ' alongside anything you have pasted.';
+    ? 'Changing this ' + one + ' changes every figure it feeds.'
+    : 'One ' + one + ', typed in. It lands in ' + team.name
+      + ' alongside anything you have pasted.';
+
+  /* A feature has no parent of its own; an item may have one. The label on the
+     key box says which thing is being named, because "Item" over a form headed
+     "Add a Feature" is the one line that could contradict the heading. */
+  $('itemParentWrap').hidden = editingFeature;
+  $('itemKeyLabel').innerHTML = editingFeature
+    ? 'Feature <span class="hint">(required)</span>'
+    : 'Item <span class="hint">(optional)</span>';
+  $('itemParent').value = r && r.parentKey ? r.parentKey : '';
+  /* The features this team actually holds, offered rather than imposed — the
+     same datalist reasoning the work type box follows. A key that matches none
+     of them is still accepted: a feature on another team's board is an ordinary
+     thing to belong to, and refusing it here would be refusing real data. */
+  $('itemParentList').innerHTML = (team.features || [])
+    .map(f => '<option value="' + escapeHtml(f.key) + '"></option>').join('');
 
   $('itemStarted').value = r && r.started ? isoOf(r.started) : '';
   $('itemCompleted').value = r && r.completed ? isoOf(r.completed) : '';
@@ -12884,9 +13411,13 @@ function openItemDialog(index) {
      Settings is that a team names its own. A datalist suggests without
      restricting, so the second Bug is one keystroke and a new type is still
      just typed. */
-  $('itemTypeList').innerHTML = [...new Set(state.teams
-      .flatMap(t => t.rows.map(x => x.type)).filter(Boolean))]
-    .sort().slice(0, 40)
+  /* Feature types when a feature is being typed in, work types otherwise: a
+     list offering "Story" on a form headed "Add a Feature" would suggest exactly
+     the value that stops it being one. */
+  $('itemTypeList').innerHTML = (editingFeature
+      ? (state.settings.featureTypes || [])
+      : [...new Set(state.teams.flatMap(t => t.rows.map(x => x.type)).filter(Boolean))]
+          .sort().slice(0, 40))
     .map(t => '<option value="' + escapeHtml(t) + '"></option>').join('');
 
   /* Only where stages exist, and only ever for work in flight — see
@@ -12942,10 +13473,16 @@ function stageDaysFromForm() {
 $('itemSave').addEventListener('click', () => {
   const team = activeTeam();
   if (!team) return;
+  /* Read again here rather than remembered from the open: the unit cannot change
+     while a modal is up, but reading the live answer means the two halves of this
+     dialog can never disagree about which list they are working on. */
+  const savingFeature = featureUnit();
+  const saveList = savingFeature ? (team.features || (team.features = [])) : team.rows;
   const built = buildManualRow({
     started: $('itemStarted').value,
     completed: $('itemCompleted').value,
     created: $('itemCreated').value,
+    parentKey: $('itemParent').value,
     type: $('itemType').value,
     key: $('itemKey').value,
     stage: state.stages.length ? $('itemStage').value : '',
@@ -12958,33 +13495,44 @@ $('itemSave').addEventListener('click', () => {
        buildManualRow. A field with no control on the form is a field the next
        save silently drops, which is the trap the sibling app records under
        `capacityScale`. */
-    keepStages: (editingItem !== null && team.rows[editingItem])
-      ? team.rows[editingItem].stages : null
-  }, state.stages);
+    keepStages: (editingItem !== null && saveList[editingItem])
+      ? saveList[editingItem].stages : null
+  }, state.stages, savingFeature);
 
   if (built.error) { $('itemWarn').textContent = built.error; return; }
 
-  if (editingItem !== null && team.rows[editingItem]) team.rows[editingItem] = built.row;
-  else team.rows.push(built.row);
+  if (editingItem !== null && saveList[editingItem]) saveList[editingItem] = built.row;
+  else saveList.push(built.row);
   save();
   $('itemDialog').close();
   $('parseNote').innerHTML = '';
   renderAll();
-  window.toast(editingItem === null ? 'Item added' : 'Item updated');
+  window.toast((editingItem === null ? (savingFeature ? 'Feature' : 'Item') + ' added'
+                                     : (savingFeature ? 'Feature' : 'Item') + ' updated'));
 });
 
 $('itemDelete').addEventListener('click', () => {
   const team = activeTeam();
-  if (!team || editingItem === null || !team.rows[editingItem]) return;
-  /* The only single-row delete in the app, and it takes one item out of every
-     figure on the dashboard — so it asks, like every other delete here. */
-  if (!confirm('Delete this work item?\n\nIt comes out of every figure it feeds. '
-      + 'There is no undo.')) return;
-  team.rows.splice(editingItem, 1);
+  const delFeature = featureUnit();
+  const list = !team ? null : (delFeature ? (team.features || []) : team.rows);
+  if (!team || editingItem === null || !list || !list[editingItem]) return;
+  /* The only single-row delete in the app, and it takes one record out of every
+     figure on the dashboard — so it asks, like every other delete here.
+     Deleting a FEATURE leaves its items exactly where they are, still carrying
+     its key: they are work that was really done, and taking them with it would
+     be the most destructive thing in the app hiding behind the smallest button.
+     Their parent key then points at nothing, which the size card reports as an
+     unjoined item rather than repairing. */
+  if (!confirm(delFeature
+      ? 'Delete this feature?\n\nThe work items belonging to it are left alone — they keep '
+        + 'its key and simply stop being joined to anything. There is no undo.'
+      : 'Delete this work item?\n\nIt comes out of every figure it feeds. There is no undo.'))
+    return;
+  list.splice(editingItem, 1);
   save();
   $('itemDialog').close();
   renderAll();
-  window.toast('Item deleted');
+  window.toast(delFeature ? 'Feature deleted' : 'Item deleted');
 });
 
 $('itemCancel').addEventListener('click', () => $('itemDialog').close());

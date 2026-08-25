@@ -1634,6 +1634,62 @@ here that is typed by hand**. It is never read, never stored and never shown. Se
 [What Happens to Bad Data](#what-happens-to-bad-data) above for the guard that makes that a rule
 rather than an accident.
 
+### Reading the Whole Dashboard in Features
+
+Once a team has features, the control strip gains a **Count** picker: *Work items* or
+*Features*. It is first in the strip because it is the only control there that chooses **what is
+being counted** — everything to its right narrows a population, and this one picks it.
+
+**Every chart, tile and table follows it.** Throughput becomes features completed per week,
+cycle time becomes how long a feature takes end to end, the cumulative flow diagram stacks
+features, All Teams compares teams by feature, and the Loaded Data tab lists features. There is
+no second set of maths anywhere: `derive()` takes a list of records and works out flow over it,
+so switching the unit is switching which list goes in. That is why the two readings can never
+disagree — there is only one reading.
+
+**Three things deliberately do not carry over:**
+
+| | Why |
+|---|---|
+| **The WIP limit and the cycle time target** | Both are promises a team made about its **board**. Three features in flight against a limit of six would read "inside it" — a reassurance about a promise nobody made — and a 54-day feature against a 10-day target would read "not met", a failure nobody signed up to. In the feature view a team has neither set, exactly as a team that has never set them. |
+| **The defect rate** | A defect is a *kind of work item*. Over features the chart would plot a flat zero and the tile would read 0.00% — a claim of perfect quality on a board that may have plenty of bugs. It is the one reading that would be actively false rather than merely less useful, so it is the one card the switch takes away, with a note saying why. |
+| **The date window on the progress table** | *Features still open* counts the whole feature. "How far along is this" is a question about the thing, not about a slice of the calendar, and a progress figure that moved when you changed the date picker would be unreadable. |
+
+The switch **disappears entirely** when no team has features. A control with one usable position
+invites a press that does nothing.
+
+### Two Cards Only the Feature View Has
+
+**Items per Feature** — the distribution of how much work a finished feature actually took, one
+bar per size. It counts finished features only, for the same reason cycle time counts finished
+items: a feature still in flight is still growing. A child that completed *after* its feature
+closed is left out too — it was added or moved later, which is not about delivery.
+
+Read the **spread**, not the median. A wide one means a feature is not a unit of anything on this
+board — two of them can differ by a factor of ten — and that is the single biggest reason a plan
+counted in features goes wrong.
+
+**Features Still Open** — every feature without a completion date of its own, most work
+remaining first, with Copy and CSV so it goes straight into a planning note. A feature is open
+until *it* has a completion date, which is not the same as all of its items being done:
+integration, sign-off and a demo all happen after the last story closes, and a board that closes
+the feature late is telling you something.
+
+### Typing a Feature In
+
+Features come out of a paste, and they can also be **typed in** — the rule this app holds for
+everything it stores. With **Count** on Features, the Your Data tab lists your features and its
+button reads *Add a Feature…*; the same form edits and deletes them.
+
+Two rules differ from a work item, and only two. A feature **must have a key** — items name it by
+key, so one without can never be joined to anything — and it may carry **only a created date**,
+because an unstarted feature is the pipeline where an unstarted item is untouched backlog.
+Everything else, including the date ordering and the refusal of future dates, is identical.
+
+The work item form gained a **Part of feature** box for the same reason, so the breakdown can be
+built by hand and not only pasted. Deleting a feature **leaves its items alone**: they are work
+that was really done, and they keep the key they carried.
+
 ### What It Costs You
 
 Nothing, unless you use it. A team with no features writes no `features` key and a row with no

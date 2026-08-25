@@ -131,6 +131,83 @@ file records what is specific to this repo and what must never regress.
 - **Which tab you were on IS remembered, for the two number views only.** `view.activeTab`, restored at boot. It used to be deliberately not saved — the old comment said "a reload should open on the dashboard" — which was out of step with both siblings (Sprint Predictability keeps `settings.view`, Money Map keeps `ui.activeTab`) and with the fact that All Teams is where somebody with several teams works. Changed 2026-08-21 after it was reported as annoying. Settings and Your Data are NOT remembered, on purpose. No new guard was needed: `selectTab` already refuses a hidden or unknown tab and falls back to the dashboard, which is exactly the All-Teams-disappears-below-two-teams case.
 - **The All Teams Throughput trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **The header names the metric** — it shipped as a bare "Trend" and that was not enough beside eight other columns that each name theirs. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart.
 
+## The Feature View (2026-08-25) — no schema change
+
+Phase 2. `view.unit` is `'items' | 'features'` and a `<select>` in the control strip. It stores
+nothing new — which unit you are reading is a position on this device, like the team you have
+picked — so no `SCHEMA` bump and no share-payload entry.
+
+- **THERE IS NO SECOND SET OF MATHS, and that is the whole design.** `derive()` takes a list of
+  records and works out flow over it; it does not know and must not care what they are. Switching
+  the unit is switching WHICH LIST goes in (`unitRowsOf`, `deriveTeams`'s `listOf`). Nothing was
+  threaded through the metrics engine, so the two readings cannot drift — there is only one
+  reading. A test derives the same list both ways and pins every figure identical.
+- **What DOES have to follow is the wording.** A chart headed "Items Completed per Week" over a
+  list of features is a lie nobody double-checks. `derive()` works the unit's name out once
+  (`unit`/`Unit`/`Units`/`unitOne`/`unitMany`, returned on the result) and every title, axis,
+  tile foot and forecast row reads it. **Never spell "item" out in a label again** — that is how
+  the two get out of step.
+- **`view.unit` is read through `featureUnit()`, never directly.** A saved view outlives the data
+  it described: delete every feature, or open a share link from a sender who had them, and a
+  stored `'features'` would leave the dashboard counting an empty list and reporting that the team
+  had stopped delivering — which looks exactly like a finding. Features only while there are some,
+  and the fallback is items rather than an empty screen. Same reason an unrecognised value means
+  items: falling back the other way would be a dashboard silently counting features while every
+  reader assumed items.
+- **THREE THINGS DELIBERATELY DO NOT CARRY OVER, and the reasoning is the same for all three: a
+  figure that is merely less useful may stay, and one that would be actively FALSE must not.**
+  - **`wipLimit` and `sleDays` are nulled in the feature view.** Both are promises a team made
+    about its BOARD. Three features in flight against a limit of six reads "inside it" — a
+    reassurance about a promise nobody made — and a 54-day feature against a 10-day target reads
+    "not met", a failure nobody signed up to. Null is "not set" everywhere in this app and not set
+    is the truth here. A second limit and target FOR features is a real thing somebody might want
+    and is deliberately not built: two more stored fields answering a question nobody has asked.
+  - **The defect rate card and tile go.** A defect is a kind of work item, so the defect type
+    matches nothing in a list of features and the chart would plot a flat zero across every
+    period — a claim of perfect quality on a board that may have plenty of bugs. The tile reads a
+    dash, not 0.00%: the figure is not zero, it does not exist.
+  - **The progress table's counts are the WHOLE feature, not the window.** Every other figure on
+    that screen is windowed; a progress figure that moved when somebody changed the date picker
+    would be unreadable. The title names no window, on purpose.
+- **`featureBreakdown(features, items)` is the ONE new piece of maths, and it is deliberately
+  OUTSIDE `derive()`.** It is the only figure needing both of a team's lists at once. Giving
+  `derive()` a second list so it could compute one card would make every caller and every existing
+  test pass an argument they have no use for. When the forecast needs the join it can have its own
+  way in.
+  - **`sizes` counts COMPLETED features only**, and only children that finished at or before the
+    feature did. An in-flight feature is still growing; a child that finished after was reparented
+    or added later. Same reasoning cycle time uses.
+  - **A finished feature with no visible children is LEFT OUT, never recorded as zero.** Its items
+    are outside the window, on another board, or not in the paste — a zero would pull every
+    measure of size down for a reason that is about the export.
+  - **`joined` and `sizes` answer different questions and the counts differ.** An item that
+    finished after its feature closed is still JOINED to it (the export's coverage) while not
+    counting toward what that feature took (delivery). A test states this directly, because
+    getting them the same is the obvious "tidy-up".
+- **The `solo` class is TOGGLED now, not static.** Flow holds three cards in the item view and
+  four in the feature view, so which card is the odd one out changes with the switch. `solo`
+  narrows the third card to one column and centres it; with four there is no third.
+- **Features can be TYPED IN, and that was not optional.** CLAUDE.md's own rule — every chart has
+  a door that is not a Jira paste — would otherwise have been broken by the two new cards on the
+  day they shipped. `buildManualRow` gained an `isFeature` flag relaxing exactly two rules and no
+  others: a key is REQUIRED (items name it by key) and a created date alone is enough. The item
+  rule is untouched and pinned as untouched. The work item form gained a **Part of feature** box
+  on the same reasoning.
+  - **The dialog decides its list once on the way in and reads it again on save.** A form opened
+    from a list of features and writing into the items would be the worst kind of wrong —
+    silently correct-looking.
+  - **Deleting a feature leaves its items alone.** They are work that was really done, and taking
+    them with it would be the most destructive thing in the app hiding behind the smallest button.
+    Their parent key then points at nothing, which the size card reports rather than repairs.
+- **The Your Data tab does NOT carry the unit switch** — the strip is for the two number views,
+  and a work-type filter or a date window means nothing to a raw list. So the HEADING names the
+  list instead ("Loaded Features"), and the export filename follows: a download called
+  `work-items.csv` holding features would be wrong on somebody's disk long after the screen that
+  produced it is gone.
+- **No new demo data was needed** and that is not a hole in the sample-data rule: the demo's two
+  keyed teams already carry features from Phase 1, so every surface here is reachable from Load
+  sample data, and Team Bare Export is the team with none.
+
 ## The Feature Layer (2026-08-25) — SCHEMA 11 → 12
 
 Asked for by Charles as the foundation of feature-level forecasting: read Jira's **Parent key**,
