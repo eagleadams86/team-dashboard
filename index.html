@@ -503,16 +503,70 @@ select { cursor: pointer; }
    exactly what the orphaned-field rule forbids. Explicit columns give the two
    boxes a sensible cap on a wide window and one full-width column on a narrow
    one, with nothing left over either way. */
-/* AUTO-FIT since the scope and counting-from pickers joined the row (2026-08-25).
-   It was three explicit columns — two boxes and the caveat — which is exactly the
-   shape that strands a field the moment a fourth one appears, and two of these
-   four come and go with the data. Auto-fit lets however many are on screen share
-   the line evenly and drop to one column on a phone with nothing left over. */
-.forecast-ask { grid-column: 1 / -1; display: grid; gap: 12px 16px; align-items: end;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+/* FLEX, NOT AUTO-FIT, and it took two goes to get here (2026-08-25).
+
+   It was three explicit columns — two boxes and the caveat — which strands a
+   field the moment a fourth appears, and two of these come and go with the data.
+   Auto-fit was the first fix and brought two faults of its own:
+
+   1. `repeat(auto-fit, minmax(180px, 1fr))` makes as many equal columns as FIT,
+      not as many as there are fields. At 1233px that is six columns of 192px for
+      four fields — four narrow boxes and two columns of dead space at the end.
+   2. A cell holding anything but a label and a control is TALLER than its
+      neighbours, and `align-items: end` then pushes its label and box up out of
+      line with them. The +12 weeks button did exactly that: 96px against 64px,
+      so its label sat 32px higher than the two beside it. Reported by Charles.
+
+   Flex fixes both by construction. `flex: 1 1 <basis>` shares the whole line
+   between however many fields are on it — no empty tracks — and the second fault
+   is answered where it starts, by keeping every field ONE label and ONE control
+   line tall: a control with an extra button puts it BESIDE the box (see
+   .fc-date-row) rather than under it. Nothing in this row may be two lines tall.
+   That is the same rule the dialogs already hold — if a setting needs more than
+   a label, it does not belong in the row. */
+.forecast-ask { grid-column: 1 / -1; display: flex; flex-wrap: wrap;
+  gap: 12px 16px; align-items: end; }
+.forecast-ask > .field { flex: 1 1 180px; min-width: 0; }
+/* The one field carrying a second control, so it asks for the room to hold both
+   on one line. It still shrinks and still wraps like the others. */
+.forecast-ask > #fcDateField { flex: 1 1 320px; }
 /* The prose takes a row of its own rather than a column, because it is a
    sentence about all of the boxes rather than about the one beside it. */
-.forecast-ask .hint, .forecast-ask .note { grid-column: 1 / -1; margin: 0; }
+.forecast-ask .hint, .forecast-ask .note { flex: 1 1 100%; margin: 0; }
+
+/* ── A DATE BOX IS 2px TALLER THAN EVERY OTHER CONTROL, and it shows wherever
+   one sits in a row beside them ─────────────────────────────────────────────
+   The shared field rule gives every control `min-height: calc(1.5em + 16px)` —
+   40px at the 16px base — and a select and a number box land exactly there.
+   Chrome's date editor has an inner content box of 26px rather than 24px, so
+   `input[type=date]` renders 42. In a row aligned on its bottom edge, a 2px
+   taller cell pushes its label and its box 2px ABOVE the ones beside it.
+
+   Pre-existing and app-wide: the main control strip has it too, on the custom
+   From and To boxes against the three selects around them. Found while fixing
+   the much larger version of the same fault below, and worth fixing while the
+   reason is written down.
+
+   `height` rather than a bigger `min-height`, and SCOPED TO THE TWO ROWS where
+   controls sit side by side. The shared rule's min-height carries an iOS guard
+   that cannot be tested from here — an empty date box collapses to its padding
+   on iOS because the pack turns the native appearance off — and pinning the
+   height in these rows keeps that guard intact by satisfying it exactly. The
+   item dialog's date fields are left alone: each is alone in its own grid cell,
+   with nothing beside it to be 2px out of line with.
+
+   The control's box is this app's own; the pack owns only the appearance and
+   the 16px touch floor. This is not theme drift. */
+.controls input[type="date"],
+.forecast-ask input[type="date"] { height: calc(1.5em + 16px); }
+
+/* A box and the button that fills it in, on one line. `min-width: 0` on the
+   input is what keeps them there: without it the date box refuses to shrink
+   below its natural width and the button wraps underneath, which is the exact
+   two-line cell this layout exists to prevent. */
+.fc-date-row { display: flex; align-items: center; gap: 8px; }
+.fc-date-row input { flex: 1 1 auto; min-width: 0; }
+.fc-date-row .btn { flex: 0 0 auto; white-space: nowrap; }
 
 /* ── The scenario block ────────────────────────────────────────────────────
    A <details> spanning the whole group. Its own surface so the knobs read as a
@@ -2257,15 +2311,21 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <label for="fcItems" id="fcItemsLabel">Number of items to finish</label>
             <input type="number" id="fcItems" min="1" max="2000" step="1" inputmode="numeric">
           </div>
-          <div class="field">
+          <div class="field" id="fcDateField">
             <label for="fcDate">Count what is done by</label>
-            <input type="date" id="fcDate">
             <!-- The RTE's date, one press. It counts twelve weeks from wherever
                  the forecast starts, and says so — this app has no PI calendar
                  and inventing one would mean asking for a start date nobody
                  would keep current. Named the way the window picker names the
-                 same span, so the two agree. -->
-            <button type="button" class="btn small" id="fcPi">+12 weeks (a PI)</button>
+                 same span, so the two agree.
+
+                 BESIDE the box, never under it. A field two lines tall is a
+                 field whose label and control sit out of line with every other
+                 one in this row — see the note on .forecast-ask. -->
+            <div class="fc-date-row">
+              <input type="date" id="fcDate">
+              <button type="button" class="btn small" id="fcPi">+12 weeks (a PI)</button>
+            </div>
           </div>
           <p class="hint" id="fcHint"></p>
           <!-- Its own line rather than more sentences in the hint: it is the one

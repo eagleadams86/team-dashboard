@@ -303,7 +303,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 2335;
+const EXPECTED = 2370;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8360,6 +8360,137 @@ group('a card with no chart matches the one beside it');
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
     if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
   }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the forecast row is never two lines tall');
+
+  /* ── THE ORPHANED-FIELD COMPLAINT AGAIN, IN A ROW RATHER THAN A DIALOG ─────
+     Reported by Charles the day the +12 weeks button shipped: the button was
+     put UNDER the date box, which made that one cell 96px against its
+     neighbours' 64px — and the row is aligned on its bottom edge, so the taller
+     cell's label and box sat 32px ABOVE the three beside them.
+
+     The rule this pins is the one the dialogs already hold, said about a row:
+     every field is ONE label line and ONE control line, and a control that
+     needs a second button puts it BESIDE the box. Nothing here may be two lines
+     tall.
+
+     Swept across widths, because the fault only shows where fields SHARE a
+     line — at phone widths they each have one of their own and any height would
+     look fine. Fields are grouped by the line they landed on and every group is
+     checked, so wrapping is covered without naming a breakpoint. */
+  {
+    const keep = { state: localStorage.getItem('td-state'),
+                   view: localStorage.getItem('td-view') };
+    /* Enough teams for the scope picker to be offered, and a stale one so the
+       counting-from picker is too — four fields is the crowded case, and a
+       field that is not on screen cannot be out of line with anything. */
+    const mkRows = (weeks, shiftDays) => {
+      const out = [];
+      for (let w = weeks; w >= 1; w--) for (let i = 0; i < 3; i++) {
+        const t = Date.now() - ((w * 7 + shiftDays + i) * 86400000);
+        out.push({ c: new Date(t).toISOString().slice(0, 10),
+                   s: new Date(t - 3 * 86400000).toISOString().slice(0, 10), t: 'Story' });
+      }
+      return out;
+    };
+    localStorage.setItem('td-state', JSON.stringify({
+      schema: TD.SCHEMA,
+      teams: [{ id: 'r1', name: 'Current', rows: mkRows(16, 0) },
+              { id: 'r2', name: 'Behind', rows: mkRows(16, 40) }],
+      settings: {}
+    }));
+    localStorage.setItem('td-view', JSON.stringify({
+      activeTab: 'dashboard', chartTab: 'forecast', months: 'all' }));
+
+    const widths = [1400, 1240, 1024, 900, 780, 640, 520, 420, 375];
+    let sweptWidths = 0, sweptLines = 0;
+
+    for (const w of widths) {
+      const f = document.createElement('iframe');
+      f.setAttribute('data-td-tests', '');
+      f.setAttribute('aria-hidden', 'true');
+      f.style.cssText = 'position:absolute;left:-9999px;height:1200px;border:0;width:' + w + 'px';
+      await new Promise((resolve) => {
+        f.onload = resolve; f.src = 'index.html' + BUST; document.body.appendChild(f);
+      });
+      const wd = f.contentDocument;
+      const stab = wd.getElementById('stab-forecast');
+      if (stab) stab.click();
+      const ask = wd.querySelector('#spanel-forecast .forecast-ask');
+      const fields = ask ? [...ask.querySelectorAll('.field')]
+        .filter(x => !x.hidden && x.getBoundingClientRect().width > 0) : [];
+
+      if (fields.length) {
+        sweptWidths++;
+        /* Grouped by the line each landed on. Grouping on the CELL's top is safe
+           here in a way it is not in the dialog sweep, because the whole point of
+           this assertion is that no cell is taller than another — if one is, its
+           top differs and the test is measuring exactly the fault it is for. */
+        const byLine = new Map();
+        fields.forEach(x => {
+          const b = x.getBoundingClientRect();
+          const key = Math.round(b.bottom);   /* the edge the row is aligned on */
+          if (!byLine.has(key)) byLine.set(key, []);
+          byLine.get(key).push({
+            id: x.id || 'field',
+            labelTop: Math.round(x.querySelector('label').getBoundingClientRect().top),
+            ctrlTop: Math.round(x.querySelector('input,select').getBoundingClientRect().top),
+            h: Math.round(b.height)
+          });
+        });
+        for (const [, group] of byLine) {
+          sweptLines++;
+          ok(new Set(group.map(r => r.labelTop)).size === 1,
+             'at ' + w + 'px, every label on one line starts at the same height',
+             JSON.stringify(group));
+          ok(new Set(group.map(r => r.ctrlTop)).size === 1,
+             'at ' + w + 'px, every control on one line starts at the same height',
+             JSON.stringify(group));
+          ok(new Set(group.map(r => r.h)).size === 1,
+             'at ' + w + 'px, no field on a shared line is taller than its neighbours',
+             JSON.stringify(group));
+        }
+        /* The button beside the box, at every width — the specific shape the
+           fault took, and the thing a later edit would most easily undo by
+           moving it back under. */
+        const box = wd.getElementById('fcDate'), btn = wd.getElementById('fcPi');
+        ok(!!box && !!btn, 'at ' + w + 'px the date box and its preset are both there');
+        if (box && btn) {
+          ok(Math.abs(box.getBoundingClientRect().top - btn.getBoundingClientRect().top) < 8,
+             'at ' + w + 'px the +12 weeks button sits BESIDE the date box, not under it',
+             'box ' + Math.round(box.getBoundingClientRect().top)
+             + ' vs button ' + Math.round(btn.getBoundingClientRect().top));
+        }
+        /* A date box is 2px taller than every other control unless it is pinned,
+           and in a bottom-aligned row that is what pushes its label out of line.
+           Asserted against a NEIGHBOUR rather than at 40px, so the day the field
+           height changes this moves with it instead of failing. */
+        const other = wd.getElementById('fcItems');
+        if (box && other) {
+          is(Math.round(box.getBoundingClientRect().height),
+             Math.round(other.getBoundingClientRect().height),
+             'at ' + w + 'px a date box is exactly as tall as the number box beside it');
+        }
+      }
+      f.remove();
+    }
+
+    /* A sweep that reached nothing passes every assertion it makes — the trap
+       this suite has been caught by before. */
+    ok(sweptWidths >= 7, 'the sweep reached the forecast row at seven widths or more',
+       String(sweptWidths));
+    ok(sweptLines >= 9, 'and checked at least nine lines of fields across them',
+       String(sweptLines));
+
+    if (keep.state === null) localStorage.removeItem('td-state');
+    else localStorage.setItem('td-state', keep.state);
+    if (keep.view === null) localStorage.removeItem('td-view');
+    else localStorage.setItem('td-view', keep.view);
+    is(localStorage.getItem('td-state'), keep.state,
+       'and the suite put the data back the way it found it');
+  }
+
 
   /* ────────────────────────────────────────────────────────── */
   group('no dialog leaves a field stranded on a short row');
