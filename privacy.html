@@ -75,7 +75,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
        is why this closes before it and why .wrap stays an ordinary <div>. -->
   <main>
   <h1>Flow Metrics — Privacy Policy</h1>
-  <p class="meta">Effective August 24, 2026</p>
+  <p class="meta">Effective August 25, 2026</p>
 
 
   <p>Flow Metrics is built to work entirely in your browser. This page explains exactly what
@@ -87,9 +87,13 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   each team (two numbers you set, which the charts are drawn against),
   the names of any workflow stages you set up, and for each team a
   list of work items — a completed date, an optional start date, an optional created date, an
-  optional work type, an optional issue key and, where your export carried them, which stage the
-  item is currently in and a number of days against each stage — plus the shared settings (labels, the text that
-  marks unplanned work, the thresholds, whether days are counted Monday to Friday, whether items
+  optional work type, an optional issue key, an optional parent key and, where your export
+  carried them, which stage the
+  item is currently in and a number of days against each stage. A team may also hold a separate
+  list of <em>features</em>, each one the same handful of dates and keys as a work item — plus the
+  shared settings (labels, the text that
+  marks unplanned work, the text that marks a feature, the thresholds, whether days are counted
+  Monday to Friday, whether items
   that took unusually long stop counting toward the duration figures, the work-type
   filter list) and your preferences
  (theme, chosen team, date window). No account
@@ -101,6 +105,15 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   nothing else — rather than trimmed to fit, so a cell that is anything other than a key is
   discarded whole. That check runs at the paste and again whenever a saved copy is read back.
   Before August 20, 2026 the app stored no key at all; a copy saved before then simply has none.</p>
+
+  <p><strong>The parent key is the key of the feature a work item belongs to</strong>, added
+  August 25, 2026, and it is held to exactly the same shape check as the issue key above — the
+  same characters, at the same two doors, discarded whole in the same way. It is what lets the app
+  say how many items a feature took. <strong>A <em>Parent summary</em> column is never read.</strong>
+  It is typed by hand and so is prose, and this app stores no prose: any column whose heading names
+  it as a summary, description, comment, note, title, reason or justification is taken out of
+  consideration entirely before your export is read, so no part of it can reach any field at all.
+  A copy saved before that date simply has no parent keys.</p>
 
   <p><strong>The project id is the letters at the front of those keys</strong> — DAE, for
   DAE-1552 — held against the team it belongs to so that one export covering several teams can

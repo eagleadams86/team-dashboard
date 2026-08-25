@@ -303,7 +303,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 2100;
+const EXPECTED = 2160;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -693,10 +693,20 @@ async function run(TD, win) {
             'DAE-1\t5/11/2026\t4/27/2026\tStory'].join('\n')).key, 0, 'and a bare "Key"');
   /* The neighbours a loose /key/ would swallow. Each is a real Jira export
      heading, and the anchored pattern is the only thing keeping them out. */
-  is(kcols(['Issue id\tParent key\tResolved\tIn Progress\tIssue Type',
-            '10432\tDAE-1\t5/11/2026\t4/27/2026\tStory',
-            '10433\tDAE-2\t6/22/2026\t4/28/2026\tBug'].join('\n')).key, 1,
-     '"Parent key" is not matched by name — the column is found by its SHAPE instead');
+  /* This pin CHANGED when the parent key became a field of its own (2026-08-25),
+     and the change is a strengthening rather than a loosening. The anchored key
+     pattern still refuses "Parent key" — that is what it was written for — but
+     the column is no longer left to the shape detector to guess at afterwards:
+     it now has an anchored pattern of its OWN, so the key role finds the real key
+     column and the parent role finds the parent, each by name. Asserted both
+     ways round, because the failure that matters is the two swapping. */
+  {
+    const both = kcols(['Issue id\tParent key\tKey\tResolved\tIn Progress\tIssue Type',
+            '10432\tDAE-1\tDAE-101\t5/11/2026\t4/27/2026\tStory',
+            '10433\tDAE-2\tDAE-102\t6/22/2026\t4/28/2026\tBug'].join('\n'));
+    is(both.key, 2, '"Parent key" is still never matched as the issue key');
+    is(both.parent, 1, 'and it is matched, by name, as the parent key');
+  }
   is(kcols(['Key changed date\tResolved\tIn Progress\tIssue Type',
             '5/1/2026\t5/11/2026\t4/27/2026\tStory'].join('\n')).key, -1,
      'and a date column called "Key changed date" is never read as the key');
@@ -1136,7 +1146,7 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 11, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 12, 'SCHEMA was bumped in the same commit as the whitelist widening');
 
 
   /* ══════════════════════════════════════════════════════════
@@ -1670,7 +1680,7 @@ async function run(TD, win) {
   is('smuggled' in strayS, false, 'a stray settings key is dropped at the boundary');
   is(strayS.agedDays, 21, 'while every known key still comes through');
   is(Object.keys(strayS).sort().join(','),
-     'agedDays,cycleTimeLabel,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,workingDays',
+     'agedDays,cycleTimeLabel,featureTypes,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,workingDays',
      'and the surviving keys are exactly the known set');
 
   is(d.names.wip, 'Work in progress', 'the rest are the standard metric names');
@@ -2795,7 +2805,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 11, 'the schema marker is 11 — the version that added ignoring outliers');
+  is(St.SCHEMA, 12, 'the schema marker is 12 — the version that added the feature layer');
 
 
   /* ────────────────────────────────────────────────────────── */
@@ -2926,6 +2936,208 @@ async function run(TD, win) {
      'a created date after the start is dropped too — no lead time shorter than its cycle time');
   is(iso(hydratedBackwards[1].started), '2015-01-05', 'without touching the dates that do make sense');
   is(iso(hydratedBackwards[2].created), '2015-01-02', 'a row in the right order keeps all three');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the parent key — the second shape-checked identifier');
+  {
+    const paste = [
+      'Key\tIssue Type\tParent key\tParent summary\tCreated\tIn Progress\tResolved',
+      'DAE-101\tStory\tDAE-1\tLogin redesign\t2026-01-05\t2026-01-06\t2026-01-09',
+      'DAE-102\tStory\tnot a key\tLogin redesign\t2026-01-05\t2026-01-07\t2026-01-12'
+    ].join('\n');
+    const r = TD.parsePastedRows(paste, 'auto', [], []);
+    is(r.columns.parent, 2, 'a column headed "Parent key" is read as the parent key');
+    is(r.rows[0].parentKey, 'DAE-1', 'and a key-shaped cell is stored');
+    is(r.rows[1].parentKey, '',
+       'anything that is not a key shape is dropped WHOLE — the issue key rule, at the same door');
+
+    /* The other door. A hand-edited backup or a share link can say anything. */
+    const back = win.TDState.hydrateRows([
+      { c: '2015-01-10', s: '2015-01-05', p: 'DAE-9' },
+      { c: '2015-01-10', s: '2015-01-05', p: 'Customer data export breaks on accented names' },
+      { c: '2015-01-10', s: '2015-01-05', p: '"><script>' }
+    ]);
+    is(back[0].parentKey, 'DAE-9', 'a key-shaped parent survives the read-back');
+    is(back[1].parentKey, '', 'a sentence does not');
+    is(back[2].parentKey, '', 'and neither does markup');
+
+    const wire = win.TDState.serializeRows(back);
+    ok(!('p' in wire[1]), 'no parentKey, no `p` on the wire — the omit-when-empty rule');
+    is(wire[0].p, 'DAE-9', 'and it round-trips when there is one');
+
+    is(TD.detectColumns([['DAE-1', 'DAE-2']], ['Parent key', 'Key'], 'auto', []).key, 1,
+       '"Parent key" cannot be read as the issue key — the anchored pattern');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a prose column may hold NO role — the storage guard');
+  {
+    is([...TD.proseColumns(['Key', 'Parent key', 'Parent summary', 'Created'])], [2],
+       'a heading with "summary" in it is named as prose');
+    ['Summary', 'Description', 'Comment', 'Notes', 'Title', 'Reason', 'Justification']
+      .forEach(h => ok(TD.PROSE_HEADING.test(h), h + ' is treated as prose'));
+    ok(!TD.PROSE_HEADING.test('Issue Type'), 'a work type heading is not');
+    ok(!TD.PROSE_HEADING.test('Resolved'), 'and neither is a date heading');
+
+    /* THE test worth having, and it is a COMPARISON rather than an assertion
+       about one parse: the same data, the same shape, one word changed in one
+       heading. Without the guard the work-type detector takes the prose column —
+       forty rows, one distinct value, no dates, so it passes every test that
+       detector applies — and stores "Login redesign" as the work type on every
+       one of them. cleanWorkType's 40-character cap does not catch it, because
+       that string is fourteen characters long.
+
+       Run both ways here rather than asserted from the rule: a guard nobody has
+       watched fail is a guard nobody knows works. */
+    const rows = [];
+    for (let i = 0; i < 40; i++) rows.push(['DAE-' + (200 + i), 'DAE-1', 'Login redesign', '2026-01-05']);
+    const guarded = TD.detectColumns(rows, ['Key', 'Parent key', 'Parent summary', 'Created'], 'auto', []);
+    const unguarded = TD.detectColumns(rows, ['Key', 'Parent key', 'Parent detail', 'Created'], 'auto', []);
+    is(guarded.type, -1, 'a prose column is never taken as the work type');
+    is(unguarded.type, 2, 'and the identical column IS taken when its heading is not prose');
+
+    /* Every role, not only the type — the rule is "no role at all". */
+    const dateish = [['2026-01-05', '2026-01-09'], ['2026-01-06', '2026-01-10']];
+    const m = TD.detectColumns(dateish, ['Created summary', 'Resolved'], 'auto', []);
+    ok(m.created !== 0 && m.started !== 0 && m.completed !== 0,
+       'a date role will not take a prose column either, however its values read');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('features are extracted, and item figures do not move');
+  {
+    const lines = [
+      'Key\tIssue Type\tParent key\tCreated\tIn Progress\tResolved',
+      'DAE-101\tStory\tDAE-1\t2026-01-05\t2026-01-06\t2026-01-09',
+      'DAE-102\tStory\tDAE-1\t2026-01-05\t2026-01-07\t2026-01-12',
+      'DAE-103\tBug\tDAE-2\t2026-01-06\t2026-01-08\t2026-01-10',
+      'DAE-104\tStory\tDAE-2\t2026-01-07\t2026-01-09\t',
+      'DAE-1\tFeature\t\t2026-01-01\t2026-01-06\t2026-01-12',
+      'DAE-2\tFeature\t\t2026-01-02\t2026-01-08\t',
+      'DAE-3\tFeature\t\t2026-01-03\t\t'
+    ];
+    const on = TD.parsePastedRows(lines.join('\n'), 'auto', [], ['Feature']);
+    is(on.rows.map(r => r.key), ['DAE-101', 'DAE-102', 'DAE-103', 'DAE-104'],
+       'the feature rows are gone from the work items');
+    is(on.features.map(f => f.key), ['DAE-1', 'DAE-2', 'DAE-3'],
+       'and are kept in their own list');
+    is(on.undated, 0,
+       'an unstarted feature is NOT counted as untouched backlog — it is the pipeline');
+
+    /* THE guarantee of this whole layer, stated as a comparison against the same
+       export with its feature rows taken out by hand and the layer switched OFF.
+       Every item-level series must be byte-identical: if extraction ever leaks a
+       feature into `rows`, or drops an item on the way, this is where it shows. */
+    const stripped = lines.filter(l => l.indexOf('\tFeature\t') < 0).join('\n');
+    const base = TD.parsePastedRows(stripped, 'auto', [], []);
+    const S2 = { sameDayValue: 0.5, unplannedType: 'Bug', unplannedLabel: 'Defect',
+      cycleTimeLabel: 'Cycle Time', agedDays: 14, workingDays: false,
+      outlierMode: 'off', outlierDays: null, filters: [{ display: 'All', value: 'All' }] };
+    const V2 = { months: 'all', bucket: 'week' };
+    const dBase = TD.derive(base.rows, S2, V2, []);
+    const dOn = TD.derive(on.rows, S2, V2, []);
+    ['throughput', 'netFlow', 'wip', 'cycleSeries', 'leadSeries', 'defectRate',
+     'cfd', 'ageing', 'cycleScatter', 'forecast', 'summary'].forEach(k =>
+      is(JSON.stringify(dOn[k]), JSON.stringify(dBase[k]),
+         k + ' is byte-identical with the feature layer on'));
+
+    /* Off by default, and off means off. */
+    const off = TD.parsePastedRows(lines.join('\n'), 'auto', [], []);
+    is(off.features.length, 0, 'with no feature types set up, nothing is extracted');
+    is(off.rows.length, 6,
+       'and the feature rows are ordinary items again — six, not seven, because '
+       + 'DAE-3 has only a created date and an ITEM in that state is untouched backlog. '
+       + 'That difference IS the relaxed rule, measured from the other side');
+
+    /* Matched the way the defect type is: trimmed, case-folded, EXACT. */
+    is(TD.parsePastedRows(lines.join('\n'), 'auto', [], ['  feature  ']).features.length, 3,
+       'the label is matched trimmed and case-folded');
+    is(TD.parsePastedRows(lines.join('\n'), 'auto', [], ['Feat']).features.length, 0,
+       'and never as a partial match');
+
+    /* A feature has to be nameable, or nothing can ever join to it. */
+    const noKey = TD.parsePastedRows([
+      'Key\tIssue Type\tCreated\tIn Progress\tResolved',
+      '\tFeature\t2026-01-01\t2026-01-06\t2026-01-12'
+    ].join('\n'), 'auto', [], ['Feature']);
+    is(noKey.features.length, 0, 'a feature with no key is dropped');
+    is(noKey.featuresNoKey, 1, 'and counted under its own heading, not as bad data');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('hydrateFeatures — one rule relaxed, and only one');
+  {
+    const S3 = win.TDState;
+    const raw = [
+      { c: '2026-01-12', s: '2026-01-06', k: '2026-01-01', t: 'Feature', i: 'DAE-1' },
+      { s: '2026-01-08', k: '2026-01-02', t: 'Feature', i: 'DAE-2' },
+      { k: '2026-01-03', t: 'Feature', i: 'DAE-3' },
+      { k: '2026-01-04', t: 'Feature' },
+      { t: 'Feature', i: 'DAE-5' }
+    ];
+    const feats = S3.hydrateFeatures(raw);
+    is(feats.map(f => f.key), ['DAE-1', 'DAE-2', 'DAE-3'],
+       'a created date alone keeps a FEATURE, where it would drop an item');
+    is(S3.hydrateRows(raw).map(r => r.key), ['DAE-1', 'DAE-2'],
+       'and the item rule is untouched — the relaxation is not shared');
+    ok(!feats.some(f => !f.key), 'a feature with no key never survives');
+    ok(!feats.some(f => !f.completed && !f.started && !f.created),
+       'and neither does one with no date at all');
+
+    /* Same record, same allowlist: a field this app does not know is stripped
+       from a feature exactly as it is from an item. */
+    const hostile = S3.hydrateFeatures([{ k: '2026-01-03', i: 'DAE-9', t: 'Feature',
+      summary: 'Customer data export', assignee: 'a name' }]);
+    is(Object.keys(hostile[0]).sort(),
+       ['completed', 'created', 'key', 'parentKey', 'stage', 'stages', 'started', 'type'],
+       'a feature carries the row allowlist and nothing else');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('features at the storage boundary');
+  {
+    const S4 = win.TDState;
+    is(S4.SCHEMA, 12, 'the feature layer took the schema to 12');
+
+    const t = S4.sanitizeTeams([{ id: 'a', name: 'X', rows: [],
+      features: [{ c: '2026-01-12', s: '2026-01-06', t: 'Feature', i: 'DAE-1' }] }])[0];
+    is(t.features.length, 1, 'a team carries its features through sanitizeTeams');
+    is(S4.sanitizeTeams([{ id: 'a', name: 'X' }])[0].features, [],
+       'and a team without any gets an empty list, never undefined');
+    is(S4.sanitizeTeams([{ id: 'a', name: 'X', features: 'nope' }])[0].features, [],
+       'a features value that is not an array becomes empty');
+
+    /* Appending features is not appending rows: a feature IS its key. */
+    const merged = S4.mergeFeatures(
+      [{ key: 'DAE-1', type: 'old' }, { key: 'DAE-2', type: 'keep' }],
+      [{ key: 'DAE-1', type: 'new' }, { key: 'DAE-3', type: 'add' }]);
+    is(merged.map(f => f.key), ['DAE-1', 'DAE-2', 'DAE-3'],
+       'the same key twice is one feature, not two');
+    is(merged[0].type, 'new', 'and the incoming copy wins — it is the newer export');
+
+    is(S4.countFeatureLinks([{ rows: [{ parentKey: 'DAE-1' }, { parentKey: '' }],
+                               features: [{ key: 'DAE-1' }] }]), 2,
+       'the losing-a-field prompt counts parent keys and features together');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('featureTypes — the one new setting');
+  {
+    const S5 = win.TDState;
+    is(S5.normalizeSettings({}).featureTypes, [], 'empty by default — the layer ships off');
+    is(S5.normalizeSettings({ featureTypes: ['Feature', 'Epic'] }).featureTypes,
+       ['Feature', 'Epic'], 'a supplied list is kept');
+    is(S5.normalizeSettings({ featureTypes: 'Feature' }).featureTypes, [],
+       'a value that is not an array becomes empty');
+    is(S5.normalizeSettings({ featureTypes: ['Feature', 'feature ', 'FEATURE'] }).featureTypes,
+       ['Feature'], 'de-duplicated on the form it is matched by');
+    is(S5.normalizeSettings({ featureTypes: ['x'.repeat(41)] }).featureTypes, [],
+       'a label longer than a label is dropped WHOLE, never truncated');
+    is(S5.normalizeSettings({
+      featureTypes: Array.from({ length: 40 }, (unused, i) => 'T' + i) }).featureTypes.length,
+       TD.FEATURE_TYPES_MAX, 'and the list itself is capped');
+  }
+
 
   /* ────────────────────────────────────────────────────────── */
   group('normalizeSettings');
@@ -4136,7 +4348,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', artId: '"><script>', rows: [] }])[0].artId,
      null, 'a hostile pointer is dropped, not swapped for a fresh id');
   is(Object.keys(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', rows: [] }])[0]).sort(),
-     ['artId', 'id', 'name', 'projectId', 'rows', 'sleDays', 'wipLimit'],
+     ['artId', 'features', 'id', 'name', 'projectId', 'rows', 'sleDays', 'wipLimit'],
      'and every team carries the field, set or not');
 
   /* ══════════════════════════════════════════════════════════

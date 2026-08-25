@@ -512,9 +512,9 @@ page rather than a list of names you'd have to open one by one:
 
 | Team | What it's there to show |
 |---|---|
-| **Team Healthy Flow** | The healthy board. Carries issue keys (`KFR-…`), as Team Long Tail does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. It sets a **WIP limit of 6 and a 10-day target** and is comfortably inside both. The baseline the other two read against. |
-| **Team Long Tail** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Team Healthy Flow's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. It sets **the same limit of 6 and the same 10-day target Team Healthy Flow does** and keeps neither — which is the point of the pair carrying identical figures. |
-| **Team Bare Export** | A newer team: four months of history, **no created dates, no issue keys, no Status column and no stage times at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. It sets **no limit and no target**, which is how every browser starts and the only way the no-line, no-verdict face of those two is reachable. Also proves each team's data stands on its own. |
+| **Team Healthy Flow** | The healthy board. Carries issue keys (`KFR-…`), as Team Long Tail does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. It sets a **WIP limit of 6 and a 10-day target** and is comfortably inside both. Its work is broken down into **29 features** of a fairly even size — most take between 4 and 14 items — which is the comparison Team Long Tail's are read against. The baseline the other two read against. |
+| **Team Long Tail** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Team Healthy Flow's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. It sets **the same limit of 6 and the same 10-day target Team Healthy Flow does** and keeps neither — which is the point of the pair carrying identical figures. Its **20 features are bigger and far more varied** than Team Healthy Flow's, from 3 items to 26, and take about two and a half times as long end to end — the same finding as its cycle times, said about features. |
+| **Team Bare Export** | A newer team: four months of history, **no created dates, no issue keys, no Status column, no stage times and no features at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. It sets **no limit and no target**, which is how every browser starts and the only way the no-line, no-verdict face of those two is reachable. With no keys it has no parent keys either, so it is also the team the feature layer's empty face is reachable from. Also proves each team's data stands on its own. |
 
 Team Healthy Flow and Team Long Tail also arrive with the **project ids their own keys are
 built from** (`KFR` and `HRN`), so [pasting several teams at once](#pasting-several-teams-at-once)
@@ -637,7 +637,7 @@ an error — it's work you've begun, and it counts on the net flow chart as work
 Rows with *no* dates at all — untouched backlog — are ignored, and the count is reported so a
 paste of 260 rows that becomes 170 items explains itself.
 
-**Only dates, a short type label and the issue key are ever saved.** The paste is read for
+**Only dates, a short type label and two keys are ever saved.** The paste is read for
 those on the spot and everything else is discarded — summaries, statuses, assignees, comments
 and the rest of the export are never stored. Two guards do that work, and they are different
 on purpose:
@@ -652,8 +652,20 @@ on purpose:
   passes this check and carries prose — which is exactly why a key could be stored where a
   summary field never will be.
 
+- The **parent key** — the key of the feature an item belongs to — is held to *exactly* the
+  same shape check as the issue key, at the same two doors. It is the same kind of value, so
+  it gets the same guard rather than a new one.
+
 Both guards run again whenever a saved copy, cloud document, backup or share link is read
 back in. There are deliberately no free-text or comment fields anywhere in the app.
+
+**A column of prose may hold no role at all.** A heading naming itself a summary, description,
+comment, note, title, reason or justification is taken out of consideration *before* the export
+is read, so it cannot become the work type, a date or a key. That guard exists because the
+work-type column is found from the *values* when no heading claims it — a column of twenty or
+fewer repeated non-date values — and a 200-row export covering eight features has exactly eight
+distinct parent summaries, which passes that test. The 40-character cap would catch most
+summaries and not a short one. So `Parent summary` is refused by name rather than by luck.
 
 **The few labels you do type are capped at 120 characters where they're written**, not just
 on the next load — team names, the defect and cycle-time words, and both columns of the work
@@ -783,6 +795,9 @@ Everything the charts depend on, shared by all your teams:
 
 - **Defect work type** — the exact text in your Type column that means "defect"
   (`Bug` by default). Anything blank, or not matching, counts as ordinary planned work.
+- **Work types that mean a feature** — comma separated, empty by default. Empty switches the
+  [feature layer](#features-the-unit-above-a-work-item) off entirely. Matched the same way the
+  defect type is: trimmed, case-folded and exact, never a partial match.
 - **Aged after (days)** — how long an item can sit in progress before the Aged work chart
   counts it (`14` by default; worth keeping under a month).
 - **Count working days only (Monday to Friday)** — off by default. On, cycle time, lead time
@@ -1043,7 +1058,8 @@ Rows gained an optional created date (`k` on the wire, backup `version: 3`, `sch
 saved state; the working-days setting later took both markers to `4`, ARTs to `5`,
 the issue key to `6`, the per-team project id to `7`, workflow stages to `8`, the per-row
 current stage to `9`, the per-team [limit and target](#your-own-limit-and-your-own-target)
-to `10` and [ignoring outliers](#ignoring-major-outliers) to `11`). A row without one is left exactly as it was
+to `10`, [ignoring outliers](#ignoring-major-outliers) to `11` and the
+[feature layer](#features-the-unit-above-a-work-item) to `12`). A row without one is left exactly as it was
  — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before. **The issue key
 (`i` on the wire) follows exactly the same rule**: absent unless there is one, so a team whose
@@ -1572,6 +1588,59 @@ whose dots and whose line disagreed about what a day is would be unreadable. And
 progress and aged work, ages are read **as of the newest date in your data**, not today — so a
 paste of last quarter's export reports that quarter rather than ageing everything by the months
 since.
+
+## Features: the Unit Above a Work Item
+
+Jira exports carry a **Parent key** column — the feature, epic or capability a work item belongs
+to. Set up which work types mean "a feature" and the app reads it, so it can answer questions
+about the thing people actually plan in rather than only about individual items.
+
+**Nothing here is on by default.** *Work types that mean a feature* in **Settings** is empty out
+of the box, and empty means the whole layer is off: no row is diverted, nothing new is stored,
+and every figure is the figure it was. There is no shipped guess at `Feature` or `Epic`, for the
+same reason the work-type filter no longer ships Spikes and Stories — a guess at somebody else's
+board is a setting that matches nothing, which reads as broken data rather than as a setting
+nobody has set. The parse report names the work types it found in your paste, so the word to put
+there is already on screen after the first paste.
+
+### A Feature Is Kept Apart, Not Flagged
+
+A feature is an issue like any other — it has a key, a type and dates — so a Jira export of a
+board hands you features and work items in the same file. Rows matching a feature type are
+**taken out of the work items entirely** and kept in their own list.
+
+That separation is the point rather than an implementation detail. Every item-level figure in
+this app — throughput, cycle time, the 85th percentile, the defect rate, work in progress, aged
+work, both forecasts — is worked out over the work items, and none of them can see a feature.
+A flag on a shared list would have meant auditing every one of those readers and trusting the
+audit for ever; a separate list means the question cannot arise. **A test pins every one of
+those series as byte-identical** with the layer on and off.
+
+### One Rule Is Relaxed for a Feature, and Only One
+
+A work item with a created date and nothing else is untouched backlog: it says nothing about
+flow, so it is counted and dropped. **A feature in that state is the pipeline** — it is precisely
+the thing a forecast is about — so a feature is kept when it has a key and a date of any kind.
+
+The key is required rather than merely useful. What makes a feature more than another row is
+that items name it, and they name it by key; a feature with no key can never be joined to
+anything. Feature rows arriving without one are counted and reported under their own heading,
+so it reads as "your export is missing a column" rather than as ordinary bad data.
+
+### The Parent Summary Is Never Read
+
+`Parent summary` sits in the next column along in the same export, and it is **the one field
+here that is typed by hand**. It is never read, never stored and never shown. See
+[What Happens to Bad Data](#what-happens-to-bad-data) above for the guard that makes that a rule
+rather than an accident.
+
+### What It Costs You
+
+Nothing, unless you use it. A team with no features writes no `features` key and a row with no
+parent writes no parent key, so a browser that never turns this on saves byte-for-byte the
+document it saved before. The stored-data marker moved to `schema: 12`; a backup from an older
+build restores fine and simply has none of it — and, because a column of parent keys pasted per
+item is not something anyone can re-type, a restore that would drop them **asks first**.
 
 ## Forecasting: What the Pace You've Had Implies
 

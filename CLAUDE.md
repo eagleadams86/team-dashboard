@@ -131,6 +131,106 @@ file records what is specific to this repo and what must never regress.
 - **Which tab you were on IS remembered, for the two number views only.** `view.activeTab`, restored at boot. It used to be deliberately not saved — the old comment said "a reload should open on the dashboard" — which was out of step with both siblings (Sprint Predictability keeps `settings.view`, Money Map keeps `ui.activeTab`) and with the fact that All Teams is where somebody with several teams works. Changed 2026-08-21 after it was reported as annoying. Settings and Your Data are NOT remembered, on purpose. No new guard was needed: `selectTab` already refuses a hidden or unknown tab and falls back to the dashboard, which is exactly the All-Teams-disappears-below-two-teams case.
 - **The All Teams Throughput trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **The header names the metric** — it shipped as a bare "Trend" and that was not enough beside eight other columns that each name theirs. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart.
 
+## The Feature Layer (2026-08-25) — SCHEMA 11 → 12
+
+Asked for by Charles as the foundation of feature-level forecasting: read Jira's **Parent key**,
+drop **Parent summary**, and keep features apart from work items so item-level metrics cannot
+move. Phase 1 of five; the forecasting itself is not built yet.
+
+- **`r.parentKey` (`p` on the wire) is the SECOND shape-checked identifier, and it went in on the
+  issue key's own reasoning, not as precedent creep.** It is guarded by `cleanIssueKey` —
+  literally the same function, the same `ISSUE_KEY_RE`, at the same two doors — because it is the
+  same shape of value. The admission test is unchanged and was applied again: *can a regex tell
+  this from a sentence?* It can. **`Parent summary` fails that test outright and is never read**,
+  which is the same answer a status got.
+- **`t.features` is a SEPARATE LIST, never a flag on `rows`, and that is the load-bearing
+  decision.** Every item-level figure is computed over `rows`, so a feature that is not in `rows`
+  cannot reach one — no audit of a dozen call sites, no trusting that audit for ever. A test
+  derives the same export twice, with the layer on and with the feature rows removed by hand, and
+  pins **eleven series byte-identical**. If extraction ever leaks, that is where it shows.
+- **A feature IS a row.** Same record, same wire letters, same `hydrateRow`, same allowlist.
+  `hydrateRows` and `hydrateFeatures` differ **only in their filter**, which is the whole
+  difference between the two: an item needs a completion or a start, a feature needs a **key and
+  any date**. Don't grow a second record shape; the one place they may diverge is that filter.
+- **The relaxed filter is not a nicety.** An item with only a created date is untouched backlog
+  and says nothing about flow. A feature in that state is the PIPELINE — the thing a forecast is
+  about — and dropping it would leave the app able to forecast only work already under way.
+  Pinned from both sides, including that `parsePastedRows` does not count it as `undated`.
+- **A KEYLESS FEATURE IS NOT A FEATURE.** Items name their feature by key; one with no key can
+  never be joined to anything. Counted as `featuresNoKey` and reported under its own heading
+  rather than folded into `undated`, because the two say different things to the reader: one
+  means "your export has backlog in it", which is normal, and the other means "your feature rows
+  arrived without the column that makes them features", which has a fix.
+- **`PROSE_HEADING` is the hardening this layer OWED the storage policy, and it closed a real
+  hole rather than a theoretical one.** No heading pattern ever matched `Parent summary` — but
+  `detectColumns` also finds the work-type column from the VALUES when no heading claims it
+  (`distinct <= 20`, `dateRate < 0.6`, rejected only when every value is distinct), and a 200-row
+  export covering eight features has exactly **eight distinct parent summaries**, which passes
+  both tests. It was kept out only by the real Type column usually having fewer distinct values
+  still, with `cleanWorkType`'s 40-character cap as the last catch — and a short summary
+  ("Login redesign", fourteen characters) clears that cap. **This change made it far likelier by
+  inviting people to paste the very export that carries the column.** So a heading matching
+  `/summary|description|comment|notes?\b|title|reason|justification/` is now excluded from
+  **every** role, in both passes, with no fallback: a role that can only be filled by a prose
+  column goes unfilled. The test runs it **both ways** — the same forty rows, one word changed in
+  one heading — and asserts the column is taken without the guard and refused with it. A guard
+  nobody has watched fail is a guard nobody knows works.
+  **Stage columns are deliberately NOT filtered by it**: a stage column is only ever a heading
+  that exactly equals an alias the reader typed by hand, which is a deliberate act rather than a
+  guess, and its values must survive `cleanStageDays` to be stored at all. This list exists to
+  stop the app GUESSING its way into prose, and stages never guess.
+- **`HEADER_PATTERNS.parent` is ANCHORED and has NO headerless fallback** — the third anchored
+  pattern, and the only role with no shape-based fallback at all. Every other role can be found
+  from its values; a parent key looks EXACTLY like an issue key, so two unheaded key columns
+  cannot be told apart. Guessing would reparent every item in the file, silently, and **a wrong
+  parent is worse than no parent**: it invents a feature breakdown nobody's board has. No
+  heading, no parent.
+- **`featureTypes` is a LIST, and empty is off.** Nothing ships in it. This app shipped Spikes,
+  Stories and Tasks in its filter list once as a guess at somebody else's board, and they were
+  three filters matching nothing. Each entry goes through `cleanWorkType` (dropped whole, never
+  truncated), the list is capped at `FEATURE_TYPES_MAX` and de-duplicated on the matched form.
+  It has its own listener rather than a row in `SETTING_INPUTS`, because that map is for scalars.
+- **`mergeFeatures` de-duplicates on APPEND where rows deliberately do not.** Two pasted rows
+  describing the same work item are two rows — the app has never had a way to know otherwise.
+  A feature IS its key, so the same key twice would count one feature as two everywhere it is
+  joined and no reader could see why their numbers had doubled. Incoming wins: it is the newer
+  export.
+- **Features are only written when feature types are set up.** With none, `res.features` is empty
+  by construction, so an unconditional replace would let an ordinary paste silently delete a
+  feature list built with the setting on. Both paste paths guard on it.
+- **A features-only paste is a real thing to do.** Both paste paths test BOTH routings before
+  deciding nothing was loaded; testing only the item routing reported such a paste as loaded and
+  wrote nothing.
+- **The multi-team split routes features through `routeRowsToTeams` too** — a feature's key
+  carries its project at the front exactly as an item's does, so the same pure function does it
+  and a feature can never land in a team its children did not. Only the `assigned` half is used:
+  an unclaimed feature key is the same finding as an unclaimed item key, already named in the
+  report by the id it belongs to.
+- **`SHARE_PAYLOAD_V` was NOT bumped**, matching ARTs, keys, stages and the two targets. Features
+  DO travel — they are what the shared charts are drawn from — and are **windowed with the same
+  cutoff the rows are**, or a link trimmed to three months would carry every feature the team ever
+  had against three months of items. **`tdAdopt`'s losing-a-field prompt WAS extended to them**,
+  on the re-typeability test: a column of parent keys pasted per item comes back only by finding
+  the export again.
+- **The demo's two keyed teams break their work down and Team Bare Export does not**, which is the
+  third face again. Items are dealt to features in **contiguous runs** whose lengths cycle through
+  the profile's `featureQuotas` — deterministic, never from `rnd()`, the fourth field to follow
+  that rule after the issue key counter, the stage split and the status cycle. **An earlier draft
+  let a feature be revisited later and gave every one of them a seven-month span**, which is both
+  wrong about how features work and useless to forecast from. How MANY features that produces
+  falls out of the quotas and the team's own throughput rather than being stated, so nothing has
+  to be kept in step by hand. The work-in-progress items are broken into runs of three so each
+  team has **two or three OPEN features** rather than one — an unfinished feature is what a
+  feature forecast is about, and one is not a demonstration. Feature rows are emitted in the same
+  paste as their children, as a real export would, and each one's dates are built FROM its
+  children: earliest created, earliest start, and a completion **only when every child is done**.
+- **Still to come (phases 2–5):** the Items/Features unit toggle, multi-team and ART forecasting,
+  feature forecasting by decomposition, and the scenario knobs. The plan is in
+  `~/.claude/plans/`. Two things Phase 4 will want that Phase 1 does not provide: an
+  **unstarted** feature in the demo (there are none — the demo generates no untouched backlog at
+  all), and a reason to widen `FORECAST_MIN_PERIODS` thinking, since feature completions are
+  sparse enough to pass the 8-period floor as a step function.
+
 ## Ignoring Major Outliers (2026-08-24) — SCHEMA 10 → 11
 
 Asked for by Charles: a way to stop one enormous item wrecking the figures across
