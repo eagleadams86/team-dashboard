@@ -3451,6 +3451,14 @@ const stripComments = (src) => {
      'and not cache-first — the whole design rests on the network being tried first');
   ok(/!res\.ok && cached/.test(SW),
      'a same-origin error reply with a cached copy in hand serves the cache');
+  /* The bug this line exists for was in all six workers from the day they
+     shipped: a bare `fetch(req)` keeps the cache mode of the request the page
+     made, so an ordinary reload was answered by the browser's own HTTP cache
+     and the fresh deploy sitting on Pages went unseen for its `max-age`. */
+  ok(/fetch\(req, \{ cache: 'no-cache' \}\)/.test(SW),
+     'the serving fetch must opt out of the HTTP cache, or network-first is a name only');
+  ok(!/fetch\(req\)/.test(SW),
+     'a bare fetch(req) is the bug \u2014 it inherits the page request\u2019s cache mode');
 
   /* install fires ONCE per script version, so a cache evicted later would never
      be rebuilt if install were the only thing that filled it. */
