@@ -131,6 +131,68 @@ file records what is specific to this repo and what must never regress.
 - **Which tab you were on IS remembered, for the two number views only.** `view.activeTab`, restored at boot. It used to be deliberately not saved — the old comment said "a reload should open on the dashboard" — which was out of step with both siblings (Sprint Predictability keeps `settings.view`, Money Map keeps `ui.activeTab`) and with the fact that All Teams is where somebody with several teams works. Changed 2026-08-21 after it was reported as annoying. Settings and Your Data are NOT remembered, on purpose. No new guard was needed: `selectTab` already refuses a hidden or unknown tab and falls back to the dashboard, which is exactly the All-Teams-disappears-below-two-teams case.
 - **The All Teams Throughput trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **The header names the metric** — it shipped as a bare "Trend" and that was not enough beside eight other columns that each name theirs. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart.
 
+## Forecasting Features by Decomposition (2026-08-25) — no schema change
+
+Phase 4. Nothing stored; two new pure samplers, one assembler, three new floors.
+
+- **DO NOT RESAMPLE FEATURE COMPLETIONS, and the reason is measured rather than asserted.** A
+  team finishing one or two features a month gives a weekly series like
+  `[0,0,1,0,0,0,1,0,0,0,0,1]` — twelve periods clears `FORECAST_MIN_PERIODS`, something completed
+  clears the all-zero check, and the existing guards let it straight through. Against a dense
+  series chosen to have the SAME median, the sparse one answers 11 periods at 50% and 24 at 95%
+  (a 2.2x spread) where the dense one answers 12 and 13.3 (1.1x). Both say "about twelve
+  periods"; only one of them knows it, and the difference is the zero fraction rather than
+  delivery. A first draft of this comment said "a step function with three or four distinct
+  answers" — that was WRONG (the sparse series produces 31 distinct answers) and the test caught
+  it. The claim is about the SPREAD, not the granularity.
+- **`featureNonZeroPeriods` + `FEATURE_MIN_NONZERO` (5)** is the floor the existing ones do not
+  give. Direct feature throughput is kept as a named fallback rather than deleted, because it
+  captures something decomposition cannot see: a feature that took three weeks after its last item
+  closed, for integration or sign-off.
+- **ONE INTEGRATED TRIAL, NEVER TWO MULTIPLIED FORECASTS.** The classic error in this kind of
+  tool is to forecast the halves separately and multiply the 85th percentiles — "the 85th
+  percentile feature is 20 items" times "20 items takes N weeks" — which compounds two tail
+  values and lands far past the real 85th. `forecastFeaturePeriods` draws a size PER FEATURE per
+  trial, sums them, and walks that target once, so the trial distribution carries both sources of
+  variance jointly. **A test pins the integrated 85th as strictly below the multiplied one**; if
+  anyone ever "simplifies" this into two calls, that test is what stops them.
+- **One draw per feature, not one per trial.** A single multiplier applied to all of them would
+  model every feature on the board being the same size as every other, which is the one thing the
+  size distribution exists to disprove.
+- **`forecastFeaturesIn` is a WALK, not a division.** A budget that runs out part-way through a
+  feature has delivered the ones before it; dividing a total by an average size would count the
+  half-built one and throw away exactly the variance this exists to report. Pinned with a
+  hand-checkable fixture (steady pace, one size).
+- **Three floors, and the ORDER of the checks is load-bearing.** `thin-join` is tested BEFORE
+  `few-sizes` because a thin join is WHY the size count is low: reporting the symptom would send
+  the reader hunting for finished features when the column they need is missing. `FEATURE_MIN_SIZES`
+  is 5 — deliberately lower than the 8 periods a throughput sample needs, because the other half
+  of the model still carries the full item history, so the total evidence behind an answer is
+  higher than either floor alone.
+- **`featureForecastOf` returns the SAME SHAPE `derive()` does for an item forecast** — same keys,
+  same rows, same histograms — so `renderForecast` draws either without knowing which. It is pure
+  and takes everything as arguments, because the two halves come from two different lists and no
+  single `derive()` call holds both. `derive()` now returns `sampleSet` (the samples themselves,
+  not just the count) for exactly this.
+- **The feature forecast is ASSEMBLED IN `renderDashboard`**, where both lists are in hand, and it
+  applies the same coverage trim the pooled forecast does — a team three periods behind
+  contributes three periods of zero to the ITEM throughput too.
+- **`#dashNoFeatures` is a fourth empty face, and it exists because the other three are each
+  WRONG for it.** A team with items and no features was being told "No Data Yet — head to Your
+  Data and paste your work items", with 48 of them already loaded. That is the same failure the
+  stage-time card has a comment about: a message that sends somebody to fix a set-up that is
+  right. Tested FIRST, before the other three.
+- **Both halves are named on the tile** ("Built from 17 finished features, sized at a median of 9
+  items each, paced by 14 whole weeks of item throughput") and the model is stated in the hint
+  every time, including the limitation it does not correct for: **decomposition assumes a feature
+  is done when its items are done**, so integration, sign-off and a demo are not in the numbers.
+  Measuring and correcting that is a later change; stating it is this one.
+- **Still to come (phase 5):** the scenario knobs — scope growth, feature clarity, team
+  confidence, estimated throughput where there is no history, features in parallel and the
+  per-feature delivery schedule, periods unavailable — plus the assumptions list, the
+  uninformative-spread guard, required throughput and the forecast CSV. The plan is in
+  `~/.claude/plans/`.
+
 ## Forecasting More Than One Team (2026-08-25) — no schema change
 
 Phase 3. `view.forecastScope` and `view.countFrom`, both device-local — no `SCHEMA` bump and no

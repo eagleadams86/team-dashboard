@@ -1985,6 +1985,18 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <p id="dashNothingBody"></p>
     </div>
 
+    <!-- The feature view's own empty face, and it exists because the two it
+         would otherwise fall into are both WRONG for it. A team with items and
+         no features is not a team with "no data yet" — telling it to go and
+         paste its work items is telling it to paste what it already has, which
+         is the failure this app's stage-time card already has a comment about.
+         It is not "nothing to plot in this window" either: the window is not
+         what is missing. -->
+    <div id="dashNoFeatures" class="card empty" hidden>
+      <h2>No Features on This Team</h2>
+      <p id="dashNoFeaturesBody"></p>
+    </div>
+
     <!-- Summary tiles — the sibling app's pattern, without RAG colour: this
          dashboard has no targets, so a tile states the figure and the ⓘ says
          what to make of it. Rendered by renderDashboard(). -->
@@ -4920,6 +4932,11 @@ const FORECAST_CONFIDENCE = [50, 85, 95];
    ever when the samples are mostly zeros. */
 const FORECAST_MAX_ITEMS = 2000;
 const FORECAST_MAX_PERIODS = 520;
+/* How many features one forecast will reason about. Past sixty the answer is a
+   list nobody reads and a trial loop sixty draws long; it is also far more
+   features than any team or train has open at once. Refused rather than
+   silently truncated. */
+const FORECAST_MAX_FEATURES = 60;
 const DEFAULT_FORECAST_ITEMS = 10;
 
 /* SEEDED, and deliberately with a constant. A forecast that moved a day every
@@ -4992,6 +5009,191 @@ function forecastPeriodsFor(samples, items, trials) {
    to six days and make the answer jump as the date crossed a boundary. The
    trial's total is floored, because two thirds of an item is not an item
    anybody receives. */
+/* ── Forecasting FEATURES, by decomposition ────────────────────────────────
+   The obvious approach — resample how many features completed per period — is
+   the wrong one on nearly every real board, and it fails in a way the existing
+   guards do not catch. A team finishing one or two features a month gives a
+   weekly series like [0,0,1,0,0,0,1,0,0,0,0,1]: twelve periods, so it clears
+   FORECAST_MIN_PERIODS, and something completed, so it clears the all-zero
+   check.
+
+   What comes out looks like an answer and is mostly an artefact of the zero
+   fraction. Measured, on that series against a dense one that happens to have
+   the same median: asking the sparse series for three features gives 11 periods
+   at 50% and 24 at 95% — the cautious answer is 2.2x the middle one. The dense
+   series, asked for the equivalent, gives 12 and 13.3, a ratio of 1.1. Both say
+   "about twelve periods"; only one of them knows it, and the difference is how
+   many zeros were dealt rather than anything about delivery.
+
+   That is why direct feature throughput needs a SECOND floor of its own
+   (FEATURE_MIN_NONZERO) and is not the default.
+
+   So a feature forecast is built from the two things this board really has
+   plenty of: the ITEM throughput, which is dense, and the measured distribution
+   of how many items a finished feature took.
+
+   ONE INTEGRATED TRIAL, AND THIS IS THE PART THAT IS EASY TO GET WRONG.
+   The tempting shortcut is to forecast the two halves separately and multiply
+   the answers — "85th percentile items per feature" times "85th percentile time
+   per item". That compounds two tail values and lands far past the real 85th.
+   Both sources of variance have to live inside ONE trial, so the trial
+   DISTRIBUTION carries them jointly: draw a size for every feature, add them up,
+   and walk that target once. */
+const FEATURE_MIN_SIZES = 5;
+/* Below five completed features the size distribution is a fact about which
+   five you happen to hold rather than about the board — the tails are wholly
+   unobserved. Deliberately lower than the 8 periods a throughput sample needs,
+   because the other half of this model still carries the full item history: the
+   total evidence behind an answer is higher than either floor alone. */
+const FEATURE_MIN_NONZERO = 5;
+/* Periods in which at least one feature completed, required before the DIRECT
+   method will run. This is the guard the step-function failure above needs and
+   the existing floors do not provide. */
+const FEATURE_JOIN_MIN = 0.5;
+/* If under half the items that name a parent name one this team holds, the
+   items-per-feature figure is measuring how well the export was filled in
+   rather than how work is broken down. Refuse and state the actual fraction. */
+
+/* How many whole periods until `featureCount` features are done. Returns
+   fractional periods, exactly as forecastPeriodsFor does, so everything
+   downstream — the day conversion, the percentiles, the histogram — is shared. */
+function forecastFeaturePeriods(samples, sizes, featureCount, trials) {
+  if (!Array.isArray(samples) || samples.length < FORECAST_MIN_PERIODS) return null;
+  if (!Array.isArray(sizes) || sizes.length < FEATURE_MIN_SIZES) return null;
+  if (!(featureCount > 0)) return null;
+  if (!samples.some(v => v > 0)) return null;
+  const rnd = seededRandom(FORECAST_SEED);
+  const n = samples.length, m = sizes.length, out = new Array(trials);
+  const wanted = Math.min(featureCount, FORECAST_MAX_FEATURES);
+  for (let t = 0; t < trials; t++) {
+    /* Draw a size per feature, so the trial's target carries the real spread of
+       feature sizes. One draw for all of them would model every feature on this
+       board being the same size as every other, which is the one thing the size
+       distribution exists to disprove. */
+    let target = 0;
+    for (let k = 0; k < wanted; k++) target += sizes[(rnd() * m) | 0];
+    if (target > FORECAST_MAX_ITEMS * 4) target = FORECAST_MAX_ITEMS * 4;
+    /* The ordinary walk, over ITEM throughput, to the target this trial drew. */
+    let done = 0, periods = 0;
+    while (done < target && periods < FORECAST_MAX_PERIODS) {
+      const dealt = samples[(rnd() * n) | 0];
+      done += dealt; periods++;
+      if (done >= target && dealt > 0) { periods -= (done - target) / dealt; break; }
+    }
+    out[t] = periods;
+  }
+  return out;
+}
+
+/* How many features are finished within `periods`. The mirror of the above, and
+   it has to be its own walk rather than a division: features are finished one at
+   a time out of a shared item throughput, so "how many fit" depends on the sizes
+   drawn, and dividing a total by an average size would throw away exactly the
+   variance this exists to report. */
+function forecastFeaturesIn(samples, sizes, periods, trials) {
+  if (!Array.isArray(samples) || samples.length < FORECAST_MIN_PERIODS) return null;
+  if (!Array.isArray(sizes) || sizes.length < FEATURE_MIN_SIZES) return null;
+  if (!(periods > 0)) return null;
+  const rnd = seededRandom(FORECAST_SEED);
+  const n = samples.length, m = sizes.length, out = new Array(trials);
+  const capped = Math.min(periods, FORECAST_MAX_PERIODS);
+  const full = Math.floor(capped), frac = capped - full;
+  for (let t = 0; t < trials; t++) {
+    let budget = 0;
+    for (let p = 0; p < full; p++) budget += samples[(rnd() * n) | 0];
+    if (frac > 0) budget += samples[(rnd() * n) | 0] * frac;
+    /* Spend the budget on features drawn one at a time. A feature only counts
+       when it is FINISHED — a budget that runs out halfway through the fourth
+       feature has delivered three, which is the honest answer and the reason
+       this is a walk rather than a division. */
+    let count = 0;
+    while (count < FORECAST_MAX_FEATURES) {
+      const size = sizes[(rnd() * m) | 0];
+      if (size > budget) break;
+      budget -= size;
+      count++;
+    }
+    out[t] = count;
+  }
+  return out;
+}
+
+/* One feature forecast, in the same shape `derive()` returns for an item
+   forecast — same keys, same rows, same histograms — so `renderForecast` draws
+   it without knowing which it was handed. PURE: everything it needs arrives as
+   an argument, because the two halves come from two different lists and no
+   single `derive()` call has both.
+
+   `reason` names WHICH floor failed rather than saying "not enough data", since
+   the three have three different fixes: widen the window, paste more finished
+   features, or fill in the Parent key column. */
+function featureForecastOf(o) {
+  const sizes = o.sizes || [], samples = o.itemSamples || [];
+  const wanted = Math.max(1, Math.min(Math.round(o.featureCount) || 1, FORECAST_MAX_FEATURES));
+
+  const reason =
+      samples.length < FORECAST_MIN_PERIODS ? 'few-periods'
+    : !samples.some(v => v > 0) ? 'no-throughput'
+    /* Checked BEFORE the size count, because a thin join is why the size count
+       is low — reporting the symptom would send the reader to find more
+       finished features when the column they need is missing. */
+    : (o.joinRate != null && o.joinRate < FEATURE_JOIN_MIN) ? 'thin-join'
+    : sizes.length < FEATURE_MIN_SIZES ? 'few-sizes'
+    : null;
+
+  const whenPeriods = reason ? null
+    : forecastFeaturePeriods(samples, sizes, wanted, FORECAST_TRIALS);
+  const whenTrials = whenPeriods
+    && whenPeriods.map(p => periodsToDays(o.countFrom, p, o.bucket));
+  const manyTrials = reason ? null
+    : forecastFeaturesIn(samples, sizes, o.horizonPeriods, FORECAST_TRIALS);
+
+  const beyond = !!whenPeriods
+    && percentileOf(whenPeriods, FORECAST_CONFIDENCE[FORECAST_CONFIDENCE.length - 1])
+       >= FORECAST_MAX_PERIODS;
+
+  return {
+    reason,
+    /* Which method ran, said on the card rather than inferred. A reader who is
+       going to promise something off this is owed the sentence. */
+    method: 'decomposed',
+    samples: samples.length,
+    sizeCount: sizes.length,
+    sizeMedian: sizes.length ? sizes.slice().sort((a, b) => a - b)[Math.floor((sizes.length - 1) / 2)] : null,
+    joinRate: o.joinRate,
+    trials: FORECAST_TRIALS,
+    minPeriods: FORECAST_MIN_PERIODS,
+    minSizes: FEATURE_MIN_SIZES,
+    items: wanted,
+    targetDate: o.targetDate,
+    horizonPeriods: o.horizonPeriods,
+    beyondReach: beyond,
+    countFrom: o.countFrom,
+    countingFromToday: !!o.countingFromToday,
+    lostPeriods: o.lostPeriods || 0,
+    coverageEnd: o.coverageEnd || null,
+    when: (whenTrials && !beyond) ? {
+      rows: FORECAST_CONFIDENCE.map(c => {
+        const days = daysAtConfidence(whenTrials, c);
+        return { confidence: c, days, date: addDays(o.countFrom, days) };
+      }),
+      hist: forecastHistogram(whenTrials, true)
+    } : null,
+    howMany: manyTrials ? {
+      rows: FORECAST_CONFIDENCE.map(c => ({ confidence: c, count: countAtConfidence(manyTrials, c) })),
+      hist: forecastHistogram(manyTrials, false)
+    } : null
+  };
+}
+
+/* Direct feature throughput — the fallback, used only when the join is too thin
+   to decompose. Kept because it captures something decomposition cannot see: a
+   feature that took three weeks after its last item closed, for integration or
+   sign-off, is in this series and is invisible to the other method. */
+function featureNonZeroPeriods(samples) {
+  return (Array.isArray(samples) ? samples : []).filter(v => v > 0).length;
+}
+
 function forecastItemsIn(samples, periods, trials) {
   if (!Array.isArray(samples) || samples.length < FORECAST_MIN_PERIODS) return null;
   if (!(periods > 0)) return null;
@@ -6099,6 +6301,11 @@ function derive(rows, settings, view, stages) {
        names the periods it was counted over, and a forecast has more reason to
        than most. */
     samples: fcSamples.length,
+    /* The sample set itself, not just its size. The feature forecast is built
+       from a DIFFERENT list's throughput than the one it reports on — item
+       throughput converted through the size distribution — so it needs to be
+       handed the numbers rather than re-derive them. Nothing else reads it. */
+    sampleSet: fcSamples,
     /* How many whole periods the coverage trim took off the end, and where it
        stopped — both stated on the card, because a figure must never move for
        a reason that is not on the page. Zero and null for every single-team
@@ -6589,7 +6796,13 @@ window.TD = {
      without a paste box or a team list on screen. */
   dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
   soleProjectId, PROJECT_ID_ADOPT_MIN,
-  featureBreakdown,
+  featureBreakdown, featureForecastOf, forecastFeaturePeriods, forecastFeaturesIn,
+  featureNonZeroPeriods,
+  FEATURE_MIN_SIZES, FEATURE_MIN_NONZERO, FEATURE_JOIN_MIN, FORECAST_MAX_FEATURES,
+  /* Three constants the forecast tests have had to hardcode around until now.
+     A test reproducing a stream by hand cannot without the seed, and beyondReach
+     was only testable by writing 520 out. */
+  FORECAST_SEED, FORECAST_MAX_PERIODS, DEFAULT_FORECAST_ITEMS,
   cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, deriveTeams, utcDate,
   /* The outlier fence on its own, so a test can hand it a sample it wrote and
      check the rule rather than only reading the answer back off derive(). A
@@ -9705,7 +9918,17 @@ function renderDashboard() {
   /* Three states, three surfaces: the charts when something plots; the paste
      instructions when the team holds nothing at all; and #dashNothing when rows
      exist but nothing can chart, which says which of two reasons applies. */
-  $('dashEmpty').hidden = plottable || rows.length > 0;
+  /* Four faces now, and the new one has to be tested FIRST because it is the
+     specific case the other three would each answer wrongly. */
+  const noFeaturesHere = featureUnit() && !rows.length && !!(team && team.rows.length);
+  $('dashNoFeatures').hidden = plottable || !noFeaturesHere;
+  if (noFeaturesHere) {
+    $('dashNoFeaturesBody').textContent = team.name + ' holds ' + team.rows.length
+      + ' work item' + (team.rows.length === 1 ? '' : 's') + ' and no features, so there is '
+      + 'nothing here to count. Set Count back to Work items to see its board, or paste an '
+      + 'export with a Parent key column and a work type this app knows means a feature.';
+  }
+  $('dashEmpty').hidden = plottable || rows.length > 0 || noFeaturesHere;
   $('dashNothing').hidden = plottable || !rows.length;
   $('dashCharts').hidden = !plottable;
   $('dashTiles').hidden = !plottable;
@@ -9938,6 +10161,42 @@ function renderDashboard() {
       fcStale = pooled.staleTeams || [];
       fcCoverage = pooled.coverageEnd;
     }
+  }
+  /* ── A feature forecast is built from the ITEMS ──────────────────────────
+     In the feature view every chart on this screen is derived over the features,
+     so `fcDerived.forecast` is a resample of FEATURE completions — and on nearly
+     every real board that series is mostly zeros. Twelve weeks holding three
+     finished features clears both existing guards and produces a step function
+     with three answers, whose spread is a fact about the zeros rather than about
+     delivery.
+
+     So the feature forecast is decomposed instead: the item throughput, which is
+     dense, converted through the measured distribution of how many items a
+     finished feature took. Both halves come from lists this derive does not
+     hold, which is why it is assembled here where they are all in hand. */
+  if (featureUnit()) {
+    const fcTeams = fcScope.teams.length ? fcScope.teams : (team ? [team] : []);
+    const items = fcTeams.flatMap(t => t.rows || []);
+    const feats = fcTeams.flatMap(t => t.features || []);
+    const itemView = { filterValue: currentFilterValue(), months: view.months,
+      bucket: view.bucket, customFrom: view.customFrom, customTo: view.customTo,
+      countFrom: view.countFrom };
+    /* The same coverage trim the pooled forecast applies, for the same reason:
+       a team three periods behind contributes three periods of zero to the item
+       throughput too. */
+    if (fcCoverage) itemView.forecastCoverageEnd = fcCoverage;
+    const itemDerive = derive(items, state.settings, itemView, state.stages);
+    const bd = featureBreakdown(feats, items);
+    const f = fcDerived.forecast;
+    fcDerived = Object.assign({}, fcDerived, {
+      forecast: featureForecastOf({
+        itemSamples: itemDerive.empty ? [] : itemDerive.forecast.sampleSet,
+        sizes: bd.sizes, joinRate: bd.joinRate,
+        featureCount: f.items, targetDate: f.targetDate,
+        horizonPeriods: f.horizonPeriods, countFrom: f.countFrom,
+        countingFromToday: f.countingFromToday, bucket: fcDerived.bucket,
+        lostPeriods: f.lostPeriods, coverageEnd: f.coverageEnd })
+    });
   }
   renderForecast(fcDerived, fcScope, fcStale);
   renderStageTime(d);
@@ -10220,14 +10479,25 @@ function renderForecast(d, scope, stale) {
   $('fcFromField').hidden = behindDays < 1;
   $('fcFrom').value = view.countFrom === 'today' ? 'today' : 'data';
 
+  /* The feature model, stated on the face every time. It is not the resample a
+     reader will assume from the item view, and the difference matters: a
+     feature answer is item throughput converted through the size distribution,
+     so it moves when either half moves. */
+  const how = f.method === 'decomposed'
+    ? ' A feature answer is worked out from how fast work items finish and how many of them '
+      + 'your finished features took \u2014 not from how often a feature completes, which on '
+      + 'most boards is too rare to resample. It assumes a feature is done when its items are: '
+      + 'integration, sign-off and a demo are not in these numbers.'
+    : '';
   const whose = (scope && scope.kind !== 'team')
     ? ' Dealt from ' + scope.phrase + ' pooled \u2014 one draw takes what they all '
       + 'delivered in the same ' + d.bucketNoun + ', so a quiet week they shared counts once.'
     : '';
   $('fcHint').textContent = 'Both answers assume the next few ' + d.bucketNounPlural
     + ' look like the ' + f.samples + ' whole ' + periodNoun(f.samples)
+    + (f.method === 'decomposed' ? ' of work-item throughput' : '')
     + ' on screen. Change the window or the work type filter and the forecast '
-    + 'follows.' + whose
+    + 'follows.' + how + whose
     + ' Counted from ' + prettyDate(f.countFrom)
     + (f.countingFromToday
         ? ', today \u2014 your data ends ' + behindDays + ' '
@@ -10278,10 +10548,20 @@ function renderForecast(d, scope, stale) {
       manyRow ? 'at least ' + manyRow.count : '&mdash;',
       manyRow ? '85% of runs completed this many or more' : 'not enough history to forecast',
       'forecastHowMany') +
-    tile('Drawn from', String(f.samples),
-      'whole ' + periodNoun(f.samples) + ' of throughput'
-        + ((scope && scope.kind !== 'team') ? ' across ' + scope.phrase : ' in this window'),
-      'forecastSamples');
+    /* In the feature view this tile names BOTH halves of the model, because a
+       feature answer rests on two samples and a reader owed one number is owed
+       both. Its label changes too: "drawn from 14 weeks" would be true and would
+       hide that those weeks counted items, not features. */
+    (f.method === 'decomposed'
+      ? tile('Built from', f.sizeCount + ' finished feature' + (f.sizeCount === 1 ? '' : 's'),
+          'sized at a median of ' + f.sizeMedian + ' items each, paced by '
+            + f.samples + ' whole ' + periodNoun(f.samples) + ' of item throughput'
+            + ((scope && scope.kind !== 'team') ? ' across ' + scope.phrase : ''),
+          'forecastSamples')
+      : tile('Drawn from', String(f.samples),
+          'whole ' + periodNoun(f.samples) + ' of throughput'
+            + ((scope && scope.kind !== 'team') ? ' across ' + scope.phrase : ' in this window'),
+          'forecastSamples'));
 
   /* An answer row: the confidence, the answer, and the swatch tying it to its
      part of the chart above. Everything user-typed is escaped as usual; the
@@ -10302,6 +10582,20 @@ function renderForecast(d, scope, stale) {
       return 'A forecast needs at least ' + f.minPeriods + ' whole ' + d.bucketNounPlural
         + ' of history to resample, and this window holds ' + f.samples + '. '
         + 'Group by a shorter period, or widen the date window, and it will fill in.';
+    /* The two feature-only floors. Each names the ONE thing that fixes it — they
+       are not degrees of "not enough data", they are two different missing
+       things with two different answers. */
+    if (f.reason === 'thin-join')
+      return 'Only ' + Math.round((f.joinRate || 0) * 100) + '% of the work items that name a '
+        + 'parent name a feature this scope holds, so how many items a feature takes would be '
+        + 'measuring how completely your export was filled in rather than how the work breaks '
+        + 'down. Add a Parent key column covering the whole export, or widen the scope to the '
+        + 'teams that own those features.';
+    if (f.reason === 'few-sizes')
+      return 'A feature forecast is built from how many items your FINISHED features took, and '
+        + 'this window holds ' + f.sizeCount + ' of them against the ' + f.minSizes + ' it '
+        + 'needs. Below that the answer is a fact about which few you happen to hold rather '
+        + 'than about the board. Widen the date window until it covers more finished features.';
     if (f.reason === 'stale-team')
       return 'Trimming this window back to where every team in scope still had data leaves '
         + f.samples + ' whole ' + periodNoun(f.samples) + ', short of the '

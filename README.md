@@ -1720,6 +1720,52 @@ Both boxes sit inside the tab rather than in the control strip at the top of the
 because they change nothing outside this group. Everything in the strip *does* reach them: the
 team, the work type filter, the date window and the grouping all decide which periods get dealt.
 
+### Forecasting Features, and Why Not the Obvious Way
+
+Switch **Count** to Features and the forecast answers in features: when will *N* features be
+done, and how many by a date.
+
+**It does not resample how often a feature completes.** That is the obvious approach and it is
+wrong on nearly every real board, in a way the existing guards do not catch. A team finishing one
+or two features a month gives a weekly series like `0,0,1,0,0,0,1,0,0,0,0,1` — twelve periods, so
+it clears the eight-period floor, and something completed, so it clears the all-zero check. What
+comes out looks like an answer and is mostly an artefact of the zeros.
+
+Measured, against a dense series picked to have the same median: the sparse one says **11 periods
+at 50% and 24 at 95%** — the cautious answer is 2.2× the middle one. The dense one says 12 and
+13.3, a ratio of 1.1. Both say "about twelve periods". Only one of them knows it.
+
+**So a feature forecast is decomposed.** It takes the two things a board really has plenty of —
+the **item throughput**, which is dense, and the **measured distribution of how many items a
+finished feature took** — and puts them together.
+
+**Both live inside one simulated run.** This is the part that is easy to get wrong: the tempting
+shortcut is to forecast the halves separately and multiply the 85th percentiles — "the 85th
+percentile feature is 20 items" × "20 items takes N weeks". That compounds two tail values and
+lands far past the real 85th. Each run draws a size for every feature, adds them up, and walks
+that target once, so the *distribution* carries both sources of variance jointly. A test pins the
+integrated answer as comfortably below the multiplied one.
+
+The tile says so on its face: *"Built from 17 finished features, sized at a median of 9 items
+each, paced by 14 whole weeks of item throughput."* A reader about to promise something off this
+is owed both halves.
+
+**It refuses in three ways, each naming one thing to fix:**
+
+| | What it means |
+|---|---|
+| **Too few finished features** (fewer than five) | The size distribution is a fact about which few you hold, not about the board. Widen the window. |
+| **A thin join** (under half the parented items find their parent) | Items-per-feature is measuring how completely your export was filled in, not how work breaks down. Fix the Parent key column, or widen the scope to the teams that own those features. |
+| **Too little item history** (under eight whole periods) | The existing floor, unchanged. |
+
+The thin-join check runs **before** the size count, because it is *why* the size count is low —
+reporting the symptom would send you hunting for finished features when the column you need is
+missing.
+
+**One limitation ships as a sentence rather than a correction:** decomposition assumes a feature
+is done when its items are done. Integration, sign-off and a demo all happen after the last story
+closes, and none of that is in these numbers. The hint says so every time.
+
 ### Whose Pace — One Team, a Train, or All of Them
 
 With two or more teams the tab gains a **Whose pace** picker: the team on screen, any ART by
