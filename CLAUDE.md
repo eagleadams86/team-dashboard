@@ -131,6 +131,59 @@ file records what is specific to this repo and what must never regress.
 - **Which tab you were on IS remembered, for the two number views only.** `view.activeTab`, restored at boot. It used to be deliberately not saved — the old comment said "a reload should open on the dashboard" — which was out of step with both siblings (Sprint Predictability keeps `settings.view`, Money Map keeps `ui.activeTab`) and with the fact that All Teams is where somebody with several teams works. Changed 2026-08-21 after it was reported as annoying. Settings and Your Data are NOT remembered, on purpose. No new guard was needed: `selectTab` already refuses a hidden or unknown tab and falls back to the dashboard, which is exactly the All-Teams-disappears-below-two-teams case.
 - **The All Teams Throughput trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **The header names the metric** — it shipped as a bare "Trend" and that was not enough beside eight other columns that each name theirs. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart.
 
+## Forecasting More Than One Team (2026-08-25) — no schema change
+
+Phase 3. `view.forecastScope` and `view.countFrom`, both device-local — no `SCHEMA` bump and no
+share-payload entry, matching `forecastItems` and `forecastDate`, which have always lived there.
+
+- **POOL THE ROWS, NEVER SUM THE TEAMS' DISTRIBUTIONS.** The series is additive (counting over a
+  disjoint union is a sum) but the DISTRIBUTION is not. One draw takes a calendar PERIOD and asks
+  what the whole train delivered in it, so the covariance between teams — a freeze, an incident,
+  planning week, a shared holiday — is carried for free. Summing independent per-team draws sets
+  that term to zero and produces a **narrower** spread than reality, which understates risk. That
+  is the one direction this app must never be wrong in. If it is ever proposed as a performance
+  optimisation, this paragraph is the reason not to; there is a comment saying so at the call
+  site and a test pinning the additive half so nobody mistakes it for licence.
+- **THE SHARED DATE IS A FAIRNESS RULE THAT BECOMES A LIE IN A FORECAST.** `deriveTeams` imposes
+  one `asOf` on every team, which is right for a comparison and wrong for a resample: a team three
+  weeks behind contributes three periods of ZERO, and those are not observations of a slow team,
+  they are the absence of data — `derive()` cannot tell the difference, because throughput is a
+  count over rows that are not there. **Worse than the level it drops is the spread it adds**:
+  those periods are systematically low rather than randomly low, so they fatten the slow tail
+  exactly where the 85th and 95th are read.
+  - `deriveTeams` computes `coverageEnd` (the earliest `dataEnd` among teams that HAVE rows —
+    teams with none are excluded, or one empty team would refuse every forecast on the train) and
+    re-derives the train with `forecastCoverageEnd` set.
+  - **Only the FORECAST's window moves.** `asOf` stays the newest date for everything else, or
+    the All Teams table stops being a fair comparison. The trim is a slice on the already-computed
+    `wholeThroughput`, not a second window.
+  - `reason: 'stale-team'` is its OWN refusal, fired only when the trim is what caused the
+    shortfall. Folding it into `few-periods` would name the wrong fix: one is answered by the
+    grouping and window controls in front of the reader, the other by re-exporting a team or
+    narrowing the scope.
+  - Nothing happens for a single team, and `lostPeriods`/`coverageEnd` are 0/null there — which
+    is every forecast this app drew before now, pinned as unchanged.
+- **`countFrom` — the anchor an export flatters the plan by.** Every figure here is read as of
+  the newest date in the data and the forecast always followed; on a nine-day-stale export that
+  puts every forecast date nine days early, and nobody delivers those days retrospectively. The
+  DEFAULT DOES NOT CHANGE — it would make the forecast disagree with every tile beside it — but
+  the control appears when the data ends before today, with the gap named. `max`, never a swap, so
+  a future-dated export cannot pull the anchor earlier than the data ends. `todayLocalISO()`, not
+  UTC: "today" is a claim about the reader's calendar, and a UTC today is tomorrow far enough
+  east. The trials are untouched; only the date they land on moves, and a test pins that the day
+  COUNT is identical and the DATE differs by exactly the staleness.
+- **`FC_SCOPE_ALL` is a `~` sentinel like `ART_NONE`**, for the same reason. `currentForecastScope()`
+  validates at the point of use and falls back to the team on screen — the one scope always
+  available — because a forecast showing too little is visible where one showing too much is not.
+  Hidden below two teams, the picker's own threshold.
+- **The scope's own derive happens in `renderDashboard`, not in `derive()`.** Everything else on
+  that screen is the team in the picker; only the forecast widens. `renderForecast` takes the
+  scope and the stale list as arguments rather than reaching for state, so what it says about
+  whose pace it dealt from cannot drift from what was dealt.
+- **`deriveTeams` derives each team ONCE for the pre-scan** (coverage end and the stale list) and
+  again for its row against the shared view. A first draft did it three times; that is a third of
+  the most expensive thing this app does thrown away.
+
 ## The Feature View (2026-08-25) — no schema change
 
 Phase 2. `view.unit` is `'items' | 'features'` and a `<select>` in the control strip. It stores
