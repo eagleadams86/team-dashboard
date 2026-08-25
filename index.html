@@ -2388,6 +2388,27 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       still time to act on it.</p>
   </div>
 
+  <!-- The feature layer's one switch. On its own line with room for a hint,
+       under the rule stated at the top of this dialog: a setting that needs more
+       than a label does not belong in the grid — and this one needs three
+       sentences, because it is the only setting here that changes what a pasted
+       row BECOMES rather than how a figure is worked out.
+       Comma-separated in one box, which is the shape a workflow stage's aliases
+       already use in the Teams & Stages window — the same question ("which words
+       in your export mean this?") asked the same way. -->
+  <div class="grid two pairs" style="margin-top:var(--sp-6)">
+    <div>
+      <label for="setFeatureTypes">Work types that mean a feature</label>
+      <input type="text" id="setFeatureTypes" placeholder="Feature, Epic">
+    </div>
+    <p class="hint" style="margin:0">Separate them with commas, exactly as they
+      appear in your Type column. Rows matching are kept <strong>apart from your
+      work items</strong>, so no item-level figure moves. <strong>Empty is
+      off</strong> &mdash; nothing ships here by default, because a guess at
+      somebody else&rsquo;s board is a setting that matches nothing. Pair it with
+      a <em>Parent key</em> column to join items to the features they belong to.</p>
+  </div>
+
   <div style="margin-top:var(--sp-6)">
     <label class="checkline" for="setWorkingDays">
       <input type="checkbox" id="setWorkingDays"><span>Count working days only (Monday to Friday)</span>
@@ -3213,8 +3234,47 @@ const HEADER_PATTERNS = {
      last of those is a DATE — reading it as the current status would put a
      timestamp where a stage name belongs. Only a heading that is exactly
      Status, or Current status, counts. */
-  status:    [/^\s*(current\s*)?status\s*$/i]
+  status:    [/^\s*(current\s*)?status\s*$/i],
+  /* ANCHORED, and for a third reason on top of the two above: the parent key is
+     read ONLY from a column that says so. Every other role here has a headerless
+     fallback that finds it from the values, because a date looks like a date and
+     a key looks like a key — but a parent key looks EXACTLY like an issue key,
+     so two unheaded key columns cannot be told apart. Guessing would reparent
+     every item in the file onto itself or onto its neighbour, silently, and a
+     wrong parent is worse than no parent: it invents a feature breakdown that
+     nobody's board has. No heading, no parent. */
+  parent:    [/^\s*parent(\s*issue)?\s*key\s*$/i]
 };
+
+/* Headings whose column is prose, and which therefore may hold NO role at all.
+   This is a guard on the storage policy rather than on parsing accuracy.
+
+   Every pattern above is matched against a heading, so a prose column is safe
+   from all of them: "Parent summary" matches none of the six, and never did.
+   But detectColumns also finds the TYPE column from the values when no heading
+   claims it — a column of twenty-or-fewer repeated non-date values — and a
+   200-row export covering eight features has exactly eight distinct parent
+   summaries. That passes the repetition test, and it is rejected today only by
+   the accident that a real Type column usually has fewer distinct values still,
+   with cleanWorkType's 40-character cap as the last catch. Neither is a
+   guarantee, and a short summary ("Login redesign") clears the cap.
+
+   So the columns nobody should ever store are named here and taken out of the
+   running before detection begins. This matters more since the app started
+   reading Parent key, because that invites a paste of the very export whose
+   next column along is Parent summary.
+
+   Stage columns are deliberately NOT filtered by this: a stage column is only
+   ever a heading that exactly equals an alias the reader typed by hand, which
+   is a deliberate act rather than a guess, and its values must survive
+   cleanStageDays to be stored at all. This list exists to stop the app GUESSING
+   its way into prose, and stages never guess. */
+const PROSE_HEADING = /summary|description|comment|notes?\b|title|reason|justification/i;
+const proseColumns = (header) => new Set(
+  (header || []).reduce((out, h, i) => {
+    if (PROSE_HEADING.test(String(h || ''))) out.push(i);
+    return out;
+  }, []));
 
 /* Both extra arguments are optional, and with neither passed this is exactly the
    matcher it has always been — which is what the second, unfussy pass in
@@ -3317,10 +3377,23 @@ function detectColumns(rows, header, order, stages) {
      — a paste whose one Resolved column holds dates this app cannot read still
      lands there and still reports its unreadable cells, rather than vanishing
      into "no completion column" and taking the diagnostic with it. */
+  /* The prose columns are out of every role's reach, in BOTH passes — unlike the
+     stage columns, which the second pass deliberately reconsiders. A stage that
+     loses its column to a date is a reader's set-up going quiet, and is worth
+     the trade; a summary column winning a role is prose reaching storage, and is
+     worth nothing. So this exclusion has no second pass and no fallback: a role
+     that can only be filled by a prose column goes unfilled. */
+  const prose = proseColumns(header);
+  const skipWith = (set) => {
+    if (!prose.size) return set;
+    const out = new Set(set);
+    for (const i of prose) out.add(i);
+    return out;
+  };
   const roleAt = (field) => {
-    const clear = matchHeader(header, field, stageSkip,
+    const clear = matchHeader(header, field, skipWith(stageSkip),
       DATE_ROLE[field] ? datey : null);
-    return clear >= 0 ? clear : matchHeader(header, field);
+    return clear >= 0 ? clear : matchHeader(header, field, prose);
   };
   /* Only the strict start patterns — "In Progress"/"Start"/"Begin" — so that a
      Created column can be recognised as created first, and then fall back into
@@ -3330,7 +3403,7 @@ function detectColumns(rows, header, order, stages) {
      and the commonest stage name on a board. */
   const startAt = (skip, fussy) => header
     ? header.findIndex((h, i) =>
-        !skip.has(i) && (!fussy || datey(i))
+        !skip.has(i) && !prose.has(i) && (!fussy || datey(i))
         && /start|begin|in.?progress/i.test(String(h || '')))
     : -1;
   const startedClear = startAt(stageSkip, true);
@@ -3348,6 +3421,10 @@ function detectColumns(rows, header, order, stages) {
        headerless-type export could have its statuses filed as work types.
        Naming the column takes it out of taken()'s reach. */
     status:    roleAt('status'),
+    /* Heading only, and no headerless fallback — see the pattern's own note.
+       Found BEFORE the contested-index rules below so that an export naming a
+       column "Parent key" cannot have it read as anything else. */
+    parent:    roleAt('parent'),
     /* Stage columns are found by HEADING ONLY, and there is no headerless
        fallback for them — deliberately. Every other role here can be found from
        the values when a heading is missing, because a date looks like a date and
@@ -3375,6 +3452,15 @@ function detectColumns(rows, header, order, stages) {
      the dashboard can do entirely without. */
   if (map.status >= 0 && [map.completed, map.started, map.created, map.type, map.key]
       .includes(map.status)) map.status = -1;
+  /* And the parent yields last of all, on the same terms. It is the newest role
+     and the one the app can most easily do without: no parent key means no
+     feature breakdown, which is a feature switched off, where a wrong parent key
+     is a breakdown that reads as real and is not. Note it can legitimately equal
+     map.key only in a file that has one column headed both ways, which cannot
+     happen — but the check costs nothing and the alternative is every item
+     parented to itself. */
+  if (map.parent >= 0 && [map.completed, map.started, map.created, map.type, map.key,
+      map.status].includes(map.parent)) map.parent = -1;
 
   /* A date, type or key role wins a contested column outright, and the stage
      that wanted it is set aside rather than dropped quietly. It happens when an
@@ -3382,17 +3468,25 @@ function detectColumns(rows, header, order, stages) {
      the obvious one — and the reader needs to be told, because from their side
      a stage they set up is simply reporting nothing. columnsReadHtml says which
      column and which stage. */
-  const roleCols = [map.completed, map.started, map.created, map.type, map.key, map.status]
-    .filter(i => i >= 0);
+  const roleCols = [map.completed, map.started, map.created, map.type, map.key, map.status,
+    map.parent].filter(i => i >= 0);
   map.stageClash = map.stages.filter(sc => roleCols.includes(sc.index));
   map.stages = map.stages.filter(sc => !roleCols.includes(sc.index));
 
   /* A Set, not a list: started and created may share an index, and a list would
      make the type detector below think one more column was consumed than is.
      The key belongs in it too — with two rows of two distinct types the type
-     detector would otherwise be free to pick the key column. */
+     detector would otherwise be free to pick the key column.
+
+     The prose columns are in it too, and that is the half of the storage guard
+     the heading patterns cannot do. Everything below this line finds a column by
+     what is IN it — the headerless key detector, the free-date ranking and the
+     work-type detector — and none of them can tell a column of short summaries
+     from a column of short labels. Naming those columns as taken is what keeps
+     the type detector off "Parent summary". */
   const taken = () => new Set([map.completed, map.started, map.created, map.type, map.key,
-    map.status].filter(i => i >= 0).concat(map.stages.map(sc => sc.index)));
+    map.status, map.parent].filter(i => i >= 0)
+    .concat(map.stages.map(sc => sc.index), [...prose]));
 
   /* No heading, or a heading this app declined to trust: find the key column by
      what is IN it. Unlike the type detector below, which has to guess from
@@ -3499,6 +3593,14 @@ function cleanWorkType(t) {
   const s = t.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim();
   return s.length > 40 ? '' : s;
 }
+
+/* How many work-type labels may mean "a feature". A board with more than a
+   handful of feature-shaped issue types does not exist — Feature, Epic,
+   Capability and an old spelling of one of them is already generous — and the
+   cap is what stops this list being somewhere a hand-edited backup can put a
+   document. Each entry is separately held to cleanWorkType, the same guard the
+   type on a pasted row gets. */
+const FEATURE_TYPES_MAX = 8;
 
 /* The one identifier this app stores, and the strictest boundary in it.
 
@@ -3769,7 +3871,13 @@ function duplicateStageAliases(stages) {
   return [...dupes.values()].sort();
 }
 
-function parsePastedRows(text, order, stages) {
+/* `featureTypes` is optional and defaults to none, which is exactly the parser
+   this has always been: with no feature types set up, `features` comes back
+   empty and every row lands in `rows` as before. That is the default state of
+   the setting too, so an existing browser sees no change until it asks for one. */
+function parsePastedRows(text, order, stages, featureTypes) {
+  const featureSet = new Set((Array.isArray(featureTypes) ? featureTypes : [])
+    .map(t => String(t || '').trim().toLowerCase()).filter(Boolean));
   /* Trim spaces but never tabs: in a tab-separated paste a leading tab is an
      empty first cell — a work-in-progress row in a completed-first export.
      l.trim() here once ate that tab and shifted every cell left, so the start
@@ -3856,6 +3964,15 @@ function parsePastedRows(text, order, stages) {
   };
 
   const rows = [], badCompleted = [], badStarted = [], badCreated = [];
+  /* Feature rows, kept out of `rows` entirely rather than flagged inside it —
+     see the split at the foot of the row loop for why. */
+  const features = [];
+  /* Feature-typed rows dropped for want of a key. Its own tally rather than
+     folded into `undated`, because the two say different things to the reader:
+     one means "your export has backlog in it", which is normal, and the other
+     means "your feature rows arrived without the column that makes them
+     features", which is a set-up problem with a fix. */
+  let featuresNoKey = 0;
   /* Cells in a stage column that are not a plain number of days. Counted per
      COLUMN rather than listed per row: a Time in Status export that has been
      asked for in the wrong format has every one of its cells wrong, and a
@@ -3884,6 +4001,21 @@ function parsePastedRows(text, order, stages) {
        reporter's name — all of it comes out as '' rather than as a shortened
        version of itself. See cleanIssueKey. */
     const key       = cleanIssueKey(at(cells, cols.key));
+    /* The SAME guard as the key above, deliberately, because it is the same
+       shape of value: up to ten letters or digits, a dash, up to six digits.
+       The admission test this app applies to a new stored field is whether a
+       regex can tell it from a sentence, and this field passes it for exactly
+       the reason the issue key does — there is no input that both survives
+       cleanIssueKey and carries prose.
+
+       Its neighbour in the same export, "Parent summary", is a manually typed
+       field and is never read: no heading pattern reaches it, and PROSE_HEADING
+       takes its column out of every role before detection begins. */
+    const parentKey = cleanIssueKey(at(cells, cols.parent));
+    /* Matched the way the defect type is matched — trimmed and lower-cased, an
+       exact comparison rather than a partial one — so "Feature" and "feature"
+       are the same label and "Feature flag" is not. */
+    const isFeature = featureSet.has(type.trim().toLowerCase());
 
     /* The day counts, one per stage column, summed where two columns feed one
        stage — a workflow with "Ready for Code Review" and "Code Review" is one
@@ -3944,12 +4076,30 @@ function parsePastedRows(text, order, stages) {
       usableCreated = null;
     }
 
+    /* A feature with no key is no use to anybody: the only thing that makes a
+       feature more than another row is that its children name it, and a child
+       names it by key. Counted rather than dropped quietly, and reported under
+       its own heading so it reads as "your feature rows are missing their key
+       column" rather than as ordinary bad data. */
+    if (isFeature && !key) { featuresNoKey++; return; }
+
     /* A row with neither date says nothing about flow — nothing to count. Not an
        error (an untouched backlog item is a normal thing to have in an export),
        but counted, because quietly dropping a third of someone's paste is how
-       you get a dashboard nobody trusts. */
-    if (!completed && !started) { undated++; return; }
-    if (!completed) unfinished++;
+       you get a dashboard nobody trusts.
+
+       ONE exemption, and only one: a feature that has been raised but not yet
+       started. For an item that is untouched backlog and says nothing; for a
+       feature it is precisely the pipeline you forecast, and dropping it would
+       mean the app could only ever forecast work already under way. It still
+       has to have a key and a date of some kind — this is a relaxed rule, not
+       an absent one. */
+    const featurePipeline = isFeature && usableCreated;
+    if (!completed && !started && !featurePipeline) { undated++; return; }
+    /* Items only. This tally feeds the "N of your rows are work in progress"
+       line under the paste, which is a claim about the work items that were
+       loaded; a feature nobody has finished is not a work item in progress. */
+    if (!completed && !isFeature) unfinished++;
 
     /* ── The stage columns, read only once the row is a KEEPER ───────────────
        Everything below this line runs after the three `return`s above, and that
@@ -4006,7 +4156,7 @@ function parsePastedRows(text, order, stages) {
       stageDays[id] = Math.min(Math.round(stageDays[id] * 100) / 100, STAGE_DAYS_MAX);
 
     const out = { completed: completed || null, started: usableStarted || null,
-                  created: usableCreated || null, type, key };
+                  created: usableCreated || null, type, key, parentKey };
     /* Absent unless this paste actually had stage columns with something in
        them, so a team whose export has none serialises byte-identically to
        before the feature existed — the rule the created date, the issue key and
@@ -4014,10 +4164,19 @@ function parsePastedRows(text, order, stages) {
     if (anyStage) out.stages = stageDays;
     /* Same omit-when-empty rule as every optional field here. */
     if (stageId) out.stage = stageId;
+    /* The split, and the whole reason features are extracted rather than
+       flagged: from this line on a feature is not in `rows`, so no item-level
+       figure can see it. Throughput, cycle time, the percentile, the defect
+       rate and every chart on the dashboard are computed over `rows` and are
+       numerically identical to what they were before the paste knew what a
+       feature was. A flag on a shared list would have meant auditing every one
+       of those call sites and trusting the audit for ever. */
+    if (isFeature) { features.push(out); return; }
     rows.push(out);
   });
 
-  return { rows, badCompleted, badStarted, badCreated, startAfterDone, raisedAfterStart,
+  return { rows, features, featuresNoKey,
+           badCompleted, badStarted, badCreated, startAfterDone, raisedAfterStart,
            unfinished, undated, skippedHeader, dateOrder: resolved, orderGuessed, columns: cols,
            /* How many non-empty lines were in the box. The note under the paste
               needs it to tell "nothing was pasted" from "nothing could be read",
@@ -6077,6 +6236,11 @@ window.TD = {
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
   cleanIssueKey,
+  /* The feature layer's parse-side pieces. PROSE_HEADING and proseColumns are
+     exported so the storage guard can be pinned as a RULE — "no column whose
+     heading is prose may hold any role" — rather than one role at a time
+     through a whole parse. */
+  PROSE_HEADING, proseColumns, FEATURE_TYPES_MAX,
   /* The project id and the routing it drives — pure, so the split can be pinned
      without a paste box or a team list on screen. */
   dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
@@ -6155,6 +6319,19 @@ const DEFAULT_SETTINGS = {
      gaps rather than overwriting. So no existing dashboard's figures move under
      it, which is the property that makes changing a default safe here at all. */
   sameDayValue: 0.5,
+  /* The work-type labels that mean "a feature" — the exact text in your Type
+     column, matched the way the defect type below is matched.
+
+     EMPTY BY DEFAULT, and empty means the whole feature layer is switched off:
+     no row is diverted, nothing new is stored, and every figure is the figure it
+     was. That is deliberate rather than cautious. This app shipped Spikes,
+     Stories and Tasks in its work-type filter once, as guesses at somebody
+     else's board, and on a team whose types read Feature, Chore and Incident
+     they were three filters matching nothing — which reads as broken data
+     rather than as a setting nobody has set. "Feature" and "Epic" would be the
+     same guess. The parse report names the work types it found in your paste,
+     so the labels to put here are already on screen after the first paste. */
+  featureTypes: [],
   unplannedType: 'Bug',
   /* Singular: it is read as "Defect rate" and "Defect Percentage Rate", where
      a plural would give "Defects rate". */
@@ -6495,7 +6672,12 @@ function sanitizeTeams(teams) {
              artId, projectId: cleanProjectId(t && t.projectId),
              wipLimit: cleanWipLimit(t && t.wipLimit),
              sleDays: cleanSleDays(t && t.sleDays),
-             rows: hydrateRows(t && t.rows) };
+             rows: hydrateRows(t && t.rows),
+             /* Its own list, never mixed into rows — see the split in
+                parsePastedRows. Rebuilt explicitly here like everything else on
+                this object: a field absent from this return is a field that does
+                not survive, which is the point of the function. */
+             features: hydrateFeatures(t && t.features) };
   });
 }
 
@@ -6517,10 +6699,15 @@ function hydrateStageDays(raw) {
   return any ? out : null;
 }
 
-function hydrateRows(raw) {
-  if (!Array.isArray(raw)) return [];
+/* ONE record, rebuilt from whatever a stored copy claims it is — and THE row
+   allowlist: a field this function does not name is a field that does not
+   survive the trip, which is what makes a hand-edited backup, a share link or a
+   restored file safe to load. Items and features both come through here, because
+   they are the same record and always were; what separates them is only which
+   ones are worth keeping, which is the two filters below and nothing else. */
+function hydrateRow(r) {
   const date = v => { if (!v) return null; const d = new Date(v + 'T00:00:00Z'); return isNaN(d) ? null : d; };
-  return raw.map(r => {
+  {
     const completed = date(r && r.c);
     let started = date(r && r.s);
     /* When the export has one. Lead time is the only thing that reads it, and
@@ -6548,6 +6735,13 @@ function hydrateRows(raw) {
          or hand-edited document cannot use this field as a free-text smuggling
          route — which is the whole reason the guard is a shape and not a cap. */
       key: cleanIssueKey(r && r.i),
+      /* `p` on the wire — the key of the feature this item belongs to. The same
+         guard as the key above because it is the same shape of value, applied at
+         the same two doors. Nothing here checks that the parent EXISTS: a
+         dangling parent key is an ordinary state of a real export (the feature
+         is on another team's board, or outside the window that was pasted), and
+         it is reported where the join happens rather than repaired here. */
+      parentKey: cleanIssueKey(r && r.p),
       /* `g` is the wire name; `stages` is what the app calls it everywhere else.
          Rebuilt key by key rather than taken as it stands: an id that is not a
          plainly safe id is dropped, a value that is not a day count is dropped,
@@ -6565,13 +6759,32 @@ function hydrateRows(raw) {
          than an object key, so PROTO_KEY is not a hazard here. */
       stage: (r && typeof r.w === 'string' && ID_OK.test(r.w)) ? r.w : ''
     };
-  })
+  }
+}
+
+function hydrateRows(raw) {
+  return (Array.isArray(raw) ? raw : []).map(hydrateRow)
   /* An item with no completion is work in progress, not a broken row — keep it,
      it still counts as work started. A created date alone is backlog that was
      raised and never picked up: it says nothing about flow, so the rule stays
      "neither of the two flow dates, no row". */
   .filter(r => r.completed || r.started);
 }
+
+/* The same records, one rule relaxed, and only for features.
+
+   A created date alone is backlog for an ITEM and says nothing about flow. For a
+   FEATURE it is the pipeline — the thing a forecast is about — and dropping it
+   would leave the app able to forecast only work already under way.
+
+   The key is required rather than merely useful. What makes a feature more than
+   another row is that items name it, and they name it by key; a feature nobody
+   can name is a row nothing will ever join to. */
+function hydrateFeatures(raw) {
+  return (Array.isArray(raw) ? raw : []).map(hydrateRow)
+    .filter(f => f.key && (f.completed || f.started || f.created));
+}
+
 /* `k` and `i` are left out when there's no created date and no issue key, so a
    team that has never pasted either serialises byte-identically to before and
    its first save after upgrading doesn't rewrite the whole stored document. The
@@ -6601,6 +6814,10 @@ const serializeRows = rows => rows.map(r => {
     if (Object.keys(g).length) out.g = g;
   }
   if (r.stage) out.w = r.stage;
+  /* And the same rule for the parent key: absent unless there is one, so a team
+     whose export has no Parent key column saves exactly what it saved before
+     this field existed. */
+  if (r.parentKey) out.p = r.parentKey;
   return out;
 });
 
@@ -6631,6 +6848,27 @@ function normalizeSettings(raw) {
     if (typeof s[k] !== 'string') s[k] = DEFAULT_SETTINGS[k];
     s[k] = s[k].slice(0, 120);
   }
+  /* The feature labels, held to the SAME guard as a work type in a pasted row —
+     cleanWorkType, so a label longer than a label is dropped WHOLE rather than
+     truncated. That matters here for the same reason it matters at the paste: a
+     summary cut to forty characters still stores words out of a work system.
+
+     Capped as a list as well as per entry. A board with more than a handful of
+     feature-shaped issue types does not exist, and the cap is what stops a
+     hand-edited backup using this array as somewhere to put a document.
+     De-duplicated on the matched form, since "Feature" and "feature " are one
+     label as far as the split is concerned and two rows in the dialog would
+     read as a bug. */
+  const seenFeature = new Set();
+  s.featureTypes = (Array.isArray(s.featureTypes) ? s.featureTypes : [])
+    .map(t => cleanWorkType(t))
+    .filter(t => {
+      const norm = t.trim().toLowerCase();
+      if (!norm || seenFeature.has(norm)) return false;
+      seenFeature.add(norm);
+      return true;
+    })
+    .slice(0, FEATURE_TYPES_MAX);
   /* Was a settings field that nothing ever read. Dropped rather than left to
      ride along in every saved copy for ever. */
   delete s.plannedLabel;
@@ -6681,7 +6919,9 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 11 added the two settings behind ignoring major outliers — a mode and
+/* SCHEMA 12 added the feature layer — a `p` (parent key) on each row and a
+   `features` list on each team, plus the `featureTypes` setting that decides
+   which pasted rows become features; 11 added the two settings behind ignoring major outliers — a mode and
    an optional typed cutoff, both shared by every team like the rest of
    `settings`; 10 added the two figures a team sets rather than measures — a
 
@@ -6701,7 +6941,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 11;
+const SCHEMA = 12;
 
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
@@ -6748,6 +6988,11 @@ function serializeState() {
          rather than not storing a value. */
       if (t.wipLimit) out.wipLimit = t.wipLimit;
       if (t.sleDays) out.sleDays = t.sleDays;
+      /* And the features, on the same rule once more: no `features` key at all
+         until this team has one, so a browser that never sets up a feature type
+         writes exactly the document it wrote before the layer existed. Written
+         with serializeRows because a feature IS a row — see hydrateFeatures. */
+      if (t.features && t.features.length) out.features = serializeRows(t.features);
       return out;
     }),
     /* Likewise: no key at all until an ART exists. */
@@ -6778,6 +7023,16 @@ const countKeys = teams =>
    both, and the prompt exists to catch exactly that file. */
 const countStageDays = teams =>
   teams.reduce((n, t) => n + t.rows.filter(r => r.stages || r.stage).length, 0);
+
+/* Both halves of the feature layer, counted together: a parent key on an item is
+   no use without the feature it names, and a feature list is no use without the
+   items naming it, so losing either loses the layer. The re-typeability test
+   that kept ARTs and the project id out of the losing-a-field prompt sends both
+   of these INTO it — a train's name is one word typed in a dialog, and a column
+   of parent keys pasted per item comes back only by finding the export again. */
+const countFeatureLinks = teams =>
+  teams.reduce((n, t) => n + t.rows.filter(r => r.parentKey).length
+    + (t.features ? t.features.length : 0), 0);
 function hydrateState(raw) {
   const arts = sanitizeArts(raw && raw.arts);
   const stages = sanitizeStages(raw && raw.stages);
@@ -6852,7 +7107,7 @@ function loadState() {
   if (stored !== null && JSON.stringify(serializeState()) !== stored) persist();
   /* A brand-new browser gets one empty team so there's somewhere to paste into.
      loadSample() drops it again if it is still untouched — see there. */
-  if (!state.teams.length) state.teams.push({ id: newId(), name: 'My team', rows: [] });
+  if (!state.teams.length) state.teams.push({ id: newId(), name: 'My team', rows: [], features: [] });
 }
 
 function loadView() {
@@ -6943,7 +7198,8 @@ window.tdRaisesKeyboard = raisesKeyboard;
    everything here decides what a copy arriving from outside this browser — a
    backup file, a share link — is allowed to turn into. */
 window.TDState = { sanitizeTeams, sanitizeArts, sanitizeStages, hydrateState, normalizeSettings,
-  isBackup, ID_OK, PROTO_KEY, serializeRows, hydrateRows, hydrateStageDays, SCHEMA };
+  isBackup, ID_OK, PROTO_KEY, serializeRows, hydrateRows, hydrateRow, hydrateFeatures,
+  hydrateStageDays, mergeFeatures, countFeatureLinks, SCHEMA };
 /* Click-to-copy's pure part, and the entry point the suite drives. */
 window.tdDots = { dotUnder, copyDotKey, dotTipFooter, onlyTopDot };
 /* The live Chart.js instances, for the suite alone. It is how the two scatters
@@ -6987,22 +7243,26 @@ window.tdAdopt = (data) => {
   const hadCreated = countCreated(state.teams);
   const hadKeys = countKeys(state.teams);
   const hadStages = countStageDays(state.teams);
+  const hadFeatures = countFeatureLinks(state.teams);
   const incoming = hydrateState(data);
   const losingCreated = hadCreated > 0 && countCreated(incoming.teams) === 0;
   const losingKeys = hadKeys > 0 && countKeys(incoming.teams) === 0;
   const losingStages = hadStages > 0 && countStageDays(incoming.teams) === 0;
+  const losingFeatures = hadFeatures > 0 && countFeatureLinks(incoming.teams) === 0;
 
-  /* ONE prompt covering all three fields, not one each. They are lost together
+  /* ONE prompt covering all four fields, not one each. They are lost together
      in the case this exists for — a build that predates any of them drops the
-     lot — and three dialogs in a row for the same event is how somebody learns
+     lot — and four dialogs in a row for the same event is how somebody learns
      to dismiss them without reading. */
-  if (losingCreated || losingKeys || losingStages) {
+  if (losingCreated || losingKeys || losingStages || losingFeatures) {
     const stale = !(data && data.schema >= SCHEMA);
     const lost = [];
     if (losingCreated) lost.push(hadCreated + ' Created date' + (hadCreated === 1 ? '' : 's'));
     if (losingKeys) lost.push(hadKeys + ' issue key' + (hadKeys === 1 ? '' : 's'));
     if (losingStages) lost.push('the stage times on ' + hadStages + ' item'
       + (hadStages === 1 ? '' : 's'));
+    if (losingFeatures) lost.push('the feature breakdown on ' + hadFeatures + ' row'
+      + (hadFeatures === 1 ? '' : 's'));
     const noun = lost.join(' and ');
     const keep = !confirm(
       'The copy you are restoring is missing what this browser has: ' + noun + '.\n\n'
@@ -7018,7 +7278,7 @@ window.tdAdopt = (data) => {
   }
 
   state = incoming;
-  if (!state.teams.length) state.teams.push({ id: newId(), name: 'My team', rows: [] });
+  if (!state.teams.length) state.teams.push({ id: newId(), name: 'My team', rows: [], features: [] });
   if (!state.teams.some(t => t.id === view.activeTeamId)) {
     view.activeTeamId = state.teams[0].id;
     saveView();
@@ -10011,6 +10271,10 @@ function renderFilterRows() {
 function renderSettingsForm() {
   $('setCycleLabel').value     = state.settings.cycleTimeLabel;
   $('setUnplannedType').value     = state.settings.unplannedType;
+  /* Joined for display, split on the way back in — the stage aliases' own
+     round trip. What is STORED is the list, so nothing here has to parse a
+     string later. */
+  $('setFeatureTypes').value      = (state.settings.featureTypes || []).join(', ');
   $('setSameDay').value        = state.settings.sameDayValue;
   $('setAgedDays').value       = state.settings.agedDays;
   $('setUnplannedLabel').value = state.settings.unplannedLabel;
@@ -11125,6 +11389,44 @@ function parseProblemsHtml(res) {
    silently, so it's stated every time rather than buried in a tooltip. Opens
    with a <br>: it always follows a sentence about what was loaded, and the two
    belong in one block. */
+/* What the feature layer did with this paste, said in the report rather than
+   left to be inferred from a row count that changed. Silent when the reader has
+   set no feature types up: a report about a switched-off feature is noise on
+   every paste anybody makes. */
+function featuresReadHtml(res) {
+  const on = (state.settings.featureTypes || []).length;
+  const parentCol = res.columns.parent;
+  if (!on && parentCol < 0) return '';
+  const colName = i => (i < 0 ? 'none' : 'column ' + (i + 1));
+  let html = '';
+  if (parentCol >= 0) {
+    html += '<br>Read <strong>' + colName(parentCol) + '</strong> as the parent key, and saved it '
+      + 'with each item — it is what joins an item to the feature it belongs to. Held to the '
+      + 'same shape as the issue key: letters, a dash and digits, and nothing else. '
+      + '<strong>A <em>Parent summary</em> column is never read</strong> — it is typed by hand, '
+      + 'so it is prose, and no column of prose is read into anything this app stores.';
+  } else if (on) {
+    html += '<br>No parent key in this paste, so nothing joins an item to a feature. '
+      + 'Add a <em>Parent key</em> column and paste again.';
+  }
+  if (on) {
+    const n = res.features.length;
+    html += '<br>' + (n
+      ? 'Took <strong>' + n + ' row' + (n === 1 ? '' : 's') + '</strong> out as features, '
+        + 'kept separately from your work items so none of them reaches a single '
+        + 'item-level figure.'
+      : 'No row in this paste matched a feature type, so nothing was taken out as a feature. '
+        + 'The work types found are listed above — copy the one that means a feature into '
+        + 'Settings.');
+    if (res.featuresNoKey) {
+      html += ' <strong>' + res.featuresNoKey + ' feature row'
+        + (res.featuresNoKey === 1 ? ' was' : 's were') + ' dropped for having no key</strong> — '
+        + 'a feature is named by its key, so one without a key can never be joined to anything.';
+    }
+  }
+  return html;
+}
+
 function columnsReadHtml(res) {
   const colName = i => (i < 0 ? 'none' : 'column ' + (i + 1));
   return '<br>Read <strong>' + colName(res.columns.completed) + '</strong> as the completed date, ' +
@@ -11154,6 +11456,12 @@ function columnsReadHtml(res) {
         + 'letters, a dash and digits. Anything else in that column is dropped.'
       : '<br>No issue key in this paste. Add a <em>Key</em> column to name the items on '
         + 'the charts; without one they are named by their work type, as before.') +
+    /* Named on the same terms as the issue key above, and for the same reason:
+       it is the second identifier this app stores, so whether it was read is
+       not a thing to leave anybody guessing at. The sentence also states what
+       was NOT read from that part of the export, because the column next to
+       this one is the one people worry about. */
+    featuresReadHtml(res) +
     /* The two-column case: Created is standing in as the start date, which is
        what this app has always done with it. Lead time then equals cycle time,
        and that needs saying before someone reads it as a finding. */
@@ -11321,7 +11629,8 @@ function showParseNote(res, mode, team, adopted) {
 function doLoad(mode) {
   const team = activeTeam();
   if (!team) return;
-  const res = parsePastedRows($('pasteBox').value, view.dateOrder, state.stages);
+  const res = parsePastedRows($('pasteBox').value, view.dateOrder, state.stages,
+    state.settings.featureTypes);
   /* Fill in the team's project id from its own export, when the export answers
      the question unanimously and nobody has answered it already. Typing an id
      per team is the setup step that would otherwise stand between a first paste
@@ -11336,11 +11645,35 @@ function doLoad(mode) {
   const adopted = (sole && !state.teams.some(t => cleanProjectId(t.projectId) === sole)) ? sole : '';
   if (adopted) team.projectId = adopted;
   showParseNote(res, mode, team, adopted);
-  if (!res.rows.length) return;
-  team.rows = mode === 'append' ? team.rows.concat(res.rows) : res.rows;
+  /* A paste of nothing but features is a real thing to do — a features-only
+     export, or a board whose items came in last week — so "did this paste load
+     anything" has to ask about both lists now, not just about rows. */
+  if (!res.rows.length && !res.features.length) return;
+  if (res.rows.length) team.rows = mode === 'append' ? team.rows.concat(res.rows) : res.rows;
+  /* Only when feature types are set up. With none, `res.features` is empty by
+     construction — so replacing unconditionally would let an ordinary paste
+     silently delete a feature list the reader built with the setting on. */
+  if ((state.settings.featureTypes || []).length) {
+    team.features = mode === 'append'
+      ? mergeFeatures(team.features, res.features)
+      : res.features;
+  }
   save();
   renderAll();
   if (mode !== 'append') $('pasteBox').value = '';
+}
+
+/* Appending features is not appending rows, and the difference is the key. Two
+   pasted ROWS that describe the same work item are two rows — the app has never
+   de-duplicated them, because it has no way to know they are the same. A feature
+   IS its key: the whole point of the record is that items name it, so the same
+   key twice in one list would count one feature as two everywhere it is joined,
+   and no reader could see why their numbers had doubled.
+   The incoming copy wins, because it is the newer export. */
+function mergeFeatures(existing, incoming) {
+  const byKey = new Map((existing || []).map(f => [f.key, f]));
+  for (const f of incoming) byKey.set(f.key, f);
+  return [...byKey.values()];
 }
 
 /* ── One paste, several teams ────────────────────────────────────────────────
@@ -11351,8 +11684,17 @@ function doLoad(mode) {
    is about saying what it decided before anything is written. */
 
 function multiParse() {
-  const res = parsePastedRows($('multiPasteBox').value, view.dateOrder, state.stages);
-  return { res, route: routeRowsToTeams(res.rows, state.teams) };
+  const res = parsePastedRows($('multiPasteBox').value, view.dateOrder, state.stages,
+    state.settings.featureTypes);
+  return { res, route: routeRowsToTeams(res.rows, state.teams),
+           /* Features route by the SAME rule the items do — a feature's key
+              carries its project at the front exactly as an item's does — so the
+              same pure function does it, and a feature can never land in a team
+              its children did not. Only the `assigned` half is used: an
+              unclaimed or ambiguous FEATURE key is the same finding as an
+              unclaimed item key, already named in the report by the id it
+              belongs to, and reporting it twice would read as two problems. */
+           featureRoute: routeRowsToTeams(res.features, state.teams) };
 }
 
 /* What each team holds right now — the figure that makes "replace" concrete. */
@@ -11483,9 +11825,12 @@ function showMultiNote(res, route, mode) {
 }
 
 function runMulti(mode) {
-  const { res, route } = multiParse();
+  const { res, route, featureRoute } = multiParse();
 
-  if (mode !== 'check' && route.assigned.length) {
+  /* Either routing having landed somewhere is enough to act on: an export of
+     nothing but features names teams through featureRoute alone, and testing
+     only the item routing would report it as loaded and write nothing. */
+  if (mode !== 'check' && (route.assigned.length || featureRoute.assigned.length)) {
     /* The one confirm in this flow, and only where it is earned: replacing
        several teams at once is the single most destructive thing this dialog
        can do, and unlike the team-at-a-time box above it can do it to boards
@@ -11506,12 +11851,35 @@ function runMulti(mode) {
       if (!team) return;
       team.rows = mode === 'append' ? team.rows.concat(a.rows) : a.rows.slice();
     });
+    /* Written in their own pass over their OWN routing, not folded into the loop
+       above: a team can be named by this paste's features and not by its items
+       (an export split by hand, a train where one team's features live on
+       another's board), and a loop over the item routing would silently drop
+       them. Same guard as the single-team box — with no feature types set up
+       there is nothing to write, and writing an empty list would delete a
+       feature list the reader built with the setting on. */
+    if ((state.settings.featureTypes || []).length) {
+      featureRoute.assigned.forEach(a => {
+        const team = state.teams.find(t => t.id === a.teamId);
+        if (!team) return;
+        team.features = mode === 'append'
+          ? mergeFeatures(team.features, a.rows)
+          : a.rows.slice();
+      });
+    }
     save();
     renderAll();
     const total = route.assigned.reduce((n, a) => n + a.rows.length, 0);
-    window.toast((mode === 'append' ? 'Added ' : 'Loaded ') + total + ' item'
-      + (total === 1 ? '' : 's') + ' into ' + route.assigned.length + ' team'
-      + (route.assigned.length === 1 ? '' : 's'), 5000);
+    const featTotal = featureRoute.assigned.reduce((n, a) => n + a.rows.length, 0);
+    /* Counted over BOTH routings, or a paste that named three teams through its
+       features alone would be announced as reaching none of them. */
+    const teamsTouched = new Set(route.assigned.map(a => a.teamId)
+      .concat(featureRoute.assigned.map(a => a.teamId))).size;
+    const parts = [];
+    if (total) parts.push(total + ' item' + (total === 1 ? '' : 's'));
+    if (featTotal) parts.push(featTotal + ' feature' + (featTotal === 1 ? '' : 's'));
+    window.toast((mode === 'append' ? 'Added ' : 'Loaded ') + parts.join(' and ')
+      + ' into ' + teamsTouched + ' team' + (teamsTouched === 1 ? '' : 's'), 5000);
   }
 
   showMultiNote(res, route, mode);
@@ -11547,7 +11915,7 @@ $('multiNote').addEventListener('click', e => {
       && !state.teams[0].projectId) state.teams = [];
   ids.filter(Boolean).forEach(id => {
     if (state.teams.some(t => cleanProjectId(t.projectId) === id)) return;
-    state.teams.push({ id: newId(), name: 'Team ' + id, artId: null, projectId: id, rows: [] });
+    state.teams.push({ id: newId(), name: 'Team ' + id, artId: null, projectId: id, rows: [], features: [] });
     made.push(id);
   });
   if (!made.length) return;
@@ -11837,7 +12205,7 @@ $('stageRows').addEventListener('click', e => {
 
 $('btnAddTeam').addEventListener('click', () => {
   const team = { id: newId(), name: 'Team ' + (state.teams.length + 1),
-                 artId: null, projectId: '', wipLimit: null, sleDays: null, rows: [] };
+                 artId: null, projectId: '', wipLimit: null, sleDays: null, rows: [], features: [] };
   state.teams.push(team);
   view.activeTeamId = team.id;
   save();
@@ -12044,14 +12412,49 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
         : e.target.value.slice(0, 120);
 
     save();
-    clearTimeout(settingsRedrawTimer);
-    /* renderViews, not renderDashboard: Settings is a dialog and can be opened
-       from any tab, so a reader who narrows the ageing threshold or the outlier
-       cutoff while standing on All Teams was left looking at figures taken
-       under the old setting until they switched tabs and back. */
-    settingsRedrawTimer = setTimeout(() => { renderDataTable(); renderViews(); }, 150);
-
+    scheduleSettingsRedraw();
   });
+});
+
+/* Pulled out of the loop above when a second listener needed it. renderViews,
+   not renderDashboard: Settings is a dialog and can be opened from any tab, so a
+   reader who narrows the ageing threshold or the outlier cutoff while standing
+   on All Teams was left looking at figures taken under the old setting until
+   they switched tabs and back. */
+function scheduleSettingsRedraw() {
+  clearTimeout(settingsRedrawTimer);
+  settingsRedrawTimer = setTimeout(() => { renderDataTable(); renderViews(); }, 150);
+}
+
+/* Its own listener rather than a row in SETTING_INPUTS, because that map is for
+   SCALARS: every value in it is a number or a capped label written straight onto
+   `state.settings`, and this one is a LIST that has to be split, cleaned,
+   de-duplicated and capped on the way in.
+
+   Guarded here as well as in normalizeSettings for the reason every typed field
+   in this app is guarded twice — save() serialises this live object straight to
+   localStorage and out into a share link, so the box is a boundary in its own
+   right rather than merely a way to reach one. cleanWorkType is the same guard a
+   work type on a pasted row gets, so a summary pasted into this box is dropped
+   whole rather than truncated.
+
+   `input` rather than `change`, matching the fields above: the save is immediate
+   and only the redraw waits, so a half-typed "Featur" is stored for a moment and
+   matches nothing — which is exactly what it should do, since nothing is
+   re-parsed until the next paste. */
+$('setFeatureTypes').addEventListener('input', e => {
+  const seen = new Set();
+  state.settings.featureTypes = String(e.target.value || '').split(',')
+    .map(t => cleanWorkType(t))
+    .filter(t => {
+      const norm = t.trim().toLowerCase();
+      if (!norm || seen.has(norm)) return false;
+      seen.add(norm);
+      return true;
+    })
+    .slice(0, FEATURE_TYPES_MAX);
+  save();
+  scheduleSettingsRedraw();
 });
 
 /* The one settings control that isn't text or a number: it reads .checked, and
@@ -12605,7 +13008,7 @@ $('loadedCard').addEventListener('click', (e) => {
 $('clearBackupBtn').addEventListener('click', downloadBackup);
 $('clearCancel').addEventListener('click', () => clearDialog.close());
 $('clearConfirm').addEventListener('click', () => {
-  state.teams = [{ id: newId(), name: 'My team', rows: [] }];
+  state.teams = [{ id: newId(), name: 'My team', rows: [], features: [] }];
   /* ARTs and stages go too. They used to survive, which made "Everything
      deleted — starting fresh" plainly untrue: a reader who had set up four
      stages and a train found both still there afterwards, with the dialog
@@ -12750,6 +13153,26 @@ function buildSharePayload(teamIds, win) {
        lines, which is graceful degradation rather than a wrong number. */
     if (t.wipLimit) out.wipLimit = t.wipLimit;
     if (t.sleDays) out.sleDays = t.sleDays;
+    /* The features travel on exactly the argument the keys and the two targets
+       travel on: they are what the shared charts are drawn from once the reader
+       is looking at the feature view, and a link that dropped them would show a
+       different picture from the sender's. The parent keys on the rows travel
+       with them for free — they are part of a row, and serializeRows is what
+       wrote them above.
+
+       Windowed with the SAME cutoff the rows are, or a link trimmed to three
+       months would carry every feature the team has ever had while carrying
+       only three months of items to join to them.
+
+       SHARE_PAYLOAD_V is NOT bumped, matching ARTs, keys, stages and the two
+       targets: an older cached build drops the list, has no feature view to
+       offer, and shows the app exactly as it was. Graceful degradation rather
+       than a wrong number. */
+    const feats = t.features || [];
+    const shared = cutoff
+      ? feats.filter(f => !outsideWindow(f, cutoff, !!(win && win.wip)))
+      : feats;
+    if (shared.length) out.features = serializeRows(shared);
     return out;
   });
   /* Only the trains the shared teams are actually on. Sharing one team should
@@ -13325,7 +13748,19 @@ const DEMO_TEAMS = [
        statusOf. Team Healthy Flow's queue is short and mostly still being built. */
     wipStatus: ['Development', 'Development', 'Code Review', 'Testing'],
     types: ['Story', 'Story', 'Story', 'Story', 'Story', 'Story',
-            'Task', 'Task', 'Bug', 'Spike'] },
+            'Task', 'Task', 'Bug', 'Spike'] ,
+    /* The feature layer. This team's items are dealt to features in runs whose
+       lengths cycle through `featureQuotas` — see parentFor.
+
+       The quotas are a SPREAD on purpose, 4 to 14 items a feature: a demo where
+       every feature is the same size would draw a flat items-per-feature chart
+       and let a forecast built on it look far more certain than any real one
+       ever is. This team's spread is the tighter of the two, which is the same
+       thing its cycle times say about it.
+
+       How many features that adds up to falls out of the quotas and this team's
+       own throughput — see parentFor, which is where the arithmetic lives. */
+    featureQuotas: [6, 11, 4, 9, 14, 7, 5, 12, 8, 6, 10, 4] },
   { name: 'Team Long Tail', seed: 71104, dated: true, art: true, key: 'HRN',
     weeks: 40, perWeek: [3, 6], cycle: [3, 8], tailChance: 0.18, tail: [22, 48],
     wait: [2, 9], wip: [4, 9, 13, 17, 21, 26, 31, 38, 45],
@@ -13369,7 +13804,20 @@ const DEMO_TEAMS = [
     types: ['Story', 'Story', 'Story', 'Story', 'Story',
             'Story', 'Story', 'Story', 'Story', 'Story',
             'Bug', 'Bug', 'Bug', 'Task', 'Task', 'Task', 'Task', 'Task',
-            'Spike', 'Spike'] },
+            'Spike', 'Spike'],
+    /* A WIDER spread than Team Healthy Flow's — 3 to 26 items a feature — which
+       is the same finding this team carries everywhere else, said about
+       features instead of items: its work is less predictable in size as well as
+       in duration. Two teams whose features were sized alike would make the
+       items-per-feature chart look like a property of the estate rather than of
+       the team, and a forecast is only worth scoping to a team if the team is
+       where the difference lives.
+
+       Bigger quotas over a comparable number of items, so this team ends up with
+       FEWER features and each of them larger — which is what puts a real
+       distance between the two boards on any feature-level figure, rather than
+       leaving them differing only in the spread. */
+    featureQuotas: [9, 3, 18, 6, 26, 4, 11, 7, 21, 5, 14, 8] },
   /* `stale` shifts every one of this team's dates back by that many days, so its
      export stops before everybody else's. Its OWN dashboard is unchanged — every
      window here hangs off the latest date in the data, so the whole picture just
@@ -13471,11 +13919,71 @@ function demoPaste(profile) {
       : profile.wipStatus[wipIndex % profile.wipStatus.length];
   };
 
-  const row = (created, started, completed, type, span, wipIndex) => {
+  /* ── The feature a row belongs to ────────────────────────────────────────
+     DETERMINISTIC and never drawn from rnd(), the third field to follow that
+     rule here after the issue key counter and the stage-day split, and for the
+     same reason: the sequence is seeded and every pinned figure in this demo
+     hangs off it, so one consumed draw would silently move Team Long Tail's
+     tail and Team Healthy Flow's aged count.
+
+     Items are dealt to features in RUNS whose lengths cycle through the
+     profile's own quota list, rather than round-robin. Two things come out of
+     that and both are the point of having the demo at all: features end up
+     genuinely different SIZES, which is what the items-per-feature distribution
+     exists to show and what any forecast built on it has to be tested against;
+     and a feature's children sit CLOSE TOGETHER in time, which is what a real
+     board looks like and what makes a feature's own dates mean anything.
+
+     Each feature's run is CONTIGUOUS and a feature is never come back to, which
+     is a deliberate simplification and the honest one for a demo: the items loop
+     below runs oldest first, so a feature's children are consecutive in time and
+     its own dates span weeks rather than the whole history. Letting a feature be
+     revisited later — which an earlier draft did, by cycling the slot back round
+     a fixed list — gave every feature a seven-month span, which is both wrong
+     about how features work and useless as something to forecast from.
+
+     How MANY features there are therefore falls out of the quotas and the number
+     of items, rather than being stated: a count fixed in the profile would have
+     to be kept in step with both by hand, and being wrong either way is silent.
+
+     Feature keys are low numbers (KFR-1, KFR-2) against the items' 1000-up
+     counter, so the two can never collide and a reader can tell them apart at a
+     glance. */
+  let featureSlot = 0, featureUsed = 0;
+  const featureKeyAt = (i) => profile.key + '-' + (i + 1);
+  const parentFor = () => {
+    if (!profile.featureQuotas) return '';
+    const quota = profile.featureQuotas[featureSlot % profile.featureQuotas.length];
+    if (featureUsed >= quota) { featureSlot++; featureUsed = 0; }
+    featureUsed++;
+    return featureKeyAt(featureSlot);
+  };
+  /* Force the next item onto a fresh feature, whatever the current run has left.
+     Used only for the work in progress below: without it every in-flight item
+     falls inside whichever run was open when the completed work ran out, which
+     left each team with exactly ONE unfinished feature. One is enough to draw a
+     chart and not enough to demonstrate anything — an unfinished feature is the
+     thing a feature-level forecast is ABOUT, so a demo that shows one is a demo
+     that cannot show a forecast. */
+  const newFeatureRun = () => { featureSlot++; featureUsed = 0; };
+
+  /* Every item this paste describes, kept as it is emitted so the feature rows
+     at the foot can be built FROM THEIR CHILDREN rather than invented beside
+     them. A feature whose dates contradicted its items would be a demo that
+     teaches the wrong thing about the one join this layer is built on. */
+  const kids = new Map();
+  const noteKid = (parent, created, started, completed) => {
+    if (!parent) return;
+    if (!kids.has(parent)) kids.set(parent, []);
+    kids.get(parent).push({ created, started, completed });
+  };
+
+  const row = (created, started, completed, type, span, wipIndex, parent) => {
     const cells = profile.dated ? [created, started, completed, type]
                                 : [started, completed, type];
     const status = statusOf(wipIndex);
     return (profile.key ? [key()].concat(cells) : cells)
+      .concat(profile.featureQuotas ? [parent || ''] : [])
       .concat(status == null ? [] : [status])
       .concat(stageCells(span)).join('\t');
   };
@@ -13483,6 +13991,10 @@ function demoPaste(profile) {
   const lines = [((profile.key ? 'Issue key\t' : '')
                   + (profile.dated ? 'Created\tIn Progress\tResolved\tIssue Type'
                                    : 'In Progress\tResolved\tIssue Type')
+                  /* Named exactly as Jira names it, because the whole point of
+                     the demo coming in through parsePastedRows is that it meets
+                     the column detector the way a real export would. */
+                  + (profile.featureQuotas ? '\tParent key' : '')
                   + (profile.wipStatus ? '\tStatus' : '')
                   + (profile.stageCols
                       ? '\t' + profile.stageCols.map(([h]) => h).join('\t') : ''))];
@@ -13495,20 +14007,64 @@ function demoPaste(profile) {
         ? between(profile.tail[0], profile.tail[1])
         : between(profile.cycle[0], profile.cycle[1]);
       const start = done - cycle;
-      lines.push(row(iso(start - between(profile.wait[0], profile.wait[1])),
-                     iso(start), iso(done), pick(profile.types), cycle));
+      const created = iso(start - between(profile.wait[0], profile.wait[1]));
+      const parent = parentFor();
+      noteKid(parent, created, iso(start), iso(done));
+      lines.push(row(created, iso(start), iso(done), pick(profile.types), cycle, null, parent));
     }
   }
   /* Started, never completed — work in progress. It contributes nothing to
      throughput or cycle time and everything to the WIP and aged-work tiles. */
   profile.wip.forEach((age, i) => {
+    /* Broken into runs of three, so a team with nine items in flight has three
+       features open rather than one. Deterministic, like every other feature
+       decision here. */
+    if (profile.featureQuotas && i % 3 === 0) newFeatureRun();
     /* An item still in flight has spent its time somewhere too, and a Time in
        Status export says so — which is what makes the table's item count larger
        than the completed count. Its INDEX is what picks its current status, so
        the ages and the stages line up: the oldest items land in the stage the
        board is actually stuck in. */
-    lines.push(row(iso(-age - between(1, 5)), iso(-age), '', pick(profile.types), age, i));
+    const created = iso(-age - between(1, 5));
+    const parent = parentFor();
+    noteKid(parent, created, iso(-age), '');
+    lines.push(row(created, iso(-age), '', pick(profile.types), age, i, parent));
   });
+
+  /* ── The feature rows ────────────────────────────────────────────────────
+     Emitted last and in the SAME paste as their children, which is how a real
+     Jira export arrives and so the shape the splitter has to handle. Each one is
+     built from the items that name it:
+
+       created   — the earliest its children were raised
+       started   — the earliest any child was picked up, blank if none has been
+       completed — the latest child completion, and ONLY when every child is done
+
+     That last rule is what makes the demo honest about the thing the feature
+     forecast is for: a feature with one item still open is a feature still in
+     flight, however much of it has shipped. It is also what gives this demo a
+     mix of finished and open features to forecast from without any of it being
+     written out by hand. */
+  if (profile.featureQuotas) {
+    /* Over the keys that actually gained children, in the order they were
+       created — so nothing is emitted for a feature nobody worked on, and a
+       feature row never arrives before the items that made it. */
+    for (const [k, mine] of kids) {
+      const earliest = (f) => mine.map(f).filter(Boolean).sort()[0] || '';
+      const allDone = mine.every(c => c.completed);
+      const completed = allDone ? mine.map(c => c.completed).sort().slice(-1)[0] : '';
+      const cells = profile.dated
+        ? [earliest(c => c.created), earliest(c => c.started), completed, 'Feature']
+        : [earliest(c => c.started), completed, 'Feature'];
+      lines.push([k].concat(cells)
+        .concat([''])                                   /* its own parent: none */
+        .concat(profile.wipStatus ? [completed ? 'Done' : 'In Progress'] : [])
+        /* No stage day counts on a feature. Those are measured per work item by
+           a Time in Status export, and a feature is not in a work item's
+           workflow — an empty cell is "no figure", which is the truth. */
+        .concat(profile.stageCols ? profile.stageCols.map(() => '') : []).join('\t'));
+    }
+  }
 
   return lines.join('\n');
 }
@@ -13546,6 +14102,9 @@ function loadSample() {
     + 'Both of them set the same work-in-progress limit and the same cycle time target, and '
     + 'only one of them keeps either. Team Bare Export sets neither, which is how every '
     + 'browser starts.\n\n'
+    + 'Team Healthy Flow and Team Long Tail also break their work down into features, so '
+    + 'you can see how many items a feature takes — Team Long Tail\u2019s features vary far '
+    + 'more in size. Team Bare Export has none.\n\n'
     + 'It is added alongside anything you already have, and you can delete it later.')) return;
 
   /* A first run auto-creates an empty "My team" (hydrateState), so loading the
@@ -13587,9 +14146,19 @@ function loadSample() {
   ];
   demoStages.forEach(st => state.stages.push(st));
 
+  /* The feature type the demo's two keyed teams export, set up BEFORE the pastes
+     are parsed for exactly the reason the stages above are: a feature row is
+     only ever recognised by a label that already exists, and the demo has to
+     come through the same door a real paste does. It is written onto `settings`,
+     which the reader shares across every team — so loading the demo turns the
+     feature layer on, and the Settings box shows the word that did it rather
+     than leaving somebody hunting for why their rows split. */
+  if (!state.settings.featureTypes.length) state.settings.featureTypes = ['Feature'];
+
   let landOn = null;
   DEMO_TEAMS.forEach(profile => {
-    const parsed = parsePastedRows(demoPaste(profile), 'auto', state.stages);
+    const parsed = parsePastedRows(demoPaste(profile), 'auto', state.stages,
+      state.settings.featureTypes);
     /* The demo's teams carry the project ids their own keys are built from, so
        "Paste several teams" is reachable from Load sample data rather than only
        after somebody types three ids in. Team Bare Export has no keys and so no id —
@@ -13604,7 +14173,12 @@ function loadSample() {
                       team is the same shape sanitizeTeams builds. */
                    wipLimit: profile.wipLimit || null,
                    sleDays: profile.sleDays || null,
-                   rows: parsed.rows };
+                   rows: parsed.rows,
+                   /* Team Bare Export has no feature quotas and so no feature
+                      rows, which is the third face again and the one that makes
+                      the empty state reachable: a team with items and no
+                      features at all. */
+                   features: parsed.features };
     state.teams.push(team);
     /* Land on Team Long Tail. Team Healthy Flow's board is the prettier one and
        says less: the reason this app reads the 85th percentile rather than the
