@@ -303,7 +303,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 2370;
+const EXPECTED = 2392;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -1067,6 +1067,27 @@ async function run(TD, win) {
   const orphan = roundTrip([{ c: '2026-08-09', s: '2026-08-02', t: 'Story', g: { ghost: 9 } }], []);
   is(orphan.teams[0].rows[0].stages, null,
      'and a row left with none loses the object, so it serialises as it did before stages existed');
+
+  /* THE SAME PRUNE ON THE OTHER LIST. A feature is a row — same record, same
+     wire letters, same hydrateRow — and the Add a Feature form offers a stage
+     picker and a box per stage, so a feature can hold both fields. Until
+     2026-08-25 hydrateState walked `rows` only, and a feature's dangling id
+     survived the stage delete, the reload and every save after it: invisible
+     (renderStageTime joins against state.stages) and permanent. */
+  const featPrune = StS.hydrateState({
+    schema: StS.SCHEMA,
+    stages: [{ id: 'sb', name: 'Build', match: [] }],
+    teams: [{ id: 't1', name: 'T', rows: [],
+              features: [{ c: '2026-08-09', s: '2026-08-02', t: 'Feature', i: 'DAE-1',
+                           g: { sb: 3, ghost: 9 }, w: 'ghost' },
+                         { s: '2026-08-02', t: 'Feature', i: 'DAE-2', g: { ghost: 9 } }] }]
+  });
+  is(featPrune.teams[0].features[0].stages, { sb: 3 },
+     'a FEATURE loses its count against a stage that does not exist, exactly as an item does');
+  is(featPrune.teams[0].features[0].stage, '',
+     'and its dangling current-stage pointer goes the same way');
+  is(featPrune.teams[0].features[1].stages, null,
+     'a feature left with no counts at all loses the object too');
 
   /* Built with JSON.parse, NOT an object literal, and that is load-bearing.
      `{ '__proto__': 9 }` in source does not create a property called
@@ -4137,6 +4158,27 @@ async function run(TD, win) {
      'a real key travels; free text planted in that field never reaches the link');
   is(Sh.SHARE_PAYLOAD_V, 1,
      'and the payload version is unchanged — an older build drops the key and names dots by type');
+
+  /* A LINK CARRIES THE STAGES ITS OWN RECORDS SPENT TIME IN, AND A FEATURE IS A
+     RECORD. `usedStages` walked `rows` only until 2026-08-25, so a stage named
+     by a feature alone was left out of the payload — and the recipient's
+     hydrateState then pruned the day count as a dangling id, dropping a figure
+     the sender could see. The other half of the same fault as the stage delete.
+     `dsx` is here to prove the filter still filters: a stage nothing references
+     stays out, which is the rule this must not weaken. */
+  plant({
+    stages: [{ id: 'fsx', name: 'Review', match: [] },
+             { id: 'dsx', name: 'Unused', match: [] }],
+    teams: [{ id: 'team-a', name: 'Alpha',
+      rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Bug' }],
+      features: [{ c: '2015-01-22', s: '2015-01-14', t: 'Feature', i: 'DAE-90',
+                   g: { fsx: 2 } }] }],
+    settings: { featureTypes: ['Feature'] }
+  });
+  const spFeatStage = Sh.buildSharePayload(['team-a']);
+  is((spFeatStage.stages || []).map(st => st.name), ['Review'],
+     'a stage named only by a FEATURE still travels, so its day count has a name at the far end');
+  is(spFeatStage.teams[0].features[0].g, { fsx: 2 }, 'and the count itself rides along');
 
   /* ────────────────────────────────────────────────────────── */
   group('Share links — how much history rides along');
@@ -7273,6 +7315,121 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(exported.length, 5, 'and every row comes off with the header');
 
   /* ────────────────────────────────────────────────────────── */
+  group('the Clear button takes the list you are LOOKING at');
+
+  /* Reported by review on 2026-08-25. This card shows ONE of a team's two lists
+     — the heading says which ("Loaded Features"), the add button says which
+     ("Add a Feature\u2026"), the export filename says which — and the red button
+     beside them said "Clear This Team's Data" and emptied `rows`. So a reader
+     looking at twenty features pressed it, was asked about a hundred and ninety
+     ITEMS they could not see, and afterwards had the same twenty features in
+     front of them and no work items anywhere.
+
+     It is the fault the item dialog's own rule already names ("the form decides
+     its list once on the way in and reads it again on save"), arriving on a
+     button instead of a form — and worse there, because nothing was open to
+     re-read: the confirm quoted a count off the invisible list. */
+  {
+    plant({ teams: [{ id: 'cl1', name: 'Both Lists',
+      rows: [{ c: '2026-03-10', s: '2026-03-01', t: 'Story', i: 'DAE-1', p: 'DAE-90' },
+             { c: '2026-03-12', s: '2026-03-02', t: 'Story', i: 'DAE-2', p: 'DAE-90' }],
+      features: [{ c: '2026-03-12', s: '2026-03-01', t: 'Feature', i: 'DAE-90' }] }],
+      settings: { featureTypes: ['Feature'] } });
+
+    const uSel = win.document.getElementById('unitSel');
+    const wasUnit = uSel.value;
+    const setUnit = (v) => {
+      uSel.value = v;
+      uSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+      win.selectTab('data');
+    };
+    const clearBtn = win.document.getElementById('btnClear');
+    const pressClear = () => {
+      let said = '';
+      const realConfirm = win.confirm;
+      win.confirm = (msg) => { said = msg; return true; };
+      try { clearBtn.click(); } finally { win.confirm = realConfirm; }
+      return said;
+    };
+
+    setUnit('items');
+    is(clearBtn.textContent, 'Clear This Team\u2019s Items',
+       'in the item view the button names the items');
+
+    setUnit('features');
+    is(win.document.getElementById('dataHeading').firstChild.textContent, 'Loaded Features ',
+       'the fixture really does put the feature list on screen');
+    is(clearBtn.textContent, 'Clear This Team\u2019s Features',
+       'and the button follows the heading rather than contradicting it');
+
+    const featSaid = pressClear();
+    ok(/Delete all 1 feature for Both Lists\?/.test(featSaid),
+       'the confirm counts what is ON SCREEN, not the list behind it \u2014 and says "feature"',
+       featSaid);
+    ok(/work items are left alone/.test(featSaid),
+       'and says the items survive, as the single-feature delete already does', featSaid);
+
+    const afterFeat = win.tdGet();
+    is((afterFeat.teams[0].features || []).length, 0, 'the features are the ones that went');
+    is(afterFeat.teams[0].rows.length, 2, 'and every work item is still there');
+
+    /* With no features left, featureUnit() falls back to items on its own — the
+       guard that exists so a saved 'features' cannot outlive the data it named. */
+    win.selectTab('data');
+    is(clearBtn.textContent, 'Clear This Team\u2019s Items',
+       'with the feature list emptied the view falls back, and so does the label');
+    const itemSaid = pressClear();
+    ok(/Delete all 2 items for Both Lists\?/.test(itemSaid),
+       'and the item view still clears the items', itemSaid);
+    is(win.tdGet().teams[0].rows.length, 0, 'which are gone');
+
+    /* Put the view back, and ASSERT the restore: this group is the only one that
+       touches `view.unit`, and td-view outlives the run. */
+    uSel.value = wasUnit;
+    uSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.document.getElementById('unitSel').value, wasUnit,
+       'the unit is put back, so nothing after this group reads a feature list');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('deleting a team names BOTH lists it is about to take');
+
+  /* Same family as the button above. A team holding twenty features and no work
+     items was deleted under a bare "Delete X?" \u2014 the most destructive control in
+     the app asking the mildest question it has, about a list it never mentioned. */
+  {
+    plant({ teams: [
+      { id: 'dl1', name: 'Keep', rows: [{ c: '2026-03-10', s: '2026-03-01', t: 'Story' }] },
+      { id: 'dl2', name: 'Featureful', rows: [],
+        features: [{ c: '2026-03-12', s: '2026-03-01', t: 'Feature', i: 'DAE-90' },
+                   { s: '2026-03-02', t: 'Feature', i: 'DAE-91' }] },
+      { id: 'dl3', name: 'Mixed',
+        rows: [{ c: '2026-03-10', s: '2026-03-01', t: 'Story' }],
+        features: [{ c: '2026-03-12', s: '2026-03-01', t: 'Feature', i: 'DAE-92' }] }
+    ], settings: { featureTypes: ['Feature'] } });
+    win.document.getElementById('manageBtn').click();
+
+    const askedFor = (id) => {
+      let said = '';
+      const realConfirm = win.confirm;
+      win.confirm = (msg) => { said = msg; return false; };   /* decline \u2014 read only */
+      try { win.document.querySelector('[data-delteam="' + id + '"]').click(); }
+      finally { win.confirm = realConfirm; }
+      return said;
+    };
+
+    const featOnly = askedFor('dl2'), both = askedFor('dl3'), plain = askedFor('dl1');
+    ok(/its 2 features\?/.test(featOnly),
+       'a team whose only data is features is asked about the features', featOnly);
+    ok(/its 1 item and 1 feature\?/.test(both),
+       'a team holding both is asked about both, each with its own noun', both);
+    ok(/its 1 item\?/.test(plain),
+       'and an ordinary team reads exactly as it always did', plain);
+    is(win.tdGet().teams.length, 3, 'nothing was actually deleted \u2014 every confirm was declined');
+    win.document.getElementById('manageCloseBtn').click();
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('CSV export — the formula guard and the quoting');
 
   /* A spreadsheet treats a cell opening with =, + or @ as a FORMULA, so a team
@@ -8164,14 +8321,19 @@ group('a delete looks like a delete, everywhere');
         { s: '2026-08-04', t: 'Story', w: 'sx1' },
         /* And one finished item carrying time in both stages. */
         { c: '2026-08-05', s: '2026-08-01', t: 'Story', g: { sx1: 2, sx2: 1 } }
-      ] }],
+      ],
+      /* A FEATURE holding both references. It is the same record as the rows
+         above and the Add a Feature form fills in both fields, so a delete that
+         walked `rows` only left this one behind for ever — and its confirm
+         quoted a count that did not include it. */
+      features: [{ s: '2026-08-02', t: 'Feature', i: 'DAE-9', w: 'sx1', g: { sx1: 4 } }] }],
       settings: {}
     });
     win.renderAll();
 
     const firstRow = win.document.querySelector('#stageRows tr');
-    is(firstRow.querySelector('td.count').textContent, '3 items',
-       'the dialog counts a row that references the stage EITHER way');
+    is(firstRow.querySelector('td.count').textContent, '4 items',
+       'the dialog counts a record that references the stage EITHER way, on EITHER list');
 
     let said = '';
     const realConfirm = win.confirm;
@@ -8179,10 +8341,11 @@ group('a delete looks like a delete, everywhere');
     try { win.document.querySelector('[data-delstage="sx1"]').click(); }
     finally { win.confirm = realConfirm; }
 
-    ok(/the time 1 item spent in it/.test(said),
-       'the confirm names the day counts it is about to remove', said);
-    ok(/2 items that are sitting in it now/.test(said),
-       'AND the items sitting in it — all a Status-only export ever has', said);
+    ok(/the time 2 items spent in it/.test(said),
+       'the confirm names the day counts it is about to remove — the feature\u2019s among them',
+       said);
+    ok(/3 items that are sitting in it now/.test(said),
+       'AND everything sitting in it — all a Status-only export ever has', said);
 
     const afterStage = win.tdGet();
     is(afterStage.stages.map(s => s.id), ['sx2'], 'the stage itself is gone');
@@ -8190,6 +8353,13 @@ group('a delete looks like a delete, everywhere');
        'and no row is left pointing at it, in the copy just written to storage');
     is(afterStage.teams[0].rows.filter(r => r.g).map(r => r.g), [{ sx2: 1 }],
        'its day counts go, and the other stage\u2019s stay');
+    /* The other list, on the same press. Nothing on screen would ever have drawn
+       what was left behind there \u2014 renderStageTime joins against state.stages \u2014
+       which is exactly why it needed pinning rather than eyeballing. */
+    is(afterStage.teams[0].features.filter(f => 'w' in f).length, 0,
+       'the FEATURE is not left pointing at the deleted stage either');
+    is(afterStage.teams[0].features.filter(f => f.g).length, 0,
+       'and its day count goes with it, rather than surviving every save after');
   }
 
   /* ────────────────────────────────────────────────────────── */

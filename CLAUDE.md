@@ -131,6 +131,63 @@ file records what is specific to this repo and what must never regress.
 - **Which tab you were on IS remembered, for the two number views only.** `view.activeTab`, restored at boot. It used to be deliberately not saved — the old comment said "a reload should open on the dashboard" — which was out of step with both siblings (Sprint Predictability keeps `settings.view`, Money Map keeps `ui.activeTab`) and with the fact that All Teams is where somebody with several teams works. Changed 2026-08-21 after it was reported as annoying. Settings and Your Data are NOT remembered, on purpose. No new guard was needed: `selectTab` already refuses a hidden or unknown tab and falls back to the dashboard, which is exactly the All-Teams-disappears-below-two-teams case.
 - **The All Teams Throughput trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **The header names the metric** — it shipped as a bare "Trend" and that was not enough beside eight other columns that each name theirs. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart.
 
+## Both of a Team's Lists, Everywhere (2026-08-25) — no schema change
+
+Found by a review of the whole repo the day the forecast landed. All three are the same shape and
+none of them is about the forecast: **the feature layer added a SECOND list to a team, and four
+places went on reading only `rows`.** A feature is a row — same record, same wire letters, same
+`hydrateRow` — so anything that walks a team's records has to walk both, and the test to apply to
+anything near this is *"would this be wrong if half the data were in `features`?"*.
+
+- **The Clear button took the list you were NOT looking at.** The Your Data card shows one of the
+  two — the heading says which, the add button says which, the export filename says which — and
+  the red button beside them read "Clear This Team's Data" and emptied `rows` regardless. So a
+  reader looking at twenty features pressed it, was asked about a hundred and ninety ITEMS that
+  were not on screen, agreed, and afterwards had the same twenty features in front of them and no
+  work items anywhere. **This is the item dialog's own rule** — *"the dialog decides its list once
+  on the way in and reads it again on save"* — arriving on a button instead of a form, and worse
+  there, because nothing was open to re-read: the confirm quoted a count off the invisible list.
+  Both the label and the handler follow `featureUnit()` now, and clearing the features says the
+  work items are left alone, the same promise the single-feature delete makes. The pluralisation
+  was fixed in passing; it said "Delete all 1 items" before.
+- **A FEATURE'S STAGE DATA WAS NEVER PRUNED, ANYWHERE.** The Add a Feature form offers the stage
+  picker and a day box per stage — `buildManualRow` writes `stage` and `stages` without asking
+  whether it is a feature — so a feature can hold both fields, and three separate places dropped
+  them on the floor:
+  - `hydrateState` pruned dangling ids on `t.rows` only, so **`openItemDialog`'s stated invariant
+    was false for the record it was opening**: *"an id on `r.stages` can only be a stage that
+    exists"*. The dialog builds its boxes from `state.stages` and reads them back as the whole
+    truth, so the orphan figure was silently dropped on the next edit and otherwise sat in
+    localStorage for ever.
+  - The stage delete cleared `rows` only — and its confirm counted `rows` only, which is the
+    contradiction the `w`-versus-`g` fix already has a paragraph about. `renderStageRows`'s count
+    column had the same gap, and the two must agree or the count above the confirm disagrees with
+    the confirm.
+  - `buildSharePayload`'s `usedStages` walked `rows` only, so a stage named by a feature alone was
+    left out of the link — and the recipient's `hydrateState` then pruned the figure as a dangling
+    id. A sender's number that arrives as nothing.
+
+  Nothing on screen ever DREW the orphan (`renderStageTime` joins against `state.stages`), which
+  is exactly why it needed a test rather than an eye.
+- **The team delete never mentioned the features it destroyed.** A team holding twenty features
+  and no work items was taken under a bare "Delete X?" — the most destructive control in the app
+  asking the mildest question it has, about a list it did not name. Both halves are stated now,
+  each only when there is one, so an ordinary team's confirm reads exactly as it always did.
+- **Eighteen assertions, and they were PROVEN TO FAIL FIRST** — all four fixes reverted, the suite
+  run, eighteen reds each naming its own fault. The Clear-button group is the only one that touches
+  `view.unit`, so it puts it back and asserts the restore: `td-view` outlives a run, and a suite
+  left in the feature view would fail the next one for a reason that is not about the app.
+
+### What was checked and is NOT wrong
+
+Recorded so the next sweep does not re-derive it. **Clean up old data is items-only on purpose** —
+the README says so in as many words — and was left alone; whether an old feature should go with
+its items is a question for Charles, not a bug to fix quietly. `countCreated`/`countKeys`/
+`countStageDays` read `rows` only, and that is harmless: `countFeatureLinks` counts the features
+themselves, so the losing-a-field prompt still fires on a file whose only created dates are on
+features. The "(empty)" a team with features and no items reads as in the picker, the share list
+and the cleanup list is the same class of thing and is left standing.
+
 ## The Forecast Scenario (2026-08-25) — no schema change
 
 Phase 5, the last of the five. `view.scenario` — seven knobs, all numbers and small integers, all

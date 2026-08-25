@@ -446,7 +446,7 @@ shared by every team — one place to say what a "defect" is.
 The picker only appears once there are **two or more** teams: with one team it is not a
 choice. It is part of a wider rule — nothing shows until there is something behind it, so a
 first run is the [welcome card](#the-first-thing-you-see) and nothing else. The **Loaded data** card,
-the **Clean up old data** card and the **Append to existing** / **Clear this team's data**
+the **Clean up old data** card and the **Append to existing** / **Clear this team's items**
 buttons all appear the moment rows exist (`renderEmptyState()`).
 
 **The Dashboard tab follows the same rule**: it isn't there until something has data, and a
@@ -1387,8 +1387,9 @@ Two more things about that kind of export, neither of them the app's doing:
 
 **Deleting a stage takes its figures with it, and the confirm counts them both ways** — the
 time items spent in it, and the items sitting in it right now, which on an ordinary Status-only
-export is all there is. No work item is deleted, and re-pasting the same export brings the
-figures back.
+export is all there is. Features are counted and cleared alongside the work items, because a
+feature carries the same two fields and the Add a Feature form fills them in. No work item is
+deleted, and re-pasting the same export brings the figures back.
 
 ### Reading the Table
 
@@ -1689,6 +1690,14 @@ Everything else, including the date ordering and the refusal of future dates, is
 The work item form gained a **Part of feature** box for the same reason, so the breakdown can be
 built by hand and not only pasted. Deleting a feature **leaves its items alone**: they are work
 that was really done, and they keep the key they carried.
+
+**Every control on that card names the list it is looking at**, and the red one included: with
+Count on Features it reads *Clear This Team's Features* and takes the features, and with Count on
+Work items it reads *Clear This Team's Items* and takes the items. It used to say *Clear This
+Team's Data* and empty the work items whichever list was on screen — so pressing it under a table
+of twenty features asked about a hundred and ninety items you could not see, and left the twenty
+in front of you afterwards. Clearing the features leaves the work items exactly where they are,
+the same promise deleting one feature makes.
 
 ### What It Costs You
 

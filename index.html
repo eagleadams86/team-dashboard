@@ -1978,7 +1978,10 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              Asked for by Charles on 2026-08-21 for exactly that reader. -->
         <button class="btn" id="btnAddItem" type="button">Add an Item&hellip;</button>
         <button class="btn" id="btnSampleData" type="button">Load Sample Data</button>
-        <button class="btn danger" id="btnClear" hidden>Clear This Team's Data</button>
+        <!-- Named for the list it clears, and renderData rewrites it with the
+             unit: this card shows one of a team's two lists, and the button
+             beside it has to say which one it takes. -->
+        <button class="btn danger" id="btnClear" hidden>Clear This Team&rsquo;s Items</button>
       </div>
       <!-- role="status": the result of a load — including its data errors — is
            announced to a screen reader, the same promise the cleanup preview
@@ -8587,7 +8590,7 @@ function hydrateState(raw) {
      explain. A row left with no counts at all loses the object too, so it goes
      back to serialising byte-identically to a row that never had one. */
   const stageIds = new Set(stages.map(st => st.id));
-  teams.forEach(t => t.rows.forEach(r => {
+  const pruneStages = (r) => {
     /* Where the item is, on the same terms as the counts below: a pointer at a
        stage that does not exist is no stage, not a ghost one. */
     if (r.stage && !stageIds.has(r.stage)) r.stage = '';
@@ -8600,7 +8603,18 @@ function hydrateState(raw) {
       any = true;
     }
     r.stages = any ? kept : null;
-  }));
+  };
+  /* BOTH LISTS, and features were missed until 2026-08-25. A feature is a row —
+     same record, same wire letters, same hydrateRow — so it can hold a current
+     stage and a set of day counts, and the Add a Feature form offers boxes for
+     both. Pruning only `rows` left a feature carrying an id nothing answers to,
+     which nothing on screen would ever draw (renderStageTime lists `state.stages`
+     and joins) and nothing would ever clear: it survived the stage delete, it
+     survived the reload, and it was written back out by serializeRows for ever.
+     The invariant openItemDialog states — "an id on `r.stages` can only be a
+     stage that exists" — has to be true of every record the dialog opens, and
+     that dialog opens features too. */
+  teams.forEach(t => { t.rows.forEach(pruneStages); (t.features || []).forEach(pruneStages); });
   return { teams, arts, stages, settings: normalizeSettings(raw && raw.settings) };
 }
 
@@ -10707,14 +10721,19 @@ function renderStageRows() {
      a board whose export carries statuses and not durations, which is the
      ordinary case. Two numbers would need two headings this table has no room
      for, on a question that only has one answer. */
+  /* BOTH LISTS, because the delete below takes both — and a count column that
+     disagreed with the confirm under it is exactly the fault that made the
+     `w`-versus-`g` bug wrong rather than merely incomplete. A feature holds the
+     same two fields an item does. */
   const counts = new Map();
   const bump = (id) => counts.set(id, (counts.get(id) || 0) + 1);
-  state.teams.forEach(t => t.rows.forEach(r => {
+  const countRefs = (r) => {
     const seen = new Set();
     if (r.stages) Object.keys(r.stages).forEach(id => seen.add(id));
     if (r.stage) seen.add(r.stage);
     seen.forEach(bump);
-  }));
+  };
+  state.teams.forEach(t => { t.rows.forEach(countRefs); (t.features || []).forEach(countRefs); });
   tb.innerHTML = '';
   state.stages.forEach((st, i) => {
     const n = counts.get(st.id) || 0;
@@ -12389,6 +12408,16 @@ function renderDataTable() {
   $('dataExport').innerHTML = rows.length
     ? exportButtons('dataItemsTable', feature ? 'features' : 'work-items') : '';
   $('btnAddItem').innerHTML = feature ? 'Add a Feature&hellip;' : 'Add an Item&hellip;';
+  /* And the delete beside it, for the reason the heading above is set at all:
+     this card shows ONE of a team's two lists, and until 2026-08-25 this button
+     said "Clear This Team's Data" over a table of features and then emptied the
+     work items — the list not on screen — leaving every feature in front of the
+     reader exactly where it was. That is the fault the item dialog's own rule
+     already names ("the form decides its list once on the way in"), arriving on
+     a button instead of a form, and it is worse here because nothing was open
+     to re-read: the confirm quoted a count off the invisible list. The label
+     names the list now, and so does the handler. */
+  $('btnClear').textContent = feature ? 'Clear This Team’s Features' : 'Clear This Team’s Items';
 
   if (!rows.length) {
     $('dataTable').innerHTML = '<div class="note info">'
@@ -14343,9 +14372,25 @@ function focusPanel(panelId, fromKeyboard) {
 
 $('btnClear').addEventListener('click', (e) => {
   const team = activeTeam();
-  if (!team || !team.rows.length) return;
-  if (!confirm('Delete all ' + team.rows.length + ' items for ' + team.name + '?\n\nThis cannot be undone.')) return;
-  team.rows = [];
+  /* The list ON SCREEN, decided the same way the item dialog decides its own —
+     see the label in renderData. Clearing the other one would empty a table the
+     reader cannot see while leaving the one they are looking at untouched. */
+  const clearFeatures = featureUnit();
+  const list = !team ? [] : (clearFeatures ? (team.features || []) : team.rows);
+  if (!team || !list.length) return;
+  /* Deleting features leaves the items alone, exactly as the single-feature
+     delete does, and for the same reason: they are work that was really done.
+     Said in the confirm because it is the question a reader has at that moment. */
+  const many = list.length + (clearFeatures
+    ? (list.length === 1 ? ' feature' : ' features')
+    : (list.length === 1 ? ' item' : ' items'));
+  if (!confirm(clearFeatures
+      ? 'Delete all ' + many + ' for ' + team.name + '?\n\nIts work items are left alone — '
+        + 'they keep the keys they carry and simply stop being joined to anything. '
+        + 'This cannot be undone.'
+      : 'Delete all ' + many + ' for ' + team.name + '?\n\nThis cannot be undone.'))
+    return;
+  if (clearFeatures) team.features = []; else team.rows = [];
   save();
   $('parseNote').innerHTML = '';
   renderAll();
@@ -14486,11 +14531,19 @@ $('stageRows').addEventListener('click', e => {
      incomplete: a team whose paste carries a Status column and no durations has
      items sitting in this stage and no time in it at all, so the count column
      said "4 items" and the confirm said nothing was going. */
+  /* Counted over BOTH lists, because both are cleared below — a feature carries
+     the same two fields an item does and the Add a Feature form fills them in,
+     so a confirm reading only `rows` would understate what the press takes. The
+     noun stays "item" for the same reason the count column's does: it is the
+     record this app is about, and "items and features" in a confirm nobody
+     asked a unit question of reads as two separate things going. */
   let timed = 0, sitting = 0;
-  state.teams.forEach(t => t.rows.forEach(r => {
+  const eachRecord = (fn) =>
+    state.teams.forEach(t => { t.rows.forEach(fn); (t.features || []).forEach(fn); });
+  eachRecord(r => {
     if (r.stages && r.stages[id] != null) timed++;
     if (r.stage === id) sitting++;
-  }));
+  });
   const goes = [];
   if (timed) goes.push('the time ' + timed + ' item' + (timed === 1 ? '' : 's') + ' spent in it');
   if (sitting) goes.push(sitting + ' item' + (sitting === 1 ? ' that is' : 's that are')
@@ -14501,7 +14554,7 @@ $('stageRows').addEventListener('click', e => {
         + 'figures back.'
       : 'Delete ' + stage.name + '?')) return;
   state.stages.splice(i, 1);
-  state.teams.forEach(t => t.rows.forEach(r => {
+  eachRecord(r => {
     /* Where the item IS goes too, and it has to go HERE rather than being left
        to hydrateState's pruning on the next load — the same call sanitizeArts'
        dangling `artId` gets from the ART delete a section above. persist()
@@ -14512,7 +14565,7 @@ $('stageRows').addEventListener('click', e => {
     if (!r.stages || r.stages[id] == null) return;
     delete r.stages[id];
     if (!Object.keys(r.stages).length) r.stages = null;
-  }));
+  });
   save();
   renderAll();
   window.toast('Deleted ' + stage.name);
@@ -14624,8 +14677,17 @@ $('teamRows').addEventListener('click', e => {
   const i = state.teams.findIndex(t => t.id === id);
   if (i < 0 || state.teams.length === 1) return;
   const team = state.teams[i];
-  const warning = team.rows.length
-    ? 'Delete ' + team.name + ' and its ' + team.rows.length + ' items?\n\nThis cannot be undone.'
+  /* Both lists are named, because both go with the team. A team holding twenty
+     features and no items used to be deleted under a bare "Delete X?" — the
+     app's most destructive button asking the mildest question it has, about a
+     list it did not mention. Each half is stated only when there is one, so an
+     ordinary team's confirm reads exactly as it always did. */
+  const held = [];
+  if (team.rows.length) held.push(team.rows.length + ' item' + (team.rows.length === 1 ? '' : 's'));
+  const featCount = (team.features || []).length;
+  if (featCount) held.push(featCount + ' feature' + (featCount === 1 ? '' : 's'));
+  const warning = held.length
+    ? 'Delete ' + team.name + ' and its ' + held.join(' and ') + '?\n\nThis cannot be undone.'
     : 'Delete ' + team.name + '?';
   if (!confirm(warning)) return;
   state.teams.splice(i, 1);
@@ -15629,11 +15691,16 @@ function buildSharePayload(teamIds, win) {
      paste box the recipient of a link does not have, and they are the one field
      in this app whose contents were typed to mirror a work system's own words.
      A link carries what the figures need and no more. */
+  /* Over BOTH lists. `teams` here is already serialised, so a feature carries
+     the same `g` and `w` an item does; reading only `rows` would send a feature's
+     stage id with no stage to name it, and the recipient's hydrateState would
+     then prune the figure the sender could see. */
   const usedStages = new Set();
-  teams.forEach(t => t.rows.forEach(r => {
+  const noteStages = (r) => {
     if (r.g) Object.keys(r.g).forEach(id => usedStages.add(id));
     if (r.w) usedStages.add(r.w);
-  }));
+  };
+  teams.forEach(t => { t.rows.forEach(noteStages); (t.features || []).forEach(noteStages); });
   const stages = state.stages.filter(st => usedStages.has(st.id))
     .map(st => ({ id: st.id, name: st.name }));
 
