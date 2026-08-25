@@ -303,7 +303,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 2255;
+const EXPECTED = 2305;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3576,6 +3576,187 @@ async function run(TD, win) {
 
 
   /* ────────────────────────────────────────────────────────── */
+  group('the scenario — every knob defaults to doing nothing');
+  {
+    is(TD.scenarioIsDefault(TD.scenarioFrom(null)), true, 'nothing set is the default scenario');
+    is(TD.scenarioAssumptions(TD.scenarioFrom(null)), [],
+       'and a default scenario makes no claims');
+    is(TD.scenarioFrom(null), TD.DEFAULT_SCENARIO, 'null normalises to the defaults');
+
+    /* THE no-op guarantee, and it is kept by DISPATCH rather than by aligned
+       streams. The scoped samplers draw more per trial than the originals — a
+       growth draw per trial and a confidence draw per period — so their output
+       CANNOT match. What matters is that a defaulted scenario never reaches
+       them: the caller runs the original, so today's answers are the same code
+       rather than approximately the same numbers. */
+    const samples = [5, 4, 6, 5, 3, 7, 5, 4, 6, 5, 4, 6];
+    const plain = TD.forecastPeriodsFor(samples, 20, 500);
+    const scopedAtDefault = TD.forecastPeriodsForScoped(samples, 20, TD.scenarioFrom(null), 500);
+    ok(JSON.stringify(plain) !== JSON.stringify(scopedAtDefault),
+       'the scoped sampler is NOT stream-identical at defaults — it draws more');
+    /* Same answer to within sampling noise, which is what says the knobs really
+       are no-ops even though the stream differs. */
+    ok(Math.abs(TD.percentileOf(plain, 50) - TD.percentileOf(scopedAtDefault, 50)) <= 1,
+       'but it gives the same answer, so the defaults really are no-ops',
+       TD.percentileOf(plain, 50) + ' vs ' + TD.percentileOf(scopedAtDefault, 50));
+
+    /* Clamping: a number out of range is pinned, junk falls back. Getting these
+       the same way round would turn "everything at once" into "one at a time". */
+    is(TD.scenarioFrom({ parallel: 99 }).parallel, TD.FORECAST_MAX_PARALLEL,
+       'an over-range number is CLAMPED');
+    is(TD.scenarioFrom({ parallel: 'banana' }).parallel, 1, 'and junk falls back to the default');
+    is(TD.scenarioFrom({ growthLo: -40 }).growthLo, 0,
+       'scope SHRINK is refused — nobody plans for it, and it would be a way to '
+       + 'forecast your way to a date');
+    is(TD.scenarioFrom({ growthLo: 60, growthHi: 10 }).growthHi, 60,
+       'a backwards range is straightened rather than rejected');
+    is(TD.scenarioFrom({ estOn: true, estLo: 0 }).estOn, false,
+       'a typed pace with no numbers in it is not a typed pace');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the knobs move the answer the way they claim to');
+  {
+    const samples = [5, 4, 6, 5, 3, 7, 5, 4, 6, 5, 4, 6];
+    const mid = (sc) => TD.percentileOf(
+      TD.forecastPeriodsForScoped(samples, 40, TD.scenarioFrom(sc), 3000), 50);
+    const basePlain = TD.percentileOf(TD.forecastPeriodsFor(samples, 40, 3000), 50);
+
+    ok(mid({ growthLo: 50, growthHi: 50 }) > basePlain,
+       'more scope takes longer', mid({ growthLo: 50, growthHi: 50 }) + ' vs ' + basePlain);
+    ok(mid({ confidence: 2 }) > basePlain,
+       'a brand-new team takes longer than the team whose history is being resampled');
+    is(mid({ unavailable: 3 }) - mid({}), 3,
+       'periods nobody is delivering push the answer out by exactly that many');
+
+    /* NO CONFIDENCE STEP LETS SOMEBODY FORECAST A SPEED-UP. That is a deliberate
+       refusal — a reorganisation making a team faster is the most-abused claim
+       in this domain and the app should not supply the arithmetic. */
+    TD.TEAM_CONFIDENCE_STEPS.forEach((s, i) =>
+      ok(s.hi <= 1.05, 'team confidence step ' + i + ' cannot forecast a speed-up'));
+    is(TD.TEAM_CONFIDENCE_STEPS[0].lo, 1, 'and the default step is exactly 1');
+    is(TD.TEAM_CONFIDENCE_STEPS[0].hi, 1, 'at both ends');
+    is(TD.CLARITY_STEPS[0].lo, 1, 'as is the default clarity step');
+    is(TD.CLARITY_STEPS[0].hi, 1, 'at both ends');
+
+    /* Clarity WIDENS rather than shifts, which is what makes it a statement
+       about certainty rather than about size. It draws once PER FEATURE, so the
+       draws partly cancel on the sum — a single per-trial multiplier would
+       overstate the spread badly. */
+    const sizes = [8, 8, 8, 8, 8, 8];
+    const spread = (clarity) => {
+      const t = TD.forecastFeaturePeriodsScoped(samples, sizes, 6,
+        TD.scenarioFrom({ clarity }), 3000);
+      return TD.percentileOf(t, 95) / TD.percentileOf(t, 50);
+    };
+    ok(spread(3) > spread(0), 'a vaguer feature widens the answer',
+       spread(3).toFixed(2) + ' vs ' + spread(0).toFixed(2));
+
+    /* A typed pace REPLACES history, so the eight-period floor does not reach
+       it — that is the whole point of the control, and the refusal stays the
+       default outcome rather than the only one. */
+    const noHistory = TD.forecastPeriodsForScoped([1, 2], 20,
+      TD.scenarioFrom({ estOn: true, estLo: 4, estHi: 6 }), 500);
+    ok(!!noHistory, 'a typed pace answers where there is no history to resample');
+    is(TD.forecastPeriodsForScoped([1, 2], 20, TD.scenarioFrom(null), 500), null,
+       'and without it the floor still refuses');
+    /* Team confidence is disabled under a typed pace: multiplying a guess by a
+       guess compounds two people's pessimism. */
+    is(JSON.stringify(TD.forecastPeriodsForScoped([1, 2], 20,
+         TD.scenarioFrom({ estOn: true, estLo: 4, estHi: 6, confidence: 2 }), 300)),
+       JSON.stringify(noHistory.slice(0, 300)),
+       'and the team setting is ignored while it is on');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('parallelism moves each feature and not the last one');
+  {
+    const samples = [5, 4, 6, 5, 3, 7, 5, 4, 6, 5, 4, 6];
+    const sizes = [3, 5, 8, 8, 10, 12, 15, 20];
+    const at = (p) => {
+      const s = TD.forecastFeatureSchedule(samples, sizes, 6, TD.scenarioFrom({ parallel: p }), 2000);
+      return { all: TD.scheduleAllDone(s, [85])[0].periods,
+               each: TD.scheduleRows(s, [85]).map(r => r[0].periods) };
+    };
+    const one = at(1), three = at(3), six = at(6), ten = at(10);
+
+    /* THE claim the whole control rests on. Throughput is dealt per period
+       whatever it is spent on, so under any schedule that never idles the team
+       the makespan is identical. Exact equality, not a tolerance: it is the same
+       seeded stream reaching the same total. */
+    is(one.all, three.all, 'one at a time and three at once finish together');
+    is(one.all, six.all, 'and so does everything at once');
+    is(one.all, ten.all, 'and a parallelism past the feature count changes nothing');
+
+    /* What DOES move: series gives early wins and a long tail, all-at-once
+       delivers nothing until the end. */
+    ok(one.each[0] < six.each[0] - 2,
+       'in series the first feature lands much earlier',
+       one.each[0].toFixed(1) + ' vs ' + six.each[0].toFixed(1));
+    ok(Math.max(...six.each) - Math.min(...six.each) < 2,
+       'and all at once they all land together',
+       JSON.stringify(six.each.map(v => +v.toFixed(1))));
+    /* In series a feature never finishes before the one before it. */
+    for (let i = 1; i < one.each.length; i++)
+      ok(one.each[i] >= one.each[i - 1], 'in series feature ' + (i + 1) + ' is not before ' + i);
+    /* The last feature IS the all-done date, in series. */
+    is(one.each[one.each.length - 1], one.all,
+       'and the last one in series is the all-done date itself');
+
+    is(TD.forecastFeatureSchedule(samples, sizes.slice(0, 2), 6, TD.scenarioFrom(null), 100), null,
+       'the size floor applies here too');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a spread that has stopped being an answer');
+  {
+    const tight = [10, 10, 11, 10, 10, 12, 10, 10, 11, 10];
+    const wide = [1, 1, 1, 1, 40, 1, 1, 1, 1, 40];
+    ok(TD.spreadRatioOf(tight, true) < 1.5, 'a steady sample is narrow');
+    ok(TD.spreadRatioOf(wide, true) > TD.spreadRatioOf(tight, true), 'and a lumpy one is not');
+    /* 2.5, and the first number here was 3 on a premise that turned out to be
+       false — see the note on the constant. A forecast sums feature sizes and
+       walks many periods, and both concentrate the result, so a ten-feature
+       forecast with every knob maxed measures 1.65 and a three-times guard could
+       never fire. */
+    is(TD.FORECAST_SPREAD_MAX, 2.5, 'two and a half times the middle answer is the line');
+    ok(TD.FORECAST_SPREAD_MAX > 1.8,
+       'and it is clear of the 1.3 an unadjusted forecast produces, so it only ever '
+       + 'fires on something the reader turned on');
+    is(TD.spreadRatioOf([], true), null, 'nothing to measure is not a spread of zero');
+
+    /* Which knob to turn back first — the widest range as a fraction of its own
+       low end. A proxy rather than an answer, and cheap enough to be worth it. */
+    const worst = TD.widestScenarioKnob(TD.scenarioFrom({
+      growthLo: 0, growthHi: 10, clarity: 3, confidence: 1 }));
+    is(worst.key, 'clarity', 'the widest range is named as the one to narrow first');
+    is(TD.widestScenarioKnob(TD.scenarioFrom(null)), null,
+       'and nothing is named when nothing is set');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the two scope knobs are orthogonal, and their product is stated');
+  {
+    /* "+20% scope" and "+20% more features" read like +40% and are +44%. They
+       are relabelled to be genuinely different quantities — growth WITHIN the
+       features you counted, versus features you did not count — but a reader who
+       sets both is still owed the number they multiply to. */
+    const r = TD.scenarioScopeRange(TD.scenarioFrom({ growthLo: 20, growthHi: 20,
+      extraLo: 20, extraHi: 20 }));
+    near(r.lo, 1.44, 'the combined low end is the product, not the sum');
+    near(r.hi, 1.44, 'and so is the high end');
+    is(TD.scenarioScopeRange(TD.scenarioFrom(null)), null,
+       'and nothing is stated when nothing multiplies');
+
+    const a = TD.scenarioAssumptions(TD.scenarioFrom({ growthLo: 10, growthHi: 40 }), 'items');
+    is(a.length, 1, 'one knob on is one assumption');
+    is(a[0].key, 'growth', 'named by what it is');
+    ok(/10% to 40%/.test(a[0].wording), 'and stated in words with its own numbers',
+       a[0].wording);
+  }
+
+
+  /* ────────────────────────────────────────────────────────── */
   group('normalizeSettings');
 
   is(S.normalizeSettings({ unplannedType: 'Incident' }).unplannedType, 'Incident', 'a supplied value is kept');
@@ -3774,8 +3955,21 @@ async function run(TD, win) {
   is(sp.label, 'Alpha', 'the label names only the chosen teams');
   is(sp.settings.unplannedType, 'Incident', 'the shared settings ride along — they drive every number');
   ok(typeof sp.sharedAt === 'number', 'the share is timestamped', String(sp.sharedAt));
-  is(Object.keys(sp).sort(), ['label', 'settings', 'sharedAt', 'teams', 'v'],
-     'and nothing else goes in — no theme, no sync uid, no view state');
+  /* `forecast` JOINED THE PAYLOAD ON 2026-08-25, AND THIS PIN CHANGED
+     DELIBERATELY. It is view state, which this assertion previously said could
+     never travel — the reasoning being that a recipient asks their own question.
+     That held while the answer depended only on the question, and stopped
+     holding when a SCENARIO could change what the numbers mean: a link is how a
+     forecast reaches a planning room, and two people reading different numbers
+     off one link is worse than useless. Charles's decision.
+     What the assertion still guarantees is the part that was always the point:
+     no theme, no sync uid, and no view state beyond the forecast itself. */
+  is(Object.keys(sp).sort(), ['forecast', 'label', 'settings', 'sharedAt', 'teams', 'v'],
+     'and nothing else goes in — no theme, no sync uid, no view state but the forecast');
+  is(Object.keys(sp.forecast).sort(),
+     ['countFrom', 'date', 'items', 'scenario', 'unit'],
+     'and the forecast block is numbers, a date string and an enum — nothing a regex '
+     + 'could mistake for a sentence');
   is(Sh.buildSharePayload([]).teams, [], 'choosing nothing shares nothing');
   is(sp.from, undefined, 'no window means no `from` — the payload is byte-identical to before');
 
@@ -3799,8 +3993,8 @@ async function run(TD, win) {
   is(Sh.buildSharePayload(['team-c']).arts, undefined,
      'a team on no train publishes no train names at all — no key, not an empty one');
   is(Object.keys(Sh.buildSharePayload(['team-c'])).sort(),
-     ['label', 'settings', 'sharedAt', 'teams', 'v'],
-     'so its payload has exactly the keys it had before ARTs existed');
+     ['forecast', 'label', 'settings', 'sharedAt', 'teams', 'v'],
+     'so its payload has no ART key at all — not an empty one');
   is(Sh.buildSharePayload(['team-a', 'team-b']).arts.map(a => a.name), ['Payments', 'Platform'],
      'sharing both teams carries both trains');
   is(Sh.buildSharePayload(['team-c']).teams[0].artId, undefined,
@@ -4910,8 +5104,8 @@ group('ARTs — the grouping, and the boundary it crosses');
      to no purpose — and every key in the payload already carries it anyway. */
   const spProj = win.TDShare.buildSharePayload(['p1']);
   is(spProj.teams[0].projectId, undefined, 'a project id never travels in a share link');
-  is(Object.keys(spProj).sort(), ['label', 'settings', 'sharedAt', 'teams', 'v'],
-     'so a link from this build has exactly the keys it had before the split existed');
+  is(Object.keys(spProj).sort(), ['forecast', 'label', 'settings', 'sharedAt', 'teams', 'v'],
+     'so a link from this build carries no project id anywhere in it');
 
   /* ── The dialog ───────────────────────────────────────────── */
   plant({ arts: [],

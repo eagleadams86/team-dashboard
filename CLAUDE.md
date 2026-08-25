@@ -131,6 +131,122 @@ file records what is specific to this repo and what must never regress.
 - **Which tab you were on IS remembered, for the two number views only.** `view.activeTab`, restored at boot. It used to be deliberately not saved — the old comment said "a reload should open on the dashboard" — which was out of step with both siblings (Sprint Predictability keeps `settings.view`, Money Map keeps `ui.activeTab`) and with the fact that All Teams is where somebody with several teams works. Changed 2026-08-21 after it was reported as annoying. Settings and Your Data are NOT remembered, on purpose. No new guard was needed: `selectTab` already refuses a hidden or unknown tab and falls back to the dashboard, which is exactly the All-Teams-disappears-below-two-teams case.
 - **The All Teams Throughput trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **The header names the metric** — it shipped as a bare "Trend" and that was not enough beside eight other columns that each name theirs. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart.
 
+## The Forecast Scenario (2026-08-25) — no schema change
+
+Phase 5, the last of the five. `view.scenario` — seven knobs, all numbers and small integers, all
+device-local. No `SCHEMA` bump; it DOES travel in a share link (see below).
+
+- **THE NO-OP PROMISE IS KEPT BY DISPATCH, NOT BY ALIGNED STREAMS, and the plan for this was
+  wrong.** The design said a defaulted scenario would return an array deep-equal to the unscoped
+  sampler's, on the strength of every knob drawing unconditionally so the stream stayed aligned.
+  That cannot hold: the scoped samplers draw MORE per trial than the originals — a growth draw per
+  trial, a confidence draw per period — so the stream is a different length whatever the knobs say.
+  `scenarioIsDefault` switches the caller back to the ORIGINAL sampler instead, which is a
+  stronger guarantee and a simpler one: today's answers are the same code, not approximately the
+  same numbers. A test asserts BOTH halves — that the scoped version is not stream-identical, and
+  that it gives the same answer anyway.
+- **Inside the scoped samplers the unconditional-draw rule still holds**, for the reason it always
+  did: turning knob A on must not move the answer knob B was giving. Every knob draws every trial,
+  even where its range collapses to 1 — never inside an `if`. Add a knob and you add its draw for
+  every trial.
+- **Clarity WIDENS, and draws ONCE PER FEATURE.** Per-feature draws model independent vagueness
+  and partly cancel on the sum; a single per-trial multiplier models one correlated shock, never
+  cancels, and overstates the spread badly. The ranges are a COMPRESSED cone of uncertainty
+  (max 0.7–3.0, not the textbook 0.25–4) because the sizes being multiplied already carry the
+  board's own spread — this is a RESIDUAL knob, not an estimation cone from nothing — and because
+  a 4x upper bound trips the spread guard every time, which would ship a control whose only output
+  is a refusal. The asymmetry is intentional: software uncertainty is one-tailed.
+- **NO TEAM-CONFIDENCE STEP GOES MEANINGFULLY ABOVE 1** (max 1.05). A reorganisation making a team
+  faster is the most-abused claim in this domain and this app must not supply the arithmetic.
+  Pinned as an invariant over the whole list, so a new step cannot quietly break it.
+- **Scope growth and extra features would DOUBLE-COUNT if named badly.** "+20%" and "+20%" reads
+  like +40% and is +44%. They are relabelled to be genuinely orthogonal — growth WITHIN counted
+  features versus features not counted — and `scenarioScopeRange` prints the product as one line
+  regardless, so the double-count cannot survive as a reading error.
+- **Scope SHRINK is refused** (`growthLo` clamps at 0). It is not a risk anybody plans for and it
+  would be a way to forecast your way to a date.
+- **Clamp an out-of-range NUMBER, default a non-number.** Resetting an over-range `parallel` to
+  the default would silently turn "everything at once" into "one at a time" — the opposite answer.
+  The split `forecastItems` already draws, applied to every integer knob.
+- **A typed pace REPLACES history and disables team confidence.** A blend is traceable to neither
+  source; multiplying a guess by a guess compounds two people's pessimism. The eight-period floor
+  stays the DEFAULT outcome rather than the only one — that is the whole point of the control. The
+  card states the weakness rather than fudging it: a typed range has no quiet weeks and no spikes,
+  so it spreads LESS than real periods do.
+- **PARALLELISM CHANGES EACH FEATURE'S DATE AND NOT THE LAST ONE**, and the test asserts EXACT
+  equality of the all-done 85th across 1, 3, 6 and 10 in parallel. Throughput is dealt per period
+  whatever it is spent on, so under any work-conserving schedule the makespan is identical.
+  **SPILLOVER IS WHAT MAKES THAT TRUE** — a feature needing less than its equal share hands the
+  remainder back inside the same period; without it the team idles and the invariance breaks. Do
+  not add a per-feature maximum rate: it would break the invariance and need a parameter nobody
+  can supply.
+  - **The card must keep saying it does not charge for splitting attention.** Little's Law ties
+    cycle time to WIP and real throughput FALLS as more is started at once. This holds it constant,
+    so parallelism looks free here and is not. That sentence is the honesty of the whole control.
+  - **Per-feature percentiles are taken INDEPENDENTLY**, never by selecting the trials where the
+    whole set landed at the 85th — that is a conditional distribution and gives artificially narrow
+    spreads. The consequence is on the card: the dates are MARGINALS and are not jointly
+    achievable; only the last row also means "everything by then".
+  - **One flat `Float64Array` with strided indexing**, not an array of arrays — the naive version
+    allocates 2,000 small arrays per render and GC-pauses on every change. Percentiles go through a
+    reused scratch buffer and the typed array's own numeric sort, NOT `percentileOf` (which slices
+    and sorts with a comparator per call). `FORECAST_SCHEDULE_TRIALS` is 2,000 rather than 10,000:
+    these are dates printed to the day and the standard error of an 85th from 2,000 draws is under
+    half a day. Don't "improve" it back for symmetry.
+- **THE SPREAD GUARD REFUSES AT 2.5x, AND THE FIRST NUMBER WAS 3 ON A FALSE PREMISE.** The plan
+  said "three is about where three stacked knobs land". Measured on the demo's own data at 4,000
+  trials, that is simply untrue — a forecast SUMS feature sizes and WALKS many periods, and both
+  concentrate the result:
+
+  | | ratio |
+  |---|---|
+  | plain, ten features | 1.30 |
+  | + scope growth 0–150% | 1.55 |
+  | + clarity "barely understood" | 1.37 |
+  | + brand new team | 1.29 |
+  | all three at once | **1.65** |
+  | all three, on ONE feature | **2.95** |
+
+  At 3 the guard was unreachable — a control whose only output is never firing. 2.5 catches the
+  last row, clears every realistic multi-feature scenario, and is nowhere near the 1.30 an
+  unadjusted forecast gives. **If the clarity or confidence ranges are ever retuned, RE-MEASURE
+  rather than reasoning about it** — the reasoning was what got it wrong the first time.
+  `widestScenarioKnob` names which knob to turn back first: a proxy (widest range as a fraction of
+  its own low end) rather than the exact answer, which would re-run the forecast once per knob at
+  ~5 extra runs and is affordable if the proxy proves not good enough.
+- **`beyondReach` is re-checked AFTER the scenario**, since a scope multiplier can push a
+  reachable backlog past the walk's limit and the old check ran on the unmultiplied count.
+- **A non-default scenario changes the answer's LABEL, not just a note beside it.** "85% of
+  adjusted runs" on the tile, the fold's summary saying how many settings are on, and the
+  assumptions listed in words UNDER THE TILES — never in the ⓘ, the standard the forecast hint
+  already set. Somebody who screenshots one tile has to still be told.
+- **`scReset` is essential, not a nicety.** These persist to localStorage with the rest of the
+  view, so without one way to clear them all somebody opens the app tomorrow and reads yesterday's
+  scenario as today's forecast.
+- **`change`, never `input`, on every knob.** Each one re-runs ten thousand simulations; an
+  `input` handler would forecast 1, 12 and 120 on the way to typing 1200. One delegated listener
+  over the block rather than one per control — a per-control list is a list somebody adds a control
+  without joining.
+- **THE FORECAST TRAVELS IN A SHARE LINK, and this reverses a documented decision.**
+  `forecastItems` and `forecastDate` were deliberately kept out, on the reasoning that a recipient
+  asks their own question. That held while the answer depended only on the question; it stops
+  holding once a SCENARIO can change what the numbers mean, because a link is how a forecast
+  reaches a planning room and two people reading different numbers off one link is worse than
+  useless. Every field is a number, an integer or a date string, so the storage policy is
+  untouched. `SHARE_PAYLOAD_V` NOT bumped — an older build drops the block and draws the plain
+  forecast. **The SCOPE deliberately does not travel**: it names teams by id, and a link carries
+  only the teams it was asked to.
+- **`derive()` TAKES A QUESTION, NOT THE APP'S STATE, and that literal object bit once.** The view
+  object handed to `derive()` in `renderDashboard` is built by hand, so a field added to `view` and
+  not added there silently never arrives. `countFrom` did exactly that for a day: it worked on a
+  pooled scope, which goes through `deriveTeams` and its own object, and did nothing on a single
+  team. **If you add a view field the forecast reads, add it in BOTH places.**
+- **Not built, and deliberately left for a later change**: a "what pace would it take" inverse
+  (bisect a multiplier on the team's own samples — the algorithm is worked out in the plan), a
+  PI-end preset for the target date, and a CSV of the forecast's own percentile rows. The
+  per-feature schedule already exports. All three are additions rather than corrections; every
+  variable Charles enumerated is built.
+
 ## Forecasting Features by Decomposition (2026-08-25) — no schema change
 
 Phase 4. Nothing stored; two new pure samplers, one assembler, three new floors.
