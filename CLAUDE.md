@@ -241,11 +241,52 @@ device-local. No `SCHEMA` bump; it DOES travel in a share link (see below).
   not added there silently never arrives. `countFrom` did exactly that for a day: it worked on a
   pooled scope, which goes through `deriveTeams` and its own object, and did nothing on a single
   team. **If you add a view field the forecast reads, add it in BOTH places.**
-- **Not built, and deliberately left for a later change**: a "what pace would it take" inverse
-  (bisect a multiplier on the team's own samples — the algorithm is worked out in the plan), a
-  PI-end preset for the target date, and a CSV of the forecast's own percentile rows. The
-  per-feature schedule already exports. All three are additions rather than corrections; every
-  variable Charles enumerated is built.
+## The Three Forecast Extras (2026-08-25) — no schema change
+
+Asked for straight after phase 5 shipped, having been left out of it. All three are additions
+rather than corrections.
+
+- **`requiredPaceFor` bisects a MULTIPLIER on the team's own samples, never substitutes a flat
+  rate.** A team that delivers 2, 9, 4, 7 does not become a team that delivers 5.5 every period
+  because it speeds up, and a required rate worked out against a flat average would be a promise
+  about a team nobody has. Monotone (scaling every sample up can only finish sooner), so bisection
+  is valid — a test pins that more scope needs a faster pace.
+  - **A multiplier under one is HEADROOM, not an instruction.** Printing "0.75x your pace" reads
+    as advice to slow down. Both readings are stated as a multiple of THE PACE THAT WOULD DO IT,
+    so "you have 5x what you need" and "you need 2.4x what you have" are the same sentence
+    pointing opposite ways, and a reader moving between them never has to reverse anything.
+  - **Unreachable is its own answer**, not "19.97x", which would read like a plan.
+  - **The pace is in WORK ITEMS even on a feature forecast** — nobody speeds up by completing
+    features faster. `sizes` is the argument that switches the walk to the feature model while
+    leaving the reported rate in items.
+- **A BISECTION IS THE MOST EXPENSIVE THING IN THIS APP, and shipping it naively cost 3x.**
+  Measured on the demo the first version put a single-team feature forecast at 336ms and
+  `renderAllTeams` at 849ms, because it is a whole forecast run once per iteration and All Teams
+  runs one derive per team plus the train. Three things fixed it, to 133ms and 260ms — the second
+  figure being FASTER than before this change:
+  - `FORECAST_SOLVE_TRIALS` 2000 → **1200** and `FORECAST_SOLVE_ITERS` 24 → **18**. Eighteen
+    halvings of 0.1–20 still resolve the multiplier to about seven millionths, five decimal places
+    past what the tile prints.
+  - **`view.forecastMode: 'off'`** skips the bisection where nothing reads it. The All Teams table
+    has NO forecast column and its train chart is throughput only, so every simulation there was
+    work nobody could see. A test pins that the flag drops the bisection and **nothing else** —
+    the forecast itself is byte-identical either way.
+  - The pre-scan in `deriveTeams` (coverage end + stale list) is skipped under the same flag: it
+    exists only for the forecast, and it was a whole extra derive per team.
+- **The +12 weeks preset counts from where the WALK starts**, not from today and not from the
+  data's end — once counting-from is in play those are three different dates, and a preset one day
+  out from the forecast it sets is worse than no preset. `lastForecastCountFrom` is remembered at
+  render because the button fires long afterwards and cannot re-derive it. **The app has no PI
+  calendar and does not pretend to**: the button is labelled by the span, the way the window picker
+  labels the same one.
+- **The figures table exists because the CSV writer reads TABLES off the page.** The percentile
+  answers are styled divs beside a histogram, which is right on screen and cannot be exported, so
+  this restates them in the one shape that can leave — the rule every export here follows: what you
+  take away is what you were looking at. **It carries the assumptions in the same file**, because a
+  percentile that arrives in a spreadsheet without the scenario that produced it is a number nobody
+  can check, and a fortnight later nobody can remember either.
+- **Nothing is left of the three.** Every variable Charles enumerated was built in phases 1–5;
+  these were the additions noted as outstanding, and they are done.
 
 ## Forecasting Features by Decomposition (2026-08-25) — no schema change
 

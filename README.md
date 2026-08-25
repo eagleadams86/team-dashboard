@@ -1882,6 +1882,40 @@ source — and the team setting is switched off while it is on, because multiply
 guess compounds two people's pessimism. It also spreads *less* than real periods do: no quiet
 weeks, no spikes. The card says so rather than fudging it.
 
+### What Pace Would It Take?
+
+The two questions above each take one thing and give you the other. A third tile takes **both** —
+the scope you have and the date you were given — and answers with the only thing neither of them
+says: how fast you would have to go.
+
+It is a multiple of **your own pace**, not a flat rate. The app scales the periods you actually
+delivered and re-runs the forecast until the answer just reaches the date, so a team that
+delivers 2, 9, 4, 7 stays a team that delivers 2, 9, 4, 7 — only faster. A required rate worked
+out against a flat average would be a promise about a team nobody has.
+
+*"Pace needed: 2.4× — 10.2 work items a week against the 4.3 you average."*
+
+Under one it reads as **headroom, not an instruction**: *"Pace in hand: 5× the pace you need for
+15 November. You could drop to 0.9 work items a week and still make it."* And when no realistic
+pace reaches the date it says exactly that, rather than quoting a number like 19.97× that reads
+like a plan.
+
+The pace is always in **work items**, even on a feature forecast — nobody speeds up by completing
+features faster.
+
+### Two Smaller Things
+
+**+12 weeks (a PI)** beside the date box, for the question an RTE arrives with. It counts twelve
+weeks from wherever the forecast starts and says so: this app has no PI calendar, and one that
+guessed at your increment's start date would be wrong for everybody whose increment did not begin
+the day their data ends.
+
+**The forecast, as figures** — a table under the two cards holding every answer above, so it can
+be copied or downloaded into a plan. The percentile rows are drawn as shaded rows beside a
+histogram, which is right on screen and cannot be exported; this is the same numbers in the one
+shape the CSV writer reads. It carries the **assumptions in the same file**, because a percentile
+that arrives in a spreadsheet without the scenario that produced it is a number nobody can check.
+
 ### It Says When It Has Been Adjusted, and When It Has Stopped Being an Answer
 
 **Nothing is hidden in an ⓘ.** A non-default scenario is listed in words under the tiles, the
