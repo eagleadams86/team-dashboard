@@ -2260,6 +2260,12 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           <div class="field">
             <label for="fcDate">Count what is done by</label>
             <input type="date" id="fcDate">
+            <!-- The RTE's date, one press. It counts twelve weeks from wherever
+                 the forecast starts, and says so — this app has no PI calendar
+                 and inventing one would mean asking for a start date nobody
+                 would keep current. Named the way the window picker names the
+                 same span, so the two agree. -->
+            <button type="button" class="btn small" id="fcPi">+12 weeks (a PI)</button>
           </div>
           <p class="hint" id="fcHint"></p>
           <!-- Its own line rather than more sentences in the hint: it is the one
@@ -2360,6 +2366,29 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              forecast hint already sets: somebody reading a number off a shared
              screen has to meet the assumptions behind it too. -->
         <div class="note info" id="fcAssumptions" hidden></div>
+
+        <!-- ── The forecast, as figures ─────────────────────────────────────
+             The two cards above draw their answers as shaded rows beside a
+             histogram, which is right on screen and cannot be exported: the CSV
+             writer reads TABLES off the page, and a row of styled divs is not
+             one. This is the same numbers as a table so they can leave — which
+             is the whole point of a forecast that is going into a planning deck.
+
+             It carries the ASSUMPTIONS too, in the same file. A percentile row
+             that arrives in a spreadsheet without the scenario that produced it
+             is a number nobody can check, and a fortnight later nobody can
+             remember either. -->
+        <div class="chart-card wide" id="cardForecastFigures">
+          <div class="chart-name" id="nameForecastFigures"></div>
+          <div class="chart-title" id="titleForecastFigures"></div>
+          <div class="row spread" style="margin-bottom:var(--sp-4)">
+            <span></span>
+            <span id="forecastFiguresExport"></span>
+          </div>
+          <div class="table-scroll">
+            <table class="data" id="forecastFiguresTable"></table>
+          </div>
+        </div>
 
         <!-- ── The delivery schedule ────────────────────────────────────────
              FEATURE VIEW ONLY, and it is the only thing the parallelism control
@@ -5492,6 +5521,11 @@ function featureForecastOf(o) {
     assumptions: scenarioAssumptions(sc, 'features'),
     scopeRange: scenarioScopeRange(sc),
     estimated: sc.estOn,
+    /* The pace is in WORK ITEMS even here — nobody speeds up by completing
+       features faster, they speed up by completing items faster — so `sizes` is
+       handed in and the bisection walks the feature model. */
+    requiredPace: (!reason && !beyond && !tooWide)
+      ? requiredPaceFor(samples, wanted, o.horizonPeriods, 85, sc, sizes) : null,
     spread, tooWide, spreadMax: FORECAST_SPREAD_MAX,
     widestKnob: tooWide ? widestScenarioKnob(sc) : null,
     when: (whenTrials && !beyond && !tooWide) ? {
@@ -5823,6 +5857,109 @@ function scheduleAllDone(sched, confidences) {
   const sorted = last.slice().sort();
   return confidences.map(c => ({ confidence: c,
     periods: sorted[Math.max(0, Math.ceil((c / 100) * trials) - 1)] }));
+}
+
+/* ── What pace would it take? ──────────────────────────────────────────────
+   The two questions above take a scope OR a date and answer with the other.
+   This one takes BOTH — the scope you have and the date you have been given —
+   and answers with the thing neither of them says: how fast you would have to
+   go. It is the question an executive actually arrives with, and the only one
+   here whose answer is an instruction rather than an observation.
+
+   HOW IT WORKS. Scale the team's own sample set by a multiplier and re-run the
+   ordinary forecast; find the multiplier where the answer just reaches the date.
+   Scaling their OWN samples rather than substituting a flat rate is the whole
+   point: a team that delivers 2, 9, 4, 7 does not become a team that delivers
+   5.5 every period just because it speeds up, and a required pace worked out
+   against a flat rate would be a promise about a team nobody has.
+
+   Monotone, so bisection is safe: scaling every sample up can only ever finish
+   sooner. Twenty-four halvings of a range from 0.1 to 20 resolves the multiplier
+   to about a millionth, which is far past what two decimal places will show.
+
+   TWO TRIAL COUNTS, and the split is deliberate. The search runs at 2,000 —
+   the standard error of an 85th percentile there is well inside the resolution
+   the answer is printed at, and 24 iterations at 10,000 would be 240,000 walks
+   on every keystroke that reaches here. The multiplier it finds is then
+   confirmed ONCE at the full 10,000, and that run is what is reported, so the
+   number on screen comes from the same trial count as every other number on the
+   card. */
+/* 1,200 and 18 rather than the 2,000 and 24 this shipped with. Measured on the
+   demo, the first pair put a single-team feature forecast at 336ms and All Teams
+   at 849ms — a bisection is the most expensive thing in this app by a distance,
+   because it is a whole forecast run once per iteration. 18 halvings of a range
+   from 0.1 to 20 still resolve the multiplier to about seven millionths, which is
+   five decimal places past what the tile prints. */
+const FORECAST_SOLVE_TRIALS = 1200;
+const FORECAST_SOLVE_ITERS = 18;
+const FORECAST_SOLVE_MAX = 20;
+const FORECAST_SOLVE_MIN = 0.1;
+
+/* `sizes` is what makes this serve BOTH units from one implementation. Handed a
+   size distribution it bisects the feature walk instead of the item one — so on
+   a feature forecast the question becomes "what WORK-ITEM pace would it take to
+   finish six features by then", which is the honest form of it: nobody speeds up
+   by completing features faster, they speed up by completing items faster. The
+   pace it reports is therefore always in work items, and the tile says so. */
+function requiredPaceFor(samples, target, horizonPeriods, conf, sc, sizes) {
+  if (!Array.isArray(samples) || !samples.length) return null;
+  if (!(target > 0) || !(horizonPeriods > 0)) return null;
+  const byFeature = Array.isArray(sizes) && sizes.length >= FEATURE_MIN_SIZES;
+  const scen = sc || DEFAULT_SCENARIO;
+  const plain = scenarioIsDefault(scen);
+  /* The pace it is a multiple OF. The mean of the whole sample set, which is the
+     figure the "completed per period" tile states — so "1.35x" can be read
+     against a number already on screen rather than one nobody has seen. */
+  const current = samples.reduce((a, b) => a + b, 0) / samples.length;
+  if (!(current > 0)) return null;
+
+  const periodsAt = (m, trials) => {
+    const scaled = samples.map(v => v * m);
+    const t = byFeature
+      ? (plain ? forecastFeaturePeriods(scaled, sizes, target, trials)
+               : forecastFeaturePeriodsScoped(scaled, sizes, target, scen, trials))
+      : (plain ? forecastPeriodsFor(scaled, target, trials)
+               : forecastPeriodsForScoped(scaled, target, scen, trials));
+    return t ? percentileOf(t, conf) : null;
+  };
+
+  /* Already comfortable? Say so as HEADROOM rather than as an instruction. A
+     multiplier under 1 is not "go 0.75x as fast", it is "you have 25% in hand",
+     and printing the first would read as advice to slow down. */
+  const atOne = periodsAt(1, FORECAST_SOLVE_TRIALS);
+  if (atOne == null) return null;
+  if (atOne <= horizonPeriods) {
+    /* Search downwards for how much slower you could go and still make it. */
+    let lo = FORECAST_SOLVE_MIN, hi = 1;
+    for (let i = 0; i < FORECAST_SOLVE_ITERS; i++) {
+      const mid = (lo + hi) / 2;
+      const p = periodsAt(mid, FORECAST_SOLVE_TRIALS);
+      if (p != null && p <= horizonPeriods) hi = mid; else lo = mid;
+    }
+    return { reachable: true, headroom: true, multiplier: hi, byFeature,
+             perPeriod: current * hi, currentPerPeriod: current, confidence: conf };
+  }
+
+  /* Otherwise search upwards. */
+  let lo = 1, hi = FORECAST_SOLVE_MAX;
+  const atMax = periodsAt(hi, FORECAST_SOLVE_TRIALS);
+  /* Nothing this side of fantasy reaches it. Reported as its own answer rather
+     than as "19.97x", which reads like a plan. */
+  if (atMax == null || atMax > horizonPeriods) {
+    return { reachable: false, headroom: false, multiplier: null, byFeature,
+             perPeriod: null, currentPerPeriod: current, confidence: conf };
+  }
+  for (let i = 0; i < FORECAST_SOLVE_ITERS; i++) {
+    const mid = (lo + hi) / 2;
+    const p = periodsAt(mid, FORECAST_SOLVE_TRIALS);
+    if (p != null && p <= horizonPeriods) hi = mid; else lo = mid;
+  }
+  /* Confirmed once at the full trial count, so the figure quoted comes from the
+     same number of runs as everything else on the card. */
+  const confirmed = periodsAt(hi, FORECAST_TRIALS);
+  return { reachable: true, headroom: false, multiplier: hi, byFeature,
+           perPeriod: current * hi, currentPerPeriod: current, confidence: conf,
+           confirmedPeriods: confirmed };
 }
 
 /* ── When the spread has stopped being an answer ───────────────────────────
@@ -7038,6 +7175,14 @@ function derive(rows, settings, view, stages) {
     targetDate: fcTarget,
     horizonPeriods: fcHorizon,
     beyondReach: fcBeyond,
+    /* Only worked out when there IS an answer to compare against — a bisection
+       over a refused forecast costs eighteen runs to report nothing — and only
+       when the caller has a use for it. `forecastMode: 'off'` is what All Teams
+       passes for its per-team rows: that table has no forecast column at all, so
+       running the most expensive thing in the app once per team was eight
+       bisections nobody could see. Measured at 849ms for three teams. */
+    requiredPace: (view.forecastMode !== 'off' && !fcReason && !fcBeyond && !fcTooWide)
+      ? requiredPaceFor(fcSamples, fcItems, fcHorizon, 85, sc) : null,
     spread: fcSpread,
     tooWide: fcTooWide,
     spreadMax: FORECAST_SPREAD_MAX,
@@ -7409,7 +7554,16 @@ function deriveTeams(teams, settings, view, stages) {
      which is a different question and cannot borrow this answer — but deriving
      three times for two facts, as a first draft of this did, is a third of the
      most expensive thing this app does thrown away. */
-  const preScan = list.map(t => ({ t, d: derive(listOf(t), settings, view, stages) }));
+  /* The pre-scan exists ONLY to work out where every team still had data, which
+     only the forecast reads. A caller that has switched the forecast off — the
+     All Teams table, which has no forecast column — skips a whole derive per
+     team for an answer nothing on its screen consumes. Measured: it was a third
+     of that view's render time. */
+  const wantForecast = !(view && view.forecastMode === 'off');
+  const preScan = wantForecast
+    ? list.map(t => ({ t,
+        d: derive(listOf(t), settings, Object.assign({}, view, { forecastMode: 'off' }), stages) }))
+    : [];
   const ends = preScan.map(x => x.d.dataEnd).filter(Boolean);
   const coverageEnd = ends.length ? new Date(Math.min(...ends.map(d => d.getTime()))) : null;
 
@@ -7419,7 +7573,7 @@ function deriveTeams(teams, settings, view, stages) {
      where every team still had data while everything else on it stays read as of
      the newest date. Skipped entirely when nothing is behind, which is the
      ordinary case and every single-team forecast. */
-  if (coverageEnd && coverageEnd < train.endDate) {
+  if (wantForecast && coverageEnd && coverageEnd < train.endDate) {
     train = derive(everything, settings,
       Object.assign({}, view, { forecastCoverageEnd: coverageEnd }), stages);
   }
@@ -7462,7 +7616,10 @@ function deriveTeams(teams, settings, view, stages) {
     rows: list.map(t => ({ id: t.id, name: t.name,
       d: derive(listOf(t), settings, Object.assign({}, shared, {
         wipLimit: view && view.unit === 'features' ? null : t.wipLimit,
-        sleDays: view && view.unit === 'features' ? null : t.sleDays }), stages) }))
+        sleDays: view && view.unit === 'features' ? null : t.sleDays,
+        /* The All Teams table has no forecast column, so the per-row derives do
+           not need the expensive half of one. The TRAIN keeps it. */
+        forecastMode: 'off' }), stages) }))
   };
 }
 
@@ -7527,6 +7684,8 @@ window.TD = {
   forecastPeriodsForScoped, forecastItemsInScoped,
   forecastFeaturePeriodsScoped, forecastFeaturesInScoped,
   spreadRatioOf, widestScenarioKnob,
+  requiredPaceFor, FORECAST_SOLVE_TRIALS, FORECAST_SOLVE_ITERS, FORECAST_SOLVE_MAX,
+  FORECAST_SOLVE_MIN, PI_WEEKS,
   forecastFeatureSchedule, scheduleRows, scheduleAllDone, FORECAST_SCHEDULE_TRIALS,
   DEFAULT_SCENARIO, CLARITY_STEPS, TEAM_CONFIDENCE_STEPS,
   FORECAST_SPREAD_MAX, FORECAST_MAX_PARALLEL, FORECAST_MAX_UNAVAILABLE,
@@ -9980,6 +10139,27 @@ const METRIC_HELP = {
     ['Lower is better — but ', b('a rate near zero in a maturing team'), ' usually means '
       + 'defects are being logged somewhere other than the board, not that there are none.'],
   ] },
+  forecastFigures: { title: 'The Forecast, as Figures', body: [
+    ['The same answers the two cards above draw, as a table, so they can be ',
+      b('copied into a plan'), '. Nothing here is new \u2014 an export in this app always '
+      + 'reads what is on screen, so what you take away is what you were looking at.'],
+    ['It carries the ', b('assumptions in the same file'), '. A percentile that arrives in a '
+      + 'spreadsheet without the scenario that produced it is a number nobody can check, and a '
+      + 'fortnight later nobody can remember either.'],
+  ] },
+  requiredPace: { title: 'The Pace It Would Take', body: [
+    ['The other two answers each take one thing and give you the other. This one takes ',
+      b('both'), ' \u2014 the scope you have and the date you were given \u2014 and answers '
+      + 'with the only thing neither of them says: how fast you would have to go.'],
+    ['It is a multiple of ', b('your own pace'), ', not a flat rate. The app scales the '
+      + 'periods you actually delivered and re-runs the forecast until the answer just reaches '
+      + 'the date, so a team that delivers 2, 9, 4, 7 stays a team that delivers 2, 9, 4, 7 \u2014 '
+      + 'only faster. A required rate worked out against a flat average would be a promise about '
+      + 'a team nobody has.'],
+    ['Under one, it is ', b('headroom rather than an instruction'), ' \u2014 you are already '
+      + 'comfortable, and the figure is how much slack you have. And the pace is always in work '
+      + 'items, even on a feature forecast: nobody speeds up by completing features faster.'],
+  ] },
   schedule: { title: 'When Each Feature Lands', body: [
     ['The same forecast, read one feature at a time. ', b('Working more features at once does '
       + 'not finish them sooner'), ' — the team delivers what it delivers, however it is spread '
@@ -10943,7 +11123,11 @@ function renderDashboard() {
        it itself. Applying it here as well would scale the pace twice. */
     const itemView = { filterValue: currentFilterValue(), months: view.months,
       bucket: view.bucket, customFrom: view.customFrom, customTo: view.customTo,
-      countFrom: view.countFrom };
+      countFrom: view.countFrom,
+      /* Read only for its sample set — featureForecastOf does the forecasting
+         from here on, so a second bisection inside this one would be pure
+         waste. */
+      forecastMode: 'off' };
     /* The same coverage trim the pooled forecast applies, for the same reason:
        a team three periods behind contributes three periods of zero to the item
        throughput too. */
@@ -10973,6 +11157,7 @@ function renderDashboard() {
   }
   renderForecast(fcDerived, fcScope, fcStale);
   renderScenario(fcDerived);
+  renderForecastFigures(fcDerived, fcScope);
   renderSchedule(fcDerived, fcSchedule);
   renderStageTime(d);
   /* The join needs both of the team's lists, so it is worked out here where both
@@ -11187,6 +11372,60 @@ function renderScenario(d) {
   }
 }
 
+/* The forecast's own figures, as a table so they can be copied out. Everything
+   here is already on screen above — this restates it in the one shape the CSV
+   writer can read, which is the rule every export in this app follows: what you
+   take away is what you were looking at, by construction. */
+function renderForecastFigures(d, scope) {
+  const f = d.forecast;
+  const card = $('cardForecastFigures');
+  const table = $('forecastFiguresTable');
+  const rows = [];
+  const q1 = f.items + ' ' + d.unitOne + (f.items === 1 ? '' : 's') + ' finished by';
+  const q2 = d.Units + ' by ' + prettyDate(f.targetDate);
+
+  if (f.when) f.when.rows.forEach(r => rows.push([q1, r.confidence + '% confident',
+    prettyDate(r.date), r.days + (r.days === 1 ? ' day' : ' days')]));
+  if (f.howMany) f.howMany.rows.forEach(r => rows.push([q2, r.confidence + '% confident',
+    'at least ' + r.count, '']));
+
+  /* Nothing to state is not an empty table with headings — it is a card with
+     nothing in it, which the two cards above are already explaining. */
+  const has = rows.length > 0;
+  card.hidden = !has;
+  if (!has) { table.innerHTML = ''; $('forecastFiguresExport').innerHTML = ''; return; }
+
+  /* The basis, so a figure taken out of here can be argued with. */
+  rows.push(['Drawn from', '', f.samples + ' whole '
+    + (f.samples === 1 ? d.bucketNoun : d.bucketNounPlural)
+    + (f.method === 'decomposed' ? ' of work-item throughput' : ''), '']);
+  if (f.method === 'decomposed') {
+    rows.push(['Feature sizes', '', f.sizeCount + ' finished features',
+      'median ' + f.sizeMedian + ' items']);
+  }
+  rows.push(['Counting from', '', prettyDate(f.countFrom), '']);
+  if (scope && scope.kind !== 'team') rows.push(['Whose pace', '', scope.phrase, '']);
+  if (f.lostPeriods > 0) rows.push(['Window trimmed to', '', prettyDate(f.coverageEnd),
+    f.lostPeriods + ' ' + (f.lostPeriods === 1 ? 'period' : 'periods') + ' short']);
+  if (f.requiredPace && f.requiredPace.reachable) {
+    rows.push([f.requiredPace.headroom ? 'Pace in hand' : 'Pace needed', '85% confident',
+      num1(f.requiredPace.perPeriod) + ' work items a ' + d.bucketNoun,
+      'against ' + num1(f.requiredPace.currentPerPeriod) + ' now']);
+  }
+  (f.assumptions || []).forEach(a => rows.push(['Assumption', a.label, a.value, a.wording]));
+
+  $('nameForecastFigures').innerHTML = '<span>The forecast, as figures</span>'
+    + helpBtn('forecastFigures', 'The forecast, as figures');
+  $('titleForecastFigures').textContent = f.assumptions && f.assumptions.length
+    ? 'Every Answer Above, and the Assumptions Behind It \u2014 Ready to Copy Out'
+    : 'Every Answer Above \u2014 Ready to Copy Out';
+  $('forecastFiguresExport').innerHTML = exportButtons('forecastFiguresTable', 'forecast');
+  table.innerHTML =
+    '<thead><tr><th>Question</th><th>Confidence</th><th>Answer</th><th>Note</th></tr></thead>'
+    + '<tbody>' + rows.map(r => '<tr>' + r.map(c =>
+        '<td>' + escapeHtml(String(c)) + '</td>').join('') + '</tr>').join('') + '</tbody>';
+}
+
 /* The delivery schedule — the only thing the parallelism knob moves. */
 function renderSchedule(d, sched) {
   const card = $('cardSchedule');
@@ -11330,6 +11569,12 @@ function renderStageTime(d) {
 
    Everything below reads only `d.forecast` — the figures are worked out in
    derive() with the rest, so this function states them and nothing more. */
+/* The forecast's anchor as of the last render. The +12 weeks button needs it and
+   runs outside any render, so it is remembered rather than recomputed — two
+   answers to "where does the walk start" is exactly how a preset ends up one day
+   out from the forecast it is setting. */
+let lastForecastCountFrom = null;
+
 function renderForecast(d, scope, stale) {
   const f = d.forecast;
   const periodNoun = n => (n === 1 ? d.bucketNoun : d.bucketNounPlural);
@@ -11341,6 +11586,9 @@ function renderForecast(d, scope, stale) {
      follow the unit as every title does — a box reading "Number of items" over a
      card headed "Features by a date" is the one place the two could disagree
      while both looked right. */
+  /* Where the walk starts, kept for the +12 weeks button — which fires long
+     after this render and cannot re-derive it. */
+  lastForecastCountFrom = f.countFrom;
   $('fcItemsLabel').textContent = 'Number of ' + d.unitMany + ' to finish';
   $('fcItems').value = String(f.items);
   $('fcDate').value = isoOf(f.targetDate);
@@ -11416,6 +11664,7 @@ function renderForecast(d, scope, stale) {
     : (f.estimated ? 'estimated runs' : 'runs');
   const noAnswerFoot = f.tooWide ? 'too uncertain to answer'
     : f.estimated ? 'no pace to draw from' : 'not enough history to forecast';
+  const rp = f.requiredPace;
   const whenRow = f.when && f.when.rows.find(r => r.confidence === conf85);
   const manyRow = f.howMany && f.howMany.rows.find(r => r.confidence === conf85);
 
@@ -11438,6 +11687,41 @@ function renderForecast(d, scope, stale) {
        feature answer rests on two samples and a reader owed one number is owed
        both. Its label changes too: "drawn from 14 weeks" would be true and would
        hide that those weeks counted items, not features. */
+    /* ── The third question, and the only one whose answer is an instruction ──
+       The two above each take one input and answer with the other. This one
+       takes BOTH — the scope you have and the date you were given — and answers
+       with the thing neither of them says. It is what an executive arrives with.
+
+       A multiplier UNDER one is headroom, not an instruction to slow down, and
+       is worded as such: printing "0.75x your pace" would read as advice. */
+    (rp
+      ? tile(rp.headroom ? 'Pace in hand' : 'Pace needed',
+          !rp.reachable ? '&mdash;'
+            /* Both readings are stated as a MULTIPLE OF THE PACE THAT WOULD DO
+               IT, so the two say the same kind of thing in the same units and a
+               reader moving between them never has to reverse anything. "You
+               have 5x what you need" and "you need 2.4x what you have" are the
+               same sentence pointing opposite ways.
+               Pinned at the search floor's own value when it bottoms out, rather
+               than printing a number the bisection never actually reached. */
+            : (rp.headroom
+                ? (rp.multiplier <= FORECAST_SOLVE_MIN * 1.01
+                    ? 'over ' + Math.round(1 / FORECAST_SOLVE_MIN) + '\u00d7'
+                    : num1(1 / rp.multiplier) + '\u00d7')
+                : num1(rp.multiplier) + '\u00d7'),
+          !rp.reachable
+            ? 'no realistic pace reaches ' + prettyDate(f.targetDate)
+            : (rp.headroom
+                ? 'the pace you need for ' + prettyDate(f.targetDate) + ' at 85% confidence. '
+                  + 'You could drop to ' + num1(rp.perPeriod) + ' work items a ' + d.bucketNoun
+                  + ' and still make it, against the ' + num1(rp.currentPerPeriod)
+                  + ' you average'
+                : 'of your pace, to finish by ' + prettyDate(f.targetDate)
+                  + ' at 85% confidence \u2014 ' + num1(rp.perPeriod) + ' work items a '
+                  + d.bucketNoun + ' against the ' + num1(rp.currentPerPeriod)
+                  + ' you average'),
+          'requiredPace')
+      : '') +
     (f.method === 'decomposed'
       ? tile('Built from', f.sizeCount + ' finished feature' + (f.sizeCount === 1 ? '' : 's'),
           'sized at a median of ' + f.sizeMedian + ' items each, paced by '
@@ -11790,7 +12074,12 @@ function renderAllTeams() {
       /* The table follows the strip like everything else on it — a unit switch
          that changed the dashboard and left this page counting something else
          would be two screens disagreeing about what a team delivered. */
-      unit: featureUnit() ? 'features' : 'items' },
+      unit: featureUnit() ? 'features' : 'items',
+      /* NOT A FORECAST SURFACE. There is no forecast column in this table and no
+         forecast on the train chart above it, so every simulation run here would
+         be work nobody can see — and this is the view that runs the most
+         derives, one per team plus the train. */
+      forecastMode: 'off' },
     state.stages);
   const train = all.train;
   /* How many items the per-team rows ignored between them. Summed from the rows
@@ -14394,6 +14683,17 @@ $('fcScenario').addEventListener('change', () => {
 /* Essential rather than a nicety: these knobs persist to localStorage with the
    rest of the view, so without one way to clear them all somebody opens the app
    tomorrow and reads yesterday's scenario as today's forecast. */
+/* Twelve weeks from where the walk starts, which is what the app can honestly
+   offer: it knows no PI calendar, and a preset that guessed at one would be
+   wrong for everybody whose increment did not start the day their data ends. */
+$('fcPi').addEventListener('click', () => {
+  const from = lastForecastCountFrom || null;
+  if (!from) return;
+  view.forecastDate = isoOf(addDays(from, PI_WEEKS * 7));
+  saveView();
+  renderDashboard();
+});
+
 $('scReset').addEventListener('click', () => {
   view.scenario = null;
   saveView();

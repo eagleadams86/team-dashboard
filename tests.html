@@ -303,7 +303,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 2305;
+const EXPECTED = 2335;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3753,6 +3753,122 @@ async function run(TD, win) {
     is(a[0].key, 'growth', 'named by what it is');
     ok(/10% to 40%/.test(a[0].wording), 'and stated in words with its own numbers',
        a[0].wording);
+  }
+
+
+  /* ────────────────────────────────────────────────────────── */
+  group('what pace would it take — the inverse');
+  {
+    /* Ten a period, steady, so the arithmetic is checkable by hand. */
+    const samples = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10];
+    const sc = TD.scenarioFrom(null);
+
+    /* 200 items in 10 periods needs twice the pace. Bisection lands close, and
+       "close" is all a tile printing one decimal place needs. */
+    const need = TD.requiredPaceFor(samples, 200, 10, 85, sc);
+    ok(!!need && need.reachable, 'it finds a pace that reaches the date');
+    ok(!need.headroom, 'and knows this one is a stretch');
+    ok(need.multiplier > 1.8 && need.multiplier < 2.6,
+       'twice the work in the same time needs about twice the pace',
+       need.multiplier.toFixed(2));
+    near(need.currentPerPeriod, 10, 'it reports the pace it is a multiple OF');
+    near(need.perPeriod, need.currentPerPeriod * need.multiplier,
+       'and the two agree — the rate is the multiple times the current pace');
+
+    /* Under one is HEADROOM, not an instruction to slow down. Printing "0.5x
+       your pace" would read as advice. */
+    const easy = TD.requiredPaceFor(samples, 20, 10, 85, sc);
+    ok(easy.headroom, 'asking for little is reported as headroom');
+    ok(easy.multiplier < 1, 'with a multiplier below one');
+    ok(easy.reachable, 'and it is still reachable');
+
+    /* Nothing this side of fantasy reaches it — said as its own answer rather
+       than as "19.97x", which would read like a plan. */
+    const never = TD.requiredPaceFor(samples, 100000, 2, 85, sc);
+    is(never.reachable, false, 'an impossible date is refused rather than quoted');
+    is(never.multiplier, null, 'with no multiplier at all');
+    near(never.currentPerPeriod, 10, 'though it still says what the current pace is');
+
+    /* Monotone, which is what makes bisection valid here: more scope in the same
+       window can never need a slower pace. */
+    const a = TD.requiredPaceFor(samples, 150, 10, 85, sc).multiplier;
+    const b = TD.requiredPaceFor(samples, 300, 10, 85, sc).multiplier;
+    ok(b > a, 'twice the scope needs a faster pace', a.toFixed(2) + ' then ' + b.toFixed(2));
+
+    /* The pace is in WORK ITEMS even on a feature question — nobody speeds up by
+       completing features faster. Handing it sizes switches the walk. */
+    const sizes = [8, 8, 8, 8, 8, 8];
+    const feat = TD.requiredPaceFor(samples, 20, 10, 85, sc, sizes);
+    ok(!!feat, 'it answers a feature question too');
+    is(feat.byFeature, true, 'and says which model it walked');
+    near(feat.currentPerPeriod, 10, 'the pace it reports is still work items a period');
+    /* Twenty features of eight items is 160 items in ten periods of ten. */
+    ok(feat.multiplier > 1.3, 'twenty eight-item features in ten periods needs a faster pace',
+       feat.multiplier.toFixed(2));
+
+    is(TD.requiredPaceFor([], 10, 10, 85, sc), null, 'no samples, no answer');
+    is(TD.requiredPaceFor(samples, 0, 10, 85, sc), null, 'no scope, no question');
+    is(TD.requiredPaceFor(samples, 10, 0, 85, sc), null, 'and no window, no question');
+    is(TD.requiredPaceFor([0, 0, 0, 0, 0, 0, 0, 0], 10, 10, 85, sc), null,
+       'a team that has delivered nothing has no pace to be a multiple of');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the expensive half is skipped where nothing reads it');
+  {
+    const S = { sameDayValue: 0.5, unplannedType: 'Bug', unplannedLabel: 'Defect',
+      cycleTimeLabel: 'Cycle Time', agedDays: 14, workingDays: false,
+      outlierMode: 'off', outlierDays: null, filters: [{ display: 'All', value: 'All' }] };
+    const rows = [];
+    for (let w = 14; w >= 1; w--) for (let i = 0; i < 4; i++) {
+      const t = Date.UTC(2026, 0, 5) + (14 - w) * 7 * 86400000 + i * 86400000;
+      rows.push({ c: new Date(t).toISOString().slice(0, 10),
+                  s: new Date(t - 2 * 86400000).toISOString().slice(0, 10), t: 'Story' });
+    }
+    const list = win.TDState.hydrateRows(rows);
+    const base = { months: 'all', bucket: 'week', forecastItems: 40 };
+    const full = TD.derive(list, S, base, []);
+    const off = TD.derive(list, S, Object.assign({}, base, { forecastMode: 'off' }), []);
+
+    ok(!!full.forecast.requiredPace, 'by default the pace inverse is worked out');
+    is(off.forecast.requiredPace, null, 'and forecastMode "off" skips it');
+    /* EVERYTHING ELSE IS UNTOUCHED — the flag drops the bisection, not the
+       forecast. A caller that switched it off to save time must still get the
+       same answers. */
+    is(JSON.stringify(off.forecast.when), JSON.stringify(full.forecast.when),
+       'the forecast itself is identical either way');
+    is(JSON.stringify(off.forecast.howMany), JSON.stringify(full.forecast.howMany),
+       'both questions, unchanged');
+    is(off.forecast.samples, full.forecast.samples, 'and the basis it was drawn from');
+
+    /* All Teams is the view that pays for this: one derive per team plus the
+       train, and no forecast column anywhere on it. */
+    const teams = win.TDState.sanitizeTeams([{ id: 'a', name: 'A', rows },
+                                             { id: 'b', name: 'B', rows }]);
+    const at = TD.deriveTeams(teams, S, Object.assign({}, base, { forecastMode: 'off' }), []);
+    is(at.rows[0].d.forecast.requiredPace, null, 'no per-team bisection on All Teams');
+    is(at.train.forecast.requiredPace, null, 'nor for the train it does not show one for');
+    is(at.rows.length, 2, 'while the table still gets its rows');
+    ok(at.rows[0].d.summary.completedTotal > 0, 'with real figures in them');
+
+    /* And the search is sized deliberately. */
+    is(TD.FORECAST_SOLVE_ITERS, 18, 'eighteen halvings');
+    is(TD.FORECAST_SOLVE_TRIALS, 1200, 'at twelve hundred trials each');
+    ok(Math.pow(0.5, TD.FORECAST_SOLVE_ITERS) * (TD.FORECAST_SOLVE_MAX - TD.FORECAST_SOLVE_MIN)
+       < 0.001, 'which resolves the multiplier far past the one decimal place it prints');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('twelve weeks is a PI, and the app has no calendar of its own');
+  {
+    is(TD.PI_WEEKS, 12, 'twelve weeks, matching the window picker that names the same span');
+    /* The preset counts from where the WALK starts, not from today and not from
+       the data's end — those are three different dates once counting-from is in
+       play, and a preset one day out from the forecast it sets is worse than no
+       preset. */
+    const from = Date.UTC(2026, 7, 23);
+    is(new Date(from + TD.PI_WEEKS * 7 * 86400000).toISOString().slice(0, 10), '2026-11-15',
+       'twelve weeks past the anchor is the date the button sets');
   }
 
 
