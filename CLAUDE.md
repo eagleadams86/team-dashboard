@@ -2439,6 +2439,48 @@ app now holds identifiers out of a work system, and the answer to "where does th
 
 ## Fields, Dialogs and Scroll Boxes (2026-08-20, layout rule added 2026-08-22)
 
+### No Field In a ROW Is Ever Two Lines Tall — `.forecast-ask` (2026-08-25)
+
+The same complaint as the dialog rule below, arriving in a horizontal strip instead. Reported by
+Charles the day the +12 weeks preset shipped: the button was put UNDER the date box, so that one
+cell was **96px against its neighbours' 64px** — and the row is aligned on its bottom edge, so its
+label and its box sat **32px above** the three beside them.
+
+- **THE RULE: a field in one of these rows is ONE label line and ONE control line.** A control
+  that needs a second button puts it BESIDE the box (`.fc-date-row`), never under it. If a setting
+  needs more than that, it does not belong in the row — which is exactly the dialogs' rule, said
+  about a strip.
+- **The row is FLEX, not `auto-fit` grid, and the grid version had a second fault nobody had
+  noticed.** `repeat(auto-fit, minmax(180px, 1fr))` makes as many equal columns as FIT, not as many
+  as there are fields: at 1233px that is six columns of 192px for four fields — four narrow boxes
+  and two columns of dead space at the right-hand end. `flex: 1 1 <basis>` shares the whole line
+  between however many fields are on it. The one field carrying a second control asks for a bigger
+  basis (`#fcDateField`, 320px) so both fit, and `min-width: 0` on the input is what keeps them on
+  one line — without it the date box refuses to shrink and the button wraps underneath, which is
+  the exact fault this exists to prevent.
+- **A DATE BOX IS 2px TALLER THAN EVERY OTHER CONTROL, and that was pre-existing and app-wide.**
+  The shared field rule gives every control `min-height: calc(1.5em + 16px)` — 40px — and a select
+  and a number box land there; Chrome's date editor has a 26px inner content box rather than 24px,
+  so `input[type=date]` renders 42. In a bottom-aligned row that pushes its label 2px out of line.
+  The main control strip had it too, on the custom From/To boxes. Fixed with `height` **scoped to
+  the two side-by-side rows** — the shared `min-height` carries an iOS guard that cannot be tested
+  from here (an empty date box collapses to its padding because the pack turns the native
+  appearance off), and pinning the height satisfies that guard exactly rather than replacing it.
+  The item dialog's date fields are left alone: each is alone in its own grid cell. **The control's
+  box is this app's own** — the pack owns only the appearance and the 16px touch floor — so this is
+  not theme drift.
+- **The sweep is the guard.** `tests.html` walks the row at nine widths, groups the fields by the
+  line they landed on, and fails on any group whose labels, controls or heights disagree — plus a
+  direct check that the button is beside the box and that the date box matches the number box
+  **as a comparison rather than at 40px**, so the day the field height changes the test moves with
+  it. It counts what it reached and refuses a sweep that found nothing, the trap this suite has
+  been caught by before. **Proven to fail before it was committed**: making `.fc-date-row` a block
+  again turns 18 checks red and names the fault.
+- **The ambient-state trap caught me on the way through.** Measuring the layout by hand left
+  `months: 'custom'` in `td-view`, and the next suite run threw at check 669 on an undefined CFD
+  chart — a custom window with no dates leaves nothing plottable. It reads as a code failure and is
+  not. `localStorage.removeItem('td-view')` before a local run, as the Working Rules say.
+
 ### No Field Is Ever Stranded on a Short Row — `.grid.two.pairs`
 
 Charles has reported dead space in a dialog more times than anything else, across two apps

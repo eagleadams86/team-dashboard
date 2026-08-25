@@ -1905,7 +1905,8 @@ features faster.
 
 ### Two Smaller Things
 
-**+12 weeks (a PI)** beside the date box, for the question an RTE arrives with. It counts twelve
+**+12 weeks (a PI)** beside the date box — *beside* it, not under it, so the row stays one line of
+labels above one line of controls — for the question an RTE arrives with. It counts twelve
 weeks from wherever the forecast starts and says so: this app has no PI calendar, and one that
 guessed at your increment's start date would be wrong for everybody whose increment did not begin
 the day their data ends.
