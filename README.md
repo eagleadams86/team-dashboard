@@ -1752,6 +1752,16 @@ typed rather than a period count of zero, and the exported table says **a typed 
 history** where it would otherwise name the periods. A figure taken out of here can be argued
 with on the same terms as any other.
 
+**Both lenses.** The *Count* switch is offered here even though nothing exists to count, because
+you are saying what you are about to build rather than what you have built. On **Work items** you
+type a pace and a scope. On **Features** you type the pace *and* the one other thing this app
+normally measures for you — **work items per feature** — and the same decomposed model runs over
+it. Nothing about the maths changes; only where the two sample sets come from.
+
+The pace is in **work items** on both lenses. A feature answer is item throughput converted
+through the size distribution — nobody speeds up by completing features faster — so the pace box,
+the assumption line and the export all say *work items* however the answer is counted.
+
 Two things worth knowing:
 
 - **A typed range spreads less than real periods do.** It has no quiet weeks and no spikes in

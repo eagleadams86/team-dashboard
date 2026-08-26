@@ -308,7 +308,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    that drives the scenario block's own controls, which is why the tick could be
    dead on screen while every pure test about it passed, and then the lens filter
    the same day. */
-const EXPECTED = 2465;
+const EXPECTED = 2485;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8138,6 +8138,105 @@ group('ARTs — the grouping, and the boundary it crosses');
        Dashboard they are asserting is hidden. */
     is(JSON.parse(win.localStorage.getItem('td-view')).planning, false,
        'and the planning flag is retired rather than left to resurface');
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     What Charles found the day planning shipped (2026-08-26): "the charts are
+     empty, refresh brings me back to the welcome page, and I need the ability to
+     forecast at the story level and the feature level."
+     ══════════════════════════════════════════════════════════ */
+  group('planning — the charts, the reload, and both lenses');
+  {
+    plant({ teams: [{ id: 'pl2', name: 'Not Started', rows: [] }], settings: {} });
+    win.renderAll();
+    const pDoc = win.document;
+    const set = (id, v) => { const b = pDoc.getElementById(id); b.value = v;
+      b.dispatchEvent(new win.Event('change', { bubbles: true })); };
+    pDoc.getElementById('welcomePlanBtn').click();
+    set('scEstLo', '4'); set('scEstHi', '7');
+
+    /* ── The charts ───────────────────────────────────────────
+       The percentile rows rendered and the two canvases above them did not: the
+       chart draw and the card headings both live past the early return this
+       path takes. Read off the chart objects rather than the pixels — a
+       screenshot of this pane cannot be trusted to show them. */
+    const ch = win.tdCharts();
+    ok(!!ch.chartForecastWhen && !!ch.chartForecastHowMany,
+       'both forecast histograms are drawn \u2014 they were the empty cards');
+    ok(ch.chartForecastWhen.data.datasets[0].data.length > 1,
+       'with real bars in them, not an empty series');
+    is(pDoc.getElementById('nameForecastWhen').textContent.trim(), 'Time to finish\u24d8'
+         .replace('\u24d8', 'i'),
+       'and the cards are headed, which the full render does in a loop '
+       + 'this path never reaches');
+    ok(/^How Many Days to Finish \d+ Items?, over [\d,]+ Simulated Runs$/
+         .test(pDoc.getElementById('titleForecastWhen').textContent),
+       'in exactly the words a dashboard with data uses \u2014 one source for both',
+       pDoc.getElementById('titleForecastWhen').textContent);
+
+    /* ── The reload ───────────────────────────────────────────
+       `welcomeStarted` lives in memory, so a reload put the welcome card back
+       over the top of a forecast the reader had typed. */
+    ok(/!anyData && !viewOnly && !welcomeStarted && !planningOn\(\)/.test(APP_SRC),
+       'a standing forecast keeps the welcome card from taking the page back');
+
+    /* ── Both lenses ──────────────────────────────────────────
+       The Count switch is offered with nothing to count, because the reader is
+       saying what they are ABOUT to build. */
+    ok(!pDoc.getElementById('unitField').hidden,
+       'the Count switch is offered even though no feature exists');
+    ok(pDoc.getElementById('scSizeWrap').hidden,
+       'and over work items there is nothing to say about feature size');
+    const unit = pDoc.getElementById('unitSel');
+    unit.value = 'features'; unit.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(unit.value, 'features', 'the feature lens sticks, where featureUnit() alone would '
+       + 'snap back to items on a browser holding no features');
+    ok(!pDoc.getElementById('scSizeWrap').hidden,
+       'and asks the one thing it cannot measure: how many items a feature takes');
+    /* Emptied explicitly. The size rides in the view like everything else here,
+       and a value left behind by an earlier sitting would answer this assertion
+       for reasons that have nothing to do with it — see the note on the Reset
+       baseline in the typed-pace group. */
+    set('scSizeLo', ''); set('scSizeHi', '');
+    ok(/waiting for a pace/.test(pDoc.getElementById('tilesForecast').textContent),
+       'until it has that, it answers nothing',
+       pDoc.getElementById('tilesForecast').textContent.replace(/\s+/g, ' ').slice(0, 100));
+
+    set('scSizeLo', '5'); set('scSizeHi', '10');
+    set('fcItems', '8');
+    const tiles = () => pDoc.getElementById('tilesForecast').textContent.replace(/\s+/g, ' ');
+    ok(/\d{4}/.test(tiles()), 'with a size typed, 8 features at 5\u201310 items each gets a date',
+       tiles().slice(0, 110));
+    /* The basis tile is the one that would lie loudest: the synthetic size list
+       is six entries long, and "6 finished features" over a team that has
+       finished none is the worst sentence this screen could carry. */
+    ok(!/finished feature/.test(tiles()),
+       'and never claims a finished feature \u2014 there are none');
+    ok(/also typed/.test(tiles()), 'it says both halves were typed', tiles().slice(-90));
+
+    /* THE PACE IS IN WORK ITEMS EVEN HERE, and three places were saying
+       otherwise — a bug that predates planning and shows on any real feature
+       dashboard with a typed pace. Nobody speeds up by completing features
+       faster; the feature model is item throughput through the size
+       distribution. */
+    is(pDoc.getElementById('scEstRangeLabel').textContent, 'Work items finished per week',
+       'the pace box asks for WORK items on the feature lens');
+    ok(/4 to 7 work items a period/.test(pDoc.getElementById('fcAssumptions').textContent),
+       'the assumption under the tiles says the same');
+    ok(/4 to 7 work items a week/.test(
+         pDoc.getElementById('forecastFiguresTable').textContent),
+       'and so does the export');
+    ok(/5 to 10 items a feature/.test(
+         pDoc.getElementById('forecastFiguresTable').textContent),
+       'which also records the size that was typed rather than a median of nothing');
+
+    /* Back to a working app for every group after this one. */
+    plant({ teams: [{ id: 'pl2', name: 'Started', rows: Array.from({ length: 12 }, (_, i) => ({
+      c: '2015-0' + (i < 9 ? '1' : '2') + '-' + String((i % 9) * 3 + 2).padStart(2, '0'),
+      s: '2015-01-02', t: 'Story' })) }], settings: {} });
+    win.renderAll();
+    is(JSON.parse(win.localStorage.getItem('td-view')).planning, false,
+       'and real data retires the flag here too');
   }
 
 

@@ -2404,6 +2404,29 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <label class="checkline" for="scEstOn">
               <input type="checkbox" id="scEstOn"><span id="scEstLabel">Use a typed pace instead of this history</span>
             </label>
+            <!-- Planning only, and only over features: the size of a feature is
+                 MEASURED everywhere else in this app, off finished features and
+                 their items. With nothing recorded there is nothing to measure,
+                 so the reader states it — the same trade the typed pace makes one
+                 row up, and stated in the same shape. -->
+            <div class="grid two pairs" id="scSizeWrap" style="margin-top:var(--sp-3)" hidden>
+              <div>
+                <label for="scSizeLo">Work items per feature</label>
+                <div class="row-pair">
+                  <input type="number" id="scSizeLo" min="1" max="500" step="1"
+                         inputmode="numeric" aria-label="Items per feature, lowest">
+                  <span class="to">to</span>
+                  <input type="number" id="scSizeHi" min="1" max="500" step="1"
+                         inputmode="numeric" aria-label="Items per feature, highest">
+                </div>
+              </div>
+              <p class="hint" style="margin:0">Everywhere else this is measured from your
+                finished features. There are none yet, so say what you expect and the same
+                model runs over it. <strong>A feature counts only when it is finished</strong>
+                &mdash; a period whose pace runs out halfway through one has delivered the
+                ones before it, which is why a wider range here moves the answer more than
+                it looks like it should.</p>
+            </div>
             <div class="grid two pairs" id="scEstWrap" style="margin-top:var(--sp-3)" hidden>
               <div>
                 <label for="scEstLo" id="scEstRangeLabel">Items finished per period</label>
@@ -5399,10 +5422,16 @@ function scenarioForUnit(s, feature) {
 /* Every knob that is NOT at its default, in words, for the list under the tiles.
    Built here rather than in the renderer so a test can pin that a default
    scenario produces an empty array — the other half of the no-op promise. */
-function scenarioAssumptions(s, unitMany) {
+function scenarioAssumptions(s, unitMany, paceMany) {
   if (!s) return [];
   const out = [];
   const many = unitMany || 'items';
+  /* The typed pace is in WORK ITEMS even where the forecast is in features —
+     nobody speeds up by completing features faster, they speed up by completing
+     items faster, and the feature model is item throughput converted through the
+     size distribution. So the pace names its own unit rather than the answer's.
+     It had been saying "4 to 7 features a period" over a pace of items. */
+  const pace = paceMany || many;
   const range = (lo, hi) => lo === hi ? lo + '%' : lo + '% to ' + hi + '%';
   /* Scope growth is the one scope knob BOTH lenses read, so it is the one that
      has to be said in the reader's own unit. Everything below it is feature-only
@@ -5411,7 +5440,7 @@ function scenarioAssumptions(s, unitMany) {
   if (scenarioPaceOn(s)) out.push({ key: 'est', label: 'Estimated pace',
     value: s.estLo === s.estHi ? String(s.estLo) : s.estLo + '\u2013' + s.estHi,
     wording: 'dealt from a typed range of ' + (s.estLo === s.estHi ? s.estLo
-      : s.estLo + ' to ' + s.estHi) + ' ' + many + ' a period instead of from history' });
+      : s.estLo + ' to ' + s.estHi) + ' ' + pace + ' a period instead of from history' });
   if (s.growthHi > 0) out.push({ key: 'growth', label: 'Scope growth',
     value: range(s.growthLo, s.growthHi),
     wording: (feature ? 'each known feature grows by ' : 'the work you counted grows by ')
@@ -5626,7 +5655,7 @@ function featureForecastOf(o) {
     lostPeriods: o.lostPeriods || 0,
     coverageEnd: o.coverageEnd || null,
     scenario: sc,
-    assumptions: scenarioAssumptions(sc, 'features'),
+    assumptions: scenarioAssumptions(sc, 'features', 'work items'),
     scopeRange: scenarioScopeRange(sc),
     estimated: scenarioPaceOn(sc),
     /* The pace is in WORK ITEMS even here — nobody speeds up by completing
@@ -6319,6 +6348,43 @@ function agedCounts(items, evalPoints, thresholdDays, wip, workingDays) {
    axis. Optional, and everything works without it: a caller that passes three
    arguments (every test written before stages existed, and deriveTeams before
    it was widened) gets the work-type columns this chart has always drawn. */
+/* ── What the two forecast cards are called ────────────────────────────────
+   One source, because two paths write these now: derive, from a team's own
+   history, and planningDerive, from nothing at all. Written twice they would
+   drift, and the drift would be invisible — a card headed one thing on a
+   dashboard and another on a planning screen looks right in both places. */
+function forecastCardWords(f, Unit, Units, unitOne) {
+  return {
+    names: {
+      /* Named for the question each answers rather than for the method: nobody
+         walks up to a board asking for a Monte Carlo. */
+      forecastWhen: 'Time to finish',
+      forecastHowMany: Units + ' by a date'
+    },
+    titles: {
+      /* Both name the question's own input, so a card read on its own — in a
+         screenshot, over someone's shoulder — still says what was asked. */
+      forecastWhen: 'How Many Days to Finish ' + f.items + ' ' + Unit
+        + (f.items === 1 ? '' : 's') + ', over ' + FORECAST_TRIALS.toLocaleString()
+        + ' Simulated Runs',
+      forecastHowMany: 'How Many ' + Units + ' Finished by ' + prettyDate(f.targetDate)
+        + ', over ' + FORECAST_TRIALS.toLocaleString() + ' Simulated Runs'
+    },
+    axisTitles: {
+      /* Both forecast charts count RUNS up the y axis — the x axis is the
+         outcome, which is the other way round from every chart above, where x
+         is time. Each says outright what it is counting, because a bar chart
+         whose y axis is "how often" is easy to read as "how many". */
+      forecastRuns: 'Simulated runs',
+      /* Calendar days, always — the working-days setting governs how long work
+         TOOK, and a forecast is a wait somebody is going to sit through. */
+      forecastWhenX: 'Days to finish ' + f.items + ' ' + unitOne
+        + (f.items === 1 ? '' : 's'),
+      forecastHowManyX: Units + ' finished by ' + prettyDate(f.targetDate)
+    }
+  };
+}
+
 /* ── The forecast, assembled ───────────────────────────────────────────────
    Lifted out of derive() so it can run WITHOUT an axis. Every figure above it
    on the dashboard keys off a completion; this one does not have to, because a
@@ -7385,6 +7451,8 @@ function derive(rows, settings, view, stages) {
      else on the screen. The card's own title says how many items it covers. */
   const stageTimes = stageTimesOf(stageWindow);
 
+  const fcWords = forecastCardWords(forecast, Unit, Units, unitOne);
+
   return {
     empty: weeks.length === 0,
     /* `buckets` is the name the code uses; `weeks` is the same array under the
@@ -7562,8 +7630,8 @@ function derive(rows, settings, view, stages) {
       cycleScatter: 'Every finished ' + unitOne + '',
       /* The two forecast cards. Named for the question each answers rather than
          for the method: nobody walks up to a board asking for a Monte Carlo. */
-      forecastWhen: 'Time to finish',
-      forecastHowMany: Units + ' by a date',
+      forecastWhen: fcWords.names.forecastWhen,
+      forecastHowMany: fcWords.names.forecastHowMany,
       /* Named for the question, like the two above it: nobody asks for the
          time-in-status table, they ask where the time goes. */
       stageTime: 'Time in stage'
@@ -7593,11 +7661,8 @@ function derive(rows, settings, view, stages) {
       cycleScatter: cycleLabel + ' of Each ' + Unit + ', on the ' + Noun + ' It Finished',
       /* Both name the question's own input, so a card read on its own — in a
          screenshot, over someone's shoulder — still says what was asked. */
-      forecastWhen: 'How Many Days to Finish ' + forecast.items + ' ' + Unit
-        + (forecast.items === 1 ? '' : 's') + ', over ' + FORECAST_TRIALS.toLocaleString()
-        + ' Simulated Runs',
-      forecastHowMany: 'How Many ' + Units + ' Finished by ' + prettyDate(forecast.targetDate) + ', over '
-        + FORECAST_TRIALS.toLocaleString() + ' Simulated Runs',
+      forecastWhen: fcWords.titles.forecastWhen,
+      forecastHowMany: fcWords.titles.forecastHowMany,
       /* Says CALENDAR DAYS in the title itself rather than only in the ⓘ, and
          says it whichever way the working-days setting is set. It is the one
          set of durations on this screen that setting does not reach — they are
@@ -7625,12 +7690,9 @@ function derive(rows, settings, view, stages) {
          outcome, which is the other way round from every chart above, where x
          is time. Each says outright what it is counting, because a bar chart
          whose y axis is "how often" is easy to read as "how many". */
-      forecastRuns: 'Simulated runs',
-      /* Calendar days, always — the working-days setting governs how long work
-         TOOK, and a forecast is a wait somebody is going to sit through. */
-      forecastWhenX: 'Days to finish ' + forecast.items + ' ' + unitOne
-        + (forecast.items === 1 ? '' : 's'),
-      forecastHowManyX: Units + ' finished by ' + prettyDate(forecast.targetDate),
+      forecastRuns: fcWords.axisTitles.forecastRuns,
+      forecastWhenX: fcWords.axisTitles.forecastWhenX,
+      forecastHowManyX: fcWords.axisTitles.forecastHowManyX,
       x: bucket === 'month' ? 'Month'
         : bucket === 'fortnight' ? 'Year-Fortnight (week numbers)'
         : 'Year-Week Number'
@@ -7993,6 +8055,8 @@ const DEFAULT_SETTINGS = {
    out fresh each render so it can never go stale as the data moves on. */
 const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', activeTeamId: null,
   chartTab: 'flow', bucket: 'week', forecastItems: DEFAULT_FORECAST_ITEMS, forecastDate: '',
+  /* How big a feature is, typed. See planningSizes. */
+  planSizeLo: 0, planSizeHi: 0,
   /* ── Planning ahead ──────────────────────────────────────────────────────
      The reader has said they want to forecast before there is anything to
      forecast from. A stored INTENTION rather than a derived one, and that is
@@ -8765,18 +8829,69 @@ function planningOn() {
 
    Work ITEMS, always. Features are counted from a Parent key column in data that
    by definition does not exist here. */
+/* A typed feature size, as the list of measured sizes the feature model expects.
+   A range of 5 to 10 means "any size in there, and I have no reason to prefer
+   one" — a uniform belief, which is exactly the list 5,6,7,8,9,10.
+
+   Repeated up to FEATURE_MIN_SIZES rather than lowering that floor: repeating a
+   uniform set leaves the distribution identical, and nothing else in the feature
+   model has to learn that planning exists. */
+function planningSizes() {
+  const lo = Math.max(0, Math.round(Number(view.planSizeLo)) || 0);
+  if (!(lo > 0)) return [];
+  const hi = Math.min(FORECAST_MAX_ITEMS, Math.max(lo, Math.round(Number(view.planSizeHi)) || lo));
+  const base = [];
+  for (let n = lo; n <= hi; n++) base.push(n);
+  const out = [];
+  while (out.length < FEATURE_MIN_SIZES) out.push(...base);
+  return out;
+}
+
 function planningDerive() {
   const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
   const noun = BUCKET_NOUNS[bucket];
   /* Today IS the end of the data when there is no data: every date this card
      prints counts forward from the reader's own calendar day. */
   const endDate = new Date(todayLocalISO() + 'T00:00:00Z');
+  const feature = planningFeatureUnit();
+  const units = feature ? 'features' : 'items';
+  /* The item forecast is built either way. On the feature lens it is not the
+     answer — it is where the dates come from, exactly as on a real dashboard,
+     where the feature model is handed the item derive's countFrom and target
+     rather than working them out again. */
+  let forecast = buildForecast({ view, samples: [], weekStarts: [],
+    bucket, endDate, units });
+  let schedule = null;
+  if (feature) {
+    /* ── A feature forecast with nothing measured ─────────────────────────
+       The model needs two samples: how fast items finish, and how many items a
+       feature takes. On a real board the first is throughput and the second is
+       measured off finished features. Here BOTH are typed — the pace in the
+       scenario block, the size in the two boxes beside it — and the model
+       itself is untouched, which is the point: a planning answer and a measured
+       answer are the same arithmetic over different inputs. */
+    const sizes = planningSizes();
+    const f = forecast;
+    forecast = featureForecastOf({
+      itemSamples: [], sizes, joinRate: null,
+      featureCount: f.items, targetDate: f.targetDate,
+      horizonPeriods: f.horizonPeriods, countFrom: f.countFrom,
+      countingFromToday: f.countingFromToday, bucket,
+      lostPeriods: 0, coverageEnd: null, scenario: view.scenario });
+    schedule = forecast.when
+      ? forecastFeatureSchedule([], sizes, forecast.items,
+          forecast.scenario, FORECAST_SCHEDULE_TRIALS)
+      : null;
+  }
+  const Unit = feature ? 'Feature' : 'Item';
+  const words = forecastCardWords(forecast, Unit, Unit + 's', Unit.toLowerCase());
   return {
-    empty: true, planning: true, endDate,
-    unit: 'items', unitOne: 'item', unitMany: 'items', Units: 'Items',
+    empty: true, planning: true, endDate, forecast, schedule,
+    unit: units, unitOne: Unit.toLowerCase(), unitMany: units, Units: Unit + 's',
     bucket, bucketNoun: noun, bucketNounPlural: noun + 's',
-    forecast: buildForecast({ view, samples: [], weekStarts: [],
-      bucket, endDate, units: 'items' })
+    /* The two cards are headed and their axes named exactly as they are on a
+       dashboard with data behind it — same source, so they cannot drift. */
+    names: words.names, titles: words.titles, axisTitles: words.axisTitles
   };
 }
 
@@ -8880,6 +8995,12 @@ const anyDataHeld = () => anyItemRows() || anyFeatures();
    list — the same empty screen that fallback exists to avoid. Where both lists
    hold something the reader's switch decides, exactly as before. */
 const featureUnit = () => anyFeatures() && (view.unit === 'features' || !anyItemRows());
+/* Planning has its OWN answer to the same question, because featureUnit() asks
+   what the data holds and there is none: the reader is telling the app what they
+   are about to build, not what they have built. Kept separate rather than folded
+   into featureUnit(), which guards a dozen readers of two lists that really do
+   have to exist. */
+const planningFeatureUnit = () => planningOn() && view.unit === 'features';
 const unitRowsOf = (team) => !team ? []
   : (featureUnit() ? (team.features || []) : (team.rows || []));
 
@@ -9499,6 +9620,77 @@ const pct1 = v => (v * 100).toFixed(1) + '%';        /* tooltips */
 const pct0 = v => Math.round(v * 100) + '%';         /* axis ticks — whole percents */
 const num1 = v => (Math.round(v * 10) / 10).toFixed(1);
 const int0 = v => String(Math.round(v));
+
+/* ── The two forecast histograms ───────────────────────────────────────────
+   Their own function, because they are the only charts on this screen that can
+   be drawn WITHOUT an axis behind them: a typed pace produces a distribution
+   with no completions anywhere in the app. drawCharts calls it in its place in
+   the sequence; the planning path calls it on its own, where nothing else on
+   the page has anything to plot. */
+function drawForecastCharts(d) {
+  /* Read here rather than closed over: drawCharts holds this as a local, and
+     the planning path never runs drawCharts at all. */
+  const seriesMain = token('--series-1');
+  /* ── The two forecasts ──
+     Both plot the same thing in the same way: how often each outcome came up
+     across ten thousand simulated runs, with every bar shaded by the confidence
+     that committing to it would carry. Bars, and the y axis counts RUNS — the
+     one pair of charts here whose x axis is an outcome rather than time.
+
+     The two face opposite ways, and that is the honest picture rather than an
+     inconsistency: a later date is a safer promise, so the solid end of the
+     "time to finish" chart is on the right, while a SMALLER number of items is
+     the safer promise, so the solid end of "items by a date" is on the left.
+     The colour means the same thing on both — the stronger it is, the safer the
+     promise — which is what lets one reading serve both, and the rows under
+     each chart repeat it in words for anyone who would rather not read colour
+     at all.
+
+     A card with nothing to draw has had its canvas hidden by renderForecast and
+     carries the reason instead; its chart is destroyed rather than left holding
+     a stale series. */
+  const forecastChart = (id, block, xTitle, tipNoun) => {
+    if (!block) {
+      if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+      return;
+    }
+    const opts = baseOptions(d.axisTitles.forecastRuns, int0, null, xTitle, null);
+    opts.scales.y.beginAtZero = true;
+    opts.scales.y.ticks.precision = 0;
+    /* One bar per outcome, so the index mode every other chart uses would light
+       up a neighbour that has nothing to do with the one under the pointer. */
+    opts.interaction = { mode: 'nearest', intersect: true };
+    /* The tooltip is where the shading is spelled out: a reader who wants to
+       know what a bar's colour means points at it. */
+    opts.plugins.tooltip.callbacks = {
+      title: items => items[0].label + ' ' + tipNoun,
+      label: c => int0(c.parsed.y) + ' of ' + FORECAST_TRIALS.toLocaleString() + ' runs',
+      afterLabel: c => Math.round(block.hist.confidence[c.dataIndex] * 100)
+        + '% confident at this point'
+    };
+    renderChart(id, {
+      type: 'bar',
+      data: {
+        labels: block.hist.labels,
+        datasets: [{
+          label: 'Simulated runs',
+          data: block.hist.counts,
+          backgroundColor: block.hist.confidence.map(forecastFill),
+          borderColor: seriesMain,
+          borderWidth: 1,
+          /* Bars butt together: this is one distribution, not a set of separate
+             categories, and gaps between them read as the latter. */
+          categoryPercentage: 1, barPercentage: 1,
+          order: 1
+        }]
+      },
+      options: opts
+    });
+  };
+  forecastChart('chartForecastWhen', d.forecast.when, d.axisTitles.forecastWhenX, 'days');
+  forecastChart('chartForecastHowMany', d.forecast.howMany, d.axisTitles.forecastHowManyX,
+    'items');
+}
 
 function drawCharts(d) {
   /* ── The two colours every chart in this app draws DATA in ────────────────
@@ -10129,65 +10321,7 @@ function drawCharts(d) {
     });
   }
 
-  /* ── The two forecasts ──
-     Both plot the same thing in the same way: how often each outcome came up
-     across ten thousand simulated runs, with every bar shaded by the confidence
-     that committing to it would carry. Bars, and the y axis counts RUNS — the
-     one pair of charts here whose x axis is an outcome rather than time.
-
-     The two face opposite ways, and that is the honest picture rather than an
-     inconsistency: a later date is a safer promise, so the solid end of the
-     "time to finish" chart is on the right, while a SMALLER number of items is
-     the safer promise, so the solid end of "items by a date" is on the left.
-     The colour means the same thing on both — the stronger it is, the safer the
-     promise — which is what lets one reading serve both, and the rows under
-     each chart repeat it in words for anyone who would rather not read colour
-     at all.
-
-     A card with nothing to draw has had its canvas hidden by renderForecast and
-     carries the reason instead; its chart is destroyed rather than left holding
-     a stale series. */
-  const forecastChart = (id, block, xTitle, tipNoun) => {
-    if (!block) {
-      if (charts[id]) { charts[id].destroy(); delete charts[id]; }
-      return;
-    }
-    const opts = baseOptions(d.axisTitles.forecastRuns, int0, null, xTitle, null);
-    opts.scales.y.beginAtZero = true;
-    opts.scales.y.ticks.precision = 0;
-    /* One bar per outcome, so the index mode every other chart uses would light
-       up a neighbour that has nothing to do with the one under the pointer. */
-    opts.interaction = { mode: 'nearest', intersect: true };
-    /* The tooltip is where the shading is spelled out: a reader who wants to
-       know what a bar's colour means points at it. */
-    opts.plugins.tooltip.callbacks = {
-      title: items => items[0].label + ' ' + tipNoun,
-      label: c => int0(c.parsed.y) + ' of ' + FORECAST_TRIALS.toLocaleString() + ' runs',
-      afterLabel: c => Math.round(block.hist.confidence[c.dataIndex] * 100)
-        + '% confident at this point'
-    };
-    renderChart(id, {
-      type: 'bar',
-      data: {
-        labels: block.hist.labels,
-        datasets: [{
-          label: 'Simulated runs',
-          data: block.hist.counts,
-          backgroundColor: block.hist.confidence.map(forecastFill),
-          borderColor: seriesMain,
-          borderWidth: 1,
-          /* Bars butt together: this is one distribution, not a set of separate
-             categories, and gaps between them read as the latter. */
-          categoryPercentage: 1, barPercentage: 1,
-          order: 1
-        }]
-      },
-      options: opts
-    });
-  };
-  forecastChart('chartForecastWhen', d.forecast.when, d.axisTitles.forecastWhenX, 'days');
-  forecastChart('chartForecastHowMany', d.forecast.howMany, d.axisTitles.forecastHowManyX,
-    'items');
+  drawForecastCharts(d);
 
   /* A canvas is a bitmap to a screen reader — give each chart its title as a
      text alternative. The full series stays reachable as text in the Your Data
@@ -11139,10 +11273,27 @@ function renderDashboard() {
        derive that gave up — see planningDerive. */
     if (planning) {
       const pd = planningDerive();
-      renderForecast(pd, currentForecastScope(), []);
+      const pScope = currentForecastScope();
+      renderForecast(pd, pScope, []);
       renderScenario(pd);
-      renderForecastFigures(pd, currentForecastScope());
-      renderSchedule(pd, null);
+      renderForecastFigures(pd, pScope);
+      renderSchedule(pd, pd.schedule);
+      /* The two cards' own headings, which the full render writes in a loop over
+         every chart on the screen — a loop this path never reaches. Without them
+         the histograms sat in blank cards with the percentile rows underneath,
+         which is what Charles saw. */
+      Object.keys(pd.names).forEach(k => {
+        const cap = k.charAt(0).toUpperCase() + k.slice(1);
+        $('name' + cap).innerHTML = '<span>' + escapeHtml(pd.names[k]) + '</span>'
+          + helpBtn(k, pd.names[k]);
+        $('title' + cap).textContent = pd.titles[k];
+      });
+      /* And the histograms themselves. The only charts in the app that can be
+         drawn with no axis behind them — see drawForecastCharts. */
+      drawForecastCharts(pd);
+      /* Re-run now there ARE canvases: the call above this branch ran when the
+         only honest answer was "nothing is maximisable". */
+      syncMaxiButtons();
     }
     return;
   }
@@ -11588,10 +11739,22 @@ function renderScenario(d) {
      typed pace is live. A control that is switched off and still looks live is
      the orphaned-control complaint again — so say it with the control. */
   $('scConfidence').disabled = scenarioPaceOn(sc);
-  $('scEstRangeLabel').textContent = d.Units + ' finished per ' + d.bucketNoun;
+  /* WORK ITEMS even on the feature lens, and for the reason the feature model
+     rests on: a feature answer is item throughput converted through the size
+     distribution, so the pace being typed is a pace of items. This box has been
+     asking for "Features finished per week" and feeding the number straight into
+     the item sampler — the same mistake the assumption sentence was making. */
+  $('scEstRangeLabel').textContent = (feature ? 'Work items' : d.Units)
+    + ' finished per ' + d.bucketNoun;
   /* Scope growth is the one knob in this block that BOTH lenses read, so it is
      the one that has to be relabelled rather than hidden. Its neighbours below
      are feature-only and hide instead. */
+  /* Only where it is the stand-in for a measurement: planning, over features.
+     With data behind it the app measures this and must never ask. */
+  const planSize = !!d.planning && feature;
+  $('scSizeWrap').hidden = !planSize;
+  $('scSizeLo').value = view.planSizeLo ? String(view.planSizeLo) : '';
+  $('scSizeHi').value = view.planSizeHi ? String(view.planSizeHi) : '';
   $('scGrowthLabel').textContent = feature
     ? 'Each known feature grows by (%)'
     : 'The work you counted grows by (%)';
@@ -11659,14 +11822,19 @@ function renderForecastFigures(d, scope) {
      that no period was ever observed. */
   rows.push(d.planning
     ? ['Drawn from', '', 'a typed pace, no history',
-       f.estimated ? f.scenario.estLo + ' to ' + f.scenario.estHi + ' ' + d.unitMany
+       f.estimated ? f.scenario.estLo + ' to ' + f.scenario.estHi + ' '
+         + (f.method === 'decomposed' ? 'work items' : d.unitMany)
          + ' a ' + d.bucketNoun : 'no pace typed']
     : ['Drawn from', '', f.samples + ' whole '
        + (f.samples === 1 ? d.bucketNoun : d.bucketNounPlural)
        + (f.method === 'decomposed' ? ' of work-item throughput' : ''), '']);
   if (f.method === 'decomposed') {
-    rows.push(['Feature sizes', '', f.sizeCount + ' finished features',
-      'median ' + f.sizeMedian + ' items']);
+    rows.push(d.planning
+      ? ['Feature sizes', '', 'typed, not measured',
+         (view.planSizeLo === view.planSizeHi ? String(view.planSizeLo)
+           : view.planSizeLo + ' to ' + view.planSizeHi) + ' items a feature']
+      : ['Feature sizes', '', f.sizeCount + ' finished features',
+         'median ' + f.sizeMedian + ' items']);
   }
   rows.push(['Counting from', '', prettyDate(f.countFrom), '']);
   if (scope && scope.kind !== 'team') rows.push(['Whose pace', '', scope.phrase, '']);
@@ -12009,25 +12177,30 @@ function renderForecast(d, scope, stale) {
                   + ' you average'),
           'requiredPace')
       : '') +
-    (f.method === 'decomposed'
-      ? tile('Built from', f.sizeCount + ' finished feature' + (f.sizeCount === 1 ? '' : 's'),
-          'sized at a median of ' + f.sizeMedian + ' items each, paced by '
-            + f.samples + ' whole ' + periodNoun(f.samples) + ' of item throughput'
-            + ((scope && scope.kind !== 'team') ? ' across ' + scope.phrase : ''),
-          'forecastSamples')
-      /* A planning forecast is drawn from a typed range, and this tile is where a
-         reader checks what an answer rests on — so it states the range rather
-         than a period count of zero, which would read as a measurement that
-         found nothing. */
-      : d.planning
+    /* PLANNING IS CHECKED FIRST, and over both lenses. The decomposed branch
+       below states a count of finished features and a median measured off them;
+       in planning both of those are a list this app synthesised from a range the
+       reader typed, and printing "6 finished features" over a team that has
+       finished none would be the worst sentence on the screen. */
+    (d.planning
       ? tile('Drawn from',
           f.estimated
             ? escapeHtml(f.scenario.estLo === f.scenario.estHi ? String(f.scenario.estLo)
                 : f.scenario.estLo + '\u2013' + f.scenario.estHi)
             : '&mdash;',
-          f.estimated
-            ? 'a pace you typed, not measured \u2014 ' + d.unitMany + ' a ' + d.bucketNoun
-            : 'no history, and no pace typed yet',
+          !f.estimated ? 'no history, and no pace typed yet'
+            : f.method === 'decomposed'
+              ? 'work items a ' + d.bucketNoun + ', typed \u2014 at '
+                + (view.planSizeLo === view.planSizeHi ? view.planSizeLo
+                    : view.planSizeLo + '\u2013' + view.planSizeHi)
+                + ' items a feature, also typed. Nothing here was measured.'
+              : 'a pace you typed, not measured \u2014 ' + d.unitMany + ' a ' + d.bucketNoun,
+          'forecastSamples')
+    : f.method === 'decomposed'
+      ? tile('Built from', f.sizeCount + ' finished feature' + (f.sizeCount === 1 ? '' : 's'),
+          'sized at a median of ' + f.sizeMedian + ' items each, paced by '
+            + f.samples + ' whole ' + periodNoun(f.samples) + ' of item throughput'
+            + ((scope && scope.kind !== 'team') ? ' across ' + scope.phrase : ''),
           'forecastSamples')
       : tile('Drawn from', String(f.samples),
           'whole ' + periodNoun(f.samples) + ' of throughput'
@@ -12946,7 +13119,14 @@ function renderEmptyState() {
      What is hidden is hidden in CSS, off `data-welcome` — see the rule beside
      `.card > .empty`. Setting `hidden` on each panel from here loses a race with
      selectTab(), which writes the same property and runs later in boot. */
-  const firstRun = !anyData && !viewOnly && !welcomeStarted;
+  /* ── …unless a forecast is already standing ──────────────────────────────
+     Planning is a door taken, and this card is the doorway. On a reload it used
+     to reappear and take the page back — tab strip and all — from a reader who
+     had a forecast of their own on the Dashboard, which is what Charles
+     reported the day it shipped. `welcomeStarted` cannot answer this: it lives
+     in memory, deliberately, because a first run creates nothing to remember.
+     The planning flag DOES persist, and it means the same thing here. */
+  const firstRun = !anyData && !viewOnly && !welcomeStarted && !planningOn();
   $('welcomeCard').hidden = !firstRun;
   document.documentElement.toggleAttribute('data-welcome', firstRun);
 }
@@ -12957,13 +13137,17 @@ function renderEmptyState() {
    control appear, and deleting the last one has to take it away and put the
    reader back on items. */
 function renderUnitControl() {
-  const offered = anyFeatures();
+  /* Offered in planning too. There are no features to count — that is the whole
+     situation — but the reader is saying what they are ABOUT to build, and a
+     scope of eight features is as ordinary a thing to plan as forty items. */
+  const offered = anyFeatures() || planningOn();
   $('unitField').hidden = !offered;
   /* Read back through featureUnit() rather than off `view`, so the box always
      shows what is actually being counted. A saved 'features' with no features
      left is silently items everywhere else in the app; a select still reading
      "Features" would be the one thing on screen contradicting that. */
-  $('unitSel').value = featureUnit() ? 'features' : 'items';
+  $('unitSel').value = (planningOn() ? planningFeatureUnit() : featureUnit())
+    ? 'features' : 'items';
 }
 
 function renderAll() {
@@ -15046,6 +15230,10 @@ $('fcScenario').addEventListener('change', () => {
     const v = $(id).value;
     return v === '' ? 0 : Number(v);
   };
+  /* Not part of the scenario: a scenario is an ADJUSTMENT to what was measured,
+     and this is a stand-in for the measurement itself. Stored beside it. */
+  view.planSizeLo = num('scSizeLo');
+  view.planSizeHi = num('scSizeHi');
   view.scenario = scenarioFrom({
     growthLo: num('scGrowthLo'), growthHi: num('scGrowthHi'),
     extraLo: num('scExtraLo'), extraHi: num('scExtraHi'),
