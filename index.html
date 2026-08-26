@@ -8744,7 +8744,22 @@ const activeRows = () => { const t = activeTeam(); return t ? t.rows : []; };
    which looks exactly like a finding. So the unit is features only while there
    are some, and the answer falls back to items rather than to an empty screen. */
 const anyFeatures = () => state.teams.some(t => (t.features || []).length);
-const featureUnit = () => view.unit === 'features' && anyFeatures();
+/* The other half of the same question. A team can hold features and NO items at
+   all — a features-only paste is a real thing to do, and loadPastedRows says so
+   in as many words — so "does this browser hold anything?" has to ask about both
+   lists. Asked about rows alone it answered no over a full feature list, and
+   every screen that keys off it went away: the Dashboard tab hid, which took the
+   Count switch on the control bar with it, which left no way to reach the
+   features at all. Data loaded, nothing on screen, no way in. */
+const anyItemRows = () => state.teams.some(t => (t.rows || []).length);
+const anyDataHeld = () => anyItemRows() || anyFeatures();
+/* Features win when they are the ONLY thing here. The rule below already falls
+   back to items for a saved 'features' with no features left to count; this is
+   the mirror of it. A browser holding nothing but features would otherwise count
+   items, of which it has none, and draw an empty dashboard over a loaded feature
+   list — the same empty screen that fallback exists to avoid. Where both lists
+   hold something the reader's switch decides, exactly as before. */
+const featureUnit = () => anyFeatures() && (view.unit === 'features' || !anyItemRows());
 const unitRowsOf = (team) => !team ? []
   : (featureUnit() ? (team.features || []) : (team.rows || []));
 
@@ -12672,15 +12687,15 @@ function renderEmptyState() {
      so hiding this one as well would leave a tab strip with nothing in it — and
      a link whose teams somehow carried no rows would show a visitor no way back
      to anything. */
-  const anyRows = state.teams.some(t => t.rows.length);
-  $('tab-dashboard').hidden = !anyRows && !viewOnly;
+  const anyData = anyDataHeld();
+  $('tab-dashboard').hidden = !anyData && !viewOnly;
   if (activeTab === 'dashboard' && $('tab-dashboard').hidden) selectTab('data');
   /* The demo offer on the empty dashboard goes with it, on the reasoning the
      one beside Load pasted rows already follows: with the tab hidden until
      something has data, the only way to reach that card is from a working app,
      where a button that quietly adds three teams is a mis-click rather than a
      help. Guarded, because a shared view rewrites this card's contents. */
-  if ($('dashDemo')) $('dashDemo').hidden = anyRows;
+  if ($('dashDemo')) $('dashDemo').hidden = anyData;
   /* The same reasoning as the demo button beside it: this is the first-run door
      into typing an item, and once this team HAS rows the Loaded Data card below
      carries its own "+ Add item" in the place you would look for it. Two live
@@ -12693,7 +12708,7 @@ function renderEmptyState() {
   /* The demo is a first-run affordance, so it goes the moment ANY team holds
      something — not just this one. Left standing beside "Load pasted rows" on a
      working app it is clutter, and a mis-click that quietly adds three teams. */
-  $('btnSampleData').hidden = state.teams.some(t => t.rows.length);
+  $('btnSampleData').hidden = anyDataHeld();
   document.documentElement.removeAttribute('data-first-run');
 
   /* ── The welcome card, and everything it stands in for ─────────────────────
@@ -12714,7 +12729,7 @@ function renderEmptyState() {
      What is hidden is hidden in CSS, off `data-welcome` — see the rule beside
      `.card > .empty`. Setting `hidden` on each panel from here loses a race with
      selectTab(), which writes the same property and runs later in boot. */
-  const firstRun = !anyRows && !viewOnly && !welcomeStarted;
+  const firstRun = !anyData && !viewOnly && !welcomeStarted;
   $('welcomeCard').hidden = !firstRun;
   document.documentElement.toggleAttribute('data-welcome', firstRun);
 }
@@ -16791,7 +16806,7 @@ if (viewOnly) {
      other teams were full to Your Data because the one they happened to be on
      was empty. selectTab refuses a hidden tab either way, so this only decides
      where a browser with nothing at all opens. */
-  selectTab(state.teams.some(t => t.rows.length) ? view.activeTab : 'data');
+  selectTab(anyDataHeld() ? view.activeTab : 'data');
   /* Last, after the tab is chosen: the whole point of the hold is that the
      reader never sees the panel this lands on being swapped for another one. */
   bootDone();

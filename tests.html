@@ -303,7 +303,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 2392;
+const EXPECTED = 2398;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -6999,7 +6999,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   ok(APP_SRC.includes("selectTab('dashboard')")
      && APP_SRC.indexOf("selectTab('dashboard')", APP_SRC.indexOf('function loadSample')) > -1,
      'and loading it switches to the dashboard, not the paste box you pressed it from');
-  ok(APP_SRC.includes("$('btnSampleData').hidden = state.teams.some(t => t.rows.length)"),
+  ok(APP_SRC.includes("$('btnSampleData').hidden = anyDataHeld()"),
      'the offer goes once anything holds data — it is a first-run affordance, not a button');
 
   /* ────────────────────────────────────────────────────────── */
@@ -7708,8 +7708,42 @@ group('ARTs — the grouping, and the boundary it crosses');
   /* A SHARED VIEW KEEPS IT, always. Your Data and Settings are both taken away
      there, so hiding this one as well would leave a tab strip with nothing in
      it and a visitor with no way back to anything. */
-  ok(/\$\('tab-dashboard'\)\.hidden = !anyRows && !viewOnly;/.test(APP_SRC),
+  ok(/\$\('tab-dashboard'\)\.hidden = !anyData && !viewOnly;/.test(APP_SRC),
      'the rule is off in a shared view, where the other two tabs are already gone');
+
+  /* A TEAM'S SECOND LIST COUNTS AS DATA (2026-08-25). A features-only paste is a
+     real thing to do — loadPastedRows says so in as many words — and asked about
+     rows alone this rule answered "nothing here" over a full feature list. The
+     tab went, and because the Count switch rides on the control bar that only
+     the number tabs show, it went too: three features loaded, an empty Your Data
+     tab on screen, and no way to reach them. Both lists, or neither. */
+  const featsOnly = { teams: [{ id: 'f1', name: 'Features only', rows: [], features: [
+      { c: '2026-07-10', s: '2026-06-01', t: 'Feature', i: 'PLAT-1' },
+      { c: '2026-08-02', s: '2026-06-15', t: 'Feature', i: 'PLAT-2' }
+    ] }], settings: { featureTypes: ['Feature'] } };
+  plant(featsOnly);
+  is(dashTab().hidden, false,
+     'a team holding only features keeps the Dashboard tab — features are data');
+  win.selectTab('dashboard');
+  is(win.document.getElementById('viewControls').hidden, false,
+     'so the control bar is reachable, and the Count switch on it with it');
+  is(win.document.getElementById('unitField').hidden, false,
+     'the Count switch itself is offered, having something to switch to');
+  is(win.document.getElementById('btnSampleData').hidden, true,
+     'and the demo offer goes, as it does for any browser that already holds data');
+
+  /* Features win when they are the ONLY list with anything in it. Counting items
+     here would draw an empty dashboard over a loaded feature list — the same
+     empty screen the opposite fallback exists to avoid. */
+  is(win.document.getElementById('unitSel').value, 'features',
+     'with no items anywhere the dashboard counts features rather than nothing');
+
+  /* But only then: one item alongside them hands the choice back to the reader. */
+  plant({ teams: [{ id: 'f2', name: 'Both', rows: [{ c: '2026-07-04', s: '2026-07-01', t: 'Story' }],
+    features: [{ c: '2026-07-10', s: '2026-06-01', t: 'Feature', i: 'PLAT-9' }] }],
+    settings: { featureTypes: ['Feature'] } });
+  is(win.document.getElementById('unitSel').value, 'items',
+     'with both lists filled the switch decides, and it defaults to items as before');
 
   /* ══════════════════════════════════════════════════════════
      The welcome card (2026-08-22). With nothing recorded anywhere the app has
@@ -7759,7 +7793,7 @@ group('ARTs — the grouping, and the boundary it crosses');
 
     /* Never over somebody else\u2019s figures: a visitor must not be offered
        three buttons that write to their own browser. */
-    ok(/!anyRows && !viewOnly && !welcomeStarted/.test(APP_SRC),
+    ok(/!anyData && !viewOnly && !welcomeStarted/.test(APP_SRC),
        'and it is off in a shared view, where those buttons would write over a link');
   }
 
