@@ -15736,6 +15736,11 @@ $('clearBtn').addEventListener('click', () => {
   const also = [];
   if (state.arts.length) also.push(plural(state.arts.length, 'ART'));
   if (state.stages.length) also.push(plural(state.stages.length, 'workflow stage'));
+  /* Named only when there is one to lose. It is not a team or an item, so it
+     rides in the same list ARTs and stages do rather than inflating the count
+     above — and it has to be named at all because an unmentioned survivor is
+     what made this sentence untrue the last time. */
+  if (!scenarioIsDefault(scenarioFrom(view.scenario))) also.push('your forecast adjustments');
   $('clearBody').textContent =
     `This deletes ${plural(c.teams, 'team')} and ${plural(c.items, 'item')}`
     + (also.length ? `, along with ${also.join(' and ')}` : '')
@@ -15962,6 +15967,22 @@ $('clearConfirm').addEventListener('click', () => {
      has to know that. */
   view.artFilter = '';
   view.activeTeamId = state.teams[0].id;   // the team it pointed at no longer exists
+  /* A scenario is an ADJUSTMENT to data, and the data is gone. Left standing it
+     would be invisible until the next paste, at which point a forecast nobody
+     had asked to adjust would quietly come out adjusted — the same fault as a
+     hidden control that goes on being claimed. The typed feature size goes with
+     it, for the same reason: it stands in for a measurement. */
+  view.scenario = null;
+  view.planSizeLo = 0;
+  view.planSizeHi = 0;
+  /* ── Back to the welcome card ─────────────────────────────────────────────
+     Asked for by Charles (2026-08-26), and the toast below has been promising it
+     in as many words since long before it was true. Two flags kept it away, and
+     both mean "this reader is past the front door": `welcomeStarted` for the
+     sitting, `planning` for good. Deleting everything is the one act that puts
+     somebody back in front of it — there is no state left to be past. */
+  welcomeStarted = false;
+  view.planning = false;
   save();
   saveView();
   clearDialog.close();

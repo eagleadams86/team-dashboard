@@ -308,7 +308,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    that drives the scenario block's own controls, which is why the tick could be
    dead on screen while every pure test about it passed, and then the lens filter
    the same day. */
-const EXPECTED = 2485;
+const EXPECTED = 2495;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8772,6 +8772,67 @@ group('a delete looks like a delete, everywhere');
     /* A filter pointing into a list that no longer exists is cleared with it. */
     is(JSON.parse(localStorage.getItem('td-view') || '{}').artFilter, '',
        'and the ART filter that pointed at one is cleared too');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('delete all data puts you back in front of the welcome card');
+
+  /* Asked for by Charles (2026-08-26). The toast has read "Everything deleted —
+     starting fresh" since long before it was true: two flags meant "this reader
+     is past the front door" and neither was cleared. `welcomeStarted` is in
+     memory for the sitting — a first run creates nothing to remember — and
+     `planning` persists. Deleting everything is the one act that genuinely puts
+     somebody back in front of that card; there is no state left to be past.
+
+     The siblings get this for free: Golf Handicap's card is derived from its
+     data alone (`no rounds && no courses`). Flow Metrics needs the dismissal
+     flag because Start Fresh creates nothing, so it has to clear it by hand —
+     this brings it back in line rather than diverging from it. */
+  {
+    const wDoc2 = win.document;
+    const shown2 = (el) => !!el && win.getComputedStyle(el).display !== 'none' && !el.hidden;
+    plant({ teams: [{ id: 'wc1', name: 'Loaded',
+      rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] }], settings: {} });
+    win.renderAll();
+    /* Past the front door two different ways, so the delete has both to undo. */
+    wDoc2.getElementById('welcomeFreshBtn').click();
+    ok(!shown2(wDoc2.getElementById('welcomeCard')), 'the card is away to begin with');
+
+    wDoc2.getElementById('clearBtn').click();
+    wDoc2.getElementById('clearConfirm').click();
+    ok(shown2(wDoc2.getElementById('welcomeCard')),
+       'deleting everything brings it back \u2014 what the toast has always claimed');
+    ok(!shown2(wDoc2.querySelector('.tabs')),
+       'as the takeover it is on a first run, tab strip and all');
+
+    /* And from planning, where a typed forecast is the only thing left to lose. */
+    wDoc2.getElementById('welcomePlanBtn').click();
+    const setP = (id, v) => { const b = wDoc2.getElementById(id); b.value = v;
+      b.dispatchEvent(new win.Event('change', { bubbles: true })); };
+    setP('scEstLo', '4'); setP('scEstHi', '7');
+    ok(!wDoc2.getElementById('tab-dashboard').hidden, 'a planning forecast is standing');
+    wDoc2.getElementById('clearBtn').click();
+    /* Named in the confirm. An unmentioned survivor is what made this sentence
+       untrue for ARTs and stages; a scenario that quietly outlived the data
+       would be the same fault, and would adjust the NEXT paste's forecast
+       without anybody asking. */
+    ok(/your forecast adjustments/.test(wDoc2.getElementById('clearBody').textContent),
+       'and the confirm says the forecast adjustments are going too',
+       wDoc2.getElementById('clearBody').textContent);
+    wDoc2.getElementById('clearConfirm').click();
+    const v2 = JSON.parse(win.localStorage.getItem('td-view') || '{}');
+    ok(shown2(wDoc2.getElementById('welcomeCard')), 'planning ends at the card as well');
+    is(v2.planning, false, 'with the planning flag cleared');
+    is(v2.scenario, null, 'and the scenario gone \u2014 an adjustment to data that no '
+       + 'longer exists must not be waiting for the next paste');
+    is([v2.planSizeLo, v2.planSizeHi], [0, 0],
+       'the typed feature size with it, since it stands in for a measurement');
+
+    /* The confirm says nothing about adjustments when there are none to lose. */
+    wDoc2.getElementById('clearBtn').click();
+    ok(!/forecast adjustments/.test(wDoc2.getElementById('clearBody').textContent),
+       'and never names them when there are none');
+    wDoc2.getElementById('clearCancel').click();
   }
 
   /* ────────────────────────────────────────────────────────── */

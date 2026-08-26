@@ -2294,9 +2294,22 @@ settings are kept**, which is the line the delete draws — the labels, the thre
 type filters and your theme are configuration, and the dialog says so. There is no "…and every device you own" line any more: since sync was removed there is
 exactly one copy, and it is the one in this browser.
 
+A **forecast scenario** goes with the data, and is named in the confirm when there is one to
+lose. It is an *adjustment to* what was measured, so left standing over an empty app it would be
+invisible until the next paste — at which point a forecast nobody had asked to adjust would come
+out adjusted. The typed feature size goes with it, for the same reason: it stands in for a
+measurement.
+
 **Your settings and your theme survive.** Starting fresh isn't asking to lose the type
 labels, filters and ageing threshold you spent time tuning — those are configuration, not
 data. What's left is exactly what a brand-new browser gets: one empty team to paste into.
+
+**And it puts you back in front of the welcome card**, which is what the toast has always
+claimed. Two flags meant "this reader is past the front door" — the one Start Fresh sets for the
+sitting, and the [planning](#planning-ahead-a-forecast-before-there-is-anything-to-forecast-from)
+flag, which persists — and deleting everything is the one act that genuinely undoes both. The
+siblings get this for free, because their welcome cards are derived from their data alone; Flow
+Metrics needs a dismissal flag at all only because *Start Fresh* creates nothing to remember.
 
 ## Sharing a Read-Only Link
 
