@@ -1866,13 +1866,23 @@ ran* — not an equivalent one, the same code — so the plain forecast is the p
 
 | Knob | What it says |
 |---|---|
-| **Each known feature grows by** | The work you have counted turns out to be more than you counted. A percentage range. |
+| **Each known feature grows by** / **The work you counted grows by** | The work you have counted turns out to be more than you counted. A percentage range. The only scope knob **both** lenses read, so it is relabelled for the one you are on rather than hidden. |
 | **Features discovered later** | Work you have not counted at all turns up. A percentage on the feature count. |
 | **How well understood are they** | Four steps, from *Well understood* to *Barely understood*. It **widens** the sizes drawn, it does not inflate them — the difference between "we are less sure" and "it will be bigger". |
 | **The team doing the work** | Established, recently changed, or brand new. Scales the pace being resampled. |
 | **Features worked at once** | See below — it changes each feature's date and not the last one. |
 | **Periods nobody is delivering** | A shutdown, a conference, a holiday fortnight. A plain number. |
 | **Use a typed pace instead of this history** | For a team with no history to resample. |
+
+**Four of the seven are about features, and they do not exist on the item lens.** Everything
+below scope growth in that table — features discovered later, how well understood they are, how
+many are worked at once — is read only by the feature forecast. Counting **Work items**, those
+controls hide *and their settings stop being claimed*: the summary count, the "multiply the scope
+by" line and the list under the tiles all describe only the knobs that moved the number in front
+of you. The values are kept, not cleared, so switching the lens back gives you your scenario
+again. Until 2026-08-26 only the controls hid, and a scenario set under Features went on
+announcing itself — "2 settings on", "multiply the scope by 2.60×" — over an item forecast that
+had read none of it.
 
 **Two of these would double-count if they were named badly**, so they are named carefully. "Scope
 grows 20%" and "20% more features" are two ways of saying +44% on the same number, and a reader

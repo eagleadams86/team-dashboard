@@ -2354,7 +2354,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
           <div class="grid two pairs">
             <div>
-              <label for="scGrowthLo">Each known feature grows by (%)</label>
+              <label for="scGrowthLo" id="scGrowthLabel">Each known feature grows by (%)</label>
               <div class="row-pair">
                 <input type="number" id="scGrowthLo" min="0" max="200" step="1"
                        inputmode="numeric" aria-label="Scope growth, lowest">
@@ -5369,6 +5369,28 @@ const scenarioIsDefault = (s) =>
   !!s && !scenarioPaceOn(s)
   && Object.keys(DEFAULT_SCENARIO).every(k => EST_KEYS.has(k) || s[k] === DEFAULT_SCENARIO[k]);
 
+/* THE KNOBS A LENS ACTUALLY READS. Three of the seven are about FEATURES — how
+   many more turn up, how well understood they are, how many are worked at once —
+   and the item sampler never looks at any of them. The controls already hide
+   themselves on the item lens, which was only ever half the job: the VALUES
+   stayed, so a scenario set under Features and then read under Work items went
+   on being counted in "2 settings on", listed under the tiles, and folded into
+   "multiply the scope by 2.60×", while moving no number at all. A forecast that
+   overstates its own adjustment is worse than one that hides the control.
+
+   Zeroed for the LENS, never in the view: switching back to Features has to give
+   the reader their settings back, so this returns a copy and the stored scenario
+   is left alone. renderScenario writes the boxes from the stored one for the same
+   reason — otherwise the delegated handler would read a zeroed hidden box on the
+   next keystroke and make the lens toggle quietly destructive. */
+const FEATURE_ONLY_KNOBS = ['extraLo', 'extraHi', 'clarity', 'parallel'];
+function scenarioForUnit(s, feature) {
+  if (!s || feature) return s;
+  const out = Object.assign({}, s);
+  FEATURE_ONLY_KNOBS.forEach(k => { out[k] = DEFAULT_SCENARIO[k]; });
+  return out;
+}
+
 /* Every knob that is NOT at its default, in words, for the list under the tiles.
    Built here rather than in the renderer so a test can pin that a default
    scenario produces an empty array — the other half of the no-op promise. */
@@ -5377,13 +5399,18 @@ function scenarioAssumptions(s, unitMany) {
   const out = [];
   const many = unitMany || 'items';
   const range = (lo, hi) => lo === hi ? lo + '%' : lo + '% to ' + hi + '%';
+  /* Scope growth is the one scope knob BOTH lenses read, so it is the one that
+     has to be said in the reader's own unit. Everything below it is feature-only
+     and never reaches here on the item lens. */
+  const feature = many === 'features';
   if (scenarioPaceOn(s)) out.push({ key: 'est', label: 'Estimated pace',
     value: s.estLo === s.estHi ? String(s.estLo) : s.estLo + '\u2013' + s.estHi,
     wording: 'dealt from a typed range of ' + (s.estLo === s.estHi ? s.estLo
       : s.estLo + ' to ' + s.estHi) + ' ' + many + ' a period instead of from history' });
   if (s.growthHi > 0) out.push({ key: 'growth', label: 'Scope growth',
     value: range(s.growthLo, s.growthHi),
-    wording: 'each known feature grows by ' + range(s.growthLo, s.growthHi) });
+    wording: (feature ? 'each known feature grows by ' : 'the work you counted grows by ')
+      + range(s.growthLo, s.growthHi) });
   if (s.extraHi > 0) out.push({ key: 'extra', label: 'Features discovered later',
     value: range(s.extraLo, s.extraHi),
     wording: range(s.extraLo, s.extraHi) + ' more features turn up than are counted' });
@@ -7172,7 +7199,11 @@ function derive(rows, settings, view, stages) {
   /* THE DISPATCH. At defaults this is literally the sampler this app has always
      run, so today's answers are the same code rather than approximately the same
      numbers. See the comment on the scoped samplers. */
-  const sc = scenarioFrom(view.scenario);
+  /* Narrowed to the lens FIRST, so `plain` is true whenever the knobs this lens
+     reads are all at their defaults — feature-only settings left over from the
+     other lens must not push an item forecast onto the scoped sampler, any more
+     than they may be claimed under the tiles. */
+  const sc = scenarioForUnit(scenarioFrom(view.scenario), units === 'features');
   const plain = scenarioIsDefault(sc);
   const whenPeriods = plain
     ? forecastPeriodsFor(fcSamples, fcItems, FORECAST_TRIALS)
@@ -7756,7 +7787,8 @@ window.TD = {
      without a paste box or a team list on screen. */
   dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
   soleProjectId, PROJECT_ID_ADOPT_MIN,
-  scenarioFrom, scenarioIsDefault, scenarioPaceOn, scenarioAssumptions, scenarioScopeRange, lerp,
+  scenarioFrom, scenarioIsDefault, scenarioPaceOn, scenarioForUnit, scenarioAssumptions,
+  scenarioScopeRange, lerp,
   forecastPeriodsForScoped, forecastItemsInScoped,
   forecastFeaturePeriodsScoped, forecastFeaturesInScoped,
   spreadRatioOf, widestScenarioKnob,
@@ -11423,7 +11455,13 @@ function renderFeatureCards(d, bd) {
    clamp pinned to 200 has to say 200, or the reader is looking at a control that
    contradicts the answer under it. */
 function renderScenario(d) {
-  const f = d.forecast, sc = f.scenario || scenarioFrom(null);
+  /* Two different scenarios on purpose. The BOXES are written from the stored
+     one, so a knob the current lens ignores keeps the value the reader typed
+     under the other lens — writing a lens-zeroed value into a hidden box would
+     let the next keystroke read it back out and erase the setting. The CLAIMS
+     under and around them come off `d.forecast`, which was narrowed to the lens,
+     so nothing is asserted that did not move a number. */
+  const f = d.forecast, sc = scenarioFrom(view.scenario);
   const feature = d.unit === 'features';
 
   const opts = (list, sel) => list.map((s, i) =>
@@ -11452,6 +11490,12 @@ function renderScenario(d) {
      the orphaned-control complaint again — so say it with the control. */
   $('scConfidence').disabled = scenarioPaceOn(sc);
   $('scEstRangeLabel').textContent = d.Units + ' finished per ' + d.bucketNoun;
+  /* Scope growth is the one knob in this block that BOTH lenses read, so it is
+     the one that has to be relabelled rather than hidden. Its neighbours below
+     are feature-only and hide instead. */
+  $('scGrowthLabel').textContent = feature
+    ? 'Each known feature grows by (%)'
+    : 'The work you counted grows by (%)';
   $('scUnavailableLabel').textContent = d.bucketNounPlural.charAt(0).toUpperCase()
     + d.bucketNounPlural.slice(1) + ' nobody is delivering';
 

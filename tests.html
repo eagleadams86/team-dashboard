@@ -304,10 +304,11 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    series), so the total moves legitimately when that data changes size. An
    exact floor here would go red for a reason that is not about the tests.
 
-   Raised to 2418 on 2026-08-26 by the typed-pace tick — the first group in here
+   Raised to 2444 on 2026-08-26 — the typed-pace tick — the first group in here
    that drives the scenario block's own controls, which is why the tick could be
-   dead on screen while every pure test about it passed. */
-const EXPECTED = 2418;
+   dead on screen while every pure test about it passed, and then the lens filter
+   the same day. */
+const EXPECTED = 2444;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3656,6 +3657,52 @@ async function run(TD, win) {
     is(TD.scenarioAssumptions(ticked), [], 'and it claims nothing under the tiles');
     is(TD.scenarioFrom({ estOn: true, estLo: 0, growthLo: 10, growthHi: 10 }).estOn, true,
        'the tick survives beside another knob too');
+
+    /* ── THE LENS DECIDES WHICH KNOBS EXIST ──────────────────────────────────
+       Reported by Charles on 2026-08-26, looking at "Each known feature grows
+       by (%)" while counting work items. The label was the visible half; the
+       half underneath was that a scenario set under Features went on being
+       CLAIMED under Work items — counted in "2 settings on", listed under the
+       tiles, folded into "multiply the scope by 2.60×" — while the item sampler
+       read none of it. The controls hid; their assertions did not. */
+    const featureSet = TD.scenarioFrom({ growthLo: 10, growthHi: 10,
+      extraLo: 20, extraHi: 30, clarity: 2, parallel: 3 });
+    const onItems = TD.scenarioForUnit(featureSet, false);
+    is([onItems.extraLo, onItems.extraHi, onItems.clarity, onItems.parallel], [0, 0, 0, 1],
+       'the item lens zeroes every knob the item sampler does not read');
+    is([onItems.growthLo, onItems.growthHi], [10, 10],
+       'and keeps scope growth, which it DOES read');
+    is([featureSet.extraLo, featureSet.clarity, featureSet.parallel], [20, 2, 3],
+       'the STORED scenario is untouched — switching lens back must give the settings '
+       + 'back, and a hidden box written to zero would be read back out and erase them');
+    is(TD.scenarioForUnit(featureSet, true), featureSet,
+       'the feature lens reads all seven, so it narrows nothing');
+
+    /* The three things the reader is told, each off the narrowed scenario. */
+    is(TD.scenarioAssumptions(onItems, 'items').map(a => a.key), ['growth'],
+       'so an item forecast claims only the knob that moved it');
+    is(TD.scenarioAssumptions(featureSet, 'features').map(a => a.key),
+       ['growth', 'extra', 'clarity', 'parallel'],
+       'while the feature forecast claims all four, as it always did');
+    is(TD.scenarioScopeRange(onItems), { lo: 1.1, hi: 1.1 },
+       'the scope line multiplies only what the lens applied');
+    ok(!TD.scenarioIsDefault(featureSet) && !TD.scenarioIsDefault(onItems),
+       'both are adjusted scenarios here, since growth is set in both');
+    /* And the dispatch: feature-only knobs alone must leave an item forecast on
+       the ORIGINAL sampler, not merely give it the same numbers. */
+    ok(TD.scenarioIsDefault(TD.scenarioForUnit(
+         TD.scenarioFrom({ extraLo: 20, extraHi: 30, clarity: 2, parallel: 3 }), false)),
+       'feature-only knobs alone leave the item lens on the plain forecast entirely');
+
+    /* Scope growth is the one scope knob both lenses read, so it is the one that
+       has to be said in the reader's own unit rather than hidden. */
+    ok(/each known feature grows by/.test(
+         TD.scenarioAssumptions(featureSet, 'features').find(a => a.key === 'growth').wording),
+       'growth is worded in features on the feature lens');
+    ok(/the work you counted grows by/.test(
+         TD.scenarioAssumptions(onItems, 'items').find(a => a.key === 'growth').wording),
+       'and in plain work-item words on the item lens — never "each known feature" '
+       + 'over a count of work items');
     is(TD.scenarioIsDefault(TD.scenarioFrom({ estOn: true, estLo: 0, growthLo: 10, growthHi: 10 })),
        false, 'though that scenario is not default — the OTHER knob is set');
   }
@@ -5804,6 +5851,93 @@ group('ARTs — the grouping, and the boundary it crosses');
     scDoc.getElementById('scReset').click();
     ok(!scDoc.getElementById('scEstOn').checked && scDoc.getElementById('scEstWrap').hidden,
        'and Reset clears a pace that WAS set, tick and boxes together');
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     THE SAME BLOCK UNDER THE OTHER LENS (2026-08-26). Charles, on the item
+     lens: "when work items is selected should the field below say 'each known
+     feature grows by (%)'?" It should not — and the label was the small half.
+     Three controls hide themselves on this lens and their VALUES stayed live in
+     every sentence the card says about itself. Driven here rather than reasoned
+     about, because the whole failure was that renderScenario and the engine
+     disagreed about which scenario they were describing.
+     ══════════════════════════════════════════════════════════ */
+  group('the scenario knobs — the lens decides which ones exist');
+
+  plant({ teams: [{ id: 'ln1', name: 'Lensed',
+    rows: Array.from({ length: 14 }, (_, i) => ({
+      c: '2015-0' + (i < 9 ? '1' : '2') + '-' + String((i % 9) * 3 + 2).padStart(2, '0'),
+      s: '2015-01-02', t: 'Story' })),
+    features: [{ c: '2015-01-22', s: '2015-01-05', t: 'Feature', i: 'LN-1' },
+               { c: '2015-02-02', s: '2015-01-12', t: 'Feature', i: 'LN-2' }] }],
+    settings: {} });
+  win.renderAll();
+  {
+    const lnDoc = win.document;
+    const unit = lnDoc.getElementById('unitSel');
+    const setUnit = (v) => { unit.value = v; unit.dispatchEvent(new win.Event('change', { bubbles: true })); };
+    const label = () => lnDoc.querySelector('label[for="scGrowthLo"]').textContent;
+    const claims = () => ({
+      summary: lnDoc.getElementById('fcScenarioSummary').textContent.replace(/\s+/g, ' '),
+      scopeNote: lnDoc.getElementById('scScopeNote').hidden ? null
+        : lnDoc.getElementById('scScopeNote').textContent,
+      tiles: lnDoc.getElementById('fcAssumptions').hidden ? null
+        : lnDoc.getElementById('fcAssumptions').textContent.replace(/\s+/g, ' ')
+    });
+
+    ok(!lnDoc.getElementById('unitField').hidden,
+       'the team has features, so the lens can actually be switched');
+    lnDoc.getElementById('scReset').click();
+
+    /* ── The label ──────────────────────────────────────────── */
+    setUnit('features');
+    is(label(), 'Each known feature grows by (%)', 'on the feature lens the growth box names features');
+    setUnit('items');
+    is(label(), 'The work you counted grows by (%)',
+       'and on the item lens it names the work — a box measuring work items may not '
+       + 'call them features');
+    ok(lnDoc.getElementById('scExtraWrap').hidden
+       && lnDoc.getElementById('scClarityWrap').hidden
+       && lnDoc.getElementById('scParallelWrap').hidden,
+       'while its three feature-only neighbours hide instead, since neither wording '
+       + 'would be true of them');
+
+    /* ── The claims, which is the half that actually misled ──── */
+    setUnit('features');
+    const setNum = (id, v) => { const b = lnDoc.getElementById(id); b.value = v;
+      b.dispatchEvent(new win.Event('change', { bubbles: true })); };
+    setNum('scExtraLo', '20'); setNum('scExtraHi', '30');
+    const clarity = lnDoc.getElementById('scClarity');
+    clarity.value = '2'; clarity.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const onFeatures = claims();
+    ok(/2 settings on/.test(onFeatures.summary), 'the feature lens counts both knobs');
+    ok(/multiply the scope/.test(onFeatures.scopeNote || ''), 'and prints what they multiply to');
+    ok(/more features turn up/.test(onFeatures.tiles || ''), 'and lists them under the tiles');
+
+    setUnit('items');
+    const onItems = claims();
+    is(onItems.summary, 'Adjust for what you know',
+       'the SAME two knobs claim nothing on the item lens — the sampler never reads them');
+    is(onItems.scopeNote, null, 'no scope multiplier is printed for knobs that multiplied nothing');
+    is(onItems.tiles, null, 'and the card does not say it is anything but the plain forecast');
+
+    /* Not by destroying them: the lens toggle has to be reversible, and a hidden
+       box written to zero would be read straight back out by the delegated
+       handler on the reader's next keystroke. */
+    is(lnDoc.getElementById('scExtraLo').value, '20',
+       'the hidden box still holds what was typed under the other lens');
+    setUnit('features');
+    ok(/2 settings on/.test(claims().summary),
+       'so switching back gives the reader every setting they had');
+
+    /* Growth is the one that crosses: set on either lens, read on both. */
+    setNum('scGrowthLo', '10'); setNum('scGrowthHi', '10');
+    setUnit('items');
+    ok(/1 setting on/.test(claims().summary), 'growth alone survives the switch to items');
+    ok(/the work you counted grows by 10%/.test(claims().tiles || ''),
+       'and is stated in work-item words under the tiles too, not only on its label',
+       claims().tiles);
+    lnDoc.getElementById('scReset').click();
   }
 
   /* ══════════════════════════════════════════════════════════
