@@ -6314,6 +6314,225 @@ function agedCounts(items, evalPoints, thresholdDays, wip, workingDays) {
    axis. Optional, and everything works without it: a caller that passes three
    arguments (every test written before stages existed, and deriveTeams before
    it was widened) gets the work-type columns this chart has always drawn. */
+/* ── The forecast, assembled ───────────────────────────────────────────────
+   Lifted out of derive() so it can run WITHOUT an axis. Every figure above it
+   on the dashboard keys off a completion; this one does not have to, because a
+   typed pace supplies its own throughput — which is the whole point of that
+   control and was, until now, unreachable: derive returns early with no
+   `forecast` at all when nothing has finished, so the one card that could still
+   answer never got the chance. Called twice now — once from derive with the
+   team’s own throughput, once from the planning path with an empty sample set.
+
+   Takes what it reads rather than closing over derive’s locals, so the second
+   caller cannot silently pick up a field the first one happened to have. */
+function buildForecast(o) {
+  const view = o.view || {};
+  const wholeThroughput = o.samples || [];
+  const weekStarts = o.weekStarts || [];
+  const bucket = o.bucket;
+  const units = o.units;
+  /* No data means no end of data: the anchor falls back to today, which is the
+     only honest answer to "counting from" when nothing has been counted. */
+  const endDate = o.endDate || new Date(todayLocalISO() + 'T00:00:00Z');
+
+  /* ── The forecast ──────────────────────────────────────────────────────────
+     Two questions off one sample set: how long until N items are finished, and
+     how many are finished by a date. Both deal from `wholeThroughput` above —
+     see the note on forecastPeriodsFor for why whole periods and why not days.
+
+     The two inputs are defaulted HERE rather than trusted from the caller, the
+     same way bucket and agedDays are: `view` comes back off localStorage, where
+     a hand-edited copy can say anything, and a test fixture written before this
+     existed still has to mean something sensible. A count is pinned to a whole
+     number in range; a date has to parse AND be later than the data ends, since
+     a target already in the past is not a forecast — it is a date the reader
+     set weeks ago and the data has since caught up with. */
+  /* Anything that is not a positive number falls back to the default rather
+     than being clamped up to 1: a negative or a cleared box is nonsense input,
+     not a small request, and quietly forecasting one item would answer a
+     question nobody asked. Only a genuine over-range number is clamped. */
+  const fcAsked = Math.round(Number(view.forecastItems));
+  const fcItems = (isFinite(fcAsked) && fcAsked > 0)
+    ? Math.min(FORECAST_MAX_ITEMS, fcAsked) : DEFAULT_FORECAST_ITEMS;
+  const fcStored = /^\d{4}-\d{2}-\d{2}$/.test(String(view.forecastDate || ''))
+    ? new Date(view.forecastDate + 'T00:00:00Z') : null;
+  /* Three months out when nothing valid is stored — about the length of a
+     planning increment, and far enough that a weekly team has a spread worth
+     looking at rather than an answer of "one or two". Counted from the end of
+     the DATA, like every other window here, so a paste of last quarter's export
+     forecasts from where that quarter stopped. */
+  /* ── Counting from ───────────────────────────────────────────────────────
+     Every other figure in this app is read as of the newest date in the data,
+     and the forecast has always followed. That is right while an export is
+     current and FLATTERS THE PLAN by exactly its staleness when it is not: a
+     team whose export stopped nine days ago has every forecast date nine days
+     early, because the walk starts nine days before today. Nobody is going to
+     deliver those nine days retrospectively.
+
+     So the anchor is a choice, defaulting to the old behaviour — changing the
+     default would make the forecast disagree with every tile beside it. `max`
+     rather than a swap, so a future-dated export can never pull the anchor
+     EARLIER than the data ends. */
+  /* The reader's OWN calendar day, read as a UTC midnight so it compares with
+     the rows — the same split todayLocalISO already draws for the future-date
+     guard on the item form. A UTC "today" would be tomorrow for anyone far
+     enough east and would move every forecast date by a day. */
+  const today = new Date(todayLocalISO() + 'T00:00:00Z');
+  const countFromToday = view.countFrom === 'today' && today && today > endDate;
+  const countFrom = countFromToday ? today : endDate;
+
+  const fcTarget = (fcStored && !isNaN(fcStored) && fcStored > countFrom)
+    ? fcStored : edate(countFrom, 3);
+  const fcHorizon = periodsBetween(countFrom, fcTarget, bucket);
+
+  /* ── Periods a team in scope had no data for ─────────────────────────────
+     Only ever set by deriveTeams, and only for a pooled forecast. One shared
+     date is imposed on every team so the All Teams table is a fair comparison —
+     but for a FORECAST that fairness turns into a lie: a team whose export
+     stopped three weeks before the others contributes three periods of zero to
+     the pool, and those are not observations of a slow team, they are the
+     absence of data. `derive()` cannot tell the difference, because throughput
+     is a count over rows that are not there.
+
+     Worse than the level it drops, the SPREAD it adds: those periods are
+     systematically low rather than randomly low, so they fatten the slow tail
+     exactly where the 85th and 95th percentiles are read. The forecast comes out
+     both slower and less certain, and neither is a fact about delivery.
+
+     So the samples stop where every team in scope still had data. Only the
+     forecast's window moves; `asOf` stays the newest date for everything else. */
+  const fcCoverage = (view.forecastCoverageEnd instanceof Date && !isNaN(view.forecastCoverageEnd))
+    ? view.forecastCoverageEnd : null;
+  let fcSamples = wholeThroughput, fcLost = 0;
+  if (fcCoverage && fcCoverage < endDate) {
+    const keep = wholeThroughput.filter((v, i) =>
+      weekStarts[i] && bucketEnd(weekStarts[i], bucket) <= fcCoverage).length;
+    fcLost = wholeThroughput.length - keep;
+    fcSamples = wholeThroughput.slice(0, keep);
+  }
+
+  /* Dealt in whole periods, reported in days — see periodsToDays for why the
+     answer changes unit on the way out. The conversion happens once here rather
+     than inside the sampler, which stays in the units it deals in so a test can
+     hand it a sample set and check the arithmetic without a calendar. */
+  /* THE DISPATCH. At defaults this is literally the sampler this app has always
+     run, so today's answers are the same code rather than approximately the same
+     numbers. See the comment on the scoped samplers. */
+  /* Narrowed to the lens FIRST, so `plain` is true whenever the knobs this lens
+     reads are all at their defaults — feature-only settings left over from the
+     other lens must not push an item forecast onto the scoped sampler, any more
+     than they may be claimed under the tiles. */
+  const sc = scenarioForUnit(scenarioFrom(view.scenario), units === 'features');
+  const plain = scenarioIsDefault(sc);
+  const whenPeriods = plain
+    ? forecastPeriodsFor(fcSamples, fcItems, FORECAST_TRIALS)
+    : forecastPeriodsForScoped(fcSamples, fcItems, sc, FORECAST_TRIALS);
+  const whenTrials = whenPeriods
+    && whenPeriods.map(p => periodsToDays(countFrom, p, bucket));
+  const manyTrials = plain
+    ? forecastItemsIn(fcSamples, fcHorizon, FORECAST_TRIALS)
+    : forecastItemsInScoped(fcSamples, fcHorizon, sc, FORECAST_TRIALS);
+
+  /* Why the forecast might have nothing to say, so the cards can name the
+     control that fixes it rather than going blank.
+
+     `few-periods` is the one that happens: group by month over a 3-month window
+     and there are three. `no-throughput` mirrors the sampler's own guard, and is
+     not a shape THIS caller can currently produce — the axis floors at the first
+     completed period, so the first whole period on it always holds a completion.
+     It is stated anyway because forecastPeriodsFor is a public, testable
+     function whose contract allows an all-zero sample set, and a message that
+     exists is better than a blank card if the axis rule ever moves. */
+  /* `stale-team` is its own reason rather than folding into `few-periods`,
+     because the two have different fixes: one is answered by the grouping and
+     window controls in front of the reader, and the other by re-exporting a
+     team or narrowing the scope. Reported only when the trim is what caused
+     the shortfall — an untrimmed window this short was always few-periods. */
+  /* A typed throughput estimate supplies its own pace, so none of the history
+     floors apply to it — that is the whole point of the control. The eight-period
+     refusal stays the DEFAULT outcome rather than the only one. */
+  const fcReason = scenarioPaceOn(sc) ? null
+    : fcSamples.length < FORECAST_MIN_PERIODS
+      ? (fcLost > 0 && wholeThroughput.length >= FORECAST_MIN_PERIODS
+          ? 'stale-team' : 'few-periods')
+    : !fcSamples.some(v => v > 0) ? 'no-throughput'
+    : null;
+
+  /* A backlog bigger than this team's recorded pace can clear inside the walk's
+     limit. The trials are all pinned at the cap, so every answer would read the
+     same absurd number — say so instead. */
+  /* Re-checked AFTER the scenario, not before: a scope multiplier can push a
+     backlog that was reachable past the walk's limit, and the old check ran on
+     the unmultiplied count. */
+  const fcBeyond = !!whenPeriods
+    && percentileOf(whenPeriods, FORECAST_CONFIDENCE[FORECAST_CONFIDENCE.length - 1])
+       >= FORECAST_MAX_PERIODS;
+  /* And the spread guard, which only ever fires under a scenario: unadjusted,
+     this ratio sits between 1.15 and 1.4 on a typical team. */
+  const fcSpread = whenTrials ? spreadRatioOf(whenTrials, true) : null;
+  const fcTooWide = !plain && fcSpread != null && fcSpread >= FORECAST_SPREAD_MAX;
+
+  const forecast = {
+    reason: fcReason,
+    /* Stated on the face wherever an answer is: every other figure in this app
+       names the periods it was counted over, and a forecast has more reason to
+       than most. */
+    samples: fcSamples.length,
+    /* The sample set itself, not just its size. The feature forecast is built
+       from a DIFFERENT list's throughput than the one it reports on — item
+       throughput converted through the size distribution — so it needs to be
+       handed the numbers rather than re-derive them. Nothing else reads it. */
+    sampleSet: fcSamples,
+    /* How many whole periods the coverage trim took off the end, and where it
+       stopped — both stated on the card, because a figure must never move for
+       a reason that is not on the page. Zero and null for every single-team
+       forecast, which is every forecast this app drew before now. */
+    lostPeriods: fcLost,
+    coverageEnd: fcLost > 0 ? fcCoverage : null,
+    countFrom,
+    countingFromToday: countFromToday,
+    scenario: sc,
+    assumptions: scenarioAssumptions(sc, units),
+    scopeRange: scenarioScopeRange(sc),
+    estimated: scenarioPaceOn(sc),
+    trials: FORECAST_TRIALS,
+    minPeriods: FORECAST_MIN_PERIODS,
+    items: fcItems,
+    targetDate: fcTarget,
+    horizonPeriods: fcHorizon,
+    beyondReach: fcBeyond,
+    /* Only worked out when there IS an answer to compare against — a bisection
+       over a refused forecast costs eighteen runs to report nothing — and only
+       when the caller has a use for it. `forecastMode: 'off'` is what All Teams
+       passes for its per-team rows: that table has no forecast column at all, so
+       running the most expensive thing in the app once per team was eight
+       bisections nobody could see. Measured at 849ms for three teams. */
+    requiredPace: (view.forecastMode !== 'off' && !fcReason && !fcBeyond && !fcTooWide)
+      ? requiredPaceFor(fcSamples, fcItems, fcHorizon, 85, sc) : null,
+    spread: fcSpread,
+    tooWide: fcTooWide,
+    spreadMax: FORECAST_SPREAD_MAX,
+    /* Which knob to turn back first: the one whose configured range is widest as
+       a fraction. A proxy rather than an answer — the exact version re-runs the
+       forecast once per knob with that knob defaulted and reports whichever
+       removal shrinks the ratio most, which is about five extra runs at 2,000
+       trials and entirely affordable if this ever proves not good enough. */
+    widestKnob: fcTooWide ? widestScenarioKnob(sc) : null,
+    when: (whenTrials && !fcBeyond && !fcTooWide) ? {
+      rows: FORECAST_CONFIDENCE.map(c => {
+        const days = daysAtConfidence(whenTrials, c);
+        return { confidence: c, days, date: addDays(countFrom, days) };
+      }),
+      hist: forecastHistogram(whenTrials, true)
+    } : null,
+    howMany: (manyTrials && !fcTooWide) ? {
+      rows: FORECAST_CONFIDENCE.map(c => ({ confidence: c, count: countAtConfidence(manyTrials, c) })),
+      hist: forecastHistogram(manyTrials, false)
+    } : null
+  };
+  return forecast;
+}
+
 function derive(rows, settings, view, stages) {
   const stageList = Array.isArray(stages) ? stages : [];
   const sameDay   = Number(settings.sameDayValue);
@@ -7116,201 +7335,8 @@ function derive(rows, settings, view, stages) {
     lines: ageLines
   };
 
-  /* ── The forecast ──────────────────────────────────────────────────────────
-     Two questions off one sample set: how long until N items are finished, and
-     how many are finished by a date. Both deal from `wholeThroughput` above —
-     see the note on forecastPeriodsFor for why whole periods and why not days.
-
-     The two inputs are defaulted HERE rather than trusted from the caller, the
-     same way bucket and agedDays are: `view` comes back off localStorage, where
-     a hand-edited copy can say anything, and a test fixture written before this
-     existed still has to mean something sensible. A count is pinned to a whole
-     number in range; a date has to parse AND be later than the data ends, since
-     a target already in the past is not a forecast — it is a date the reader
-     set weeks ago and the data has since caught up with. */
-  /* Anything that is not a positive number falls back to the default rather
-     than being clamped up to 1: a negative or a cleared box is nonsense input,
-     not a small request, and quietly forecasting one item would answer a
-     question nobody asked. Only a genuine over-range number is clamped. */
-  const fcAsked = Math.round(Number(view.forecastItems));
-  const fcItems = (isFinite(fcAsked) && fcAsked > 0)
-    ? Math.min(FORECAST_MAX_ITEMS, fcAsked) : DEFAULT_FORECAST_ITEMS;
-  const fcStored = /^\d{4}-\d{2}-\d{2}$/.test(String(view.forecastDate || ''))
-    ? new Date(view.forecastDate + 'T00:00:00Z') : null;
-  /* Three months out when nothing valid is stored — about the length of a
-     planning increment, and far enough that a weekly team has a spread worth
-     looking at rather than an answer of "one or two". Counted from the end of
-     the DATA, like every other window here, so a paste of last quarter's export
-     forecasts from where that quarter stopped. */
-  /* ── Counting from ───────────────────────────────────────────────────────
-     Every other figure in this app is read as of the newest date in the data,
-     and the forecast has always followed. That is right while an export is
-     current and FLATTERS THE PLAN by exactly its staleness when it is not: a
-     team whose export stopped nine days ago has every forecast date nine days
-     early, because the walk starts nine days before today. Nobody is going to
-     deliver those nine days retrospectively.
-
-     So the anchor is a choice, defaulting to the old behaviour — changing the
-     default would make the forecast disagree with every tile beside it. `max`
-     rather than a swap, so a future-dated export can never pull the anchor
-     EARLIER than the data ends. */
-  /* The reader's OWN calendar day, read as a UTC midnight so it compares with
-     the rows — the same split todayLocalISO already draws for the future-date
-     guard on the item form. A UTC "today" would be tomorrow for anyone far
-     enough east and would move every forecast date by a day. */
-  const today = new Date(todayLocalISO() + 'T00:00:00Z');
-  const countFromToday = view.countFrom === 'today' && today && today > endDate;
-  const countFrom = countFromToday ? today : endDate;
-
-  const fcTarget = (fcStored && !isNaN(fcStored) && fcStored > countFrom)
-    ? fcStored : edate(countFrom, 3);
-  const fcHorizon = periodsBetween(countFrom, fcTarget, bucket);
-
-  /* ── Periods a team in scope had no data for ─────────────────────────────
-     Only ever set by deriveTeams, and only for a pooled forecast. One shared
-     date is imposed on every team so the All Teams table is a fair comparison —
-     but for a FORECAST that fairness turns into a lie: a team whose export
-     stopped three weeks before the others contributes three periods of zero to
-     the pool, and those are not observations of a slow team, they are the
-     absence of data. `derive()` cannot tell the difference, because throughput
-     is a count over rows that are not there.
-
-     Worse than the level it drops, the SPREAD it adds: those periods are
-     systematically low rather than randomly low, so they fatten the slow tail
-     exactly where the 85th and 95th percentiles are read. The forecast comes out
-     both slower and less certain, and neither is a fact about delivery.
-
-     So the samples stop where every team in scope still had data. Only the
-     forecast's window moves; `asOf` stays the newest date for everything else. */
-  const fcCoverage = (view.forecastCoverageEnd instanceof Date && !isNaN(view.forecastCoverageEnd))
-    ? view.forecastCoverageEnd : null;
-  let fcSamples = wholeThroughput, fcLost = 0;
-  if (fcCoverage && fcCoverage < endDate) {
-    const keep = wholeThroughput.filter((v, i) =>
-      weekStarts[i] && bucketEnd(weekStarts[i], bucket) <= fcCoverage).length;
-    fcLost = wholeThroughput.length - keep;
-    fcSamples = wholeThroughput.slice(0, keep);
-  }
-
-  /* Dealt in whole periods, reported in days — see periodsToDays for why the
-     answer changes unit on the way out. The conversion happens once here rather
-     than inside the sampler, which stays in the units it deals in so a test can
-     hand it a sample set and check the arithmetic without a calendar. */
-  /* THE DISPATCH. At defaults this is literally the sampler this app has always
-     run, so today's answers are the same code rather than approximately the same
-     numbers. See the comment on the scoped samplers. */
-  /* Narrowed to the lens FIRST, so `plain` is true whenever the knobs this lens
-     reads are all at their defaults — feature-only settings left over from the
-     other lens must not push an item forecast onto the scoped sampler, any more
-     than they may be claimed under the tiles. */
-  const sc = scenarioForUnit(scenarioFrom(view.scenario), units === 'features');
-  const plain = scenarioIsDefault(sc);
-  const whenPeriods = plain
-    ? forecastPeriodsFor(fcSamples, fcItems, FORECAST_TRIALS)
-    : forecastPeriodsForScoped(fcSamples, fcItems, sc, FORECAST_TRIALS);
-  const whenTrials = whenPeriods
-    && whenPeriods.map(p => periodsToDays(countFrom, p, bucket));
-  const manyTrials = plain
-    ? forecastItemsIn(fcSamples, fcHorizon, FORECAST_TRIALS)
-    : forecastItemsInScoped(fcSamples, fcHorizon, sc, FORECAST_TRIALS);
-
-  /* Why the forecast might have nothing to say, so the cards can name the
-     control that fixes it rather than going blank.
-
-     `few-periods` is the one that happens: group by month over a 3-month window
-     and there are three. `no-throughput` mirrors the sampler's own guard, and is
-     not a shape THIS caller can currently produce — the axis floors at the first
-     completed period, so the first whole period on it always holds a completion.
-     It is stated anyway because forecastPeriodsFor is a public, testable
-     function whose contract allows an all-zero sample set, and a message that
-     exists is better than a blank card if the axis rule ever moves. */
-  /* `stale-team` is its own reason rather than folding into `few-periods`,
-     because the two have different fixes: one is answered by the grouping and
-     window controls in front of the reader, and the other by re-exporting a
-     team or narrowing the scope. Reported only when the trim is what caused
-     the shortfall — an untrimmed window this short was always few-periods. */
-  /* A typed throughput estimate supplies its own pace, so none of the history
-     floors apply to it — that is the whole point of the control. The eight-period
-     refusal stays the DEFAULT outcome rather than the only one. */
-  const fcReason = scenarioPaceOn(sc) ? null
-    : fcSamples.length < FORECAST_MIN_PERIODS
-      ? (fcLost > 0 && wholeThroughput.length >= FORECAST_MIN_PERIODS
-          ? 'stale-team' : 'few-periods')
-    : !fcSamples.some(v => v > 0) ? 'no-throughput'
-    : null;
-
-  /* A backlog bigger than this team's recorded pace can clear inside the walk's
-     limit. The trials are all pinned at the cap, so every answer would read the
-     same absurd number — say so instead. */
-  /* Re-checked AFTER the scenario, not before: a scope multiplier can push a
-     backlog that was reachable past the walk's limit, and the old check ran on
-     the unmultiplied count. */
-  const fcBeyond = !!whenPeriods
-    && percentileOf(whenPeriods, FORECAST_CONFIDENCE[FORECAST_CONFIDENCE.length - 1])
-       >= FORECAST_MAX_PERIODS;
-  /* And the spread guard, which only ever fires under a scenario: unadjusted,
-     this ratio sits between 1.15 and 1.4 on a typical team. */
-  const fcSpread = whenTrials ? spreadRatioOf(whenTrials, true) : null;
-  const fcTooWide = !plain && fcSpread != null && fcSpread >= FORECAST_SPREAD_MAX;
-
-  const forecast = {
-    reason: fcReason,
-    /* Stated on the face wherever an answer is: every other figure in this app
-       names the periods it was counted over, and a forecast has more reason to
-       than most. */
-    samples: fcSamples.length,
-    /* The sample set itself, not just its size. The feature forecast is built
-       from a DIFFERENT list's throughput than the one it reports on — item
-       throughput converted through the size distribution — so it needs to be
-       handed the numbers rather than re-derive them. Nothing else reads it. */
-    sampleSet: fcSamples,
-    /* How many whole periods the coverage trim took off the end, and where it
-       stopped — both stated on the card, because a figure must never move for
-       a reason that is not on the page. Zero and null for every single-team
-       forecast, which is every forecast this app drew before now. */
-    lostPeriods: fcLost,
-    coverageEnd: fcLost > 0 ? fcCoverage : null,
-    countFrom,
-    countingFromToday: countFromToday,
-    scenario: sc,
-    assumptions: scenarioAssumptions(sc, units),
-    scopeRange: scenarioScopeRange(sc),
-    estimated: scenarioPaceOn(sc),
-    trials: FORECAST_TRIALS,
-    minPeriods: FORECAST_MIN_PERIODS,
-    items: fcItems,
-    targetDate: fcTarget,
-    horizonPeriods: fcHorizon,
-    beyondReach: fcBeyond,
-    /* Only worked out when there IS an answer to compare against — a bisection
-       over a refused forecast costs eighteen runs to report nothing — and only
-       when the caller has a use for it. `forecastMode: 'off'` is what All Teams
-       passes for its per-team rows: that table has no forecast column at all, so
-       running the most expensive thing in the app once per team was eight
-       bisections nobody could see. Measured at 849ms for three teams. */
-    requiredPace: (view.forecastMode !== 'off' && !fcReason && !fcBeyond && !fcTooWide)
-      ? requiredPaceFor(fcSamples, fcItems, fcHorizon, 85, sc) : null,
-    spread: fcSpread,
-    tooWide: fcTooWide,
-    spreadMax: FORECAST_SPREAD_MAX,
-    /* Which knob to turn back first: the one whose configured range is widest as
-       a fraction. A proxy rather than an answer — the exact version re-runs the
-       forecast once per knob with that knob defaulted and reports whichever
-       removal shrinks the ratio most, which is about five extra runs at 2,000
-       trials and entirely affordable if this ever proves not good enough. */
-    widestKnob: fcTooWide ? widestScenarioKnob(sc) : null,
-    when: (whenTrials && !fcBeyond && !fcTooWide) ? {
-      rows: FORECAST_CONFIDENCE.map(c => {
-        const days = daysAtConfidence(whenTrials, c);
-        return { confidence: c, days, date: addDays(countFrom, days) };
-      }),
-      hist: forecastHistogram(whenTrials, true)
-    } : null,
-    howMany: (manyTrials && !fcTooWide) ? {
-      rows: FORECAST_CONFIDENCE.map(c => ({ confidence: c, count: countAtConfidence(manyTrials, c) })),
-      hist: forecastHistogram(manyTrials, false)
-    } : null
-  };
+  const forecast = buildForecast({ view, samples: wholeThroughput, weekStarts,
+    bucket, endDate, units });
 
   /* The window's defect share: pooled — defects completed over everything
      completed — NOT the mean of the per-bucket rates the chart plots. The
@@ -7562,10 +7588,10 @@ function derive(rows, settings, view, stages) {
       cycleScatter: cycleLabel + ' of Each ' + Unit + ', on the ' + Noun + ' It Finished',
       /* Both name the question's own input, so a card read on its own — in a
          screenshot, over someone's shoulder — still says what was asked. */
-      forecastWhen: 'How Many Days to Finish ' + fcItems + ' ' + Unit
-        + (fcItems === 1 ? '' : 's') + ', over ' + FORECAST_TRIALS.toLocaleString()
+      forecastWhen: 'How Many Days to Finish ' + forecast.items + ' ' + Unit
+        + (forecast.items === 1 ? '' : 's') + ', over ' + FORECAST_TRIALS.toLocaleString()
         + ' Simulated Runs',
-      forecastHowMany: 'How Many ' + Units + ' Finished by ' + prettyDate(fcTarget) + ', over '
+      forecastHowMany: 'How Many ' + Units + ' Finished by ' + prettyDate(forecast.targetDate) + ', over '
         + FORECAST_TRIALS.toLocaleString() + ' Simulated Runs',
       /* Says CALENDAR DAYS in the title itself rather than only in the ⓘ, and
          says it whichever way the working-days setting is set. It is the one
@@ -7597,8 +7623,9 @@ function derive(rows, settings, view, stages) {
       forecastRuns: 'Simulated runs',
       /* Calendar days, always — the working-days setting governs how long work
          TOOK, and a forecast is a wait somebody is going to sit through. */
-      forecastWhenX: 'Days to finish ' + fcItems + ' ' + unitOne + (fcItems === 1 ? '' : 's'),
-      forecastHowManyX: Units + ' finished by ' + prettyDate(fcTarget),
+      forecastWhenX: 'Days to finish ' + forecast.items + ' ' + unitOne
+        + (forecast.items === 1 ? '' : 's'),
+      forecastHowManyX: Units + ' finished by ' + prettyDate(forecast.targetDate),
       x: bucket === 'month' ? 'Month'
         : bucket === 'fortnight' ? 'Year-Fortnight (week numbers)'
         : 'Year-Week Number'
