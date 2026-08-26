@@ -1730,6 +1730,11 @@ It answers two questions, from the same set of deals:
 | **Time to finish** | a number of items | the date that many will be done by, at 50%, 85% and 95% confidence |
 | **Items by a date** | a target date | how many will be finished by then, at the same three confidences |
 
+**Adjust for what you know remembers whether you left it open.** A `<details>` resets to its
+markup on every load, so a reader who had it folded open came back to it shut with their settings
+behind the fold — and the summary's *"6 settings on"* was the only thing that would have told them
+anything was there.
+
 Both boxes sit inside the tab rather than in the control strip at the top of the dashboard,
 because they change nothing outside this group. Everything in the strip *does* reach them: the
 team, the work type filter, the date window and the grouping all decide which periods get dealt.
@@ -1915,7 +1920,7 @@ ran* — not an equivalent one, the same code — so the plain forecast is the p
 | **The team doing the work** | Established, recently changed, or brand new. Scales the pace being resampled. |
 | **Features worked at once** | See below — it changes each feature's date and not the last one. |
 | **Periods nobody is delivering** | A shutdown, a conference, a holiday fortnight. A plain number. |
-| **Use a typed pace instead of this history** | For a team with no history to resample. |
+| **Use a typed pace instead of this history** | For a team with no history to resample. **Ticked by default where there is none**, unticked where there is — see below. |
 
 **Four of the seven are about features, and they do not exist on the item lens.** Everything
 below scope growth in that table — features discovered later, how well understood they are, how
@@ -1938,6 +1943,18 @@ intended. So one is growth *within* the features you counted and the other is fe
 reorganisation making a team faster is the most-abused claim in this business and this app is not
 going to supply the arithmetic for it. If the team is unchanged, the default is the honest
 setting.
+
+**The tick follows your data until you touch it.** It arrives *checked* wherever the app would
+otherwise refuse a forecast for want of history — nothing recorded at all, fewer than eight whole
+periods, or periods with nothing finished in them — and *unchecked* wherever there is history to
+resample. That is the app's own refusal condition rather than a second opinion about it, so the
+boxes are open in exactly the cases the card would otherwise have nothing to say in, and the
+tiles read *waiting for a pace below* rather than naming history you have no way to conjure.
+
+It is a **default, not a rule**. The setting is three-state — on, off, and not chosen — so the
+first press wins for good, in either direction: untick it over a brand-new team and it stays
+unticked; tick it over a team with a year of data and it stays ticked. *Reset to No Adjustments*
+hands it back to the data.
 
 **A typed pace replaces history rather than blending with it** — a blend is traceable to neither
 source — and the team setting is switched off while it is on, because multiplying a guess by a

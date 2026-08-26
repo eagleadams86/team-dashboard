@@ -5333,7 +5333,11 @@ const FORECAST_MAX_PARALLEL = 10;
 /* Past ten, a schedule is indistinguishable from "everything at once". */
 
 const DEFAULT_SCENARIO = { growthLo: 0, growthHi: 0, extraLo: 0, extraHi: 0,
-  clarity: 0, confidence: 0, estOn: false, estLo: 0, estHi: 0,
+  /* NULL, not false: "the reader has not said". The tick's default follows the
+     data — see paceDefaultOn — and a stored `false` is a reader who unticked it,
+     which must stick over a team with no history just as firmly as a stored
+     `true` sticks over one with plenty. */
+  clarity: 0, confidence: 0, estOn: null, estLo: 0, estHi: 0,
   parallel: 1, unavailable: 0 };
 
 /* Read out of `view`, where a hand-edited copy can say anything, and pinned to
@@ -5357,7 +5361,9 @@ function scenarioFrom(raw) {
   };
   s.clarity = step(s.clarity, CLARITY_STEPS);
   s.confidence = step(s.confidence, TEAM_CONFIDENCE_STEPS);
-  s.estOn = s.estOn === true;
+  /* Three states in, three states out. Anything that is neither boolean is "not
+     chosen", which is what a saved view from before this existed also means. */
+  s.estOn = (s.estOn === true || s.estOn === false) ? s.estOn : null;
   const est = (v) => {
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? Math.min(EST_THROUGHPUT_MAX, n) : 0;
@@ -5383,6 +5389,29 @@ function scenarioFrom(raw) {
   s.parallel = int(s.parallel, 1, FORECAST_MAX_PARALLEL, 1);
   s.unavailable = int(s.unavailable, 0, FORECAST_MAX_UNAVAILABLE, 0);
   return s;
+}
+
+/* ── What the tick defaults to ─────────────────────────────────────────────
+   Asked for by Charles (2026-08-26): checked where there is no history,
+   unchecked where there is. This is the app's OWN definition of "no history" —
+   the pair of conditions that make it refuse a forecast — rather than a second
+   opinion about it, so the box arrives ticked in exactly the cases the card
+   would otherwise have nothing to say in.
+
+   A DEFAULT, not a rule: it answers only while `estOn` is null. The first press
+   of the tick writes a boolean and this stops having an opinion. */
+const paceDefaultOn = (samples) => !(Array.isArray(samples)
+  && samples.length >= FORECAST_MIN_PERIODS && samples.some(v => v > 0));
+
+/* Resolved ONCE per forecast, against the samples that forecast is actually
+   dealing from — so the tick, the sampler and the sentence under the tiles
+   cannot disagree about whether a typed pace is on. Everything downstream reads
+   the resolved copy off `forecast.scenario`. */
+function scenarioWithPaceDefault(s, samples) {
+  if (!s || s.estOn !== null) return s;
+  const out = Object.assign({}, s);
+  out.estOn = paceDefaultOn(samples);
+  return out;
 }
 
 /* A typed pace is in effect only once there is a pace typed. Everything that
@@ -5601,7 +5630,9 @@ function featureForecastOf(o) {
   const sizes = o.sizes || [], samples = o.itemSamples || [];
   const wanted = Math.max(1, Math.min(Math.round(o.featureCount) || 1, FORECAST_MAX_FEATURES));
 
-  const sc = scenarioFrom(o.scenario);
+  /* Against the ITEM throughput, which is what a feature forecast's pace is
+     dealt from — the same set the floors below are read against. */
+  const sc = scenarioWithPaceDefault(scenarioFrom(o.scenario), samples);
   const plain = scenarioIsDefault(sc);
 
   const reason =
@@ -6493,7 +6524,8 @@ function buildForecast(o) {
      reads are all at their defaults — feature-only settings left over from the
      other lens must not push an item forecast onto the scoped sampler, any more
      than they may be claimed under the tiles. */
-  const sc = scenarioForUnit(scenarioFrom(view.scenario), units === 'features');
+  const sc = scenarioWithPaceDefault(
+    scenarioForUnit(scenarioFrom(view.scenario), units === 'features'), fcSamples);
   const plain = scenarioIsDefault(sc);
   const whenPeriods = plain
     ? forecastPeriodsFor(fcSamples, fcItems, FORECAST_TRIALS)
@@ -7882,6 +7914,7 @@ window.TD = {
   dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
   soleProjectId, PROJECT_ID_ADOPT_MIN,
   buildForecast,
+  paceDefaultOn, scenarioWithPaceDefault,
   scenarioFrom, scenarioIsDefault, scenarioPaceOn, scenarioForUnit, scenarioAssumptions,
   scenarioScopeRange, lerp,
   forecastPeriodsForScoped, forecastItemsInScoped,
@@ -8057,6 +8090,11 @@ const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', act
   chartTab: 'flow', bucket: 'week', forecastItems: DEFAULT_FORECAST_ITEMS, forecastDate: '',
   /* How big a feature is, typed. See planningSizes. */
   planSizeLo: 0, planSizeHi: 0,
+  /* Whether "Adjust for what you know" is folded open. A <details> resets to its
+     markup on every load, so a reader who had it open came back to it shut with
+     their settings behind the fold — and the summary's "6 settings on" is the
+     only thing that would have told them anything was there at all. */
+  scenarioOpen: false,
   /* ── Planning ahead ──────────────────────────────────────────────────────
      The reader has said they want to forecast before there is anything to
      forecast from. A stored INTENTION rather than a derived one, and that is
@@ -11731,14 +11769,18 @@ function renderScenario(d) {
      control cannot be turned on at all. Everything that moves a figure asks
      `scenarioPaceOn` instead, so a ticked box with an empty range is still,
      honestly, the plain forecast. */
-  $('scEstOn').checked = sc.estOn;
+  /* The tick reads the RESOLVED value off the forecast, not the stored one:
+     until the reader presses it, what it shows is a fact about their data. The
+     two boxes under it still come from storage like every other box here. */
+  const tickOn = f.scenario ? f.scenario.estOn === true : sc.estOn === true;
+  $('scEstOn').checked = tickOn;
   $('scEstLo').value = sc.estLo ? String(sc.estLo) : '';
   $('scEstHi').value = sc.estHi ? String(sc.estHi) : '';
-  $('scEstWrap').hidden = !sc.estOn;
+  $('scEstWrap').hidden = !tickOn;
   /* The hint beside these boxes says the team setting is switched off while a
      typed pace is live. A control that is switched off and still looks live is
      the orphaned-control complaint again — so say it with the control. */
-  $('scConfidence').disabled = scenarioPaceOn(sc);
+  $('scConfidence').disabled = f.scenario ? scenarioPaceOn(f.scenario) : scenarioPaceOn(sc);
   /* WORK ITEMS even on the feature lens, and for the reason the feature model
      rests on: a feature answer is item throughput converted through the size
      distribution, so the pace being typed is a pace of items. This box has been
@@ -11755,6 +11797,10 @@ function renderScenario(d) {
   $('scSizeWrap').hidden = !planSize;
   $('scSizeLo').value = view.planSizeLo ? String(view.planSizeLo) : '';
   $('scSizeHi').value = view.planSizeHi ? String(view.planSizeHi) : '';
+  /* Restored here rather than at boot: this is the render that knows the block
+     exists, and it runs on every change to it. Assigning the value it already
+     has fires no toggle, so this cannot fight the reader's own press. */
+  $('fcScenario').open = view.scenarioOpen === true;
   $('scGrowthLabel').textContent = feature
     ? 'Each known feature grows by (%)'
     : 'The work you counted grows by (%)';
@@ -12113,11 +12159,18 @@ function renderForecast(d, scope, stale) {
      claims, and only one of them is true here. */
   const runWord = f.assumptions && f.assumptions.length ? 'adjusted runs'
     : (f.estimated ? 'estimated runs' : 'runs');
+  /* "Not enough history" is true wherever the tick has defaulted itself on —
+     that IS why it defaulted on — and saying it there points the reader at the
+     one remedy this card cannot offer while the one it can sits open two inches
+     below. So a ticked box with an empty range names the range instead,
+     wherever it is: planning has no history by definition, and a team three
+     weeks old is in exactly the same position with a paste to look forward to. */
   const noAnswerFoot = f.tooWide ? 'too uncertain to answer'
-    /* "Not enough history" is true of a planning forecast and is not its
-       problem: it was never going to have any, and the reader has already been
-       told so. What it is waiting for is the range below. */
-    : d.planning ? 'waiting for a pace below'
+    /* A planning forecast that HAS its pace and still cannot answer is missing
+       the other typed half. Naming the pace there would send the reader to
+       re-check a box they have already filled in. */
+    : (d.planning && f.reason === 'few-sizes') ? 'waiting for a size below'
+    : (f.scenario && f.scenario.estOn === true && !f.estimated) ? 'waiting for a pace below'
     : f.estimated ? 'no pace to draw from' : 'not enough history to forecast';
   const rp = f.requiredPace;
   const whenRow = f.when && f.when.rows.find(r => r.confidence === conf85);
@@ -14776,13 +14829,18 @@ $('welcomePlanBtn').addEventListener('click', () => {
   view.planning = true;
   /* Nothing has been counted, so "the end of the data" is not a place. */
   view.countFrom = 'today';
-  const sc = scenarioFrom(view.scenario);
-  sc.estOn = true;
-  view.scenario = sc;
+  /* The tick is NOT forced on here any more. With no history the default
+     answers for it — see paceDefaultOn — which is the same answer arrived at
+     from the data rather than from this button, and means Reset inside the
+     block leaves the reader with a working forecast rather than a dead one. */
   saveView();
   renderAll();
   selectTab('dashboard');
   selectChartTab('forecast');
+  /* Through the view, so the fold the door opens is the fold that comes back on
+     the next load rather than something the next render shuts again. */
+  view.scenarioOpen = true;
+  saveView();
   $('fcScenario').open = true;
   /* After the render, on the box they have to fill in for any of this to
      answer — the one thing on the screen that is asking them a question. */
@@ -15257,6 +15315,16 @@ $('fcPi').addEventListener('click', () => {
   view.forecastDate = isoOf(addDays(from, PI_WEEKS * 7));
   saveView();
   renderDashboard();
+});
+
+/* The fold's own state, remembered. `toggle` rather than a click handler on the
+   summary: a <details> opens from the keyboard and from a find-in-page match
+   too, and only this event sees all three. */
+$('fcScenario').addEventListener('toggle', () => {
+  const open = $('fcScenario').open;
+  if (view.scenarioOpen === open) return;
+  view.scenarioOpen = open;
+  saveView();
 });
 
 $('scReset').addEventListener('click', () => {

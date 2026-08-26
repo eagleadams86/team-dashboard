@@ -308,7 +308,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    that drives the scenario block's own controls, which is why the tick could be
    dead on screen while every pure test about it passed, and then the lens filter
    the same day. */
-const EXPECTED = 2495;
+const EXPECTED = 2516;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3648,7 +3648,42 @@ async function run(TD, win) {
     is(TD.scenarioPaceOn(TD.scenarioFrom({ estOn: true, estLo: 4, estHi: 6 })), true,
        'and it IS one once a number is typed');
     is(TD.scenarioPaceOn(TD.scenarioFrom({ estLo: 4, estHi: 6 })), false,
-       'a range typed with the box unticked is not one either');
+       'a range typed with the box untouched is not one either');
+
+    /* ── WHAT THE TICK DEFAULTS TO ───────────────────────────────────────────
+       Asked for by Charles (2026-08-26): checked where there is no history,
+       unchecked where there is. So `estOn` is three-state — on, off, and NOT
+       CHOSEN — because a stored `false` has to stick over a team with no
+       history exactly as firmly as a stored `true` sticks over one with plenty,
+       and a two-state field cannot tell "unticked" from "never touched". */
+    is(TD.scenarioFrom(null).estOn, null, 'an untouched tick is null, not false');
+    is(TD.scenarioFrom({ estOn: 'yes' }).estOn, null,
+       'and so is anything that is not a boolean \u2014 a view saved before this '
+       + 'existed means "not chosen" too');
+
+    const plenty = [5, 4, 6, 5, 3, 7, 5, 4, 6, 5, 4, 6];
+    is(TD.paceDefaultOn([]), true, 'no periods at all defaults the tick ON');
+    is(TD.paceDefaultOn([1, 2, 3]), true, 'so does a team under the eight-period floor');
+    is(TD.paceDefaultOn([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), true,
+       'and one with periods but nothing finished in any of them');
+    is(TD.paceDefaultOn(plenty), false, 'a team with real throughput defaults it OFF');
+    /* The default IS the app's refusal condition, not a second opinion about it:
+       the box arrives ticked in exactly the cases the card would otherwise have
+       nothing to say in. */
+    is(TD.paceDefaultOn(plenty.slice(0, TD.FORECAST_MIN_PERIODS - 1)), true,
+       'one period short of the floor is still "no history"');
+    is(TD.paceDefaultOn(plenty.slice(0, TD.FORECAST_MIN_PERIODS)), false,
+       'and exactly at it is not');
+
+    /* Resolution happens once, against the samples the forecast deals from. */
+    is(TD.scenarioWithPaceDefault(TD.scenarioFrom(null), []).estOn, true,
+       'an untouched tick resolves to the default');
+    is(TD.scenarioWithPaceDefault(TD.scenarioFrom(null), plenty).estOn, false,
+       'either way');
+    is(TD.scenarioWithPaceDefault(TD.scenarioFrom({ estOn: false }), []).estOn, false,
+       'a reader who UNTICKED it over no history keeps it unticked');
+    is(TD.scenarioWithPaceDefault(TD.scenarioFrom({ estOn: true }), plenty).estOn, true,
+       'and one who ticked it over plenty of history keeps it ticked');
     /* The half-set state has to be a NO-OP end to end, not merely unread by the
        sampler: `scenarioIsDefault` is the dispatch that keeps today's answers on
        today's code, so a ticked empty box must not push the reader onto the
@@ -5794,11 +5829,14 @@ group('ARTs — the grouping, and the boundary it crosses');
      ══════════════════════════════════════════════════════════ */
   group('the typed pace — a tick that can actually be ticked');
 
-  plant({ teams: [{ id: 'sc1', name: 'Paced', rows: [
-    { c: '2015-01-05', s: '2015-01-02', t: 'Story' },
-    { c: '2015-01-12', s: '2015-01-05', t: 'Story' },
-    { c: '2015-01-19', s: '2015-01-12', t: 'Story' },
-    { c: '2015-01-26', s: '2015-01-19', t: 'Story' } ] }], settings: {} });
+  /* TWELVE whole weeks, deliberately. This group is about what the tick DOES,
+     not about what it defaults to, and over a team with no history it now
+     arrives ticked — see paceDefaultOn. A four-row fixture would have made every
+     assertion below read the default rather than the press. */
+  plant({ teams: [{ id: 'sc1', name: 'Paced', rows:
+    ['2015-01-05', '2015-01-12', '2015-01-19', '2015-01-26', '2015-02-02', '2015-02-09',
+     '2015-02-16', '2015-02-23', '2015-03-02', '2015-03-09', '2015-03-16', '2015-03-23']
+      .map(c => ({ c, s: '2015-01-02', t: 'Story' })) }], settings: {} });
   win.renderAll();
   {
     const scDoc = win.document;
@@ -8198,8 +8236,9 @@ group('ARTs — the grouping, and the boundary it crosses');
        for reasons that have nothing to do with it — see the note on the Reset
        baseline in the typed-pace group. */
     set('scSizeLo', ''); set('scSizeHi', '');
-    ok(/waiting for a pace/.test(pDoc.getElementById('tilesForecast').textContent),
-       'until it has that, it answers nothing',
+    ok(/waiting for a size below/.test(pDoc.getElementById('tilesForecast').textContent),
+       'until it has that it answers nothing \u2014 and names the SIZE, not the pace, '
+       + 'which is already filled in',
        pDoc.getElementById('tilesForecast').textContent.replace(/\s+/g, ' ').slice(0, 100));
 
     set('scSizeLo', '5'); set('scSizeHi', '10');
@@ -8230,6 +8269,59 @@ group('ARTs — the grouping, and the boundary it crosses');
          pDoc.getElementById('forecastFiguresTable').textContent),
        'which also records the size that was typed rather than a median of nothing');
 
+    /* ── The tick's default, on screen ────────────────────────
+       Three states, and the middle one is the point: a team three weeks old is
+       in the same position as a team with nothing, and gets the same open
+       boxes. */
+    const thin = (n) => ({ teams: [{ id: 'thin1', name: 'Just Started',
+      rows: Array.from({ length: n }, (_, i) => ({
+        c: '2026-08-0' + (i + 1), s: '2026-08-01', t: 'Story' })) }], settings: {} });
+    plant(thin(3));
+    win.renderAll(); win.selectTab('dashboard');
+    /* Back to work items, and with the pace typed earlier in this group cleared:
+       a range left in the boxes would answer these assertions for reasons that
+       have nothing to do with the default. */
+    const unitBack = pDoc.getElementById('unitSel');
+    unitBack.value = 'items'; unitBack.dispatchEvent(new win.Event('change', { bubbles: true }));
+    pDoc.getElementById('scReset').click();
+    ok(pDoc.getElementById('scEstOn').checked,
+       'a team under the eight-period floor gets the tick already on');
+    ok(!pDoc.getElementById('scEstWrap').hidden, 'with its boxes open');
+    ok(/waiting for a pace below/.test(pDoc.getElementById('tilesForecast').textContent),
+       'and the tiles point at the remedy that is open rather than at the history '
+       + 'it has no way to conjure',
+       pDoc.getElementById('tilesForecast').textContent.replace(/\s+/g, ' ').slice(0, 90));
+
+    /* An explicit press wins over the default, in BOTH directions — which is the
+       whole reason the field is three-state. */
+    const tick = pDoc.getElementById('scEstOn');
+    tick.checked = false; tick.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(JSON.parse(win.localStorage.getItem('td-view')).scenario.estOn, false,
+       'unticking it over no history stores a real false');
+    win.renderAll();
+    ok(!pDoc.getElementById('scEstOn').checked, 'and it stays off across a render');
+    ok(/not enough history/.test(pDoc.getElementById('tilesForecast').textContent),
+       'the card going back to naming the thing it actually lacks');
+
+    /* ── The fold is remembered ───────────────────────────────
+       A <details> resets to its markup on every load, so a reader who had it
+       open came back to it shut with their settings behind the fold — and the
+       summary's "6 settings on" was the only hint anything was there. */
+    const fold = pDoc.getElementById('fcScenario');
+    ok(fold.open, 'the planning door leaves the block folded open');
+    is(JSON.parse(win.localStorage.getItem('td-view')).scenarioOpen, true,
+       'and that is remembered, not just applied');
+    fold.open = false;
+    fold.dispatchEvent(new win.Event('toggle'));
+    is(JSON.parse(win.localStorage.getItem('td-view')).scenarioOpen, false,
+       'shutting it is remembered too');
+    win.renderAll();
+    ok(!fold.open, 'and the next render leaves it shut rather than reopening it');
+    fold.open = true;
+    fold.dispatchEvent(new win.Event('toggle'));
+    win.renderAll();
+    ok(fold.open, 'both ways round \u2014 a render must never fight the reader\u2019s own press');
+
     /* Back to a working app for every group after this one. */
     plant({ teams: [{ id: 'pl2', name: 'Started', rows: Array.from({ length: 12 }, (_, i) => ({
       c: '2015-0' + (i < 9 ? '1' : '2') + '-' + String((i % 9) * 3 + 2).padStart(2, '0'),
@@ -8237,6 +8329,18 @@ group('ARTs — the grouping, and the boundary it crosses');
     win.renderAll();
     is(JSON.parse(win.localStorage.getItem('td-view')).planning, false,
        'and real data retires the flag here too');
+    /* Twelve unambiguous whole weeks, so "there is history" is not a judgement
+       call, and Reset to hand the tick back to the data rather than to the press
+       a few lines above. */
+    plant({ teams: [{ id: 'pl3', name: 'Going', rows:
+      ['2015-01-05', '2015-01-12', '2015-01-19', '2015-01-26', '2015-02-02', '2015-02-09',
+       '2015-02-16', '2015-02-23', '2015-03-02', '2015-03-09', '2015-03-16', '2015-03-23']
+        .map(c => ({ c, s: '2015-01-02', t: 'Story' })) }], settings: {} });
+    win.renderAll();
+    win.selectTab('dashboard');
+    pDoc.getElementById('scReset').click();
+    ok(!pDoc.getElementById('scEstOn').checked,
+       'and with twelve whole weeks behind it the data says off');
   }
 
 
