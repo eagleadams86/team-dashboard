@@ -5336,8 +5336,12 @@ function scenarioFrom(raw) {
   };
   s.estLo = est(s.estLo); s.estHi = est(s.estHi);
   if (s.estHi < s.estLo) s.estHi = s.estLo;
-  /* A typed range with no numbers in it is not a throughput estimate. */
-  if (!(s.estLo > 0)) s.estOn = false;
+  /* The tick is NOT forced back off when the range is empty, though a range with
+     no numbers in it is still not a throughput estimate. Those are two different
+     facts and this used to conflate them, which made the control unreachable:
+     the boxes are hidden until the tick is on, so the tick could never survive
+     long enough for anybody to type the number that would have kept it. The tick
+     opens the boxes; `scenarioPaceOn` below is what the forecast asks. */
   /* Clamped when it is a number out of range, defaulted when it is not a number
      at all — the split forecastItems already draws. A typed 20 means "as many as
      you can", which is the cap; a typed "banana" means nothing, which is the
@@ -5353,8 +5357,17 @@ function scenarioFrom(raw) {
   return s;
 }
 
+/* A typed pace is in effect only once there is a pace typed. Everything that
+   changes an ANSWER asks this; only the checkbox itself reads `estOn` raw. */
+const scenarioPaceOn = (s) => !!s && s.estOn === true && s.estLo > 0;
+
+/* The est fields are exempt while the pace is off, for the same reason: a ticked
+   box with nothing in it must still be the plain forecast, or ticking it would
+   silently move the reader off the default sampler and onto the scoped one. */
+const EST_KEYS = new Set(['estOn', 'estLo', 'estHi']);
 const scenarioIsDefault = (s) =>
-  !!s && Object.keys(DEFAULT_SCENARIO).every(k => s[k] === DEFAULT_SCENARIO[k]);
+  !!s && !scenarioPaceOn(s)
+  && Object.keys(DEFAULT_SCENARIO).every(k => EST_KEYS.has(k) || s[k] === DEFAULT_SCENARIO[k]);
 
 /* Every knob that is NOT at its default, in words, for the list under the tiles.
    Built here rather than in the renderer so a test can pin that a default
@@ -5364,7 +5377,7 @@ function scenarioAssumptions(s, unitMany) {
   const out = [];
   const many = unitMany || 'items';
   const range = (lo, hi) => lo === hi ? lo + '%' : lo + '% to ' + hi + '%';
-  if (s.estOn) out.push({ key: 'est', label: 'Estimated pace',
+  if (scenarioPaceOn(s)) out.push({ key: 'est', label: 'Estimated pace',
     value: s.estLo === s.estHi ? String(s.estLo) : s.estLo + '\u2013' + s.estHi,
     wording: 'dealt from a typed range of ' + (s.estLo === s.estHi ? s.estLo
       : s.estLo + ' to ' + s.estHi) + ' ' + many + ' a period instead of from history' });
@@ -5535,8 +5548,8 @@ function featureForecastOf(o) {
          reach it — that is the whole point of the control. The SIZE floors still
          do: a feature forecast cannot be built without knowing how big a feature
          is, whatever the pace comes from. */
-      (!sc.estOn && samples.length < FORECAST_MIN_PERIODS) ? 'few-periods'
-    : (!sc.estOn && !samples.some(v => v > 0)) ? 'no-throughput'
+      (!scenarioPaceOn(sc) && samples.length < FORECAST_MIN_PERIODS) ? 'few-periods'
+    : (!scenarioPaceOn(sc) && !samples.some(v => v > 0)) ? 'no-throughput'
     /* Checked BEFORE the size count, because a thin join is why the size count
        is low — reporting the symptom would send the reader to find more
        finished features when the column they need is missing. */
@@ -5583,7 +5596,7 @@ function featureForecastOf(o) {
     scenario: sc,
     assumptions: scenarioAssumptions(sc, 'features'),
     scopeRange: scenarioScopeRange(sc),
-    estimated: sc.estOn,
+    estimated: scenarioPaceOn(sc),
     /* The pace is in WORK ITEMS even here — nobody speeds up by completing
        features faster, they speed up by completing items faster — so `sizes` is
        handed in and the bisection walks the feature model. */
@@ -5632,24 +5645,24 @@ function featureForecastOf(o) {
    BOTH paths consume exactly one throughput draw and one confidence draw, so the
    stream is the same length whichever is on. */
 function scenarioDeal(samples, n, sc, rnd) {
-  const base = sc.estOn ? lerp(sc.estLo, sc.estHi, rnd()) : samples[(rnd() * n) | 0];
+  const pace = scenarioPaceOn(sc);
+  const base = pace ? lerp(sc.estLo, sc.estHi, rnd()) : samples[(rnd() * n) | 0];
   /* Team confidence is DISABLED under a typed estimate — multiplying a guess by
      a guess compounds two people's pessimism, and "3 to 7 a week" already
      carries whatever uncertainty the person typing it meant. The draw is still
      taken, so the stream does not shift. */
   const conf = lerp(TEAM_CONFIDENCE_STEPS[sc.confidence].lo,
                     TEAM_CONFIDENCE_STEPS[sc.confidence].hi, rnd());
-  return sc.estOn ? base : base * conf;
+  return pace ? base : base * conf;
 }
 
 /* Whether there is any pace at all to deal from. A typed estimate supplies its
    own, so the history floors do not apply to it — that is the whole point of the
    control, and the eight-period refusal stays the DEFAULT outcome rather than
    the only one. */
-const scenarioHasPace = (samples, sc) => sc.estOn
-  ? sc.estLo > 0
-  : (Array.isArray(samples) && samples.length >= FORECAST_MIN_PERIODS
-     && samples.some(v => v > 0));
+const scenarioHasPace = (samples, sc) => scenarioPaceOn(sc)
+  || (Array.isArray(samples) && samples.length >= FORECAST_MIN_PERIODS
+      && samples.some(v => v > 0));
 
 function forecastPeriodsForScoped(samples, items, sc, trials) {
   if (!scenarioHasPace(samples, sc)) return null;
@@ -6067,7 +6080,7 @@ function widestScenarioKnob(s) {
     width: CLARITY_STEPS[s.clarity].hi / CLARITY_STEPS[s.clarity].lo });
   if (s.confidence > 0) cands.push({ key: 'confidence', label: 'Team confidence',
     width: TEAM_CONFIDENCE_STEPS[s.confidence].hi / TEAM_CONFIDENCE_STEPS[s.confidence].lo });
-  if (s.estOn && s.estHi > s.estLo) cands.push({ key: 'est', label: 'Estimated pace',
+  if (scenarioPaceOn(s) && s.estHi > s.estLo) cands.push({ key: 'est', label: 'Estimated pace',
     width: s.estHi / s.estLo });
   if (!cands.length) return null;
   return cands.reduce((best, c) => c.width > best.width ? c : best);
@@ -7188,7 +7201,7 @@ function derive(rows, settings, view, stages) {
   /* A typed throughput estimate supplies its own pace, so none of the history
      floors apply to it — that is the whole point of the control. The eight-period
      refusal stays the DEFAULT outcome rather than the only one. */
-  const fcReason = sc.estOn ? null
+  const fcReason = scenarioPaceOn(sc) ? null
     : fcSamples.length < FORECAST_MIN_PERIODS
       ? (fcLost > 0 && wholeThroughput.length >= FORECAST_MIN_PERIODS
           ? 'stale-team' : 'few-periods')
@@ -7231,7 +7244,7 @@ function derive(rows, settings, view, stages) {
     scenario: sc,
     assumptions: scenarioAssumptions(sc, units),
     scopeRange: scenarioScopeRange(sc),
-    estimated: sc.estOn,
+    estimated: scenarioPaceOn(sc),
     trials: FORECAST_TRIALS,
     minPeriods: FORECAST_MIN_PERIODS,
     items: fcItems,
@@ -7743,7 +7756,7 @@ window.TD = {
      without a paste box or a team list on screen. */
   dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
   soleProjectId, PROJECT_ID_ADOPT_MIN,
-  scenarioFrom, scenarioIsDefault, scenarioAssumptions, scenarioScopeRange, lerp,
+  scenarioFrom, scenarioIsDefault, scenarioPaceOn, scenarioAssumptions, scenarioScopeRange, lerp,
   forecastPeriodsForScoped, forecastItemsInScoped,
   forecastFeaturePeriodsScoped, forecastFeaturesInScoped,
   spreadRatioOf, widestScenarioKnob,
@@ -11425,10 +11438,19 @@ function renderScenario(d) {
   $('scExtraHi').value = String(sc.extraHi);
   $('scParallel').value = String(sc.parallel);
   $('scUnavailable').value = String(sc.unavailable);
+  /* The tick and the boxes it opens are the one place that reads `estOn` raw:
+     the boxes have to be reachable BEFORE there is a number in them, or the
+     control cannot be turned on at all. Everything that moves a figure asks
+     `scenarioPaceOn` instead, so a ticked box with an empty range is still,
+     honestly, the plain forecast. */
   $('scEstOn').checked = sc.estOn;
   $('scEstLo').value = sc.estLo ? String(sc.estLo) : '';
   $('scEstHi').value = sc.estHi ? String(sc.estHi) : '';
   $('scEstWrap').hidden = !sc.estOn;
+  /* The hint beside these boxes says the team setting is switched off while a
+     typed pace is live. A control that is switched off and still looks live is
+     the orphaned-control complaint again — so say it with the control. */
+  $('scConfidence').disabled = scenarioPaceOn(sc);
   $('scEstRangeLabel').textContent = d.Units + ' finished per ' + d.bucketNoun;
   $('scUnavailableLabel').textContent = d.bucketNounPlural.charAt(0).toUpperCase()
     + d.bucketNounPlural.slice(1) + ' nobody is delivering';

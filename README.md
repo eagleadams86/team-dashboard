@@ -1888,8 +1888,16 @@ setting.
 
 **A typed pace replaces history rather than blending with it** — a blend is traceable to neither
 source — and the team setting is switched off while it is on, because multiplying a guess by a
-guess compounds two people's pessimism. It also spreads *less* than real periods do: no quiet
-weeks, no spikes. The card says so rather than fudging it.
+guess compounds two people's pessimism. The **The team doing the work** picker greys out to say
+so, rather than leaving a live-looking control that is being ignored. A typed pace also spreads
+*less* than real periods do: no quiet weeks, no spikes. The card says so rather than fudging it.
+
+**Ticking the box and typing the range are two separate steps, and only the second changes a
+figure.** Ticking it opens the two boxes; until a number is in them the forecast is still the
+plain one, claims nothing under the tiles, and is refused by the same eight-period floor as
+before. This is worth stating because it used to be wrong the other way: the box un-ticked itself
+whenever the range was empty, and since the range is hidden until the box is ticked, the control
+could never be switched on at all.
 
 ### What Pace Would It Take?
 

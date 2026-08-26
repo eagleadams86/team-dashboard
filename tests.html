@@ -302,8 +302,12 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    loss of a single one. This suite counts ASSERTIONS, and a good many sit
    inside loops over app data (the theme table, the demo teams, a derived
    series), so the total moves legitimately when that data changes size. An
-   exact floor here would go red for a reason that is not about the tests. */
-const EXPECTED = 2398;
+   exact floor here would go red for a reason that is not about the tests.
+
+   Raised to 2418 on 2026-08-26 by the typed-pace tick — the first group in here
+   that drives the scenario block's own controls, which is why the tick could be
+   dead on screen while every pure test about it passed. */
+const EXPECTED = 2418;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3631,8 +3635,29 @@ async function run(TD, win) {
        + 'forecast your way to a date');
     is(TD.scenarioFrom({ growthLo: 60, growthHi: 10 }).growthHi, 60,
        'a backwards range is straightened rather than rejected');
-    is(TD.scenarioFrom({ estOn: true, estLo: 0 }).estOn, false,
-       'a typed pace with no numbers in it is not a typed pace');
+    /* The tick and the pace are two different facts, and conflating them is what
+       made this control unreachable: the boxes are hidden until the tick is on,
+       so a tick that could not survive an empty range could never be turned on
+       by anybody. The tick SURVIVES so the boxes can open; the pace stays off
+       until there is a number in them. */
+    const ticked = TD.scenarioFrom({ estOn: true, estLo: 0 });
+    is(ticked.estOn, true, 'the tick survives an empty range, so the boxes can open');
+    is(TD.scenarioPaceOn(ticked), false,
+       'but a typed pace with no numbers in it is not a typed pace');
+    is(TD.scenarioPaceOn(TD.scenarioFrom({ estOn: true, estLo: 4, estHi: 6 })), true,
+       'and it IS one once a number is typed');
+    is(TD.scenarioPaceOn(TD.scenarioFrom({ estLo: 4, estHi: 6 })), false,
+       'a range typed with the box unticked is not one either');
+    /* The half-set state has to be a NO-OP end to end, not merely unread by the
+       sampler: `scenarioIsDefault` is the dispatch that keeps today's answers on
+       today's code, so a ticked empty box must not push the reader onto the
+       scoped path or light up the "this is not the plain forecast" note. */
+    is(TD.scenarioIsDefault(ticked), true, 'a ticked empty box is still the default scenario');
+    is(TD.scenarioAssumptions(ticked), [], 'and it claims nothing under the tiles');
+    is(TD.scenarioFrom({ estOn: true, estLo: 0, growthLo: 10, growthHi: 10 }).estOn, true,
+       'the tick survives beside another knob too');
+    is(TD.scenarioIsDefault(TD.scenarioFrom({ estOn: true, estLo: 0, growthLo: 10, growthHi: 10 })),
+       false, 'though that scenario is not default — the OTHER knob is set');
   }
 
   /* ────────────────────────────────────────────────────────── */
@@ -3687,6 +3712,17 @@ async function run(TD, win) {
          TD.scenarioFrom({ estOn: true, estLo: 4, estHi: 6, confidence: 2 }), 300)),
        JSON.stringify(noHistory.slice(0, 300)),
        'and the team setting is ignored while it is on');
+    /* The other half of that: with the box ticked and NOTHING typed, the history
+       floors must still apply and the answer must be bit-identical to the
+       untouched scenario. Ticking a box you have not filled in cannot be allowed
+       to move a date. */
+    is(TD.forecastPeriodsForScoped([1, 2], 20,
+         TD.scenarioFrom({ estOn: true, estLo: 0 }), 500), null,
+       'a ticked empty box does NOT lift the eight-period floor');
+    is(JSON.stringify(TD.forecastPeriodsForScoped(samples, 40,
+         TD.scenarioFrom({ estOn: true, estLo: 0 }), 300)),
+       JSON.stringify(TD.forecastPeriodsForScoped(samples, 40, TD.scenarioFrom(null), 300)),
+       'and it leaves every figure exactly where it was');
   }
 
   /* ────────────────────────────────────────────────────────── */
@@ -5698,6 +5734,77 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and the tile states the limit and how far over it today is, in words', tileText);
   ok(/target 10/.test(tileText) && /not met/.test(tileText),
      'with the target read against the percentile beside it', tileText);
+
+  /* ══════════════════════════════════════════════════════════
+     THE TYPED-PACE TICK, ON SCREEN (2026-08-26). Reported by Charles: "this
+     checkbox doesn't seem to do anything". It did not — and every pure test
+     above passed the whole time, because the break was the loop between the
+     sanitiser and the renderer rather than either one alone. The boxes are
+     hidden until the tick is on; the sanitiser turned the tick off whenever the
+     boxes were empty; so the tick could not survive its own change handler and
+     the range could never be typed. Nothing here can be pinned without driving
+     the real control, which is why this group exists at all.
+     ══════════════════════════════════════════════════════════ */
+  group('the typed pace — a tick that can actually be ticked');
+
+  plant({ teams: [{ id: 'sc1', name: 'Paced', rows: [
+    { c: '2015-01-05', s: '2015-01-02', t: 'Story' },
+    { c: '2015-01-12', s: '2015-01-05', t: 'Story' },
+    { c: '2015-01-19', s: '2015-01-12', t: 'Story' },
+    { c: '2015-01-26', s: '2015-01-19', t: 'Story' } ] }], settings: {} });
+  win.renderAll();
+  {
+    const scDoc = win.document;
+    const tick = scDoc.getElementById('scEstOn');
+    const wrap = scDoc.getElementById('scEstWrap');
+    const conf = scDoc.getElementById('scConfidence');
+    ok(!!tick && !!wrap, 'the typed-pace tick and the boxes it opens are both on the page');
+    /* From a KNOWN baseline. The scenario rides in the view, which persists on
+       this origin — an earlier group, or the app itself in another tab, leaves
+       one behind, and a start state read out of ambient storage is not a start
+       state. Reset is the app's own way of saying "no adjustments". */
+    scDoc.getElementById('scReset').click();
+    ok(!tick.checked, 'and after Reset to No Adjustments the tick is off');
+    ok(wrap.hidden, 'with the boxes hidden, since nothing is typed yet');
+
+    /* The whole bug, in three lines. `change` and not `click`: one delegated
+       handler covers the whole block, and it is change that reaches it. */
+    tick.checked = true;
+    tick.dispatchEvent(new win.Event('change', { bubbles: true }));
+    ok(tick.checked, 'ticking it leaves it TICKED — it used to silently untick itself');
+    ok(!wrap.hidden, 'and opens the two boxes, which is the only way to reach them');
+    ok(!conf.disabled,
+       'the team setting is still live, because an empty range is not yet a pace');
+
+    /* Ticked but empty must remain the plain forecast — the note under the tiles
+       is what tells a reader they are no longer looking at one. */
+    ok(scDoc.getElementById('fcAssumptions').hidden,
+       'a ticked empty box claims nothing under the tiles');
+
+    const lo = scDoc.getElementById('scEstLo');
+    lo.value = '4';
+    lo.dispatchEvent(new win.Event('change', { bubbles: true }));
+    ok(tick.checked && !wrap.hidden, 'typing a number keeps the box open');
+    is(JSON.parse(win.localStorage.getItem('td-view')).scenario.estLo, 4,
+       'and stores the pace that was typed');
+    ok(conf.disabled,
+       'now the team setting is switched off IN the control, not only in the hint — '
+       + 'multiplying a guess by a guess compounds two people\u2019s pessimism');
+    ok(/Estimated pace/.test(scDoc.getElementById('fcAssumptions').textContent),
+       'and the forecast says under the tiles that it is no longer the plain one');
+
+    /* Back off again, both ways round: the tick clears the pace, and Reset
+       clears the tick. */
+    tick.checked = false;
+    tick.dispatchEvent(new win.Event('change', { bubbles: true }));
+    ok(wrap.hidden && !conf.disabled, 'unticking closes the boxes and gives the team setting back');
+    tick.checked = true; tick.dispatchEvent(new win.Event('change', { bubbles: true }));
+    scDoc.getElementById('scEstLo').value = '4';
+    scDoc.getElementById('scEstLo').dispatchEvent(new win.Event('change', { bubbles: true }));
+    scDoc.getElementById('scReset').click();
+    ok(!scDoc.getElementById('scEstOn').checked && scDoc.getElementById('scEstWrap').hidden,
+       'and Reset clears a pace that WAS set, tick and boxes together');
+  }
 
   /* ══════════════════════════════════════════════════════════
      On paper (2026-08-22). These figures get read in rooms, and until this
