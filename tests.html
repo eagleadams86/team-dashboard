@@ -308,7 +308,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    that drives the scenario block's own controls, which is why the tick could be
    dead on screen while every pure test about it passed, and then the lens filter
    the same day. */
-const EXPECTED = 2444;
+const EXPECTED = 2465;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -7949,8 +7949,9 @@ group('ARTs — the grouping, and the boundary it crosses');
   /* A SHARED VIEW KEEPS IT, always. Your Data and Settings are both taken away
      there, so hiding this one as well would leave a tab strip with nothing in
      it and a visitor with no way back to anything. */
-  ok(/\$\('tab-dashboard'\)\.hidden = !anyData && !viewOnly;/.test(APP_SRC),
-     'the rule is off in a shared view, where the other two tabs are already gone');
+  ok(/\$\('tab-dashboard'\)\.hidden = !anyData && !planningOn\(\) && !viewOnly;/.test(APP_SRC),
+     'the rule is off in a shared view, where the other two tabs are already gone \u2014 '
+     + 'and planning is the third way past it');
 
   /* A TEAM'S SECOND LIST COUNTS AS DATA (2026-08-25). A features-only paste is a
      real thing to do — loadPastedRows says so in as many words — and asked about
@@ -8009,11 +8010,17 @@ group('ARTs — the grouping, and the boundary it crosses');
     ok(['dashboard', 'allteams', 'data'].every(t => !shown(wDoc.getElementById('panel-' + t))),
        'and every panel gone — one card, and nothing else');
 
-    /* The three ways in, in the family's words and the family's Title Case. */
-    is(['welcomeFreshBtn', 'welcomeSampleBtn', 'welcomeRestoreBtn']
+    /* The ways in, in the family's words and the family's Title Case. The first
+       three are the family's, in the family's order. The FOURTH is this app's
+       alone and is a deliberate divergence (2026-08-26): forecasting is the one
+       thing Flow Metrics can usefully do before anything is recorded, and no
+       sibling has an equivalent to mirror. If a sibling ever grows one, this is
+       the shape it copies. */
+    is(['welcomeFreshBtn', 'welcomeSampleBtn', 'welcomeRestoreBtn', 'welcomePlanBtn']
          .map(id => wDoc.getElementById(id).textContent.trim()),
-       ['Start Fresh', 'Load Sample Data', 'Restore a Backup'],
-       'offering the family\u2019s three buttons, in the family\u2019s order');
+       ['Start Fresh', 'Load Sample Data', 'Restore a Backup', 'Forecast Ahead'],
+       'offering the family\u2019s three buttons in the family\u2019s order, then this '
+       + 'app\u2019s own fourth');
     /* The privacy claim the footer three inches below also makes. This app has
        no sync and no account, and the two sentences must never disagree. */
     ok(/Nothing is uploaded/.test(wDoc.getElementById('welcomeCard').textContent),
@@ -8037,6 +8044,102 @@ group('ARTs — the grouping, and the boundary it crosses');
     ok(/!anyData && !viewOnly && !welcomeStarted/.test(APP_SRC),
        'and it is off in a shared view, where those buttons would write over a link');
   }
+
+  /* ══════════════════════════════════════════════════════════
+     FORECASTING BEFORE THERE IS ANYTHING TO FORECAST FROM (2026-08-26). Charles:
+     "we now have the means to forecast without actual data but no way to get to
+     forecasting without first keying data." Both halves of that were true. The
+     typed pace supplies its own throughput, but derive() returns early with no
+     `forecast` at all when nothing has finished, and the Dashboard tab hides
+     itself until a team holds a row — so the one control built for a team with
+     no history could only be reached by a team that had some.
+     ══════════════════════════════════════════════════════════ */
+  group('planning — a forecast with no history behind it');
+  {
+    /* The engine half, first: buildForecast is the piece that had to come out of
+       derive to be callable without an axis. */
+    const paced = win.TD.buildForecast({
+      view: { forecastItems: 40, countFrom: 'today',
+        scenario: { estOn: true, estLo: 4, estHi: 7 } },
+      samples: [], weekStarts: [], bucket: 'week', units: 'items',
+      endDate: new Date('2026-01-05T00:00:00Z') });
+    is(paced.reason, null, 'a typed pace answers with NO history at all — not one period');
+    is(paced.samples, 0, 'and says so: nothing was resampled');
+    ok(!!paced.when && paced.when.rows.length, 'it produces dated answers');
+    ok(paced.estimated, 'flagged as estimated, so every label it feeds says so');
+    /* 40 items at 4 to 7 a week cannot be under 5 weeks or over 11. Pinned as a
+       RANGE rather than a figure: this is arithmetic, and a test that pins the
+       seed would pass while the arithmetic was wrong. */
+    const p50 = TD.percentileOf(paced.when.rows.map(r => r.days), 50);
+    ok(p50 >= 5 * 7 && p50 <= 11 * 7, '40 items at 4–7 a week lands where it must',
+       p50 + ' days');
+    const unpaced = win.TD.buildForecast({
+      view: { forecastItems: 40, countFrom: 'today', scenario: null },
+      samples: [], weekStarts: [], bucket: 'week', units: 'items',
+      endDate: new Date('2026-01-05T00:00:00Z') });
+    ok(!!unpaced.reason && !unpaced.when,
+       'without a pace the same empty history still refuses, as it always did');
+
+    /* ── The door ─────────────────────────────────────────────
+       A genuinely empty app: one team, no rows anywhere. */
+    plant({ teams: [{ id: 'pl1', name: 'Not Started', rows: [] }], settings: {} });
+    win.renderAll();
+    const plDoc = win.document;
+    ok(plDoc.getElementById('tab-dashboard').hidden,
+       'with nothing keyed the Dashboard is hidden, exactly as before');
+    ok(!!plDoc.getElementById('welcomePlanBtn'), 'and the welcome card offers a fourth door');
+
+    plDoc.getElementById('welcomePlanBtn').click();
+    ok(!plDoc.getElementById('tab-dashboard').hidden, 'which opens the Dashboard');
+    ok(plDoc.getElementById('scEstOn').checked,
+       'with the typed-pace tick already on \u2014 the door does the part that would '
+       + 'otherwise be a hunt');
+    ok(plDoc.getElementById('scEstLo').value === '',
+       'but types NO pace: every number in the answer has to be one the reader chose');
+    ok(plDoc.getElementById('dashTiles').hidden
+       && plDoc.getElementById('dashEmpty').hidden,
+       'the flow tiles and the paste-instructions card both stay away');
+    is(['flow', 'delivery', 'health', 'forecast']
+         .filter(g => !plDoc.getElementById('stab-' + g).hidden), ['forecast'],
+       'and the only chart group on the strip is the one that can answer');
+    ok(/nothing to resample/.test(plDoc.getElementById('fcHint').textContent),
+       'the card says there is no history rather than claiming 0 weeks of it');
+    ok(/waiting for a pace/.test(plDoc.getElementById('tilesForecast').textContent),
+       'and the tiles say what they are waiting for, not "not enough history" \u2014 '
+       + 'which is true here and is not the problem');
+
+    const lo = plDoc.getElementById('scEstLo'), hi = plDoc.getElementById('scEstHi');
+    lo.value = '4'; lo.dispatchEvent(new win.Event('change', { bubbles: true }));
+    hi.value = '7'; hi.dispatchEvent(new win.Event('change', { bubbles: true }));
+    ok(/\d{4}/.test(plDoc.getElementById('tilesForecast').textContent),
+       'typing the range produces a dated answer out of nothing but arithmetic',
+       plDoc.getElementById('tilesForecast').textContent.replace(/\s+/g, ' ').slice(0, 120));
+    ok(/a pace you typed, not measured/.test(plDoc.getElementById('tilesForecast').textContent),
+       'and the basis tile states the range rather than a period count of zero');
+    ok(/a typed pace, no history/.test(plDoc.getElementById('forecastFiguresTable').textContent),
+       'the exported table says the same \u2014 what leaves must match what was read');
+
+    /* ── Real data always wins ────────────────────────────────
+       The flag is an intention, not a mode to get stuck in. */
+    plant({ teams: [{ id: 'pl1', name: 'Not Started', rows: Array.from({ length: 12 }, (_, i) => ({
+      c: '2015-0' + (i < 9 ? '1' : '2') + '-' + String((i % 9) * 3 + 2).padStart(2, '0'),
+      s: '2015-01-02', t: 'Story' })) }], settings: {} });
+    win.renderAll();
+    is(['flow', 'delivery', 'health', 'forecast']
+         .filter(g => !plDoc.getElementById('stab-' + g).hidden),
+       ['flow', 'delivery', 'health', 'forecast'],
+       'the moment a row exists the whole dashboard is back');
+    ok(!plDoc.getElementById('dashTiles').hidden, 'tiles included');
+    ok(!/nothing to resample/.test(plDoc.getElementById('fcHint').textContent),
+       'and the forecast goes back to describing the history it now has');
+    /* RETIRED, not outvoted. Left standing, the intention would come back the
+       moment somebody cleared their rows — and every later group in this file
+       plants an empty app, so a flag that survived here would hand them a
+       Dashboard they are asserting is hidden. */
+    is(JSON.parse(win.localStorage.getItem('td-view')).planning, false,
+       'and the planning flag is retired rather than left to resurface');
+  }
+
 
   plant({ teams: [{ id: 'z1', name: 'Back',
     rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] }], settings: {} });

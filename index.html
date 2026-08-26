@@ -1764,13 +1764,18 @@ main:focus { outline: none; }
     <p style="margin-top:16px">
       <button class="btn primary" id="welcomeFreshBtn" type="button">Start Fresh</button>
       <button class="btn" id="welcomeSampleBtn" type="button">Load Sample Data</button>
-      <button class="btn" id="welcomeRestoreBtn" type="button">Restore a Backup</button></p>
+      <button class="btn" id="welcomeRestoreBtn" type="button">Restore a Backup</button>
+      <button class="btn" id="welcomePlanBtn" type="button">Forecast Ahead</button></p>
     <p><strong>Start Fresh</strong> opens Your Data, where you paste a report out of Jira or
       add work items one at a time — a board kept by hand works just as well.</p>
     <p><strong>Load Sample Data</strong> fills every chart with three invented teams and nine
       months of work items, each team named for the one thing it shows, so you can see what
       the app does before typing anything of your own. The figures are made up.</p>
     <p><strong>Restore a Backup</strong> reads a Flow Metrics export.</p>
+    <p><strong>Forecast Ahead</strong> is for a team that has not started. You type how fast you
+      think it will go and it answers the same two questions it would answer from real data —
+      when a scope finishes, and how much finishes by a date. It is your estimate with the
+      arithmetic done, not a measurement.</p>
   </div></div>
 
   <!-- The three tab panels. The main landmark that wraps them opens ABOVE the
@@ -7814,6 +7819,7 @@ window.TD = {
      without a paste box or a team list on screen. */
   dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
   soleProjectId, PROJECT_ID_ADOPT_MIN,
+  buildForecast,
   scenarioFrom, scenarioIsDefault, scenarioPaceOn, scenarioForUnit, scenarioAssumptions,
   scenarioScopeRange, lerp,
   forecastPeriodsForScoped, forecastItemsInScoped,
@@ -7987,6 +7993,17 @@ const DEFAULT_SETTINGS = {
    out fresh each render so it can never go stale as the data moves on. */
 const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', activeTeamId: null,
   chartTab: 'flow', bucket: 'week', forecastItems: DEFAULT_FORECAST_ITEMS, forecastDate: '',
+  /* ── Planning ahead ──────────────────────────────────────────────────────
+     The reader has said they want to forecast before there is anything to
+     forecast from. A stored INTENTION rather than a derived one, and that is
+     deliberate: deriving it from "a pace is typed" would repeat the mistake the
+     typed-pace tick itself made — the boxes you type the pace into live on the
+     Dashboard, and the Dashboard is what this flag opens. A door cannot be
+     locked behind the room it leads to.
+
+     It stops mattering the moment any team holds a row: planningOn() reads both,
+     so real data always wins and nothing has to remember to clear this. */
+  planning: false,
   /* How the All teams table is sorted. Null is the picker's own order, which is
      where a reader expects to find a team before they have asked for anything
      else. Validated at its point of use like every other view field — an
@@ -8730,6 +8747,37 @@ function loadState() {
   /* A brand-new browser gets one empty team so there's somewhere to paste into.
      loadSample() drops it again if it is still untouched — see there. */
   if (!state.teams.length) state.teams.push({ id: newId(), name: 'My team', rows: [], features: [] });
+}
+
+/* Planning mode: the reader asked to forecast, and there is nothing anywhere to
+   forecast FROM. Never in a shared view — a visitor is looking at somebody's
+   data, and a link that somehow carried none of it must not turn into a blank
+   planning tool with their host's name on it. */
+function planningOn() {
+  return view.planning === true && !viewOnly && !anyDataHeld();
+}
+
+/* The derive() a planning forecast gets, since derive() itself cannot make one:
+   it returns early with no `forecast` at all when nothing has finished, which is
+   correct for every other card on that screen and wrong for this one. Only the
+   fields the four forecast renderers actually read — see buildForecast for why
+   that list is worth keeping short.
+
+   Work ITEMS, always. Features are counted from a Parent key column in data that
+   by definition does not exist here. */
+function planningDerive() {
+  const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
+  const noun = BUCKET_NOUNS[bucket];
+  /* Today IS the end of the data when there is no data: every date this card
+     prints counts forward from the reader's own calendar day. */
+  const endDate = new Date(todayLocalISO() + 'T00:00:00Z');
+  return {
+    empty: true, planning: true, endDate,
+    unit: 'items', unitOne: 'item', unitMany: 'items', Units: 'Items',
+    bucket, bucketNoun: noun, bucketNounPlural: noun + 's',
+    forecast: buildForecast({ view, samples: [], weekStarts: [],
+      bucket, endDate, units: 'items' })
+  };
 }
 
 function loadView() {
@@ -11034,13 +11082,26 @@ function renderDashboard() {
       + 'nothing here to count. Set Count back to Work items to see its board, or paste an '
       + 'export with a Parent key column and a work type this app knows means a feature.';
   }
-  $('dashEmpty').hidden = plottable || rows.length > 0 || noFeaturesHere;
+  /* ── The fifth face: planning ────────────────────────────────────────────
+     Every other face here explains why there is nothing to see. This one has
+     something to see — the forecast card, dealing from a typed pace — so it
+     suppresses the explanations rather than joining them, and takes the chart
+     groups with it: three tabs onto nothing is the same complaint #dashEmpty
+     was written to answer. */
+  const planning = planningOn();
+  $('dashEmpty').hidden = plottable || rows.length > 0 || noFeaturesHere || planning;
   $('dashNothing').hidden = plottable || !rows.length;
-  $('dashCharts').hidden = !plottable;
+  $('dashCharts').hidden = !plottable && !planning;
   $('dashTiles').hidden = !plottable;
   /* The group tablist goes with the charts it switches between — left standing
      over an empty-state card it would offer three tabs onto nothing. */
-  $('dashSubtabs').hidden = !plottable;
+  $('dashSubtabs').hidden = !plottable && !planning;
+  /* In planning mode the strip survives with ONE tab on it. Kept rather than
+     hidden so the reader can see what this screen is — a forecast — and so the
+     tab they land on is the tab that is selected; a lone panel under no strip at
+     all reads as a page that lost its navigation. */
+  ['flow', 'delivery', 'health'].forEach(g => { $('stab-' + g).hidden = planning; });
+  if (planning) selectChartTab('forecast');
 
   if (!plottable) {
     if (rows.length && !rows.some(r => r.completed)) {
@@ -11072,6 +11133,17 @@ function renderDashboard() {
     /* Nothing plots, so nothing can be maximised — and if something was, this is
        what brings the window back down rather than leaving a dead canvas up. */
     syncMaxiButtons();
+    /* The forecast is the one thing on this screen that does not need a
+       completion, so it is the one thing that still renders. Same four calls the
+       full render makes, against a derive built for having no data rather than a
+       derive that gave up — see planningDerive. */
+    if (planning) {
+      const pd = planningDerive();
+      renderForecast(pd, currentForecastScope(), []);
+      renderScenario(pd);
+      renderForecastFigures(pd, currentForecastScope());
+      renderSchedule(pd, null);
+    }
     return;
   }
 
@@ -11582,10 +11654,16 @@ function renderForecastFigures(d, scope) {
   card.hidden = !has;
   if (!has) { table.innerHTML = ''; $('forecastFiguresExport').innerHTML = ''; return; }
 
-  /* The basis, so a figure taken out of here can be argued with. */
-  rows.push(['Drawn from', '', f.samples + ' whole '
-    + (f.samples === 1 ? d.bucketNoun : d.bucketNounPlural)
-    + (f.method === 'decomposed' ? ' of work-item throughput' : ''), '']);
+  /* The basis, so a figure taken out of here can be argued with — and a planning
+     forecast has the most to be argued with, so it says outright in the export
+     that no period was ever observed. */
+  rows.push(d.planning
+    ? ['Drawn from', '', 'a typed pace, no history',
+       f.estimated ? f.scenario.estLo + ' to ' + f.scenario.estHi + ' ' + d.unitMany
+         + ' a ' + d.bucketNoun : 'no pace typed']
+    : ['Drawn from', '', f.samples + ' whole '
+       + (f.samples === 1 ? d.bucketNoun : d.bucketNounPlural)
+       + (f.method === 'decomposed' ? ' of work-item throughput' : ''), '']);
   if (f.method === 'decomposed') {
     rows.push(['Feature sizes', '', f.sizeCount + ' finished features',
       'median ' + f.sizeMedian + ' items']);
@@ -11806,7 +11884,25 @@ function renderForecast(d, scope, stale) {
     ? ' Dealt from ' + scope.phrase + ' pooled \u2014 one draw takes what they all '
       + 'delivered in the same ' + d.bucketNoun + ', so a quiet week they shared counts once.'
     : '';
-  $('fcHint').textContent = 'Both answers assume the next few ' + d.bucketNounPlural
+  /* ── The sentence a planning forecast is owed ────────────────────────────
+     The one below it says these answers assume the next few periods look like
+     the periods on screen. With no data there are none, and printing "the 0
+     whole weeks on screen" would be the card describing history it does not
+     have. What replaces it says the one thing a reader of this number most
+     needs to hear: it is your own estimate, resampled — the app has contributed
+     the arithmetic and nothing else. */
+  if (d.planning) {
+    $('fcHint').textContent = f.estimated
+      ? 'There is no history here — these answers are dealt from the pace you typed below, '
+        + FORECAST_TRIALS.toLocaleString() + ' times over, counting from today. They are your '
+        + 'estimate with the arithmetic done, not a measurement, and a typed range spreads '
+        + 'less than real ' + d.bucketNounPlural + ' do. Paste or add real work items on Your '
+        + 'Data and this becomes a forecast from what actually happened.'
+      : 'Nothing has been counted yet, so there is nothing to resample. Type how many '
+        + d.unitMany + ' you expect to finish per ' + d.bucketNoun + ' under '
+        + '\u201cAdjust for what you know\u201d below \u2014 that range is what these two '
+        + 'answers will be dealt from, and until it is there they have nothing to say.';
+  } else $('fcHint').textContent = 'Both answers assume the next few ' + d.bucketNounPlural
     + ' look like the ' + f.samples + ' whole ' + periodNoun(f.samples)
     + (f.method === 'decomposed' ? ' of work-item throughput' : '')
     + ' on screen. Change the window or the work type filter and the forecast '
@@ -11850,6 +11946,10 @@ function renderForecast(d, scope, stale) {
   const runWord = f.assumptions && f.assumptions.length ? 'adjusted runs'
     : (f.estimated ? 'estimated runs' : 'runs');
   const noAnswerFoot = f.tooWide ? 'too uncertain to answer'
+    /* "Not enough history" is true of a planning forecast and is not its
+       problem: it was never going to have any, and the reader has already been
+       told so. What it is waiting for is the range below. */
+    : d.planning ? 'waiting for a pace below'
     : f.estimated ? 'no pace to draw from' : 'not enough history to forecast';
   const rp = f.requiredPace;
   const whenRow = f.when && f.when.rows.find(r => r.confidence === conf85);
@@ -11914,6 +12014,20 @@ function renderForecast(d, scope, stale) {
           'sized at a median of ' + f.sizeMedian + ' items each, paced by '
             + f.samples + ' whole ' + periodNoun(f.samples) + ' of item throughput'
             + ((scope && scope.kind !== 'team') ? ' across ' + scope.phrase : ''),
+          'forecastSamples')
+      /* A planning forecast is drawn from a typed range, and this tile is where a
+         reader checks what an answer rests on — so it states the range rather
+         than a period count of zero, which would read as a measurement that
+         found nothing. */
+      : d.planning
+      ? tile('Drawn from',
+          f.estimated
+            ? escapeHtml(f.scenario.estLo === f.scenario.estHi ? String(f.scenario.estLo)
+                : f.scenario.estLo + '\u2013' + f.scenario.estHi)
+            : '&mdash;',
+          f.estimated
+            ? 'a pace you typed, not measured \u2014 ' + d.unitMany + ' a ' + d.bucketNoun
+            : 'no history, and no pace typed yet',
           'forecastSamples')
       : tile('Drawn from', String(f.samples),
           'whole ' + periodNoun(f.samples) + ' of throughput'
@@ -12781,7 +12895,17 @@ function renderEmptyState() {
      a link whose teams somehow carried no rows would show a visitor no way back
      to anything. */
   const anyData = anyDataHeld();
-  $('tab-dashboard').hidden = !anyData && !viewOnly;
+  /* Real data does not merely outvote the planning flag, it RETIRES it. Left
+     standing, the intention would come back the moment a reader cleared their
+     rows — resurrecting a mode they last chose weeks ago, from a click they have
+     forgotten making. A mutation inside a render, like the allteams fallback
+     below it, and idempotent for the same reason. */
+  if (view.planning && anyData) { view.planning = false; saveView(); }
+  /* Planning is the third way in. Nothing on that screen plots, but one card on
+     it can still answer, and the rule this gate keeps — nothing shows until
+     there is something behind it — is met by the pace the reader is about to
+     type rather than by a row. */
+  $('tab-dashboard').hidden = !anyData && !planningOn() && !viewOnly;
   if (activeTab === 'dashboard' && $('tab-dashboard').hidden) selectTab('data');
   /* The demo offer on the empty dashboard goes with it, on the reasoning the
      one beside Load pasted rows already follows: with the tab hidden until
@@ -14457,6 +14581,29 @@ $('welcomeFreshBtn').addEventListener('click', () => {
 });
 $('welcomeSampleBtn').addEventListener('click', loadSample);
 $('welcomeRestoreBtn').addEventListener('click', () => openModal($('dataDialog')));
+/* ── The fourth door ───────────────────────────────────────────────────────
+   It does NOT type a pace on the reader's behalf. Landing them in front of the
+   two empty boxes with the tick already on is the honest version — every number
+   in the answer has to be one they chose — and the card above the boxes says so
+   while they are still empty. It ticks the box and opens the block, which is the
+   part that would otherwise be a hunt. */
+$('welcomePlanBtn').addEventListener('click', () => {
+  welcomeStarted = true;
+  view.planning = true;
+  /* Nothing has been counted, so "the end of the data" is not a place. */
+  view.countFrom = 'today';
+  const sc = scenarioFrom(view.scenario);
+  sc.estOn = true;
+  view.scenario = sc;
+  saveView();
+  renderAll();
+  selectTab('dashboard');
+  selectChartTab('forecast');
+  $('fcScenario').open = true;
+  /* After the render, on the box they have to fill in for any of this to
+     answer — the one thing on the screen that is asking them a question. */
+  $('scEstLo').focus();
+});
 $('btnLoad').addEventListener('click', () => doLoad('replace'));
 $('btnAppend').addEventListener('click', () => doLoad('append'));
 /* Move focus into a panel when the control the user was standing on has gone — either
@@ -16899,7 +17046,10 @@ if (viewOnly) {
      other teams were full to Your Data because the one they happened to be on
      was empty. selectTab refuses a hidden tab either way, so this only decides
      where a browser with nothing at all opens. */
-  selectTab(anyDataHeld() ? view.activeTab : 'data');
+  /* Planning counts as somewhere to be: the reader left this app on a forecast
+     they had typed, and dropping them on Your Data would look like it had been
+     thrown away. */
+  selectTab((anyDataHeld() || planningOn()) ? view.activeTab : 'data');
   /* Last, after the tab is chosen: the whole point of the hold is that the
      reader never sees the panel this lands on being swapped for another one. */
   bootDone();

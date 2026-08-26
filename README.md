@@ -472,12 +472,17 @@ card in the middle of the page:
 > date and a type — and it works out throughput, cycle and lead time, work in progress, and
 > the age of everything still open…
 >
-> **Start Fresh** · **Load Sample Data** · **Restore a Backup**
+> **Start Fresh** · **Load Sample Data** · **Restore a Backup** · **Forecast Ahead**
 
 **Start Fresh** opens *Your Data*, where you paste a report out of Jira or add work items one
 at a time. **Load Sample Data** loads [the demo](#the-demo--trying-it-without-pasting-anything).
 **Restore a Backup** opens the same [*Back Up & Restore*](#back-up--restore) window the ⇩
-button does.
+button does. **Forecast Ahead** is
+[planning without data](#planning-ahead-a-forecast-before-there-is-anything-to-forecast-from).
+
+The first three are the family's card, in the family's words and order. The fourth is this
+app's alone: forecasting is the one thing Flow Metrics can usefully do before anything is
+recorded, and no sibling has an equivalent.
 
 It writes nothing. There is nothing to create here — the figures come from a paste or from
 typed items — so *Start Fresh* just puts the card away for this sitting and opens the tab that
@@ -1728,6 +1733,34 @@ It answers two questions, from the same set of deals:
 Both boxes sit inside the tab rather than in the control strip at the top of the dashboard,
 because they change nothing outside this group. Everything in the strip *does* reach them: the
 team, the work type filter, the date window and the grouping all decide which periods get dealt.
+
+### Planning Ahead: A Forecast Before There Is Anything to Forecast From
+
+A team that has not started has no throughput to resample — and that is exactly the team most
+often asked for a date. **Forecast Ahead** on the welcome card is the way in: it opens the
+Dashboard with the Forecast group and nothing else, the typed-pace tick already on, and the two
+boxes waiting.
+
+It does **not** type a pace for you. Every number in the answer has to be one you chose, so
+until the range is filled in the tiles read *waiting for a pace below* rather than a date. Fill
+it in and you get the same two answers, at the same three confidences, that real data would
+give — dealt from your range instead of from history, counting from today.
+
+What the screen says about itself changes to match. There is no *"the next few weeks look like
+the 13 whole weeks on screen"*, because there are none; the basis tile states the range you
+typed rather than a period count of zero, and the exported table says **a typed pace, no
+history** where it would otherwise name the periods. A figure taken out of here can be argued
+with on the same terms as any other.
+
+Two things worth knowing:
+
+- **A typed range spreads less than real periods do.** It has no quiet weeks and no spikes in
+  it, so treat its confidence as the most generous reading rather than the safest one. The
+  *team confidence* setting is switched off while a typed pace is live — multiplying a guess by
+  a guess compounds two people's pessimism.
+- **Real data retires it.** The moment any team holds a row the whole dashboard comes back and
+  the planning flag is cleared for good, rather than lying in wait to resurface if you later
+  clear your rows.
 
 ### Forecasting Features, and Why Not the Obvious Way
 
