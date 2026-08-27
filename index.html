@@ -572,13 +572,48 @@ select { cursor: pointer; }
    A <details> spanning the whole group. Its own surface so the knobs read as a
    thing you are setting rather than as more of the answer. */
 .forecast-scenario { grid-column: 1 / -1; border: 1px solid var(--border-control);
-  border-radius: var(--radius); padding: 12px 16px; background: var(--surface); }
+  border-radius: var(--radius); padding: 12px 16px; background: var(--surface);
+  container: scenario / inline-size; }
 .forecast-scenario > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 600;
   color: var(--text-secondary); list-style-position: outside; }
 .forecast-scenario[open] > summary { margin-bottom: var(--sp-5); }
 /* Says WHAT is on when the block is shut, so a closed scenario is never hiding
    an adjustment. */
 .forecast-scenario > summary .on { font-weight: 400; color: var(--text-muted); }
+/* ── The scenario's knobs, three across ──────────────────────────────────────
+   Not `.pairs`. That class exists to close the gap a field is left in when the
+   count does not divide by the column count, and it does it by fixing the count
+   at two — which is the wrong count here, because this row is the one place in
+   the app where fields DISAPPEAR rather than being added. The item lens hides
+   three of the six, and two columns turned the three that were left into a row
+   of one, a wrapped sentence and a row of two, with a third of the block empty.
+   Charles asked for the four boxes on one line on 2026-08-27 and the line was
+   always wide enough; the column count was the thing in the way.
+
+   Three columns serve both lenses because six and three both divide by three,
+   so neither strands a field — the `.pairs` span trick could not have been used
+   anyway, since `:nth-child` counts a hidden field and a hidden field takes no
+   track.
+
+   The lens is read straight off the DOM rather than through a class the renderer
+   would have to remember to set: `#scExtraWrap[hidden]` IS the item lens, set by
+   the same line that hides its two neighbours. And the widths come from a NAMED
+   container query, like the tile row's, so the block answers the panel it is in
+   rather than the viewport, which is wider than it by the whole page gutter.
+   The thresholds are the 260px minimum field and the 16px gap multiplied out:
+   3 → 812, 2 → 536. */
+.grid.two.sc-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@container scenario (max-width: 811px) {
+  /* Six into two is still even. Three into two is not, so the item lens stacks
+     rather than leave its last knob alone beside a hole. */
+  .grid.two.sc-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid.two.sc-fields:has(> #scExtraWrap[hidden]) { grid-template-columns: minmax(0, 1fr); }
+}
+@container scenario (max-width: 535px) {
+  .grid.two.sc-fields { grid-template-columns: minmax(0, 1fr); }
+}
+/* It follows the grid now, so it needs the gap the grid's own rows have. */
+#scScopeNote { margin-top: var(--sp-3); }
 /* Two number boxes reading "3 to 7", which is one control rather than two —
    hence one label above the pair and an aria-label on each half. */
 .row-pair { display: flex; align-items: center; gap: 8px; }
@@ -2367,7 +2402,14 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         <details class="forecast-scenario" id="fcScenario">
           <summary><span id="fcScenarioSummary">Adjust for what you know</span></summary>
 
-          <div class="grid two pairs">
+          <!-- ONE grid, three across, and the order is the arithmetic: the first
+               three are the knobs `scenarioScopeRange` multiplies together, the
+               last three are about how the work gets done. The item lens hides
+               exactly the second of each pair, so what is left — scope growth,
+               the team, the periods off — is three fields and fills the same one
+               line. Six and three both divide by three, which is why one column
+               count serves both lenses without stranding a field in either. -->
+          <div class="grid two sc-fields">
             <div>
               <label for="scGrowthLo" id="scGrowthLabel">Each known feature grows by (%)</label>
               <div class="row-pair">
@@ -2388,10 +2430,6 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
                        inputmode="numeric" aria-label="Features discovered later (%), highest">
               </div>
             </div>
-          </div>
-          <p class="hint" id="scScopeNote" hidden></p>
-
-          <div class="grid two pairs" style="margin-top:var(--sp-5)">
             <div id="scClarityWrap">
               <label for="scClarity">How well understood are they</label>
               <select id="scClarity"></select>
@@ -2409,6 +2447,11 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
               <input type="number" id="scUnavailable" min="0" max="26" step="1" inputmode="numeric">
             </div>
           </div>
+          <!-- Under the whole grid rather than tucked under the scope row, which
+               is where a full-width line would have to break that row to sit. So
+               the sentence names its own subject instead of pointing at whatever
+               happens to be beside it. -->
+          <p class="hint" id="scScopeNote" hidden></p>
 
           <div style="margin-top:var(--sp-5)">
             <label class="checkline" for="scEstOn">
@@ -11840,7 +11883,23 @@ function renderScenario(d) {
   const range = f.scopeRange;
   $('scScopeNote').hidden = !range;
   if (range) {
-    $('scScopeNote').textContent = 'Together these multiply the scope by '
+    /* NAMES ITS SUBJECT rather than saying "these". The line sat directly under
+       the two scope boxes and could point at them; it now sits under the whole
+       grid, where "these" would be pointing at the team and the periods off —
+       neither of which multiplies anything.
+
+       And it counts them, because naming them made the singular audible: the
+       item lens has exactly ONE scope knob, so "together, the scope settings"
+       was describing a plural that lens does not have. Counted off the SAME
+       zeroed scenario the range itself came from — asking the stored one would
+       count a feature knob the item lens is not reading. */
+    const scr = f.scenario || sc;
+    const knobs = (scr.growthLo || scr.growthHi ? 1 : 0)
+      + (scr.extraLo || scr.extraHi ? 1 : 0)
+      + (scr.clarity > 0 ? 1 : 0);
+    $('scScopeNote').textContent = (knobs > 1
+      ? 'Together, the scope settings above multiply the work by '
+      : 'The scope setting above multiplies the work by ')
       + range.lo.toFixed(2) + '\u00d7 to ' + range.hi.toFixed(2) + '\u00d7.';
   }
 

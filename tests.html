@@ -307,8 +307,10 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    Raised to 2444 on 2026-08-26 — the typed-pace tick — the first group in here
    that drives the scenario block's own controls, which is why the tick could be
    dead on screen while every pure test about it passed, and then the lens filter
-   the same day. */
-const EXPECTED = 2524;
+   the same day. And to 2600 on 2026-08-27, when the orphaned-field sweep gained
+   a second target: the scenario's own knob grid, which is not in a dialog and so
+   had never been walked. */
+const EXPECTED = 2600;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -5977,7 +5979,7 @@ group('ARTs — the grouping, and the boundary it crosses');
     clarity.value = '2'; clarity.dispatchEvent(new win.Event('change', { bubbles: true }));
     const onFeatures = claims();
     ok(/2 settings on/.test(onFeatures.summary), 'the feature lens counts both knobs');
-    ok(/multiply the scope/.test(onFeatures.scopeNote || ''), 'and prints what they multiply to');
+    ok(/multiply the work/.test(onFeatures.scopeNote || ''), 'and prints what they multiply to');
     ok(/more features turn up/.test(onFeatures.tiles || ''), 'and lists them under the tiles');
 
     setUnit('items');
@@ -9473,6 +9475,149 @@ group('a card with no chart matches the one beside it');
     ok(boxes[1].getBoundingClientRect().width < gridW - 2,
        'while the two above it stay in their own columns');
     gd.getElementById('itemDialog').close();
+
+    f.remove();
+    if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
+    if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the scenario knobs fill their line');
+
+  /* ── THE ORPHANED-FIELD SWEEP, POINTED AT THE ONE GRID THAT IS NOT IN A
+       DIALOG ──────────────────────────────────────────────────────────────────
+     Charles, 2026-08-27: "there should be enough room to fit all four inputs on
+     one line so let's do that". The scenario's knobs sat in two `.grid.two.pairs`
+     grids, and the item lens hides three of the six — so two fixed columns left
+     the three survivors as a row of ONE, a wrapped sentence, and a row of two,
+     with a third of a block that was always wide enough standing empty.
+
+     The sweep above walks dialogs, which is why it never saw this. This block is
+     the same measurement pointed at `.sc-fields`, and it moves the LENS as well
+     as the width: the field count is what strands a field, and the lens is the
+     only thing in the app that changes a field count without anybody editing the
+     markup. `.pairs` could not have fixed it either — its span rule keys off
+     `:nth-child`, which counts a hidden field that occupies no track. */
+  {
+    const keep = { state: localStorage.getItem('td-state'),
+                   view: localStorage.getItem('td-view') };
+    /* Enough whole periods to forecast from, and two finished features, or the
+       lens cannot be switched and half of this measures one layout twice. */
+    localStorage.setItem('td-state', JSON.stringify({
+      schema: TD.SCHEMA, stages: [], arts: [],
+      teams: [{ id: 'sf1', name: 'Scened',
+        rows: Array.from({ length: 14 }, (_, i) => ({
+          c: '2015-0' + (i < 9 ? '1' : '2') + '-' + String((i % 9) * 3 + 2).padStart(2, '0'),
+          s: '2015-01-02', t: 'Story' })),
+        /* A feature without an issue key is dropped by hydrateFeatures, which
+           is how the first draft of this test measured the item lens twice. */
+        features: [{ c: '2015-01-22', s: '2015-01-05', t: 'Feature', i: 'SF-1' },
+                   { c: '2015-02-02', s: '2015-01-12', t: 'Feature', i: 'SF-2' }] }],
+      settings: {}
+    }));
+    /* The block is a <details> that renderScenario re-asserts from the view on
+       every render, so opening the element by hand would be shut again by the
+       next keystroke. It is opened where the app itself opens it. */
+    localStorage.setItem('td-view', JSON.stringify({ activeTab: 'dashboard',
+      chartTab: 'forecast', months: 'all', scenarioOpen: true }));
+
+    const f = document.createElement('iframe');
+    f.setAttribute('data-td-tests', '');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;left:-9999px;width:1240px;height:1400px;border:0';
+    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html' + BUST; document.body.appendChild(f); });
+    const sw = f.contentWindow, sd = sw.document;
+
+    const setUnit = (v) => { const u = sd.getElementById('unitSel');
+      u.value = v; u.dispatchEvent(new sw.Event('change', { bubbles: true })); };
+
+    /* Rows by LEFT resetting, not by top — the grid is `align-items: end`, so two
+       cells on one row routinely have different tops and grouping by top reports
+       failures where the layout is fine. Same reason as the dialog sweep. */
+    const fieldRows = () => {
+      const g = sd.querySelector('.sc-fields');
+      const gr = g.getBoundingClientRect();
+      const cells = [...g.children].filter(c => c.offsetParent !== null);
+      const rows = []; let cur = null, prevLeft = Infinity;
+      cells.forEach(c => { const r = c.getBoundingClientRect();
+        if (Math.round(r.left) <= Math.round(prevLeft)) { cur = []; rows.push(cur); }
+        cur.push(r); prevLeft = r.left; });
+      return { width: Math.round(gr.width), cells: cells.length,
+        rows: rows.map(rw => rw.length),
+        short: rows.map(rw => Math.round(gr.right - rw[rw.length - 1].right))
+                   .filter(px => px > 2) };
+    };
+
+    ok(!sd.getElementById('spanel-forecast').hidden,
+       'the forecast panel is the one on screen, or this measures a hidden grid');
+    ok(sd.getElementById('fcScenario').open,
+       'and the scenario block is folded open, or every box below has no size');
+
+    /* ── The ask itself ─────────────────────────────────────── */
+    setUnit('items');
+    const wideItems = fieldRows();
+    is(wideItems.cells, 3, 'the item lens leaves three knobs standing — scope growth, '
+       + 'the team, and the periods nobody is delivering');
+    is(wideItems.rows, [3], 'and all three sit on ONE line, which is the four boxes '
+       + 'Charles asked to see together');
+    ok(wideItems.width > 900, 'at a width where that is a real claim', wideItems.width);
+
+    setUnit('features');
+    const wideFeat = fieldRows();
+    is(wideFeat.cells, 6, 'the feature lens has all six');
+    is(wideFeat.rows, [3, 3], 'and splits them into two FULL rows rather than 3 + 2 + 1');
+
+    /* ── And no width strands one, on either lens ────────────── */
+    [1240, 1000, 900, 800, 700, 620, 560, 480, 400].forEach(w => {
+      f.style.width = w + 'px';
+      ['items', 'features'].forEach(u => {
+        setUnit(u);
+        const r = fieldRows();
+        is(r.short, [], 'no knob is left beside a hole at ' + w + 'px on the ' + u + ' lens',
+           r.rows.join(' + '));
+      });
+    });
+
+    /* ── The mechanism, not luck ─────────────────────────────── */
+    f.style.width = '800px';
+    const tracks = () => sw.getComputedStyle(sd.querySelector('.sc-fields'))
+      .gridTemplateColumns.split(' ').filter(Boolean).length;
+    setUnit('features');
+    is(tracks(), 2, 'in the narrow band six knobs go two across, which divides evenly');
+    setUnit('items');
+    is(tracks(), 1, 'while three stack instead — two columns would strand the third, '
+       + 'and the rule reads the lens off #scExtraWrap[hidden] rather than a class '
+       + 'the renderer has to remember to set');
+
+    /* ── The sentence that lost its neighbours ───────────────── */
+    const note = sd.getElementById('scScopeNote');
+    ok(note.compareDocumentPosition(sd.querySelector('.sc-fields'))
+       & Node.DOCUMENT_POSITION_PRECEDING,
+       'the scope note follows the whole grid — a full-width line between the knobs '
+       + 'would break the row this block exists to keep whole');
+    f.style.width = '1240px';
+    setUnit('features');
+    const setNum = (id, v) => { const b = sd.getElementById(id); b.value = v;
+      b.dispatchEvent(new sw.Event('change', { bubbles: true })); };
+    setNum('scGrowthLo', '20'); setNum('scGrowthHi', '20');
+    setNum('scExtraLo', '10'); setNum('scExtraHi', '10');
+    ok(!note.hidden, 'and it appears once a scope knob is off its default');
+    ok(!/\bthese\b/.test(note.textContent),
+       'saying WHICH settings it means rather than pointing at whatever is beside it — '
+       + 'the team and the periods off are beside it now, and neither multiplies anything',
+       note.textContent);
+    ok(/Together, the scope settings above multiply/.test(note.textContent),
+       'plural where two knobs really do multiply together', note.textContent);
+
+    /* Naming the subject is what made the singular audible: the item lens has
+       exactly ONE scope knob, so a sentence beginning "Together, the scope
+       settings" was describing a plural that lens does not have. */
+    setUnit('items');
+    ok(!note.hidden, 'the note survives the switch — growth is read on both lenses');
+    ok(/^The scope setting above multiplies/.test(note.textContent),
+       'and goes singular on the lens that has only one of them', note.textContent);
+    setNum('scGrowthLo', '0'); setNum('scGrowthHi', '0');
+    ok(note.hidden, 'and says nothing at all when nothing multiplies');
 
     f.remove();
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);

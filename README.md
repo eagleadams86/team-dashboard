@@ -1922,11 +1922,17 @@ ran* — not an equivalent one, the same code — so the plain forecast is the p
 | **Periods nobody is delivering** | A shutdown, a conference, a holiday fortnight. A plain number. |
 | **Use a typed pace instead of this history** | For a team with no history to resample. **Ticked by default where there is none**, unticked where there is — see below. |
 
+**The six knobs sit three across, and the row stays full on either lens.** Six and three both
+divide by three, so the item lens — which hides three of them — puts the three that are left on
+the same single line rather than in a row of one and a row of two with a third of the block
+standing empty. Narrower than three columns will take, six go two across and three stack, for the
+same reason: a row is never left with a field alone beside a hole.
+
 **Four of the seven are about features, and they do not exist on the item lens.** Everything
 below scope growth in that table — features discovered later, how well understood they are, how
 many are worked at once — is read only by the feature forecast. Counting **Work items**, those
-controls hide *and their settings stop being claimed*: the summary count, the "multiply the scope
-by" line and the list under the tiles all describe only the knobs that moved the number in front
+controls hide *and their settings stop being claimed*: the summary count, the scope-multiplier
+line and the list under the tiles all describe only the knobs that moved the number in front
 of you. The values are kept, not cleared, so switching the lens back gives you your scenario
 again. Until 2026-08-26 only the controls hid, and a scenario set under Features went on
 announcing itself — "2 settings on", "multiply the scope by 2.60×" — over an item forecast that
@@ -1937,7 +1943,10 @@ grows 20%" and "20% more features" are two ways of saying +44% on the same numbe
 who set both because the labels sounded like different risks would get a compound they never
 intended. So one is growth *within* the features you counted and the other is features you did
 *not* count — genuinely different quantities — and the combined effect is printed as one line:
-*"Together these multiply the scope by 1.20× to 1.44×."*
+*"Together, the scope settings above multiply the work by 1.20× to 1.44×."* It says **the scope
+settings** rather than *these* because it sits under the whole grid rather than under those two
+boxes, and it drops to the singular where only one scope knob is on — which on the item lens is
+the only case there is.
 
 **No team setting can forecast a speed-up.** The steps run from 1.0 downwards, because a
 reorganisation making a team faster is the most-abused claim in this business and this app is not
