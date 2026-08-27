@@ -9895,9 +9895,26 @@ group('a card with no chart matches the one beside it');
        all, not that it is exactly 66ch, and pinning the exact figure would fail
        the day somebody changed the body font. */
     ok(pr.width < 750, 'with the prose capped to a readable measure', Math.round(pr.width) + 'px');
-    ok(pr.width < wrap.getBoundingClientRect().width - 300,
-       'well inside the width it would otherwise take',
-       Math.round(pr.width) + ' of ' + Math.round(wrap.getBoundingClientRect().width));
+    /* Against the BLOCK, not against the panel: the panel now hugs this
+       paragraph, so measuring the cap against it would be measuring the cap
+       against itself. The block is the width the line would run to if the cap
+       were lifted, which is the thing being ruled out. */
+    ok(pr.width < body.getBoundingClientRect().width - 300,
+       'well inside the width it would otherwise run to',
+       Math.round(pr.width) + ' of ' + Math.round(body.getBoundingClientRect().width));
+
+    /* THE PANEL COMES IN TO THE TEXT rather than the text going out to the
+       panel — Charles asked for the second on 2026-08-27 and the measurement
+       said no: 146 characters a line against 83. So the void it left goes by
+       shrinking the box, and the box may not go back to spanning the block. */
+    const panel = wrap.closest('.sc-pace');
+    ok(panel.getBoundingClientRect().width < body.getBoundingClientRect().width - 200,
+       'and the panel around it ends where its content does rather than spanning the block',
+       Math.round(panel.getBoundingClientRect().width) + ' of '
+       + Math.round(body.getBoundingClientRect().width));
+    ok(panel.getBoundingClientRect().right - pr.right < 40,
+       'with no grey left over past the end of the sentence',
+       Math.round(panel.getBoundingClientRect().right - pr.right) + 'px');
     xd.getElementById('scReset').click();
 
     f.remove();

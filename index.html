@@ -675,6 +675,21 @@ select { cursor: pointer; }
    always looked like — and what the forecast row above now does too. */
 .grid.two.sc-fields { grid-template-columns: repeat(3, minmax(0, max-content));
   justify-content: start; }
+/* ── ALL SIX ON ONE LINE WHERE THERE IS ROOM (2026-08-27) ───────────────────
+   Charles asked whether there was; there is, on a wide enough window, and the
+   figure is measured rather than guessed. The six fields come to 1168px of
+   content plus five 16px gaps at the widest labels the app can produce — the
+   month bucket's "Months nobody is delivering" is 6px wider than the week
+   one's, and that is the worst case, because every other label here is fixed
+   text. 1220 is that with enough headroom left for a label to grow a word.
+
+   Below it they go back to three, which is where the item lens lives at every
+   width: three fields, one row, and six tracks would only hang three empty gaps
+   off the end of it. The `:has` probe is the same one the narrow bands use. */
+@container scenario (min-width: 1220px) {
+  .grid.two.sc-fields:not(:has(> #scExtraWrap[hidden])) {
+    grid-template-columns: repeat(6, minmax(0, max-content)); }
+}
 @container scenario (max-width: 811px) {
   /* Six into two is still even. Three into two is not, so the item lens stacks
      rather than leave its last knob alone beside a hole. */
@@ -703,14 +718,23 @@ select { cursor: pointer; }
 @container scenario (max-width: 640px) {
   .sc-typed { grid-template-columns: minmax(0, 1fr); }
 }
-/* The panel is the app's own; only its spacing inside this block is here. The
-   gap is the largest on the scale because a LEGEND sits on that top border — at
-   12px it read as an underline to the row of boxes above rather than as the head
-   of something new, which is the one thing the panel exists to say. */
-/* `.formpanel.sc-pace`, not `.sc-pace`: `fieldset.formpanel` sets `margin: 0`
-   and out-specifies a bare class, so the gap was being zeroed and the legend sat
-   on the row of boxes above it. */
-.formpanel.sc-pace { margin-top: var(--sp-7); }
+/* The panel is the app's own; only its spacing and its width inside this block
+   are here. The gap is the largest on the scale because a LEGEND sits on that
+   top border — at 12px it read as an underline to the row of boxes above rather
+   than as the head of something new, which is the one thing the panel exists to
+   say. (`.formpanel.sc-pace`, not `.sc-pace`: `fieldset.formpanel` sets
+   `margin: 0` and out-specifies a bare class, so the gap was being zeroed.)
+
+   IT HUGS ITS CONTENT rather than spanning the block. Charles asked whether the
+   paragraph should run to the end of the box instead; measured, that is 146
+   characters a line against the 83 it reads at now — roughly double the ~75 that
+   every column of prose on the web is set to, and for the reason that beyond it
+   the eye loses the start of the next line. So the box comes in to the text
+   rather than the text going out to the box, which also lines its right edge up
+   with the knobs above it and the button below: all three end where their own
+   content does. It DOES grow when the tick reveals the boxes — that is a reveal
+   making room for what appeared, not a layout shifting under anybody. */
+.formpanel.sc-pace { margin-top: var(--sp-7); width: max-content; max-width: 100%; }
 /* ── The one control that undoes the others ──────────────────────────────────
    A rule above it, so it is not read as one more field, and the disabled state
    is the honest one: `renderScenario` turns it on exactly when the stored

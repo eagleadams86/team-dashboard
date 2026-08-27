@@ -1921,11 +1921,14 @@ ran* — not an equivalent one, the same code — so the plain forecast is the p
 | **Periods nobody is delivering** | A shutdown, a conference, a holiday fortnight. A plain number. |
 | **Use a typed pace instead of this history** | For a team with no history to resample. **Ticked by default where there is none**, unticked where there is — see below. |
 
-**The six knobs sit three across, and the row stays full on either lens.** Six and three both
-divide by three, so the item lens — which hides three of them — puts the three that are left on
-the same single line rather than in a row of one and a row of two with a third of the block
-standing empty. Narrower than three columns will take, six go two across and three stack, for the
-same reason: a row is never left with a field alone beside a hole.
+**All six knobs sit on one line where there is room for them, and three across where there is
+not.** Six fields come to 1168px of content plus their gaps at the widest labels the app can
+produce, so one line needs about 1220px of block — a 1440px window, not a 1366px one. Below that
+they go back to three across, which is where the item lens sits at every width: it hides three of
+the six, and the three that are left fill the same single line rather than making a row of one and
+a row of two with a third of the block standing empty. Narrower again, six go two across and three
+stack. Every count divides evenly at every step, so a row is never left with a field alone beside
+a hole.
 
 **And each box is the size of what goes in it** — see [A box is as wide as what goes in
 it](#a-box-is-as-wide-as-what-goes-in-it).
@@ -1941,6 +1944,13 @@ that could not un-press it would be lying.
 `fieldset` the item form and the backup window use. Everything above it *adjusts* your data; this
 *replaces* it, and the panel is what says so. Each of those fields sits beside its own
 explanation rather than across the block from it.
+
+**That panel ends where its text ends.** The alternative — running the paragraph out to the full
+width of the block — measures at 146 characters a line against the 83 it reads at now, roughly
+double the ~75 every column of prose is set to and for the reason that beyond it the eye loses the
+start of the next line. So the box comes in to the text rather than the text going out to the box,
+which puts its right edge in line with the knobs above it and the button below: all three end
+where their own content does.
 
 That ⓘ is also why the fold is a plain button with `aria-expanded` rather than a `<details>`. A
 `<summary>` is a button in the accessibility tree, so a help dot inside one is a nested
