@@ -1945,6 +1945,11 @@ that could not un-press it would be lying.
 *replaces* it, and the panel is what says so. Each of those fields sits beside its own
 explanation rather than across the block from it.
 
+**Both typed rows share one grid**, so the label columns are the same width and the two
+paragraphs beside them start on the same edge. They were a grid each until 2026-08-27, which sized
+*"Work items per feature"* and *"Work items finished per week"* independently and left the prose
+39px out of line in planning — the one state where both are on screen at once.
+
 **That panel ends where its text ends.** The alternative — running the paragraph out to the full
 width of the block — measures at 146 characters a line against the 83 it reads at now, roughly
 double the ~75 every column of prose is set to and for the reason that beyond it the eye loses the
@@ -2073,10 +2078,17 @@ time: the first by late September, then roughly every three weeks, the last in m
 same five all at once: nothing until late November, then all of them. **All five done: mid-December
 either way.**
 
+**It answers at all three confidences** — 50%, 85% and 95%, a column each, the same three the two
+histograms above it give. It shipped with two, which made it the only card in the group answering
+a different set of questions; and because the CSV writer reads this table off the page, the file
+people took into a plan was missing the careful figure too. The columns are built from the app's
+own list of confidences rather than a list of this card's own, so the two cannot drift apart again.
+
 Two things the schedule says out loud, because both are easy to get wrong:
 
-- **The dates are not all achievable at once.** Each is an 85% answer for its own feature; the
-  chance every one lands on time is far lower. Only the last row also means "everything by then".
+- **The dates are not all achievable at once.** Each is that feature's own answer at that
+  confidence; the chance every one of them lands on its 85% date is far lower than 85%, and lower
+  again at 95%. Only the last row also means "everything by then".
 - **It does not charge for splitting attention.** Real throughput usually *falls* as more is
   started at once. This model holds it constant, so parallelism looks free here and is not.
 

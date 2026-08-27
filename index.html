@@ -712,11 +712,15 @@ select { cursor: pointer; }
    running the full width of this block is a single 1100px line, which is worse
    to read than the gap was. Aligned on the TOP, not the bottom — a sentence and
    a box start together. */
-.sc-typed { display: grid; grid-template-columns: max-content minmax(0, 66ch);
-  gap: 4px 16px; align-items: start; margin-top: var(--sp-4); }
+.sc-typed-rows { display: grid; grid-template-columns: max-content minmax(0, 66ch);
+  gap: var(--sp-6) 16px; align-items: start; }
+/* Only when one of them is actually on screen — an empty grid still carries its
+   own margin, which would sit as a strip of nothing under the tick. */
+.sc-typed-rows:has(> :not([hidden])) { margin-top: var(--sp-4); }
+.sc-typed { display: contents; }
 .sc-typed > p { margin: 0; }
 @container scenario (max-width: 640px) {
-  .sc-typed { grid-template-columns: minmax(0, 1fr); }
+  .sc-typed-rows { grid-template-columns: minmax(0, 1fr); }
 }
 /* The panel is the app's own; only its spacing and its width inside this block
    are here. The gap is the largest on the scale because a LEGEND sits on that
@@ -2636,6 +2640,15 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
                  their items. With nothing recorded there is nothing to measure,
                  so the reader states it — the same trade the typed pace makes one
                  row up, and stated in the same shape. -->
+          <!-- ONE grid over BOTH rows (2026-08-27). They were a grid each, so each
+               sized its own `max-content` label column — "Work items per feature"
+               against "Work items finished per week" — and in planning, where
+               both are on screen at once, the two paragraphs started 39px apart.
+               `display: contents` on the rows hands their cells to this grid, so
+               there is one label column and one prose column for the pair. The
+               rows still hide one at a time: `[hidden]`'s `display: none` beats
+               `display: contents`, which is the whole reason this works. -->
+          <div class="sc-typed-rows">
             <div class="sc-typed" id="scSizeWrap" hidden>
               <div>
                 <label for="scSizeLo">Work items per feature</label>
@@ -2672,6 +2685,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
                 while this is on: multiplying a guess by a guess compounds two people&rsquo;s
                 pessimism.</p>
             </div>
+          </div>
           </fieldset>
 
           <!-- A rule above it, because it is the one control here that undoes
@@ -10831,9 +10845,10 @@ const METRIC_HELP = {
       + 'not finish them sooner'), ' — the team delivers what it delivers, however it is spread '
       + 'about — so this changes which feature lands FIRST, and leaves the date they are all '
       + 'done exactly where it was.'],
-    [b('The dates are not all achievable at once.'), ' Each is an 85% answer for that feature '
-      + 'on its own. The chance that every one of them lands on time is far lower than 85%, and '
-      + 'only the last row also means "everything by then".'],
+    [b('The dates are not all achievable at once.'), ' Each is that feature\u2019s own answer at '
+      + 'that confidence. The chance that every one of them lands on its 85% date is far lower '
+      + 'than 85% \u2014 and lower again at 95% \u2014 so only the last row also means '
+      + '\u201ceverything by then\u201d.'],
     ['It does not charge for splitting attention. Real throughput usually ', b('falls'),
       ' as more work is started at once; this model holds it constant, so parallelism looks '
       + 'free here and is not. The order is the one you would work them in — the app has none '
@@ -12234,8 +12249,14 @@ function renderSchedule(d, sched) {
   card.hidden = !sched;
   if (!sched) { $('scheduleTable').innerHTML = ''; $('scheduleExport').innerHTML = ''; return; }
   const f = d.forecast;
-  const rows = scheduleRows(sched, [50, 85]);
-  const allDone = scheduleAllDone(sched, [50, 85]);
+  /* FORECAST_CONFIDENCE, not a list of its own. This card carried [50, 85] and
+     the two cards above it answered at 50, 85 and 95 — so a reader who took the
+     careful figure off a histogram found no column for it here, and the table
+     they exported was the only place in the group missing it. Charles asked for
+     the 95 on 2026-08-27; taking the shared constant rather than adding a third
+     number is what stops the two disagreeing again. */
+  const rows = scheduleRows(sched, FORECAST_CONFIDENCE);
+  const allDone = scheduleAllDone(sched, FORECAST_CONFIDENCE);
   const toDate = (periods) => addDays(f.countFrom,
     periodsToDays(f.countFrom, periods, d.bucket));
 
@@ -12246,23 +12267,29 @@ function renderSchedule(d, sched) {
     : sched.parallel + ' Features Worked at Once';
 
   $('scheduleExport').innerHTML = exportButtons('scheduleTable', 'feature-schedule');
+  /* Built FROM the confidences rather than spelled out three times. The old
+     version named its two columns in the heading and then indexed r[0] and r[1]
+     under them, so a third confidence meant editing the same fact in four
+     places — and the CSV writer reads this table off the page, which means a
+     heading and a cell that disagreed would have gone out in the file too. */
+    const cell = (v) => '<td>' + escapeHtml(prettyDate(toDate(v.periods))) + '</td>';
   $('scheduleTable').innerHTML =
-    '<thead><tr><th>Feature</th><th>50% confident</th><th>85% confident</th></tr></thead><tbody>'
+    '<thead><tr><th>Feature</th>'
+    + FORECAST_CONFIDENCE.map(c => '<th>' + c + '% confident</th>').join('')
+    + '</tr></thead><tbody>'
     + rows.map((r, i) =>
-        '<tr><td>Feature ' + (i + 1) + '</td>'
-        + '<td>' + escapeHtml(prettyDate(toDate(r[0].periods))) + '</td>'
-        + '<td>' + escapeHtml(prettyDate(toDate(r[1].periods))) + '</td></tr>').join('')
+        '<tr><td>Feature ' + (i + 1) + '</td>' + r.map(cell).join('') + '</tr>').join('')
     + '</tbody><tfoot><tr><td>All ' + rows.length + ' done</td>'
-    + '<td>' + escapeHtml(prettyDate(toDate(allDone[0].periods))) + '</td>'
-    + '<td>' + escapeHtml(prettyDate(toDate(allDone[1].periods))) + '</td></tr></tfoot>';
+    + allDone.map(cell).join('') + '</tr></tfoot>';
 
   /* Both sentences are load-bearing and neither belongs in the ⓘ. The first is
      the most likely misreading on this card; the second is the honesty of the
      whole control. */
   $('scheduleNote').innerHTML =
-    '<strong>These dates are not all achievable at once.</strong> Each is an 85% answer for '
-    + 'that feature on its own; the chance that every one of them lands on time is far lower. '
-    + 'Only the last row also means \u201ceverything by then\u201d. '
+    '<strong>These dates are not all achievable at once.</strong> Each is that feature\u2019s own '
+    + 'answer at that confidence; the chance that EVERY one of them lands on its 85% date is far '
+    + 'lower than 85%, and lower again at 95%. Only the last row also means '
+    + '\u201ceverything by then\u201d. '
     + '<strong>Nor does this model the cost of splitting attention</strong> \u2014 real '
     + 'throughput usually falls as more is started at once, and this holds it constant, so the '
     + 'all-done date will not move however you set it. What changes is which feature lands '

@@ -312,8 +312,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    had never been walked — then to 2620 the same day for the box widths, which
    found two boxes narrower than the value their own `max` accepts, and 2640 for
    the block's own ⓘ, the state of its Reset button, and the two halves of the
-   hand-rolled disclosure that ⓘ forced the block into. */
-const EXPECTED = 2660;
+   hand-rolled disclosure that ⓘ forced the block into. 2680 the same day again,
+   for the schedule's third confidence column and the two typed rows lining up. */
+const EXPECTED = 2680;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3849,6 +3850,82 @@ async function run(TD, win) {
 
     is(TD.forecastFeatureSchedule(samples, sizes.slice(0, 2), 6, TD.scenarioFrom(null), 100), null,
        'the size floor applies here too');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the schedule answers at all three confidences');
+
+  /* Charles asked for the 95 column on 2026-08-27. The card had shipped with
+     two, which made it the only place in the Forecast group that did not answer
+     the same three questions the two histograms above it do — and because the
+     CSV writer reads this table off the page, the file people took into a plan
+     was missing it too.
+
+     Pinned against FORECAST_CONFIDENCE rather than against the numbers, so this
+     stays true if the app ever answers at a different three, and fails if the
+     card starts keeping a list of its own again. */
+  {
+    /* The DEMO rather than a hand-planted team: this card needs finished features
+       WITH their items linked to them, because a feature's size is measured off
+       its children — and a set of features nobody has hung an item on gives the
+       size floor nothing to clear, which is how the first draft of this measured
+       an empty table. The demo is the one fixture that already has the shape. */
+    const scReal = { confirm: win.confirm, toast: win.toast };
+    win.confirm = () => true; win.toast = () => {};
+    try { win.loadSample(); } finally { Object.assign(win, scReal); }
+    const scDoc2 = win.document;
+    const uSel = scDoc2.getElementById('unitSel');
+    const teamSel = scDoc2.getElementById('teamSel');
+    const setUnitFeatures = () => {
+      uSel.value = 'features';
+      uSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    };
+    setUnitFeatures();
+    /* Whichever demo team can actually be scheduled — naming one would tie this
+       test to the demo's contents rather than to the card. */
+    for (const o of [...teamSel.options]) {
+      if (!scDoc2.getElementById('cardSchedule').hidden) break;
+      teamSel.value = o.value;
+      teamSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+      setUnitFeatures();
+    }
+
+    const table = scDoc2.getElementById('scheduleTable');
+    ok(!scDoc2.getElementById('cardSchedule').hidden,
+       'the schedule card is on screen, or the rest of this measures an empty table');
+
+    const heads = [...table.querySelectorAll('thead th')].map(t => t.textContent.trim());
+    is(heads[0], 'Feature', 'the first column names the feature');
+    is(heads.slice(1), TD.FORECAST_CONFIDENCE.map(c => c + '% confident'),
+       'and the rest are the app’s own three confidences, in its own order');
+
+    const bodyRows = [...table.querySelectorAll('tbody tr')];
+    ok(bodyRows.length >= 2, 'there are features to schedule', bodyRows.length + ' rows');
+    const wrong = bodyRows.filter(r => r.children.length !== TD.FORECAST_CONFIDENCE.length + 1);
+    is(wrong.length, 0, 'every row carries a cell for each of them');
+    is([...table.querySelectorAll('tfoot td')].length, TD.FORECAST_CONFIDENCE.length + 1,
+       'and so does the all-done row');
+
+    /* THE ANSWER HAS TO GET LATER AS THE CONFIDENCE RISES, or a column has been
+       wired to the wrong percentile — which is exactly the mistake an indexed
+       r[0]/r[1]/r[2] invites and the thing a column count alone would not catch. */
+    const outOfOrder = [];
+    [...bodyRows, table.querySelector('tfoot tr')].forEach((r, ri) => {
+      const dates = [...r.children].slice(1).map(td => Date.parse(td.textContent));
+      for (let i = 1; i < dates.length; i++)
+        if (dates[i] < dates[i - 1]) outOfOrder.push('row ' + ri + ' col ' + i);
+    });
+    is(outOfOrder, [], 'and a more confident answer is never an earlier date');
+
+    /* The file people take away IS this table — the CSV writer reads it off the
+       page — so the column reaches it by construction, and this is what says so. */
+    const csv = TD.toCsv(TD.tableToRows(table));
+    is(csv.split('\r\n')[0], ['Feature'].concat(TD.FORECAST_CONFIDENCE.map(c => c + '% confident')).join(','),
+       'and the export carries the same columns, in the same order');
+
+    /* Back to a known board for every group after this one — the demo is a big
+       fixture and leaving it loaded makes the next failure hard to read. */
+    plant({ teams: [], settings: {} });
   }
 
   /* ────────────────────────────────────────────────────────── */
@@ -9915,6 +9992,30 @@ group('a card with no chart matches the one beside it');
     ok(panel.getBoundingClientRect().right - pr.right < 40,
        'with no grey left over past the end of the sentence',
        Math.round(panel.getBoundingClientRect().right - pr.right) + 'px');
+
+    /* ── AND THE TWO OF THEM LINE UP ─────────────────────────
+       Planning over features is the one state where both typed rows are on
+       screen at once, and they were a grid EACH: "Work items per feature"
+       against "Work items finished per week" sized two different label columns,
+       so the paragraphs beside them started 39px apart. Reported by Charles on
+       2026-08-27. One grid over both rows via `display: contents` is the fix,
+       and this is what stops them being split back into two. */
+    xw.tdAdopt({ schema: TD.SCHEMA, arts: [], stages: [], teams: [], settings: {} });
+    xw.localStorage.setItem('td-view', JSON.stringify({ activeTab: 'dashboard',
+      chartTab: 'forecast', months: 'all', scenarioOpen: true,
+      planning: true, unit: 'features' }));
+    xw.location.reload();
+    await new Promise((resolve) => { f.onload = resolve; });
+    const pd = f.contentDocument;
+    const pTick = pd.getElementById('scEstOn');
+    if (!pTick.checked) pTick.click();
+    const shown = [...pd.querySelectorAll('.sc-typed:not([hidden])')];
+    is(shown.length, 2, 'planning over features shows BOTH typed rows at once');
+    const lefts = shown.map(w => Math.round(w.querySelector(':scope > p').getBoundingClientRect().left));
+    is(new Set(lefts).size, 1, 'and their two paragraphs start on the same edge',
+       lefts.join(' vs '));
+    const boxLefts = shown.map(w => Math.round(w.querySelector('input').getBoundingClientRect().left));
+    is(new Set(boxLefts).size, 1, 'with the boxes under one another too', boxLefts.join(' vs '));
     xd.getElementById('scReset').click();
 
     f.remove();
