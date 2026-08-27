@@ -14004,7 +14004,11 @@ $('panel-allteams').addEventListener('click', (e) => {
     view.forecastItems = Number($('fcItems').value) || DEFAULT_FORECAST_ITEMS;
     view.forecastDate = $('fcDate').value;
     saveView();
-    renderAll();
+    /* THROTTLED, for the reason the paragraph above already half-knew: a spinner
+       fires change on every press and there is no blur to wait for, so nudging
+       the item count froze the page exactly as the scenario knobs did. `true`
+       because this one needs renderAll — see scheduleForecastRedraw. */
+    scheduleForecastRedraw(true);
   });
 });
 
@@ -15632,7 +15636,78 @@ $('unitSel').addEventListener('change', e => {
    an `input` handler would run the forecast against 1, 12 and 120 on the way to
    typing 1200. A select fires change once per choice; a number box fires it on
    blur or Enter, which is exactly when the reader has finished saying what they
-   meant. */
+   meant.
+
+   AND THAT LAST SENTENCE WAS NOT TRUE OF THE SPINNER ARROWS, which is what
+   `scheduleScenarioRedraw` is for (2026-08-27, reported by Charles: "clicking
+   the up and down arrows quickly freezes up the screen"). A number box also
+   fires `change` on EVERY press of its own up/down arrow — there is no blur to
+   wait for — and one of these costs 114ms of blocked main thread, measured on
+   the demo. Ten clicks is three quarters of a second in which nothing responds,
+   and holding an arrow down is worse.
+
+   THE SAVE STAYS IMMEDIATE, like the Settings group's rule written for the same
+   fault two weeks earlier: the knobs go into the view on every event, so nothing
+   set can be lost by navigating away mid-pause.
+
+   THE REDRAW LEADS, THEN TRAILS — and it is NOT the Settings block's plain
+   trailing debounce, which would have been the wrong shape here. A reader who
+   presses an arrow once and waits must see the answer move at once; a plain
+   debounce makes every single press feel broken in order to fix the case where
+   there are twenty. So the first press renders straight away and opens a window;
+   anything arriving inside that window is a burst and folds into ONE run at the
+   end of it.
+
+   That also keeps this honest under test: a suite that dispatches one `change`
+   and reads the answer back is doing what a reader doing one thing does, and it
+   still gets a synchronous answer. Thirteen assertions went red when this was a
+   trailing-only debounce, which is the suite saying exactly that. */
+/* ONE SCHEDULER FOR THE WHOLE GROUP, because the scenario's knobs are not the
+   only boxes here with arrows on them: "Number of items to finish" has a spinner
+   and the date box has a picker, and the comment on that listener already said
+   so — "both a number box's spinner and a date picker fire change on their own"
+   — while still calling renderAll() on every one of them. That is the heavier of
+   the two renders, so it was the worse freeze of the two.
+
+   `all` is which render the caller needs, and a window that saw BOTH kinds runs
+   the heavier one: renderAll covers what renderDashboard does, so folding a
+   dashboard-only press into a renderAll costs nothing and losing a renderAll
+   into a renderDashboard would leave the other tabs stale. */
+const FORECAST_REDRAW_MS = 120;
+let forecastRedrawTimer = null;
+let forecastRedrawPending = false;
+let forecastRedrawAll = false;
+function scheduleForecastRedraw(all) {
+  if (forecastRedrawTimer !== null) {
+    forecastRedrawPending = true;
+    forecastRedrawAll = forecastRedrawAll || !!all;
+    return;
+  }
+  (all ? renderAll : renderDashboard)();
+  forecastRedrawTimer = setTimeout(() => {
+    forecastRedrawTimer = null;
+    if (!forecastRedrawPending) return;
+    forecastRedrawPending = false;
+    const wantAll = forecastRedrawAll;
+    forecastRedrawAll = false;
+    scheduleForecastRedraw(wantAll);
+  }, FORECAST_REDRAW_MS);
+}
+/* FOR THE SUITE, and it earns its place rather than being a convenience: a test
+   sets two knobs in the same millisecond, which is a thing no reader does, and
+   the window above is there precisely to fold presses that close together into
+   one run. Without this a test would have to sleep, and a sleep in a suite is a
+   number somebody tunes until it passes. This says "the pause has happened now"
+   instead. */
+window.tdFlushForecast = function flushForecastRedraw() {
+  if (forecastRedrawTimer === null && !forecastRedrawPending) return;
+  clearTimeout(forecastRedrawTimer);
+  forecastRedrawTimer = null;
+  const wantAll = forecastRedrawPending && forecastRedrawAll;
+  forecastRedrawPending = false;
+  forecastRedrawAll = false;
+  (wantAll ? renderAll : renderDashboard)();
+};
 $('fcScenario').addEventListener('change', () => {
   const num = (id) => {
     const v = $(id).value;
@@ -15650,7 +15725,7 @@ $('fcScenario').addEventListener('change', () => {
     parallel: num('scParallel'), unavailable: num('scUnavailable')
   });
   saveView();
-  renderDashboard();
+  scheduleForecastRedraw(false);
 });
 
 /* Essential rather than a nicety: these knobs persist to localStorage with the

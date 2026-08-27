@@ -2049,6 +2049,22 @@ histogram, which is right on screen and cannot be exported; this is the same num
 shape the CSV writer reads. It carries the **assumptions in the same file**, because a percentile
 that arrives in a spreadsheet without the scenario that produced it is a number nobody can check.
 
+### The Arrows Don't Lock the Page Up
+
+Every box in this group re-runs **ten thousand simulations** when it changes, which is why the
+listeners were on `change` rather than `input` — an `input` handler would forecast against 1, 12
+and 120 on the way to typing 1200. What that missed is that a number box fires `change` on every
+press of its **own up and down arrow**: there is no blur to wait for. One run costs about 114ms of
+blocked main thread, so twenty presses of a held arrow was two seconds in which nothing moved.
+Reported by Charles on 2026-08-27, on the scenario knobs; the *Number of items to finish* box had
+it too, and worse, because its listener called the heavier of the two renders.
+
+**The first press still answers at once.** This leads and then trails rather than simply waiting
+for a pause — a plain debounce makes every single press feel broken in order to fix the case where
+there are twenty. Presses arriving within 120ms of a run fold into one more run at the end of it,
+and **the save never waits**, so a value can't be lost by navigating away mid-burst. Twenty
+presses now take about 130ms of wall clock instead of two seconds.
+
 ### It Says When It Has Been Adjusted, and When It Has Stopped Being an Answer
 
 **Nothing is hidden in an ⓘ.** A non-default scenario is listed in words under the tiles, the
