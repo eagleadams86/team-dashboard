@@ -7479,6 +7479,37 @@ group('ARTs — the grouping, and the boundary it crosses');
   scope.value = ''; scope.dispatchEvent(new win.Event('change'));
   is(trainSeries().reduce((a, b) => a + b, 0), 3, 'and back to every team');
 
+  /* ── The ⓘ in a sortable heading must not stand on the sort button ─────────
+     The circle is 16px with an ::after growing it 5px in every direction, so any
+     margin under 5px puts that invisible target ON TOP of the button beside it,
+     and the right-hand end of the heading opens the note instead of sorting the
+     column. It looked right on screen the whole time it was wrong: the 12px gap
+     was the sort button's own padding, which is INSIDE its box. That is why this
+     is MEASURED off real boxes rather than read out of the CSS — the source says
+     what was intended, and only a box says where the target landed. It is the
+     one place in the app where two targets sit side by side. */
+  {
+    const GROW = 5;                       // .tile-help::after { inset: -5px }
+    const heads = [...win.document.querySelectorAll('table.data th.sortable .th-head')]
+      .filter((h) => h.querySelector('.tile-help'));
+    ok(heads.length >= 2,
+       'there are sortable headings carrying an ⓘ, or this measures nothing',
+       heads.length + ' found');
+    heads.forEach((h) => {
+      const sort = h.querySelector('button:not(.tile-help)');
+      const dot = h.querySelector('.tile-help');
+      const a = sort.getBoundingClientRect(), b = dot.getBoundingClientRect();
+      const gap = Math.round(b.left - a.right);
+      ok(gap >= GROW,
+         'the ⓘ after “' + sort.textContent.trim() + '” clears the sort '
+           + 'button’s box by the ' + GROW + 'px its own target grows',
+         gap + 'px');
+      ok(Math.round(b.width) + GROW * 2 >= 24,
+         'and it still grows to WCAG 2.2’s 24px',
+         (Math.round(b.width) + GROW * 2) + 'px');
+    });
+  }
+
   /* Nothing to plot: the card goes, and the chart is DESTROYED rather than left
      holding a stale series — the next render may be a different train entirely. */
   plant({ arts: [], teams: [{ id: 'q1', name: 'One', rows: [] },

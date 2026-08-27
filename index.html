@@ -952,9 +952,20 @@ table.data th.sortable button:not(.tile-help):hover { color: var(--text-primary)
    label's own line, and baselining it against an 11px uppercase heading sits it
    visibly low. */
 table.data th.sortable .th-head { display: flex; align-items: center; }
-/* The gap on the left is the sort button's own right padding; the one on the
-   right is what keeps the circle off the cell border. */
-table.data th.sortable .th-head .tile-help { margin-left: 0; margin-right: 12px; }
+/* The 12px gap on the left used to be the sort button's own right padding, and
+   that was right about the PICTURE and wrong about the TARGET. Padding is inside
+   the button's box, so the sort button ended flush against the circle — and the
+   circle's ::after grows 5px in every direction, so those 5px sat ON TOP of the
+   sort button. Aiming at the right-hand end of the heading opened the note
+   instead of sorting the column, and axe-core's target-size rule reported the
+   two as touching (it is the only pair in the app that does).
+   So the same 12px is now split: 2px of button padding plus a 10px margin. The
+   picture is unchanged to the pixel; the circle's expanded target now clears the
+   sort button by 5px. The one on the right still keeps the circle off the cell
+   border. Measured with elementFromPoint at the edges — nothing else can see a
+   pseudo-element's hit area. */
+table.data th.sortable .th-head button:not(.tile-help) { padding-right: 2px; }
+table.data th.sortable .th-head .tile-help { margin-left: 10px; margin-right: 12px; }
 /* A heading and its column have to agree. `th.num` has always been right-aligned
    and `td.num` never was, so every numeric column in Loaded Data — the cycle
    time and the period — ran its figures down the LEFT of a heading sitting on
