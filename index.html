@@ -400,6 +400,38 @@ input[type="password"] {
      2026-08-22; the other five apps were swept and fixed 2026-08-23. */
   min-height: calc(1.5em + 16px);
 }
+/* ── A BOX IS AS WIDE AS WHAT GOES IN IT ─────────────────────────────────────
+   `width: 100%` above is right for a name or a pasted export and wrong for a
+   number: it gave "Weeks nobody is delivering" a 225px box for a figure that
+   cannot exceed 26, and the typed-pace pair two 225px boxes for a number of
+   items a week. Charles asked for it on 2026-08-27, and this file had already
+   written the principle down beside the aged-item threshold — "a box for a
+   two-digit number stretched across 1100px is its own kind of dead space" —
+   where the answer was to fill the space with a hint. This is that principle
+   applied to the box instead, so a field with nothing to put beside it does not
+   need one.
+
+   `--digits` IS THE `max` ATTRIBUTE, IN DIGITS, and it belongs on the same tag:
+   the two are one fact and splitting them is how they drift. The 38px is the
+   chrome around the digits — 18px of padding, 2px of border, and the spinner,
+   which no engine will report a width for. The figure was checked against the
+   app's own precedent rather than guessed: `table.manage input.target` had held
+   a target in a hand-set 64px since the manage table shipped, and 3ch + 38 is
+   67. That box is on this rule now too — the 64px turned out to be four
+   characters of room for a five-character value, which is the drift a second
+   mechanism was always going to hide.
+
+   The DEFAULT is 4 rather than nothing, so a box added without a `--digits`
+   comes out a reasonable size instead of a full-width one. `max-width: 100%` is
+   what stops any of them overflowing a phone-width column. */
+input[type="number"] { width: calc(var(--digits, 4) * 1ch + 38px); max-width: 100%; }
+/* A date, unlike a number, has no digit count to read off the markup — and what
+   the box has to hold is the LOCALE's rendering of one, which is not this app's
+   to predict: a browser set to a language that spells the month out needs more
+   room than 11/18/2026, and one showing mm/dd/yyyy in an empty box needs more
+   than a filled one does. So this is deliberately generous rather than snug,
+   and it is still a third of what the field was taking. */
+input[type="date"], input[type="month"] { width: 170px; max-width: 100%; }
 /* A search field is drawn natively with its own inset shape, which ignores the
    border and radius above — the same move the pack makes for date fields. It
    takes Chromium's native × with it; a search box that has no other way to clear
@@ -517,19 +549,29 @@ select { cursor: pointer; }
       line with them. The +12 weeks button did exactly that: 96px against 64px,
       so its label sat 32px higher than the two beside it. Reported by Charles.
 
-   Flex fixes both by construction. `flex: 1 1 <basis>` shares the whole line
-   between however many fields are on it — no empty tracks — and the second fault
-   is answered where it starts, by keeping every field ONE label and ONE control
-   line tall: a control with an extra button puts it BESIDE the box (see
-   .fc-date-row) rather than under it. Nothing in this row may be two lines tall.
-   That is the same rule the dialogs already hold — if a setting needs more than
-   a label, it does not belong in the row. */
+   Flex fixes both by construction, and the second fault is answered where it
+   starts, by keeping every field ONE label and ONE control line tall: a control
+   with an extra button puts it BESIDE the box (see .fc-date-row) rather than
+   under it. Nothing in this row may be two lines tall. That is the same rule the
+   dialogs already hold — if a setting needs more than a label, it does not
+   belong in the row.
+
+   THE FIELDS NO LONGER GROW (2026-08-27). `flex: 1 1 180px` shared the whole
+   line between them equally, which is right when every control wants the room
+   and wrong when they do not want the same amount of it: four equal columns gave
+   a two-digit box the same 330px as a team picker, and the box sat in the left
+   quarter of it. `0 1 auto` sizes each field to the wider of its label and its
+   control, and they pack left.
+
+   That does leave the line short on a wide window, and the older note above
+   records a complaint about exactly that. It is not the same fault: what was
+   reported there was a field that had been GIVEN a width and stopped short of
+   it — a stretched-looking box with a hole beside it — where these are visibly
+   the size of what they hold. A row that ends after its last field reads as a
+   row that has ended. */
 .forecast-ask { grid-column: 1 / -1; display: flex; flex-wrap: wrap;
   gap: 12px 16px; align-items: end; }
-.forecast-ask > .field { flex: 1 1 180px; min-width: 0; }
-/* The one field carrying a second control, so it asks for the room to hold both
-   on one line. It still shrinks and still wraps like the others. */
-.forecast-ask > #fcDateField { flex: 1 1 320px; }
+.forecast-ask > .field { flex: 0 1 auto; min-width: 0; }
 /* The prose takes a row of its own rather than a column, because it is a
    sentence about all of the boxes rather than about the one beside it. */
 .forecast-ask .hint, .forecast-ask .note { flex: 1 1 100%; margin: 0; }
@@ -563,9 +605,14 @@ select { cursor: pointer; }
 /* A box and the button that fills it in, on one line. `min-width: 0` on the
    input is what keeps them there: without it the date box refuses to shrink
    below its natural width and the button wraps underneath, which is the exact
-   two-line cell this layout exists to prevent. */
+   two-line cell this layout exists to prevent.
+
+   IT SHRINKS BUT DOES NOT GROW (`0 1`, not `1 1`). Growing is what made this the
+   widest box on the row — 278px of field for ten characters of date, with the
+   button pushed out to the far edge — and the flex-grow was never what kept the
+   two on one line; `min-width: 0` is, and it still does. */
 .fc-date-row { display: flex; align-items: center; gap: 8px; }
-.fc-date-row input { flex: 1 1 auto; min-width: 0; }
+.fc-date-row input { flex: 0 1 auto; min-width: 0; }
 .fc-date-row .btn { flex: 0 0 auto; white-space: nowrap; }
 
 /* ── The scenario block ────────────────────────────────────────────────────
@@ -602,18 +649,35 @@ select { cursor: pointer; }
    rather than the viewport, which is wider than it by the whole page gutter.
    The thresholds are the 260px minimum field and the 16px gap multiplied out:
    3 → 812, 2 → 536. */
-.grid.two.sc-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* `max-content`, not `1fr`, from 2026-08-27 — the same afternoon the boxes
+   stopped being full-width, and for the same reason. Equal thirds gave a
+   two-digit box a third of the block and left it standing in the left corner of
+   it; a track as wide as the widest thing in it is as wide as the label, which
+   is what a column of a form is actually for. The tracks pack left and the block
+   ends where its fields do, which is what the dashboard's own control strip has
+   always looked like — and what the forecast row above now does too. */
+.grid.two.sc-fields { grid-template-columns: repeat(3, minmax(0, max-content));
+  justify-content: start; }
 @container scenario (max-width: 811px) {
   /* Six into two is still even. Three into two is not, so the item lens stacks
      rather than leave its last knob alone beside a hole. */
-  .grid.two.sc-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .grid.two.sc-fields:has(> #scExtraWrap[hidden]) { grid-template-columns: minmax(0, 1fr); }
+  .grid.two.sc-fields { grid-template-columns: repeat(2, minmax(0, max-content)); }
+  .grid.two.sc-fields:has(> #scExtraWrap[hidden]) { grid-template-columns: minmax(0, max-content); }
 }
 @container scenario (max-width: 535px) {
-  .grid.two.sc-fields { grid-template-columns: minmax(0, 1fr); }
+  .grid.two.sc-fields { grid-template-columns: minmax(0, max-content); }
 }
 /* It follows the grid now, so it needs the gap the grid's own rows have. */
 #scScopeNote { margin-top: var(--sp-3); }
+/* ── A FIELD BESIDE A PARAGRAPH ALIGNS ON THE TOP, NOT THE BOTTOM ────────────
+   These two rows pair a short field with five lines of explanation, and
+   `.grid.two`'s `align-items: end` — right when every cell is a label and a
+   control — sat the field on the FLOOR of the row with the void above it. It
+   was always there; it became the most visible thing in the block the moment
+   the boxes stopped being 225px wide and filling it. A field belongs beside the
+   first line of its own explanation. */
+#scEstWrap, #scSizeWrap { align-items: start; }
+#scEstWrap > div, #scSizeWrap > div { justify-content: flex-start; }
 /* Two number boxes reading "3 to 7", which is one control rather than two —
    hence one label above the pair and an aria-label on each half. */
 .row-pair { display: flex; align-items: center; gap: 8px; }
@@ -1175,7 +1239,13 @@ table.manage input.aliases { max-width: none; }
 table.manage td.target { min-width: 112px; white-space: nowrap; }
 table.manage .target-set { display: inline-flex; align-items: center; gap: 6px;
   color: var(--text-secondary); font-size: var(--fs-xs); }
-table.manage input.target { width: 64px; max-width: 64px; text-align: right; }
+/* Sized by `--digits` like every other number box since 2026-08-27, rather than
+   by the 64px it carried before. That figure was set by eye for "999" and the
+   85% box takes a HALF day — `step="0.5"`, so "999.5" — which did not fit it:
+   40px of text and a spinner in 44px of content box. Found by the width test,
+   not by looking. The two boxes now differ in width because they differ in what
+   they hold, which is the whole point of the rule. */
+table.manage input.target { text-align: right; }
 /* A row with nothing in it yet — the ARTs table before the first train. */
 table.manage td.empty-row { text-align: left; color: var(--text-secondary);
   border-bottom: 0; padding-left: 0; }
@@ -2362,9 +2432,9 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           </div>
           <div class="field">
             <label for="fcItems" id="fcItemsLabel">Number of items to finish</label>
-            <input type="number" id="fcItems" min="1" max="2000" step="1" inputmode="numeric">
+            <input type="number" id="fcItems" style="--digits:4" min="1" max="2000" step="1" inputmode="numeric">
           </div>
-          <div class="field" id="fcDateField">
+          <div class="field">
             <label for="fcDate">Count what is done by</label>
             <!-- The RTE's date, one press. It counts twelve weeks from wherever
                  the forecast starts, and says so — this app has no PI calendar
@@ -2413,20 +2483,20 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <div>
               <label for="scGrowthLo" id="scGrowthLabel">Each known feature grows by (%)</label>
               <div class="row-pair">
-                <input type="number" id="scGrowthLo" min="0" max="200" step="1"
+                <input type="number" id="scGrowthLo" style="--digits:3" min="0" max="200" step="1"
                        inputmode="numeric" aria-label="Scope growth, lowest">
                 <span class="to">to</span>
-                <input type="number" id="scGrowthHi" min="0" max="200" step="1"
+                <input type="number" id="scGrowthHi" style="--digits:3" min="0" max="200" step="1"
                        inputmode="numeric" aria-label="Scope growth, highest">
               </div>
             </div>
             <div id="scExtraWrap">
               <label for="scExtraLo">Features discovered later (%)</label>
               <div class="row-pair">
-                <input type="number" id="scExtraLo" min="0" max="200" step="1"
+                <input type="number" id="scExtraLo" style="--digits:3" min="0" max="200" step="1"
                        inputmode="numeric" aria-label="Features discovered later (%), lowest">
                 <span class="to">to</span>
-                <input type="number" id="scExtraHi" min="0" max="200" step="1"
+                <input type="number" id="scExtraHi" style="--digits:3" min="0" max="200" step="1"
                        inputmode="numeric" aria-label="Features discovered later (%), highest">
               </div>
             </div>
@@ -2440,11 +2510,11 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             </div>
             <div id="scParallelWrap">
               <label for="scParallel">Features worked at once</label>
-              <input type="number" id="scParallel" min="1" max="10" step="1" inputmode="numeric">
+              <input type="number" id="scParallel" style="--digits:2" min="1" max="10" step="1" inputmode="numeric">
             </div>
             <div>
               <label for="scUnavailable" id="scUnavailableLabel">Periods nobody is delivering</label>
-              <input type="number" id="scUnavailable" min="0" max="26" step="1" inputmode="numeric">
+              <input type="number" id="scUnavailable" style="--digits:2" min="0" max="26" step="1" inputmode="numeric">
             </div>
           </div>
           <!-- Under the whole grid rather than tucked under the scope row, which
@@ -2466,10 +2536,10 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
               <div>
                 <label for="scSizeLo">Work items per feature</label>
                 <div class="row-pair">
-                  <input type="number" id="scSizeLo" min="1" max="500" step="1"
+                  <input type="number" id="scSizeLo" style="--digits:3" min="1" max="500" step="1"
                          inputmode="numeric" aria-label="Work items per feature, lowest">
                   <span class="to">to</span>
-                  <input type="number" id="scSizeHi" min="1" max="500" step="1"
+                  <input type="number" id="scSizeHi" style="--digits:3" min="1" max="500" step="1"
                          inputmode="numeric" aria-label="Work items per feature, highest">
                 </div>
               </div>
@@ -2484,10 +2554,10 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
               <div>
                 <label for="scEstLo" id="scEstRangeLabel">Items finished per period</label>
                 <div class="row-pair">
-                  <input type="number" id="scEstLo" min="0" max="500" step="1"
+                  <input type="number" id="scEstLo" style="--digits:3" min="0" max="500" step="1"
                          inputmode="numeric" aria-label="Estimated pace, lowest">
                   <span class="to">to</span>
-                  <input type="number" id="scEstHi" min="0" max="500" step="1"
+                  <input type="number" id="scEstHi" style="--digits:3" min="0" max="500" step="1"
                          inputmode="numeric" aria-label="Estimated pace, highest">
                 </div>
               </div>
@@ -2770,7 +2840,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     </div>
     <div>
       <label for="setSameDay">Cycle time to use when an item starts and finishes the same day (days)</label>
-      <input type="number" id="setSameDay" step="0.1" min="0">
+      <input type="number" id="setSameDay" style="--digits:4" step="0.1" min="0">
     </div>
     <div>
       <label for="setUnplannedLabel">Word to use for defects on charts</label>
@@ -2795,7 +2865,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <div class="grid two pairs" style="margin-top:var(--sp-6)">
     <div>
       <label for="setAgedDays" id="setAgedDaysLabel">Count an in-progress item as aged after (days)</label>
-      <input type="number" id="setAgedDays" step="1" min="1" placeholder="14">
+      <input type="number" id="setAgedDays" style="--digits:3" step="1" min="1" placeholder="14">
     </div>
     <!-- Not a <div>, so `.grid.two > div`'s flex rule leaves it alone; the
          grid's own `align-items: end` sits it on the same baseline as the box. -->
@@ -2863,7 +2933,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     </div>
     <div>
       <label for="setOutlierDays" id="setOutlierDaysLabel">Ignore items over (days)</label>
-      <input type="number" id="setOutlierDays" step="1" min="1" placeholder="90">
+      <input type="number" id="setOutlierDays" style="--digits:3" step="1" min="1" placeholder="90">
     </div>
   </div>
   <p class="hint" style="margin-top:var(--sp-3)">
@@ -11025,7 +11095,11 @@ function renderTeamRows() {
     return '<td class="target"><span class="target-set">' +
       '<label for="' + escapeHtml(id) + '">' +
       (isWip ? 'WIP \u2264' : CYCLE_PERCENTILE + '% \u2264') + '</label>' +
-      '<input class="target" type="number" inputmode="numeric" id="' + escapeHtml(id) + '"' +
+      /* WIP is whole items, so three characters; the 85% target is a number of
+         days at a half-day step, so five — "999.5". Read off the same `isWip`
+         that sets `step` two lines down, which is what keeps them agreeing. */
+      '<input class="target" type="number" style="--digits:' + (isWip ? '3' : '5')
+      + '" inputmode="numeric" id="' + escapeHtml(id) + '"' +
       ' data-' + (isWip ? 'wip-limit' : 'sle-days') + '="' + escapeHtml(t.id) + '"' +
       ' min="' + (isWip ? '1' : '0.1') + '" max="' + TEAM_TARGET_MAX + '"' +
       ' step="' + (isWip ? '1' : '0.5') + '" autocomplete="off"' +
@@ -15991,8 +16065,13 @@ function openItemDialog(index) {
     $('itemStageDays').innerHTML = state.stages.map(st => {
       const boxId = 'itemStageDay-' + st.id;
       const v = (held && held[st.id] != null) ? String(held[st.id]) : '';
+      /* SEVEN, not four. STAGE_DAYS_MAX is four digits, but the step is 0.01, so
+         the widest thing this box accepts is "3650.99" — and a day count typed
+         off a Time in Status export really does arrive with decimals on it. The
+         first draft of this said five, reasoning from "12.25" rather than from
+         the max, and the width test caught it. */
       return '<div><label for="' + escapeHtml(boxId) + '">' + escapeHtml(st.name) + '</label>'
-        + '<input type="number" id="' + escapeHtml(boxId) + '" data-stageday="'
+        + '<input type="number" style="--digits:7" id="' + escapeHtml(boxId) + '" data-stageday="'
         + escapeHtml(st.id) + '" min="0" max="' + STAGE_DAYS_MAX + '" step="0.01" '
         + 'inputmode="decimal" autocomplete="off" value="' + escapeHtml(v) + '"></div>';
     }).join('');

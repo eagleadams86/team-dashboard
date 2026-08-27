@@ -309,8 +309,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    dead on screen while every pure test about it passed, and then the lens filter
    the same day. And to 2600 on 2026-08-27, when the orphaned-field sweep gained
    a second target: the scenario's own knob grid, which is not in a dialog and so
-   had never been walked. */
-const EXPECTED = 2600;
+   had never been walked — then to 2620 the same day for the box widths, which
+   found two boxes narrower than the value their own `max` accepts. */
+const EXPECTED = 2620;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9533,7 +9534,14 @@ group('a card with no chart matches the one beside it');
 
     /* Rows by LEFT resetting, not by top — the grid is `align-items: end`, so two
        cells on one row routinely have different tops and grouping by top reports
-       failures where the layout is fine. Same reason as the dialog sweep. */
+       failures where the layout is fine. Same reason as the dialog sweep.
+
+       SHORT MEANS SHORT OF THE OTHER ROWS, not short of the grid's right edge.
+       The dialog sweep can use the edge because those grids are `1fr` and are
+       meant to reach it; these tracks are `max-content` and deliberately stop
+       where the fields do, so measuring against the edge would fail every row.
+       What still has to hold is the thing the edge was standing in for: no row
+       ends before its neighbours, which is exactly what a stranded field is. */
     const fieldRows = () => {
       const g = sd.querySelector('.sc-fields');
       const gr = g.getBoundingClientRect();
@@ -9542,10 +9550,13 @@ group('a card with no chart matches the one beside it');
       cells.forEach(c => { const r = c.getBoundingClientRect();
         if (Math.round(r.left) <= Math.round(prevLeft)) { cur = []; rows.push(cur); }
         cur.push(r); prevLeft = r.left; });
+      const ends = rows.map(rw => Math.round(rw[rw.length - 1].right));
+      const full = Math.max(...ends);
       return { width: Math.round(gr.width), cells: cells.length,
         rows: rows.map(rw => rw.length),
-        short: rows.map(rw => Math.round(gr.right - rw[rw.length - 1].right))
-                   .filter(px => px > 2) };
+        /* Never wider than the block it is in, whatever max-content asks for. */
+        overflow: Math.max(0, full - Math.round(gr.right)),
+        short: ends.map(x => full - x).filter(px => px > 2) };
     };
 
     ok(!sd.getElementById('spanel-forecast').hidden,
@@ -9575,6 +9586,8 @@ group('a card with no chart matches the one beside it');
         const r = fieldRows();
         is(r.short, [], 'no knob is left beside a hole at ' + w + 'px on the ' + u + ' lens',
            r.rows.join(' + '));
+        is(r.overflow, 0, 'and nothing hangs out past the block at ' + w + 'px on the '
+           + u + ' lens', String(r.overflow));
       });
     });
 
@@ -9618,6 +9631,129 @@ group('a card with no chart matches the one beside it');
        'and goes singular on the lens that has only one of them', note.textContent);
     setNum('scGrowthLo', '0'); setNum('scGrowthHi', '0');
     ok(note.hidden, 'and says nothing at all when nothing multiplies');
+
+    f.remove();
+    if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
+    if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a box is as wide as what goes in it');
+
+  /* ── Charles, 2026-08-27: "make these fields a reasonable width based on the
+       data in them" ─────────────────────────────────────────────────────────
+     `width: 100%` is right for a team name and wrong for a number: it gave the
+     periods-off box 225px for a figure that cannot exceed 26, and the typed-pace
+     pair two of them. The boxes are sized from `--digits` now, and that is a
+     number written beside `max` in the markup — so what needs guarding is the
+     pairing, in both directions: too narrow CLIPS the largest value the field
+     accepts, too wide is the dead space this started as.
+
+     Every box on screen AND in every dialog, because the rule is the app's, not
+     the forecast's. The upper bound is deliberately loose — no number in this
+     app wants 120px, and a rule that fails at 121 would fail for a reason
+     nobody could act on. */
+  {
+    const keep = { state: localStorage.getItem('td-state'),
+                   view: localStorage.getItem('td-view') };
+    localStorage.setItem('td-state', JSON.stringify({
+      schema: TD.SCHEMA, arts: [],
+      stages: [{ id: 'sb', name: 'Build', match: [] },
+               { id: 'sr', name: 'Review', match: [] }],
+      teams: [{ id: 'bw1', name: 'Boxed',
+        rows: Array.from({ length: 14 }, (_, i) => ({
+          c: '2015-0' + (i < 9 ? '1' : '2') + '-' + String((i % 9) * 3 + 2).padStart(2, '0'),
+          s: '2015-01-02', t: 'Story' })) }],
+      settings: {}
+    }));
+    localStorage.setItem('td-view', JSON.stringify({ activeTab: 'dashboard',
+      chartTab: 'forecast', months: 'all', scenarioOpen: true }));
+
+    const f = document.createElement('iframe');
+    f.setAttribute('data-td-tests', '');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;left:-9999px;width:1240px;height:1600px;border:0';
+    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html' + BUST; document.body.appendChild(f); });
+    const bw = f.contentWindow, bd = f.contentDocument;
+
+    /* The dialogs hold most of the number boxes in the app and none of them are
+       on screen until one is opened, so they are opened — the item dialog by its
+       own button, since it BUILDS its stage boxes in the opener. */
+    bd.getElementById('btnAddItem').click();
+    ['settingsDialog', 'manageDialog'].forEach(id => {
+      const d = bd.getElementById(id);
+      if (d && !d.open) { try { d.showModal(); } catch (_) {} }
+    });
+
+    const boxes = [...bd.querySelectorAll('input[type=number]')]
+      .filter(i => i.offsetParent !== null);
+    ok(boxes.length >= 10, 'the sweep reached the number boxes on screen and in the dialogs',
+       boxes.length + ' boxes');
+
+    /* BOTH DIRECTIONS, and they are different questions. `--digits` is a CLAIM
+       about how many characters the box shows; the width has to deliver that
+       claim, and the claim has to be big enough for the `max` beside it. Three
+       of the boxes here declare no max at all — an unbounded field cannot be
+       held to one, so only the first question is asked of those. */
+    const tooWide = [], short = [], understated = [];
+    boxes.forEach(i => {
+      const r = i.getBoundingClientRect();
+      const cs = bw.getComputedStyle(i);
+      const name = i.id || i.name || '?';
+      if (r.width > 120) tooWide.push(name + ' is ' + Math.round(r.width) + 'px');
+
+      const step = Number(i.step);
+      const dp = (step > 0 && step < 1 && String(i.step).includes('.'))
+        ? String(i.step).split('.')[1].length : 0;
+      const claimed = Number(cs.getPropertyValue('--digits')) || 4;
+
+      const c = bd.createElement('canvas').getContext('2d');
+      c.font = cs.font;
+      const inner = r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+        - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth);
+      /* 12px is the spinner the engine draws inside the content box and reports
+         no width for. Checked against Chromium's and WebKit's, which differ. */
+      const spare = inner - c.measureText('0'.repeat(claimed)).width;
+      if (spare < 12) short.push(name + ' claims ' + claimed + ' characters and has '
+        + Math.round(spare) + 'px of room for the spinner');
+
+      if (i.max) {
+        const needed = String(i.max).length + (dp ? dp + 1 : 0);
+        if (claimed < needed) understated.push(name + ' accepts "' + i.max
+          + (dp ? '.' + '9'.repeat(dp) : '') + '" — ' + needed
+          + ' characters — and is sized for ' + claimed);
+      }
+    });
+    is(tooWide, [], 'no box for a number is wider than the number it can hold');
+    is(short, [], 'and every one is wide enough for the characters it claims');
+    is(understated, [], 'and claims enough of them for the maximum it accepts');
+
+    /* The two that were worst, named, so the fix cannot be quietly undone on
+       just these while the sweep above still passes on the rest. */
+    const w = (id) => Math.round(bd.getElementById(id).getBoundingClientRect().width);
+    ok(w('scUnavailable') < 70, 'the periods-off box is a two-digit box, not a quarter of the block',
+       w('scUnavailable') + 'px');
+    ok(w('fcItems') < 90, 'and the item count a four-digit one', w('fcItems') + 'px');
+    ok(w('fcItems') > w('scUnavailable'),
+       'with the wider box actually the one that holds more — the widths come from '
+       + '--digits, not from wherever each happens to sit');
+
+    /* A date has no digit count to read off the markup, so it gets a figure of
+       its own; what it may not do is go back to filling its container. */
+    const dates = [...bd.querySelectorAll('input[type=date]')].filter(i => i.offsetParent !== null);
+    ok(dates.length >= 3, 'and the date boxes are on screen too', dates.length + ' boxes');
+    is(dates.filter(i => i.getBoundingClientRect().width > 200)
+            .map(i => (i.id || '?') + ' is ' + Math.round(i.getBoundingClientRect().width) + 'px'),
+       [], 'no date box is wider than a date needs');
+
+    /* A text field is the other half of the rule and must NOT have been swept up
+       in it: what goes in these is words of unknown length, so full width is the
+       right answer for them and always was. */
+    const words = bd.getElementById('setUnplannedType');
+    ok(words && words.getBoundingClientRect().width > 200,
+       'while a box that holds words still fills its column — the rule is about '
+       + 'fields whose content has a known size, not about narrow boxes',
+       words ? Math.round(words.getBoundingClientRect().width) + 'px' : 'missing');
 
     f.remove();
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);

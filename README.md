@@ -1928,6 +1928,9 @@ the same single line rather than in a row of one and a row of two with a third o
 standing empty. Narrower than three columns will take, six go two across and three stack, for the
 same reason: a row is never left with a field alone beside a hole.
 
+**And each box is the size of what goes in it** — see [A box is as wide as what goes in
+it](#a-box-is-as-wide-as-what-goes-in-it).
+
 **Four of the seven are about features, and they do not exist on the item lens.** Everything
 below scope growth in that table — features discovered later, how well understood they are, how
 many are worked at once — is read only by the feature forecast. Counting **Work items**, those
@@ -2708,3 +2711,28 @@ unchanged.
 
 Every page in this repo passes axe-core at WCAG 2.1 A and AA plus its best-practice rules, in
 all four themes, with data loaded and on every tab.
+
+
+## A Box Is as Wide as What Goes In It (2026-08-27)
+
+Every field used to be `width: 100%`. That is right for a team name, a work type or a pasted
+export, whose length nobody can predict — and wrong for a number, where the length is written
+in the markup two attributes away. "Weeks nobody is delivering" had a 225px box for a figure
+that cannot exceed 26; the typed-pace pair had two of them for a number of items a week.
+
+A number box now takes its width from **`--digits`, set beside its own `max`** — the two are
+one fact, so they sit on the same tag. A date box has no digit count to read off the markup
+and takes a figure of its own, deliberately generous: what it has to hold is the *locale's*
+rendering of a date, and a browser set to spell the month out needs more room than `11/18/2026`.
+Text fields and pickers are untouched, because words have no known size.
+
+The tests check the pairing **in both directions**, over every box on screen and in every
+dialog: too narrow clips the largest value the field accepts, too wide is the dead space this
+started as. Both faults were live when the check first ran — the stage-day boxes were sized for
+five characters and accept `3650.99`, and the manage table's 85% target had been sized by eye
+for `999` in a box that takes `999.5` since the day it shipped.
+
+Two rows were re-laid at the same time, because a snug control inside a stretched column just
+moves the empty space rather than removing it. The forecast's question row and the scenario's
+knobs now size each **field** to the wider of its label and its control and pack them left,
+which is what the dashboard's own control strip has always done.
