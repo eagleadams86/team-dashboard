@@ -2768,7 +2768,8 @@ Text fields and pickers are untouched, because words have no known size.
 
 The tests check the pairing **in both directions**, over every box on screen and in every
 dialog: too narrow clips the largest value the field accepts, too wide is the dead space this
-started as. Both faults were live when the check first ran — the stage-day boxes were sized for
+started as. A **placeholder** counts as content too — Sprint Predictability found that when the
+same rule went in there, on two boxes that take a two-digit head count and say *then* and *now*. Both faults were live when the check first ran — the stage-day boxes were sized for
 five characters and accept `3650.99`, and the manage table's 85% target had been sized by eye
 for `999` in a box that takes `999.5` since the day it shipped.
 

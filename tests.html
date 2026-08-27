@@ -9798,8 +9798,15 @@ group('a card with no chart matches the one beside it');
         - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth);
       /* 12px is the spinner the engine draws inside the content box and reports
          no width for. Checked against Chromium's and WebKit's, which differ. */
-      const spare = inner - c.measureText('0'.repeat(claimed)).width;
-      if (spare < 12) short.push(name + ' claims ' + claimed + ' characters and has '
+      /* The PLACEHOLDER counts as content too. Sprint Predictability found this
+         on 2026-08-27 when the same rule went in there: its team-size boxes take
+         a two-digit head count and say "then" and "now", which is four
+         characters — a box sized for the digits alone would clip its own
+         instruction, and nothing about the `max` would have said so. */
+      const widest = [i.placeholder || '', '0'.repeat(claimed)]
+        .reduce((a, x) => c.measureText(x).width > c.measureText(a).width ? x : a, '');
+      const spare = inner - c.measureText(widest).width;
+      if (spare < 12) short.push(name + ' has to hold "' + widest + '" and has '
         + Math.round(spare) + 'px of room for the spinner');
 
       if (i.max) {
