@@ -318,7 +318,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    size over a board that has a measured one, and 2749 the same day for what
    Charles found in it: the size row riding with the pace tick in planning, and
    Reset actually emptying the two boxes. */
-const EXPECTED = 2749;
+const EXPECTED = 2783;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -1182,7 +1182,7 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 12, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 13, 'SCHEMA was bumped in the same commit as the whitelist widening');
 
 
   /* ══════════════════════════════════════════════════════════
@@ -1716,7 +1716,7 @@ async function run(TD, win) {
   is('smuggled' in strayS, false, 'a stray settings key is dropped at the boundary');
   is(strayS.agedDays, 21, 'while every known key still comes through');
   is(Object.keys(strayS).sort().join(','),
-     'agedDays,cycleTimeLabel,featureTypes,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,workingDays',
+     'agedDays,cycleTimeLabel,featureAgedDays,featureTypes,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,workingDays',
      'and the surviving keys are exactly the known set');
 
   is(d.names.wip, 'Work in progress', 'the rest are the standard metric names');
@@ -2539,6 +2539,86 @@ async function run(TD, win) {
        { filterValue: '', months: 'all' }).agedCount[i]),
      'a longer threshold can only ever count fewer items as aged');
 
+  /* ────────────────────────────────────────────────────────────────────────
+     A FEATURE IS AGED AGAINST ITS OWN THRESHOLD, OR AGAINST NOTHING.
+
+     The item threshold above is a coaching convention about items and it does
+     not survive the change of unit — read against features, a fortnight flags a
+     board that is behaving normally. So the feature threshold is a setting of
+     its own that ships EMPTY, and every aged figure has to survive that empty:
+     null, never a confident zero. A 0 on this tile would be the app reporting
+     no ageing problem on a board it is not measuring, which is the same
+     wrongness the WIP limit and the cycle time target are dropped for. */
+  {
+    const featSettings = (n) => Object.assign({}, SAMPLE_SETTINGS,
+      n === undefined ? {} : { featureAgedDays: n });
+    const asFeat = (n) => TD.derive(p.rows, featSettings(n),
+      { filterValue: '', months: 'all', unit: 'features' });
+    const asItem = (n) => TD.derive(p.rows, featSettings(n),
+      { filterValue: '', months: 'all' });
+
+    const noneSet = asFeat();
+    is(noneSet.agedDays, null, 'no feature threshold set means no threshold at all');
+    ok(noneSet.agedCount.length === noneSet.wip.length,
+       'the aged series keeps its length so nothing walking it beside WIP falls out of step',
+       String(noneSet.agedCount.length));
+    ok(noneSet.agedCount.every(v => v === null),
+       'but every point is null rather than zero');
+    is(noneSet.summary.agedNow, null, 'and the tile has no figure to state');
+    is(noneSet.ageing.agedCount, null, 'nor does the age chart');
+    is(noneSet.ageing.threshold, null, 'which has no threshold to report');
+    ok(noneSet.ageing.points.every(pt => pt.aged === false),
+       'and not one in-flight feature is marked aged, however old it is');
+    is(noneSet.ageing.lines.filter(l => l.key === 'threshold').length, 0,
+       'the threshold line comes off the chart — a line at null would draw at zero');
+    /* The two headings have to say what is being shown rather than name a number
+       that does not exist. "Longer Than null Days" is the failure this catches. */
+    ok(!/null/.test(noneSet.titles.agedWork), 'no title names a threshold that is not set',
+       noneSet.titles.agedWork);
+    ok(!/null/.test(noneSet.axisTitles.agedWork), 'and neither does the axis',
+       noneSet.axisTitles.agedWork);
+    ok(/No Threshold Set/.test(noneSet.titles.agedWork), 'the title says so outright',
+       noneSet.titles.agedWork);
+
+    const set30 = asFeat(30);
+    is(set30.agedDays, 30, 'a feature threshold that IS set is the one in force');
+    is(set30.ageing.threshold, 30, 'and the age chart counts against it');
+    is(set30.ageing.lines.filter(l => l.key === 'threshold').length, 1,
+       'and draws its line again');
+    /* Held to the definition by the same route the item series is: the SAME
+       list counted at the SAME threshold has to give the same series whichever
+       unit it is called, and the item series a line above this one is already
+       checked against the brute-force definition at four thresholds. Asserted
+       as an equivalence rather than rebuilding the evaluation points here,
+       because a second reconstruction of them is a second thing to keep in step
+       with derive(). */
+    is(set30.agedCount,
+       TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS, { agedDays: 30 }),
+         { filterValue: '', months: 'all' }).agedCount,
+       'and the series is exactly what the same list at the same threshold gives as items');
+    is(set30.agedCount[set30.agedCount.length - 1], set30.summary.agedNow,
+       'with the last bar equal to the tile, as of the newest date in the data');
+
+    /* NEITHER SETTING REACHES THE OTHER'S VIEW. Both directions, because a
+       single shared read would pass one of them by accident. */
+    is(asItem(60).agedDays, SAMPLE_SETTINGS.agedDays || 14,
+       'a feature threshold does not move the item view');
+    is(TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS,
+         { agedDays: 90, featureAgedDays: 30 }),
+       { filterValue: '', months: 'all', unit: 'features' }).agedDays, 30,
+       'and an item threshold does not move the feature view');
+
+    /* Positive or nothing, at the boundary rather than at the point of use — a
+       zero would call every open feature aged the moment it started. */
+    const norm = (v) => win.TDState.normalizeSettings({ featureAgedDays: v }).featureAgedDays;
+    is(norm(undefined), null, 'the feature threshold ships unset');
+    is(norm(0), null, 'a zero is not a threshold of no days, it is no threshold');
+    is(norm(-5), null, 'nor is a negative one');
+    is(norm('nonsense'), null, 'nor is anything that is not a number');
+    is(norm(21), 21, 'a real number comes through');
+    is(norm('21'), 21, 'including one a hand-edited backup wrote as a string');
+  }
+
   /* The coaching ratio: work in progress against a month of throughput. */
   ok(dW.summary.monthlyThroughput > 0, 'a month of throughput is counted for the ratio',
      String(dW.summary.monthlyThroughput));
@@ -2841,7 +2921,8 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 12, 'the schema marker is 12 — the version that added the feature layer');
+  is(St.SCHEMA, 13, 'the schema marker is 13 — the version that gave features their own '
+     + 'ageing threshold');
 
 
   /* ────────────────────────────────────────────────────────── */
@@ -3133,7 +3214,8 @@ async function run(TD, win) {
   group('features at the storage boundary');
   {
     const S4 = win.TDState;
-    is(S4.SCHEMA, 12, 'the feature layer took the schema to 12');
+    is(S4.SCHEMA, 13, 'the feature layer took the schema to 12, and the feature ageing '
+       + 'threshold to 13');
 
     const t = S4.sanitizeTeams([{ id: 'a', name: 'X', rows: [],
       features: [{ c: '2026-01-12', s: '2026-01-06', t: 'Feature', i: 'DAE-1' }] }])[0];
@@ -3239,8 +3321,19 @@ async function run(TD, win) {
        the words move. */
     is(JSON.stringify(asFeats.throughput), JSON.stringify(asItems.throughput),
        'the same list gives the same figures whatever it is called');
-    is(JSON.stringify(asFeats.summary), JSON.stringify(asItems.summary),
-       'including every summary figure');
+    /* EVERY summary figure but ONE. `agedNow` parted company with the rest when
+       features got an ageing threshold of their own: the item threshold is
+       defaulted and always in force, the feature one ships empty, and this
+       fixture sets no feature threshold — so the two views count the same list
+       and only one of them has a rule to count it against. Compared with the
+       field dropped rather than by listing the fields that survive, so a figure
+       added to `summary` later is still covered by this. */
+    const dropAged = (o) => { const c = Object.assign({}, o); delete c.agedNow; return c; };
+    is(JSON.stringify(dropAged(asFeats.summary)), JSON.stringify(dropAged(asItems.summary)),
+       'including every summary figure but the aged count');
+    is(asItems.summary.agedNow, 0, 'which the item view states off its own defaulted threshold');
+    is(asFeats.summary.agedNow, null,
+       'and the feature view leaves at null, because no feature threshold is set');
 
     is(asItems.unit, 'items', 'the unit is reported back');
     is(asFeats.unit, 'features', 'both ways');
@@ -5822,14 +5915,59 @@ group('ARTs — the grouping, and the boundary it crosses');
 
   /* The other end of the same pair, where the threshold is typed. */
   uiDoc.getElementById('settingsBtn').click();
-  /* Its own cell in the grid, NOT a child of the field's div — a hint long
-     enough to be worth reading is exactly what inflates a grid row and strands
-     the field beside it, so it sits alongside the box rather than under it. */
-  const agedHint = uiDoc.getElementById('setAgedDays').closest('.grid').querySelector('p.hint');
-  ok(agedHint && /Unfinished work only/.test(agedHint.textContent),
+  /* OUTSIDE the grid and under it since the feature threshold landed beside the
+     item one — the layout the outlier pair already uses. What has not changed is
+     the rule that put it there: a hint long enough to be worth reading may not
+     sit in a grid cell, where it inflates the row and strands the short field
+     next to it. Two boxes on the row, prose beneath. */
+  const agedGrid = uiDoc.getElementById('setAgedDays').closest('.grid');
+  is(agedGrid.querySelectorAll('p.hint').length, 0,
+     'no prose inside the threshold row — it holds two fields and nothing else');
+  is(agedGrid.querySelectorAll('input[type="number"]').length, 2,
+     'and the second field is the feature threshold, in the space beside the item one');
+  ok(uiDoc.getElementById('setFeatureAgedDays'), 'which is the box this all hangs on');
+  /* WHICHEVER LAYOUT IS IN FORCE, pinned by asking the grid rather than by
+     assuming. Two columns is the case the change exists for — the two labels
+     wrap to different heights, and `align-items: end` is what keeps their boxes
+     on one baseline instead of stranding one of them halfway up its cell. One
+     column is the sub-640px case, where they stack and share a left edge.
+
+     This suite's app frame is ONE PIXEL WIDE, so it is always the stacked case
+     here; asserting the two-up baseline unconditionally would fail on a layout
+     that is behaving correctly. The measurements are guarded on a real height
+     first either way, because a box that came back as zeros would let any of
+     these comparisons pass without ever seeing a field. */
+  const aBox = uiDoc.getElementById('setAgedDays').getBoundingClientRect();
+  const fBox = uiDoc.getElementById('setFeatureAgedDays').getBoundingClientRect();
+  ok(aBox.height > 0 && fBox.height > 0, 'both threshold boxes are actually laid out',
+     aBox.height + ' / ' + fBox.height);
+  const twoUp = win.getComputedStyle(agedGrid).gridTemplateColumns.split(' ').length === 2;
+  if (twoUp) {
+    ok(Math.abs(aBox.bottom - fBox.bottom) < 2,
+       'two-up, the boxes sit on one baseline however their labels wrap',
+       aBox.bottom + ' vs ' + fBox.bottom);
+    ok(fBox.left > aBox.right, 'with the feature box in the space beside the item one',
+       aBox.right + ' then ' + fBox.left);
+  } else {
+    ok(Math.abs(aBox.left - fBox.left) < 2,
+       'stacked, the boxes share a left edge', aBox.left + ' vs ' + fBox.left);
+    ok(fBox.top > aBox.bottom, 'and the feature one follows below',
+       aBox.bottom + ' then ' + fBox.top);
+  }
+  /* The two paragraphs directly after the row, and only those: reaching for
+     every `p.hint` in the dialog would pass on the outlier block's prose. */
+  const agedHints = [agedGrid.nextElementSibling, agedGrid.nextElementSibling &&
+      agedGrid.nextElementSibling.nextElementSibling]
+    .filter(el => el && el.matches('p.hint')).map(el => el.textContent).join(' ');
+  ok(agedHints.length > 0, 'the row is followed by its own hints', String(agedHints.length));
+  ok(/Unfinished work only/.test(agedHints),
      'the ageing threshold says, right where it is typed, that it counts unfinished work only');
-  ok(agedHint && /85%/.test(agedHint.textContent) && /lower/.test(agedHint.textContent),
+  ok(/85%/.test(agedHints) && /lower/.test(agedHints),
      'names the target it is mistaken for, and which way round they go');
+  /* And the one thing the feature box cannot say with a label: empty is a
+     setting, not an unfinished one. */
+  ok(/empty by default, and empty is off/.test(agedHints),
+     'and the feature box says outright that empty is off, not unfilled');
   uiDoc.getElementById('settingsCloseBtn').click();
 
   /* And the chart's own note carries the reasoning, which neither box has room

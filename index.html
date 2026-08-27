@@ -2396,10 +2396,19 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           <div class="chart-wrap"><canvas id="chartWip"></canvas></div>
         </div>
 
-        <div class="chart-card">
+        <!-- It gained an id and an empty face when the feature threshold landed.
+             The threshold this chart counts against is a number the reader sets,
+             and there is no number this app is entitled to assume about
+             features — so in the feature view with none set there is nothing to
+             plot, and the card says which setting is missing and what this
+             team's own features actually look like. Explaining itself rather
+             than vanishing is the rule the defect rate and lead time cards
+             already follow. -->
+        <div class="chart-card" id="cardAgedWork">
           <div class="chart-name" id="nameAgedWork"></div>
           <div class="chart-title" id="titleAgedWork"></div>
           <div class="chart-wrap"><canvas id="chartAgedWork"></canvas></div>
+          <div class="note info" id="agedWorkNone" hidden></div>
         </div>
 
         <!-- The card that explodes the one above it: that plots how MANY were
@@ -2999,23 +3008,37 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        two fields next to it. IF A SETTING NEEDS MORE THAN A LABEL, IT BELONGS ON
        ITS OWN LINE DOWN HERE, not in the grid above.
 
-       The threshold is paired with its own explanation two-up rather than given
-       the full width: a box for a two-digit number stretched across 1100px is
-       its own kind of dead space, and the hint is exactly the thing to put in
-       the space beside it. -->
+       THE TWO THRESHOLDS SIT SIDE BY SIDE, one to a column, and the hint that
+       used to fill the space beside the item box now runs full width beneath
+       them. That is the outlier pair's layout three blocks down, and it is the
+       right one the moment a second field exists: the dead space the old
+       comment complained about is a box's worth of it, so the fix is to put the
+       second box there rather than to keep spending it on prose. A paragraph at
+       the dialog's full width is not dead space; a 62px box at it is.
+
+       Both boxes stay `--digits:3` so the pair reads as one question asked
+       twice, and `align-items: end` on the grid keeps them on one baseline even
+       though the two labels wrap to different heights on a narrow window. -->
   <div class="grid two pairs" style="margin-top:var(--sp-6)">
     <div>
       <label for="setAgedDays" id="setAgedDaysLabel">Count an in-progress item as aged after (days)</label>
       <input type="number" id="setAgedDays" style="--digits:3" step="1" min="1" placeholder="14">
     </div>
-    <!-- Not a <div>, so `.grid.two > div`'s flex rule leaves it alone; the
-         grid's own `align-items: end` sits it on the same baseline as the box. -->
-    <p class="hint" style="margin:0">Unfinished work only &mdash; nothing that
-      has completed is ever counted here. Not the same as a team&rsquo;s
-      <strong>85% &le;</strong> target, which is checked against work that has finished; set
-      this <strong>lower</strong> than that target so something is flagged while there is
-      still time to act on it.</p>
+    <div>
+      <label for="setFeatureAgedDays" id="setFeatureAgedDaysLabel">Count an in-progress feature as aged after (days)</label>
+      <input type="number" id="setFeatureAgedDays" style="--digits:3" step="1" min="1">
+    </div>
   </div>
+  <p class="hint" style="margin-top:var(--sp-3)">Unfinished work only &mdash; nothing that
+    has completed is ever counted here. Not the same as a team&rsquo;s
+    <strong>85% &le;</strong> target, which is checked against work that has finished; set
+    each <strong>lower</strong> than that target so something is flagged while there is
+    still time to act on it.</p>
+  <p class="hint" style="margin-top:var(--sp-3)">The feature box is
+    <strong>empty by default, and empty is off</strong> &mdash; a fortnight is a rule about
+    work items, and nothing here assumes it holds for features. Until you set a number, the
+    Aged Work card in the feature view says so and shows what that team&rsquo;s finished
+    features actually took, so the number you pick is measured against your own board.</p>
 
   <!-- The feature layer's one switch. On its own line with room for a hint,
        under the rule stated at the top of this dialog: a setting that needs more
@@ -7010,10 +7033,56 @@ function derive(rows, settings, view, stages) {
   const noun   = BUCKET_NOUNS[bucket];
   /* Titles are Title Case, so the grouping word needs a capitalised form. */
   const Noun   = noun.charAt(0).toUpperCase() + noun.slice(1);
-  /* Defaulted here too, for the same reason: a settings object saved before
-     aged work existed must still mean the documented 14 days. */
-  const agedDays = Number(settings.agedDays) > 0
-    ? Number(settings.agedDays) : DEFAULT_SETTINGS.agedDays;
+  /* ── What one of these things is called ──────────────────────────────────
+     `derive()` takes a LIST OF RECORDS and works out flow over them. It does not
+     know, and must not care, whether those records are work items or features:
+     that is the whole reason the feature view needed no new maths — the caller
+     hands it a different list and every figure follows.
+
+     What DOES have to follow is the wording. A chart headed "Items Completed per
+     Week" over a list of features is a chart that lies about what it is
+     counting, and it is the kind of lie nobody double-checks. So the unit's name
+     is worked out once, here, and every title, axis and tile reads it rather
+     than spelling "item" out.
+
+     `view.unit` is the caller's word for what it handed over. Anything other
+     than 'features' means items, so a caller that has never heard of the setting
+     — every test written before it, and the All Teams rows — gets exactly the
+     wording it always got. */
+  const unit = view.unit === 'features' ? 'features' : 'items';
+  const Unit = unit === 'features' ? 'Feature' : 'Item';
+  const Units = Unit + 's';
+  const unitOne = Unit.toLowerCase();
+  const units = unit === 'features' ? 'features' : 'items';
+
+  /* IT NOW DECIDES A FIGURE, not only a noun. Everything below this line that
+     reads `unit` for wording still only reads it for wording; the ageing
+     threshold immediately below is the one thing that reads it to decide what
+     is counted, which is why this block moved up here from beside the bucket
+     labels. */
+
+  /* ── The ageing threshold, one per unit ────────────────────────────────────
+     For ITEMS: defaulted here rather than relying on the caller, so a settings
+     object saved before aged work existed still means the documented 14 days.
+
+     For FEATURES: whatever the reader set, or NULL. There is no default and
+     there must not be one — the item threshold is a coaching convention about
+     items, and a fortnight read against features flags an ordinary board as a
+     failing one. That is the same wrongness the WIP limit and the cycle time
+     target are dropped for in the feature view, and it arrives the same way:
+     null is not set, and nothing below may read null as a zero.
+
+     EVERYTHING DOWNSTREAM HAS TO SURVIVE NULL. `agedCount` becomes a row of
+     nulls so the series keeps its length, `agedNow` and `ageing.agedCount`
+     become null so their tiles say "—" rather than a confident zero, the
+     threshold line comes off the age chart, and the two titles say what is
+     being shown instead of naming a number that does not exist. A zero
+     anywhere in that list would be the app reporting perfect health on a board
+     it is not measuring. */
+  const agedDays = unit === 'features'
+    ? (Number(settings.featureAgedDays) > 0 ? Number(settings.featureAgedDays) : null)
+    : (Number(settings.agedDays) > 0
+        ? Number(settings.agedDays) : DEFAULT_SETTINGS.agedDays);
   /* Calendar days unless this is explicitly on — the same defaulting as above,
      so a settings object saved before the toggle existed still means calendar
      days rather than undefined. One flag drives all three durations and the
@@ -7370,7 +7439,13 @@ function derive(rows, settings, view, stages) {
   const evalPoints = weekStarts.map(b =>
     new Date(Math.min(bucketEnd(b, bucket).getTime(), endDate.getTime())));
   const wip = openCounts(items, evalPoints);
-  const agedCount = agedCounts(items, evalPoints, agedDays, wip, workingDays);
+  /* A row of nulls, not a row of zeros, when no threshold is in force. The
+     series keeps its length so everything that walks it alongside `wip` still
+     lines up, and Chart.js draws a gap rather than a flat line along the axis —
+     which is what a count of nothing would look like, and would be read as a
+     board with no ageing problem. */
+  const agedCount = agedDays == null ? evalPoints.map(() => null)
+    : agedCounts(items, evalPoints, agedDays, wip, workingDays);
 
   /* ── The cumulative flow diagram ───────────────────────────────────────────
      Three cumulative counts read at the same points work in progress is read
@@ -7459,27 +7534,9 @@ function derive(rows, settings, view, stages) {
 
   const cycleLabel = settings.cycleTimeLabel || 'Cycle time';
 
-  /* ── What one of these things is called ──────────────────────────────────
-     `derive()` takes a LIST OF RECORDS and works out flow over them. It does not
-     know, and must not care, whether those records are work items or features:
-     that is the whole reason the feature view needed no new maths — the caller
-     hands it a different list and every figure follows.
-
-     What DOES have to follow is the wording. A chart headed "Items Completed per
-     Week" over a list of features is a chart that lies about what it is
-     counting, and it is the kind of lie nobody double-checks. So the unit's name
-     is worked out once, here, and every title, axis and tile reads it rather
-     than spelling "item" out.
-
-     `view.unit` is the caller's word for what it handed over. Anything other
-     than 'features' means items, so a caller that has never heard of the setting
-     — every test written before it, and the All Teams rows — gets exactly the
-     wording it always got. */
-  const unit = view.unit === 'features' ? 'features' : 'items';
-  const Unit = unit === 'features' ? 'Feature' : 'Item';
-  const Units = Unit + 's';
-  const unitOne = Unit.toLowerCase();
-  const units = unit === 'features' ? 'features' : 'items';
+  /* The unit's four names are worked out much further up, beside the ageing
+     threshold that now reads them — see the block above `agedDays`. They were
+     here until that threshold stopped being one number for both units. */
 
   /* The last bucket usually stops part-way through: the data ends on a Tuesday,
      the month it lands in has three more weeks to run. Its bars are therefore
@@ -7738,7 +7795,7 @@ function derive(rows, settings, view, stages) {
       agePoints.push({
         x: i + (n === 1 ? 0 : -AGE_SPREAD + (2 * AGE_SPREAD * j) / (n - 1)),
         y: r.age,
-        aged: r.age > agedDays,
+        aged: agedDays != null && r.age > agedDays,
         type: r.type,
         started: r.started,
         key: r.key || '',
@@ -7774,8 +7831,12 @@ function derive(rows, settings, view, stages) {
      whole dashboard down with "cannot read properties of undefined" the first
      time this line existed. One list, one owner: if a line does not belong on
      both charts, it does not go into this array. */
+  /* The threshold line only where there IS a threshold. A line drawn at null
+     is a line drawn at zero — the whole chart above a rule saying every open
+     feature is already aged — and the dots would take the aged shape with it. */
   const ageLines = cycleScatter.lines.filter(l => l.key !== 'outlier').concat(
-    [{ key: 'threshold', value: agedDays, text: 'aged after ' + agedDays }]);
+    agedDays == null ? []
+      : [{ key: 'threshold', value: agedDays, text: 'aged after ' + agedDays }]);
 
 
   const ageing = {
@@ -7793,7 +7854,7 @@ function derive(rows, settings, view, stages) {
     byStage,
     foldedTypes: folded.length,
     count: inFlight.length,
-    agedCount: inFlight.filter(r => r.age > agedDays).length,
+    agedCount: agedDays == null ? null : inFlight.filter(r => r.age > agedDays).length,
     oldest: inFlight.length ? maxOf(inFlight.map(r => r.age)) : null,
     median: ageMedian,
     p85: ageP85,
@@ -7961,7 +8022,11 @@ function derive(rows, settings, view, stages) {
       sleJudgedIncludesIgnored: outlierCutoff != null && excluded.size > 0,
 
 
-      agedNow: agedCount.length ? agedCount[agedCount.length - 1] : 0,
+      /* Null, never 0, when no threshold is set — the tile beside it says "—"
+         and names the setting, where a 0 would be this app assuring a reader
+         that nothing has aged on a board it never measured. */
+      agedNow: agedDays == null ? null
+        : (agedCount.length ? agedCount[agedCount.length - 1] : 0),
       asOf: endDate,
       monthlyThroughput,
       /* Null rather than Infinity when nothing was finished in the last month —
@@ -8050,7 +8115,9 @@ function derive(rows, settings, view, stages) {
         + Noun + ' — the Cumulative Flow Diagram',
       leadTime: 'Average Lead Time per ' + Noun + ' (Raised to Delivered)',
       wip: 'Work in Progress at the End of Each ' + Noun,
-      agedWork: Units + ' in Progress Longer Than ' + agedDays + ' ' + DayNoun,
+      agedWork: agedDays == null
+        ? Units + ' in Progress Too Long — No Threshold Set'
+        : Units + ' in Progress Longer Than ' + agedDays + ' ' + DayNoun,
       itemAge: 'Age of Every ' + Unit + ' Still in Progress on ' + prettyDate(endDate)
         + (ageing.byStage ? ', by Workflow Stage' : ', by Work Type'),
       cycleScatter: cycleLabel + ' of Each ' + Unit + ', on the ' + Noun + ' It Finished',
@@ -8077,7 +8144,8 @@ function derive(rows, settings, view, stages) {
       cfd: Units + ', counted from the start of the window',
       leadTime: 'Lead time (' + dayNoun + ')',
       wip: Units + ' open at period end',
-      agedWork: Units + ' older than ' + agedDays + ' ' + dayNoun,
+      agedWork: agedDays == null ? Units + ' past the threshold'
+        : Units + ' older than ' + agedDays + ' ' + dayNoun,
       itemAge: 'Age so far (' + dayNoun + ')',
       itemAgeX: ageing.byStage ? 'Workflow stage' : 'Work type',
       cycleScatter: cycleLabel + ' (' + dayNoun + ')',
@@ -8392,6 +8460,27 @@ const DEFAULT_SETTINGS = {
   /* Two weeks. The usual coaching starting point, and short enough that a board
      with a real ageing problem shows it. */
   agedDays: 14,
+  /* The same question asked of FEATURES, and deliberately unanswered.
+
+     Nothing ships here because there is no defensible number to ship. The
+     fourteen days above is a coaching convention about work items and it does
+     not survive the change of unit: read against features it flags a board that
+     is behaving perfectly normally, which is the reassurance-nobody-asked-for
+     failure the WIP limit and the cycle time target are already dropped to
+     avoid — see the block in renderDashboard that nulls both in the feature
+     view. Scaling it by some multiple would be the same guess wearing
+     arithmetic.
+
+     Null is not set, and not set is honest: the aged figures simply do not
+     exist in the feature view until somebody answers, and the card says so with
+     that team's own finished-feature percentiles beside the question. Positive
+     or null, never 0, exactly like `outlierDays`.
+
+     Global rather than per team, like every other field in this object. A team
+     whose features genuinely run to a different scale is a real thing, and it
+     is the same argument the WIP limit answers per team — but that is a second
+     question, and this one is worth answering first. */
+  featureAgedDays: null,
   /* Calendar days, off. Flow metrics measure the wait the customer actually
      had, and the customer's weekend is not free — so calendar days are the
      right default and working days are the deliberate choice. It is also the
@@ -8991,6 +9080,13 @@ function normalizeSettings(raw) {
      negative one is meaningless. */
   const a = Number(s.agedDays);
   s.agedDays = Number.isFinite(a) && a > 0 ? a : DEFAULT_SETTINGS.agedDays;
+  /* Positive or NULL, never a default and never 0 — the opposite of the line
+     above it, and the difference is the whole design. There is no number this
+     app is entitled to assume about somebody else's features, so a blank, a
+     zero, a negative or a hand-edited "14" typed as a string all come out as
+     "not set" rather than as a threshold the reader never chose. */
+  const fa = Number(s.featureAgedDays);
+  s.featureAgedDays = Number.isFinite(fa) && fa > 0 ? fa : null;
   /* A checkbox, so only the boolean true means on. A hand-edited backup saying
      "yes" or 1 must not switch the measure every figure is taken in — and it
      must be a real boolean either way: JSON.stringify drops an undefined
@@ -9026,7 +9122,8 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 12 added the feature layer — a `p` (parent key) on each row and a
+/* SCHEMA 13 added the feature ageing threshold — `featureAgedDays`, the one
+   setting whose default is "not set"; 12 added the feature layer — a `p` (parent key) on each row and a
    `features` list on each team, plus the `featureTypes` setting that decides
    which pasted rows become features; 11 added the two settings behind ignoring major outliers — a mode and
    an optional typed cutoff, both shared by every team like the rest of
@@ -9048,7 +9145,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 12;
+const SCHEMA = 13;
 
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
@@ -10424,6 +10521,35 @@ function drawCharts(d) {
     options: wipOpts
   });
 
+  /* ── No threshold, no chart ──
+     Only ever the feature view: the item threshold is defaulted in derive() and
+     cannot be missing. The message names the setting AND this team's own
+     finished-feature percentiles, because "pick a number" is not a question
+     anybody can answer off a blank box — the numbers to pick between are the
+     ones already on the tiles above, and stating them here is the same move the
+     paste report makes when it names the work types it found. */
+  const agedCard = $('cardAgedWork');
+  const agedNone = $('agedWorkNone');
+  const hasAged = d.agedDays != null;
+  agedCard.querySelector('.chart-wrap').hidden = !hasAged;
+  agedCard.classList.toggle('no-chart', !hasAged);
+  agedNone.hidden = hasAged;
+  agedNone.textContent = hasAged ? ''
+    : 'No ageing threshold is set for features, so nothing here is counted — a '
+      + 'fortnight is a rule about work items and would flag an ordinary feature '
+      + 'board as a failing one. Set one under Settings. '
+      + (d.summary.p85CycleTime == null
+        ? 'Nothing has finished in this window to measure against yet.'
+        : 'For scale: features that finished in this window took '
+          + (d.summary.medianCycleTime == null ? ''
+            : num1(d.summary.medianCycleTime) + ' ' + d.dayNoun + ' at the median and ')
+          + num1(d.summary.p85CycleTime) + ' ' + d.dayNoun + ' at the '
+          + d.cyclePercentile + 'th percentile. Set yours below that, so a feature '
+          + 'is flagged while there is still time to act on it.');
+
+  if (!hasAged) {
+    if (charts.chartAgedWork) { charts.chartAgedWork.destroy(); delete charts.chartAgedWork; }
+  } else {
   const agedOpts = baseOptions(d.axisTitles.agedWork, int0, null, d.axisTitles.x, d.partial);
   agedOpts.scales.y.beginAtZero = true;
   agedOpts.scales.y.ticks.precision = 0;
@@ -10447,6 +10573,7 @@ function drawCharts(d) {
     },
     options: agedOpts
   });
+  }
 
   /* ── Every finished item, at the time it took ──
      The canonical Kanban chart, and the one view here where a single item is a
@@ -10744,8 +10871,21 @@ function drawCharts(d) {
   };
   /* Both lines, so the label reads the way the card does. */
   const label = k => d.names[k] + ' — ' + d.titles[k];
-  ['defectRate', 'cycleTime', 'throughput', 'netFlow', 'cfd', 'wip', 'agedWork']
+  ['defectRate', 'cycleTime', 'throughput', 'netFlow', 'cfd', 'wip']
     .forEach(k => describe('chart' + k.charAt(0).toUpperCase() + k.slice(1), label(k)));
+  /* Conditional since the feature threshold landed, like the four below it: with
+     no threshold set there is no aged chart, and an aria-label describing a
+     hidden canvas is a chart announced to a screen reader that nobody else can
+     see. */
+  if (d.agedDays != null) describe('chartAgedWork', label('agedWork'));
+  /* And STRIPPED when it did not. The canvas is hidden, so this is belt and
+     braces — but the attribute survives a re-render, and a stale label reading
+     "Items in Progress Longer Than 14 Days" on the feature view is the exact
+     claim this whole change exists to stop the app making. */
+  else {
+    const c = $('chartAgedWork');
+    if (c) { c.removeAttribute('aria-label'); c.removeAttribute('role'); }
+  }
   if (d.hasCreated) describe('chartLeadTime', label('leadTime'));
   if (d.cycleScatter.points.length) describe('chartCycleScatter', label('cycleScatter'));
   if (d.ageing.count) describe('chartItemAge', label('itemAge'));
@@ -11142,6 +11282,12 @@ const METRIC_HELP = {
     ['One caveat: the clean-up tool’s option to also remove unfinished items deletes '
       + 'long-running work in progress, which is exactly what this chart counts, so ',
       b('history before a clean-up like that will read low'), '.'],
+    ['Features have ', b('a threshold of their own, and it starts empty'),
+      '. The two weeks above is a convention about work items and it does not survive '
+      + 'the change of unit — read against features it would flag a board that is '
+      + 'behaving normally. Until you set one, this card in the feature view says so '
+      + 'and shows what that team’s finished features actually took, so the number you '
+      + 'pick is measured against your own board rather than guessed.'],
   ] },
   teamTrend: { title: 'Throughput Trend', body: [
     ['Which way this team’s throughput has been going across the window on screen — the '
@@ -11824,8 +11970,10 @@ function renderDashboard() {
           : '; limit ' + s.wipLimit + (s.overWipLimit
             ? ' — over by ' + (s.currentWip - s.wipLimit) : ' — inside it')),
       'wip') +
-    tile('Aged work', String(s.agedNow),
-      'in progress over ' + d.agedDays + ' ' + d.dayNoun, 'agedWork');
+    tile('Aged work', s.agedNow == null ? '&mdash;' : String(s.agedNow),
+      s.agedNow == null
+        ? 'no threshold set for features — set one in Settings'
+        : 'in progress over ' + d.agedDays + ' ' + d.dayNoun, 'agedWork');
 
   /* Both lines hold user-chosen label text, so both are escaped. The ⓘ goes on
      the name, which is what it explains. */
@@ -13314,8 +13462,10 @@ function renderAllTeams() {
       'over every item any team completed, not an average of theirs', 'trainPercentile') +
     tile('Work in progress', String(s.currentWip),
       'open across every team as of ' + prettyDate(s.asOf), 'wip') +
-    tile('Aged work', String(s.agedNow),
-      'in progress over ' + train.agedDays + ' ' + train.dayNoun, 'agedWork');
+    tile('Aged work', s.agedNow == null ? '&mdash;' : String(s.agedNow),
+      s.agedNow == null
+        ? 'no threshold set for features — set one in Settings'
+        : 'in progress over ' + train.agedDays + ' ' + train.dayNoun, 'agedWork');
 
   drawTrainThroughput(train, scopePhrase);
 
@@ -13646,13 +13796,25 @@ function renderSettingsForm() {
   $('setFeatureTypes').value      = (state.settings.featureTypes || []).join(', ');
   $('setSameDay').value        = state.settings.sameDayValue;
   $('setAgedDays').value       = state.settings.agedDays;
+  /* Null is an EMPTY box, not a zero — the same trap `setOutlierDays` documents
+     below. Here it matters more: a 0 under this label would read as a threshold
+     of no days at all, which is the one value normalizeSettings refuses, on the
+     one setting whose whole point is that nothing was assumed. */
+  $('setFeatureAgedDays').value = state.settings.featureAgedDays == null
+    ? '' : state.settings.featureAgedDays;
   $('setUnplannedLabel').value = state.settings.unplannedLabel;
   $('setWorkingDays').checked  = state.settings.workingDays === true;
   /* The ageing threshold is counted in whichever days the toggle says, so its
      label has to follow — a box reading "(days)" beside a working-days chart is
      the one place the two measures could be read as coexisting. */
-  $('setAgedDaysLabel').textContent = 'Count an in-progress item as aged after ('
-    + (state.settings.workingDays === true ? 'working days' : 'days') + ')';
+  const dayWord = state.settings.workingDays === true ? 'working days' : 'days';
+  $('setAgedDaysLabel').textContent =
+    'Count an in-progress item as aged after (' + dayWord + ')';
+  /* Follows the toggle for the same reason its neighbour does, and has to be
+     said twice rather than shared: they are two labels, and a pair where only
+     one tracked the measure would read as two different measures. */
+  $('setFeatureAgedDaysLabel').textContent =
+    'Count an in-progress feature as aged after (' + dayWord + ')';
   $('setOutlierMode').value = state.settings.outlierMode;
   /* Null is an EMPTY box, not a zero. A number input handed null renders "0",
      which would read as a cutoff of no days at all — the one value
@@ -16020,16 +16182,21 @@ $('scReset').addEventListener('click', () => {
 /* settings — shared by every team */
 /* Coerced to a non-negative number on the way in; everything else is a capped
    label, never free text. */
-const NUMERIC_SETTINGS = new Set(['sameDayValue', 'agedDays', 'outlierDays']);
+const NUMERIC_SETTINGS = new Set(['sameDayValue', 'agedDays', 'outlierDays', 'featureAgedDays']);
 /* Emptying the box is "no cutoff", not "a cutoff of zero" — the one numeric
    setting here where a blank is a meaningful value rather than a half-typed
    one, because the mode above it can legitimately be on 'days' before a number
    exists. The other two floor at a number instead; see the listener below. */
-const NULLABLE_SETTINGS = new Set(['outlierDays']);
+/* `featureAgedDays` joined it for the stronger version of the same reason: a
+   blank there is not a half-typed number, it is the state this setting SHIPS in
+   and the state a reader returns it to when they decide features should not be
+   aged at all. */
+const NULLABLE_SETTINGS = new Set(['outlierDays', 'featureAgedDays']);
 const SETTING_INPUTS = {
   setCycleLabel: 'cycleTimeLabel', setUnplannedType: 'unplannedType',
   setSameDay: 'sameDayValue', setUnplannedLabel: 'unplannedLabel',
-  setAgedDays: 'agedDays', setOutlierDays: 'outlierDays'
+  setAgedDays: 'agedDays', setOutlierDays: 'outlierDays',
+  setFeatureAgedDays: 'featureAgedDays'
 };
 
 /* Every keystroke here tears down and rebuilds every chart. That was tolerable
@@ -17852,6 +18019,13 @@ const DEMO_AGED = (() => {
   return longTail ? longTail.wip.filter(a => a > DEFAULT_SETTINGS.agedDays).length : 0;
 })();
 
+/* The demo's FEATURE ageing threshold. A constant of the demo and never of the
+   app: `DEFAULT_SETTINGS.featureAgedDays` is null and must stay null — see the
+   comment there — so this number is written where the demo's other choices are
+   and read nowhere else. Chosen against the two boards it has to describe, and
+   the reasoning is at the assignment in loadSample. */
+const DEMO_FEATURE_AGED = 30;
+
 function loadSample() {
   if (!confirm(
       'Load the demo? Three teams and about nine months of work items, ending today. '
@@ -17870,7 +18044,9 @@ function loadSample() {
     + 'browser starts.\n\n'
     + 'Team Healthy Flow and Team Long Tail also break their work down into features, so '
     + 'you can see how many items a feature takes — Team Long Tail\u2019s features vary far '
-    + 'more in size. Team Bare Export has none.\n\n'
+    + 'more in size. Team Bare Export has none. Features are aged against a threshold of '
+    + 'their own, set here to ' + DEMO_FEATURE_AGED + ' days, because a feature that has run '
+    + 'for a fortnight is not late.\n\n'
     + 'It is added alongside anything you already have, and you can delete it later.')) return;
 
   /* A first run auto-creates an empty "My team" (hydrateState), so loading the
@@ -17920,6 +18096,23 @@ function loadSample() {
      feature layer on, and the Settings box shows the word that did it rather
      than leaving somebody hunting for why their rows split. */
   if (!state.settings.featureTypes.length) state.settings.featureTypes = ['Feature'];
+  /* And a threshold to age those features against, for the same reason and by
+     the same rule — only where the reader has not answered already.
+
+     Thirty days is not a default this app holds, and nothing outside the demo
+     may read it as one: it is the number that fits THESE two boards, which is
+     the whole argument for the setting shipping empty. Team Healthy Flow's
+     features run to a median of about a fortnight and none of its in-flight
+     work is past thirty; Team Long Tail's run past forty and one of its open
+     features is well past — so the feature view tells the same story about the
+     same two teams the item view does, and it sits below Team Long Tail's own
+     85th percentile, which is where the ⓘ says to put it.
+
+     Set rather than left empty because leaving it empty would hide four things
+     — the aged chart, its tile, the threshold line on the age chart and the
+     All Teams column — to show one empty card. The empty card is one cleared
+     box away; the other four are not. */
+  if (state.settings.featureAgedDays == null) state.settings.featureAgedDays = DEMO_FEATURE_AGED;
 
   let landOn = null;
   DEMO_TEAMS.forEach(profile => {

@@ -517,14 +517,19 @@ page rather than a list of names you'd have to open one by one:
 
 | Team | What it's there to show |
 |---|---|
-| **Team Healthy Flow** | The healthy board. Carries issue keys (`KFR-…`), as Team Long Tail does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. It sets a **WIP limit of 6 and a 10-day target** and is comfortably inside both. Its work is broken down into **29 features** of a fairly even size — most take between 4 and 14 items — which is the comparison Team Long Tail's are read against. The baseline the other two read against. |
-| **Team Long Tail** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Team Healthy Flow's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. It sets **the same limit of 6 and the same 10-day target Team Healthy Flow does** and keeps neither — which is the point of the pair carrying identical figures. Its **20 features are bigger and far more varied** than Team Healthy Flow's, from 3 items to 26, and take about two and a half times as long end to end — the same finding as its cycle times, said about features. |
+| **Team Healthy Flow** | The healthy board. Carries issue keys (`KFR-…`), as Team Long Tail does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. It sets a **WIP limit of 6 and a 10-day target** and is comfortably inside both. Its work is broken down into **29 features** of a fairly even size — most take between 4 and 14 items — which is the comparison Team Long Tail's are read against. **None of its features is aged** against the demo's 30-day feature threshold either — the same clean reading its items give. The baseline the other two read against. |
+| **Team Long Tail** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Team Healthy Flow's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. It sets **the same limit of 6 and the same 10-day target Team Healthy Flow does** and keeps neither — which is the point of the pair carrying identical figures. Its **20 features are bigger and far more varied** than Team Healthy Flow's, from 3 items to 26, and take about two and a half times as long end to end — the same finding as its cycle times, said about features. **One of its three in-flight features is past the 30-day feature threshold** the demo sets, so the aged reading holds at both levels while Team Healthy Flow's stays clean. |
 | **Team Bare Export** | A newer team: four months of history, **no created dates, no issue keys, no Status column, no stage times and no features at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. It sets **no limit and no target**, which is how every browser starts and the only way the no-line, no-verdict face of those two is reachable. With no keys it has no parent keys either, so it is also the team the feature layer's empty face is reachable from. Also proves each team's data stands on its own. |
 
 Team Healthy Flow and Team Long Tail also arrive with the **project ids their own keys are
 built from** (`KFR` and `HRN`), so [pasting several teams at once](#pasting-several-teams-at-once)
 works straight off the demo rather than only after three ids are typed in — and Team Bare
 Export, with no keys, is the team the split's *takes nothing* line is about.
+
+The demo also sets the **feature ageing threshold to 30 days**, which the app itself ships
+empty on purpose. Thirty is not a default the app holds — it is the number that fits *these two
+boards*, which is the whole argument for shipping none — and the confirmation says so before
+anything is loaded. Clear the box in Settings to see the not-set face the app actually starts in.
 
 The demo also arrives with **four workflow stages set up** — Build, Review, Test and Deploy —
 because a status is only ever read when a stage already lists it, so the demo has
@@ -803,8 +808,15 @@ Everything the charts depend on, shared by all your teams:
 - **Work types that mean a feature** — comma separated, empty by default. Empty switches the
   [feature layer](#features-the-unit-above-a-work-item) off entirely. Matched the same way the
   defect type is: trimmed, case-folded and exact, never a partial match.
-- **Aged after (days)** — how long an item can sit in progress before the Aged work chart
-  counts it (`14` by default; worth keeping under a month).
+- **Count an in-progress item as aged after (days)** — how long an item can sit in progress
+  before the Aged work chart counts it (`14` by default; worth keeping under a month).
+- **Count an in-progress feature as aged after (days)** — the same question asked of features,
+  and **empty by default, because empty is off**. A fortnight is a convention about work items
+  and it does not survive the change of unit: read against features it flags a board that is
+  behaving normally. Nothing is assumed from the box beside it, and no multiple of it is
+  guessed. While it is empty the feature view's Aged work card and tile say so and show what
+  that team's finished features actually took, so the number you pick is measured against your
+  own board. See [The ageing threshold is per unit](#the-ageing-threshold-is-per-unit).
 - **Count working days only (Monday to Friday)** — off by default. On, cycle time, lead time
   and the ageing threshold skip weekends: an item started on a Friday and finished on the
   Monday takes one day, not three. It is one switch for all three, because a screen mixing the
@@ -888,7 +900,7 @@ in-progress item as aged after 10 days** in Settings — and they answer differe
 |---|---|---|
 | Looks at | Work that has **finished** | Work that has **not** |
 | Asks | Did 85% of what we delivered get through in N days? | How long can something sit open before we want to see it? |
-| Default | Not set | 14 |
+| Default | Not set | 14 for work items; **not set** for features |
 
 **The threshold usually wants to be the lower of the two, and that is the part worth acting on.**
 If your promise is ten days, an item that has already been open ten days has *missed* it — being
@@ -1660,6 +1672,34 @@ disagree — there is only one reading.
 | **The WIP limit and the cycle time target** | Both are promises a team made about its **board**. Three features in flight against a limit of six would read "inside it" — a reassurance about a promise nobody made — and a 54-day feature against a 10-day target would read "not met", a failure nobody signed up to. In the feature view a team has neither set, exactly as a team that has never set them. |
 | **The defect rate** | A defect is a *kind of work item*. Over features the chart would plot a flat zero and the tile would read 0.00% — a claim of perfect quality on a board that may have plenty of bugs. It is the one reading that would be actively false rather than merely less useful, so it is the one card the switch takes away, with a note saying why. |
 | **The date window on the progress table** | *Features still open* counts the whole feature. "How far along is this" is a question about the thing, not about a slice of the calendar, and a progress figure that moved when you changed the date picker would be unreadable. |
+
+**And one thing is replaced rather than dropped:** the ageing threshold. See below.
+
+#### The Ageing Threshold Is per Unit
+
+The item threshold defaults to 14 days. Read against features that is not merely less useful,
+it is wrong in the direction that matters: features routinely run for weeks, so a fortnight
+would flag an ordinary board as a failing one, and the Aged work chart — the one chart here
+that can warn you before a miss happens — would be a flat wall of red herrings.
+
+So **features are aged against a threshold of their own**, set in Settings, and it ships
+**empty**. Empty is a setting, not an unfinished one:
+
+| With no feature threshold set | With one set |
+|---|---|
+| The Aged work **card** keeps its place and explains itself, naming the setting and stating what that team's finished features actually took — the median and the 85th percentile — so the number you pick comes off your own board | The card plots the series, exactly as the item view does |
+| The Aged work **tile** reads **—**, never `0`. A zero would be the app reporting no ageing problem on a board it is not measuring | The tile counts, as of the newest date in the data |
+| The **Aged** column on All Teams reads **—** for every team | It counts per team |
+| The threshold line comes **off** the work-item-age chart, and no dot is drawn as aged | The line is drawn and the dots past it take the aged shape |
+
+Neither threshold ever reaches the other's view, in either direction, and both are pinned that
+way by a test. The item view is byte-for-byte what it always was.
+
+**No default ships** for the same reason the feature work-type list ships empty: a guess at
+somebody else's board is worse than a missing setting, because a filter or a threshold that
+silently matches the wrong thing reads as broken data rather than as a setting nobody set.
+Loading the demo does set one — 30 days — because it is a number chosen for those two
+particular boards, and it says so in the confirmation.
 
 The switch **disappears entirely** when no team has features. A control with one usable position
 invites a press that does nothing.
