@@ -1546,14 +1546,13 @@ main:focus { outline: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
-/* Charts opt out of animation in code, so this governs the toast's fade — and
-   any future addition that would otherwise have to remember to ask. */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important; scroll-behavior: auto !important;
-  }
-}
+/* prefers-reduced-motion is the theme pack's rule 15 as of 2026-08-26, so there
+   is nothing to declare here. It was hand-copied into five pages in THREE
+   spellings and missing from four others; `theme.css` carries the one form now
+   and every app gets it by linking the file. The pack's version is the `.01ms`
+   spelling deliberately — `transition: none` never fires `transitionend`.
+   A scroll asked for from SCRIPT still needs its own check: CSS cannot reach
+   `scrollTo({ behavior: 'smooth' })`. */
 
 /* Shown only on paper. There is exactly one of these — the line naming the team
    and the window — and it is built by the same render that writes the note under
