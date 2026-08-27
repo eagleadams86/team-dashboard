@@ -1998,8 +1998,8 @@ weeks from wherever the forecast starts and says so: this app has no PI calendar
 guessed at your increment's start date would be wrong for everybody whose increment did not begin
 the day their data ends.
 
-**The forecast, as figures** — a table under the two cards holding every answer above, so it can
-be copied or downloaded into a plan. The percentile rows are drawn as shaded rows beside a
+**The forecast, as figures** — a table at the foot of the tab, under the two cards, holding every
+answer above, so it can be copied or downloaded into a plan. The percentile rows are drawn as shaded rows beside a
 histogram, which is right on screen and cannot be exported; this is the same numbers in the one
 shape the CSV writer reads. It carries the **assumptions in the same file**, because a percentile
 that arrives in a spreadsheet without the scenario that produced it is a number nobody can check.

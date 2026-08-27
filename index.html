@@ -2469,6 +2469,28 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              screen has to meet the assumptions behind it too. -->
         <div class="note info" id="fcAssumptions" hidden></div>
 
+        <div class="tiles group" id="tilesForecast"></div>
+
+        <!-- Each card holds a chart AND the three answers under it, because the
+             answers are the output and the chart is the working. The rows carry
+             the same colour their part of the distribution is drawn in, so the
+             shading needs no legend of its own. -->
+        <div class="chart-card" id="cardForecastWhen">
+          <div class="chart-name" id="nameForecastWhen"></div>
+          <div class="chart-title" id="titleForecastWhen"></div>
+          <div class="chart-wrap"><canvas id="chartForecastWhen"></canvas></div>
+          <div class="forecast-rows" id="rowsForecastWhen"></div>
+          <div class="note info forecast-none" hidden></div>
+        </div>
+
+        <div class="chart-card" id="cardForecastHowMany">
+          <div class="chart-name" id="nameForecastHowMany"></div>
+          <div class="chart-title" id="titleForecastHowMany"></div>
+          <div class="chart-wrap"><canvas id="chartForecastHowMany"></canvas></div>
+          <div class="forecast-rows" id="rowsForecastHowMany"></div>
+          <div class="note info forecast-none" hidden></div>
+        </div>
+
         <!-- ── The forecast, as figures ─────────────────────────────────────
              The two cards above draw their answers as shaded rows beside a
              histogram, which is right on screen and cannot be exported: the CSV
@@ -2509,28 +2531,6 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <table class="data" id="scheduleTable"></table>
           </div>
           <p class="note info" id="scheduleNote"></p>
-        </div>
-
-        <div class="tiles group" id="tilesForecast"></div>
-
-        <!-- Each card holds a chart AND the three answers under it, because the
-             answers are the output and the chart is the working. The rows carry
-             the same colour their part of the distribution is drawn in, so the
-             shading needs no legend of its own. -->
-        <div class="chart-card" id="cardForecastWhen">
-          <div class="chart-name" id="nameForecastWhen"></div>
-          <div class="chart-title" id="titleForecastWhen"></div>
-          <div class="chart-wrap"><canvas id="chartForecastWhen"></canvas></div>
-          <div class="forecast-rows" id="rowsForecastWhen"></div>
-          <div class="note info forecast-none" hidden></div>
-        </div>
-
-        <div class="chart-card" id="cardForecastHowMany">
-          <div class="chart-name" id="nameForecastHowMany"></div>
-          <div class="chart-title" id="titleForecastHowMany"></div>
-          <div class="chart-wrap"><canvas id="chartForecastHowMany"></canvas></div>
-          <div class="forecast-rows" id="rowsForecastHowMany"></div>
-          <div class="note info forecast-none" hidden></div>
         </div>
       </div>
     </div>
