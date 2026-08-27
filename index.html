@@ -12248,7 +12248,18 @@ function renderScenario(d) {
      The boxes are written from the view whichever screen it is, for the reason
      every other box here is: a value hidden behind a lens or a tick has to be
      given back when the reader comes back to it. */
-  const planSize = !!d.planning && feature;
+  /* IN PLANNING IT RIDES WITH THE PACE TICK (2026-08-27, reported the day it
+     shipped). It had been showing whenever the feature lens was on, which left
+     the size boxes standing over an unticked pace — and there, with no history,
+     an unticked pace is no forecast at all, so the size is a number that cannot
+     reach an answer. That is the orphaned-control fault this block has had twice
+     before, arriving a third time. The one tick in the panel governs everything
+     under it, which is also how a reader reads a fieldset with one tick at the
+     top of it.
+
+     WITH DATA the two are independent, and must stay so: a board with history
+     already has a pace, so a typed size on its own is a whole answer. */
+  const planSize = !!d.planning && feature && tickOn;
   const sizeTick = !d.planning && feature;
   $('scSizeOnLine').hidden = !sizeTick;
   $('scSizeOn').checked = view.planSizeOn === true;
@@ -12314,14 +12325,18 @@ function renderScenario(d) {
      off `f.assumptions`: a ticked box with an empty range claims nothing and
      moves no number, so it raises no assumption — but it is still a thing the
      reader pressed, and a Reset that could not un-press it would be lying. */
-  $('scReset').disabled = scenarioIsUntouched(view.scenario)
-    /* The typed size is not in the scenario — it stands in for a measurement
-       rather than adjusting one — but where the tick is on screen and pressed it
-       is still a thing the reader pressed, and it is listed under the tiles as an
-       assumption. A Reset that could not un-press it would be lying in exactly
-       the way the note above describes. Where the tick is NOT on screen, neither
-       is anything for this button to undo. */
-    && !(sizeTick && view.planSizeOn === true);
+  /* THE TYPED SIZE COUNTS, both the tick and the two numbers behind it. It is
+     not in the scenario — it stands in for a measurement rather than adjusting
+     one — but the button clears it, so the button has to be live for it. The
+     NUMBERS on their own are enough: in planning nothing gates them, so a size
+     left in those boxes is driving the answer whatever the tick says, and a
+     greyed-out Reset over a live typed size is the button lying about its own
+     reach. Scoped to the feature lens, which is the only place either can be
+     reached. */
+  const sizeInPlay = feature
+    && (view.planSizeLo > 0 || view.planSizeHi > 0
+        || (sizeTick && view.planSizeOn === true));
+  $('scReset').disabled = scenarioIsUntouched(view.scenario) && !sizeInPlay;
 
   /* A shut block must never hide an adjustment. */
   const on = f.assumptions.length;
@@ -12644,9 +12659,24 @@ function renderForecast(d, scope, stale) {
         + 'estimate with the arithmetic done, not a measurement, and a typed range spreads '
         + 'less than real ' + d.bucketNounPlural + ' do. Paste or add real work items on Your '
         + 'Data and this becomes a forecast from what actually happened.'
-      : 'Nothing has been counted yet, so there is nothing to resample. Type how many '
-        + d.unitMany + ' you expect to finish per ' + d.bucketNoun + ' under '
-        + '\u201cAdjust for what you know\u201d below \u2014 that range is what these two '
+      /* IT HAS TO NAME THE TICK when the tick is off, because the boxes it is
+         sending the reader to are behind it. Pointing at a box that is not on
+         screen is the same dead end the size row was left in. */
+      : 'Nothing has been counted yet, so there is nothing to resample. '
+        + (f.scenario && f.scenario.estOn === true
+            ? 'Type how many '
+            : 'Tick \u201cUse a typed pace instead of this history\u201d under '
+              + '\u201cAdjust for what you know\u201d below and say how many ')
+        /* WORK ITEMS, not the lens's own unit. A feature answer is item
+           throughput converted through the size distribution, so the box asks
+           for work items and this sentence has been asking for features beside
+           it — the same slip that was fixed in three other places on
+           2026-08-26. */
+        + (d.unit === 'features' ? 'work items' : d.unitMany)
+        + ' you expect to finish per ' + d.bucketNoun
+        + (f.scenario && f.scenario.estOn === true
+            ? ' under \u201cAdjust for what you know\u201d below' : '')
+        + ' \u2014 that range is what these two '
         + 'answers will be dealt from, and until it is there they have nothing to say.';
   } else $('fcHint').textContent = 'Both answers assume the next few ' + d.bucketNounPlural
     + ' look like the ' + f.samples + ' whole ' + periodNoun(f.samples)
@@ -15971,12 +16001,17 @@ $('fcScenarioToggle').addEventListener('click', () => {
 
 $('scReset').addEventListener('click', () => {
   view.scenario = null;
-  /* The TICK goes; the two numbers stay. Un-ticking is what "no adjustments"
-     means here — the forecast goes back to the measured size — and the numbers
-     behind it are worth keeping so re-ticking does not cost a retype. Clearing
-     them would also be destructive in planning, where they are the only size the
-     screen has and no tick governs them. */
+  /* THE NUMBERS GO WITH THE TICK. This shipped keeping them, on the reasoning
+     that re-ticking should not cost a retype — which was wrong twice over, and
+     reported the same day. In planning nothing gates the two boxes, so a size
+     left behind goes on driving the answer while the button that claims to have
+     cleared everything has just said otherwise; and with data, "Reset to No
+     Adjustments" that leaves a typed range in a visible box is asking the reader
+     to believe two different things about the same screen. A convenience is not
+     worth a button that lies about its own reach. */
   view.planSizeOn = false;
+  view.planSizeLo = 0;
+  view.planSizeHi = 0;
   saveView();
   renderDashboard();
   window.toast('Scenario reset \u2014 this is the plain forecast again');

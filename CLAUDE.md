@@ -243,6 +243,15 @@ device-local. No `SCHEMA` bump; it DOES travel in a share link (see below).
   `f.sizesTyped` first**: the basis tile, the figures row, the `how` sentence and the schedule all
   claimed a measurement over a synthesised list until they did. Kept under the `planSize` key
   prefix on purpose — renaming would drop every stored value at `loadView`'s whitelist.
+  - **IN PLANNING THE SIZE ROW RIDES WITH THE PACE TICK** and there is no size tick at all. With no
+    history an unticked pace is no forecast, so a size box standing beside one is a number with
+    nowhere to go — the orphaned-control fault, third time. With data the two are independent and
+    must stay so. The planning hint names the TICK when the tick is off, rather than sending the
+    reader to a box that is not on screen.
+  - **Reset CLEARS `planSizeLo`/`planSizeHi` as well as `planSizeOn`**, and `scReset.disabled` reads
+    the two numbers, not only the tick. It shipped keeping them for one day and was reported the
+    same day: nothing gates those boxes in planning, so a kept size goes on forecasting under a
+    button that says it cleared everything.
 - **PARALLELISM CHANGES EACH FEATURE'S DATE AND NOT THE LAST ONE**, and the test asserts EXACT
   equality of the all-done 85th across 1, 3, 6 and 10 in parallel. Throughput is dealt per period
   whatever it is spent on, so under any work-conserving schedule the makespan is identical.

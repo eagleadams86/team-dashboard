@@ -315,8 +315,10 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    hand-rolled disclosure that ⓘ forced the block into. 2680 the same day again,
    for the schedule's third confidence column and the two typed rows lining up,
    and 2695 for the spinner throttle. 2740 on 2026-08-27 for the typed feature
-   size over a board that has a measured one. */
-const EXPECTED = 2740;
+   size over a board that has a measured one, and 2749 the same day for what
+   Charles found in it: the size row riding with the pace tick in planning, and
+   Reset actually emptying the two boxes. */
+const EXPECTED = 2749;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8386,6 +8388,33 @@ group('ARTs — the grouping, and the boundary it crosses');
        + 'snap back to items on a browser holding no features');
     ok(!pDoc.getElementById('scSizeWrap').hidden,
        'and asks the one thing it cannot measure: how many items a feature takes');
+
+    /* ── AND IT RIDES WITH THE PACE TICK HERE ─────────────────
+       Reported by Charles the day this shipped: the size boxes stood over an
+       unticked pace. In planning that is a number with nowhere to go — with no
+       history an unticked pace is no forecast at all — so the boxes were asking
+       for something that could not reach an answer, which is the orphaned-control
+       fault this block has had twice already. The one tick in the panel governs
+       everything under it, which is also how anyone reads a fieldset with a
+       single tick at the top.
+
+       WITH DATA the two stay independent, and the group below pins that: a board
+       with history already has a pace, so a typed size on its own is an answer. */
+    const paceTick = pDoc.getElementById('scEstOn');
+    const pressPace = (on) => { paceTick.checked = on;
+      paceTick.dispatchEvent(new win.Event('change', { bubbles: true }));
+      win.tdFlushForecast(); };
+    pressPace(false);
+    ok(pDoc.getElementById('scEstWrap').hidden, 'unticking the pace shuts its own boxes');
+    ok(pDoc.getElementById('scSizeWrap').hidden,
+       'and the size boxes go with them \u2014 with no history and no pace there is '
+       + 'no answer for a size to reach');
+    ok(/Tick \u201cUse a typed pace/.test(pDoc.getElementById('fcHint').textContent),
+       'and the card names the TICK rather than sending the reader to a box that '
+       + 'is no longer on screen',
+       pDoc.getElementById('fcHint').textContent.slice(0, 120));
+    pressPace(true);
+    ok(!pDoc.getElementById('scSizeWrap').hidden, 'ticking it brings both rows back');
     /* Emptied explicitly. The size rides in the view like everything else here,
        and a value left behind by an earlier sitting would answer this assertion
        for reasons that have nothing to do with it — see the note on the Reset
@@ -8700,9 +8729,35 @@ group('ARTs — the grouping, and the boundary it crosses');
     ok(!sDoc.getElementById('scSizeOn').checked, 'and it un-ticks it');
     ok(/6 finished features/.test(txt('tilesForecast')),
        'putting the measured size back', txt('tilesForecast').slice(-120));
-    is(sDoc.getElementById('scSizeLo').value, '20',
-       'the NUMBER survives, so re-ticking does not cost a retype — and because '
-       + 'clearing it would be destructive in planning, where no tick governs it');
+    /* AND THE NUMBERS WITH IT. This shipped keeping them, on the reasoning that
+       re-ticking should not cost a retype, and Charles reported the same day that
+       Reset left the two boxes full. It was wrong twice over: in planning nothing
+       gates those boxes, so a size left behind goes on driving the answer while
+       the button claims it cleared everything; and with data, a visible box still
+       holding a typed range under a button reading "Reset to No Adjustments" asks
+       the reader to believe two things about one screen. */
+    is(sDoc.getElementById('scSizeLo').value, '',
+       'and empties the two boxes — a convenience is not worth a button that lies '
+       + 'about its own reach');
+    is(sDoc.getElementById('scSizeHi').value, '', 'both of them');
+    is((v => [v.planSizeLo, v.planSizeHi, v.planSizeOn])(
+         JSON.parse(win.localStorage.getItem('td-view'))), [0, 0, false],
+       'in the view too, not only in the boxes');
+
+    /* THE BUTTON IS LIVE FOR THE NUMBERS ALONE, which is what makes the clearing
+       above reachable. A size sitting in those boxes with the tick off is still
+       the size planning forecasts from, so a greyed-out Reset over one would be
+       the same lie in a quieter shape. */
+    fire('scSizeOn', e => { e.checked = true; });
+    fire('scSizeLo', e => { e.value = '9'; });
+    fire('scSizeOn', e => { e.checked = false; });
+    ok(!sDoc.getElementById('scReset').disabled,
+       'Reset stays live over a typed size whose tick is off');
+    sDoc.getElementById('scReset').click();
+    win.tdFlushForecast();
+    is(sDoc.getElementById('scSizeLo').value, '', 'and clears it');
+    ok(sDoc.getElementById('scReset').disabled,
+       'and only then goes back to grey — there is nothing left to undo');
 
     /* ── The board it rescues ─────────────────────────────────
        Too few finished features to measure from is the case that sent Charles

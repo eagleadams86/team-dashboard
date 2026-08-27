@@ -2026,9 +2026,15 @@ The two typed-size boxes existed only in planning mode, which disappears the mom
 holds a row.
 
 So there is a second tick in **Typed, Not Measured**: *"Use a typed size instead of your finished
-features"*. It is on screen only on the **Features** lens and only where there is data — in
-planning there is no measurement to choose between and the boxes are simply there, and on the
+features"*. It is on screen only on the **Features** lens and only where there is data. On the
 **Work items** lens a feature size means nothing.
+
+**In planning there is no second tick, and the size boxes ride with the pace one.** There is no
+measurement there to choose between, so nothing needs choosing — but an unticked pace over no
+history is no forecast at all, which makes a size box standing beside it a number with nowhere to
+go. The one tick in that panel governs everything under it, which is also how anyone reads a
+fieldset with a single tick at the top. With data the two are independent and must stay so: a
+board with history already has a pace, so a typed size on its own is a whole answer.
 
 It had to be three things at once, and each is a way this could have gone wrong.
 
@@ -2056,11 +2062,13 @@ standing, exactly as a ticked pace with an empty range leaves the plain forecast
 - The **per-feature schedule** is built from the same sizes. The last row of that table and the
   tile above it must never disagree about how big a feature is.
 
-**Undoable.** Because it is listed as an assumption, **Reset to No Adjustments** reaches it — a
-Reset that could not un-press something it lists would be lying, which is the same test the
-typed-pace tick is held to. Reset un-ticks it and leaves the two numbers behind, so re-ticking
-does not cost a retype; clearing them would also be destructive in planning, where no tick governs
-them.
+**Undoable.** **Reset to No Adjustments** un-ticks it *and empties the two boxes*, and the button
+goes live for a typed size even when the tick is off. It shipped keeping the numbers, on the
+reasoning that re-ticking should not cost a retype, and that was wrong twice over: in planning
+nothing gates those boxes, so a size left behind goes on driving the answer while the button claims
+to have cleared everything — and with data, a visible box still holding a range under a button
+reading *Reset to No Adjustments* asks you to believe two things about one screen. A convenience
+is not worth a button that lies about its own reach.
 
 **The board it rescues.** Fewer than five finished features used to end the forecast with *widen
 the date window until it covers more finished features* — the one thing a reader with four
