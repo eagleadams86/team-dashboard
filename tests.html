@@ -308,7 +308,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    that drives the scenario block's own controls, which is why the tick could be
    dead on screen while every pure test about it passed, and then the lens filter
    the same day. */
-const EXPECTED = 2516;
+const EXPECTED = 2524;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -5939,6 +5939,34 @@ group('ARTs — the grouping, and the boundary it crosses');
        && lnDoc.getElementById('scParallelWrap').hidden,
        'while its three feature-only neighbours hide instead, since neither wording '
        + 'would be true of them');
+
+    /* ── WCAG 2.5.3: the name starts with the words on screen ──
+       An aria-label REPLACES the visible one, so a box reading "Items finished
+       per week" that announced itself as "Estimated pace, lowest" could not be
+       reached by a voice-control user saying what they could see. Found by the
+       2026-08-26 audit, which axe passed clean: its label-in-name rule only
+       covers elements whose visible text IS their content, so an input with a
+       separate label and its own aria-label goes straight past it.
+
+       Both of these labels MOVE with the lens, so the test moves with them —
+       comparing against a fixed string would pass on one lens and miss the
+       other, which is the drift the shared variable exists to stop. */
+    const nameStartsWithLabel = (labelId, loId, hiId) => {
+      const shown = lnDoc.getElementById(labelId).textContent.trim();
+      [[loId, 'lowest'], [hiId, 'highest']].forEach(([id, end]) => {
+        is(lnDoc.getElementById(id).getAttribute('aria-label'), shown + ', ' + end,
+           id + ' announces the words on screen, then which end it is');
+      });
+    };
+    setUnit('items');
+    nameStartsWithLabel('scGrowthLabel', 'scGrowthLo', 'scGrowthHi');
+    setUnit('features');
+    nameStartsWithLabel('scGrowthLabel', 'scGrowthLo', 'scGrowthHi');
+    ok(/feature/i.test(lnDoc.getElementById('scGrowthLo').getAttribute('aria-label')),
+       'and it really did move with the lens rather than being pinned to one wording');
+    nameStartsWithLabel('scEstRangeLabel', 'scEstLo', 'scEstHi');
+    setUnit('items');
+    nameStartsWithLabel('scEstRangeLabel', 'scEstLo', 'scEstHi');
 
     /* ── The claims, which is the half that actually misled ──── */
     setUnit('features');

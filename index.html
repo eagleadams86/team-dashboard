@@ -2372,10 +2372,10 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
               <label for="scExtraLo">Features discovered later (%)</label>
               <div class="row-pair">
                 <input type="number" id="scExtraLo" min="0" max="200" step="1"
-                       inputmode="numeric" aria-label="Extra features, lowest">
+                       inputmode="numeric" aria-label="Features discovered later (%), lowest">
                 <span class="to">to</span>
                 <input type="number" id="scExtraHi" min="0" max="200" step="1"
-                       inputmode="numeric" aria-label="Extra features, highest">
+                       inputmode="numeric" aria-label="Features discovered later (%), highest">
               </div>
             </div>
           </div>
@@ -2414,10 +2414,10 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
                 <label for="scSizeLo">Work items per feature</label>
                 <div class="row-pair">
                   <input type="number" id="scSizeLo" min="1" max="500" step="1"
-                         inputmode="numeric" aria-label="Items per feature, lowest">
+                         inputmode="numeric" aria-label="Work items per feature, lowest">
                   <span class="to">to</span>
                   <input type="number" id="scSizeHi" min="1" max="500" step="1"
-                         inputmode="numeric" aria-label="Items per feature, highest">
+                         inputmode="numeric" aria-label="Work items per feature, highest">
                 </div>
               </div>
               <p class="hint" style="margin:0">Everywhere else this is measured from your
@@ -11786,8 +11786,17 @@ function renderScenario(d) {
      distribution, so the pace being typed is a pace of items. This box has been
      asking for "Features finished per week" and feeding the number straight into
      the item sampler — the same mistake the assumption sentence was making. */
-  $('scEstRangeLabel').textContent = (feature ? 'Work items' : d.Units)
-    + ' finished per ' + d.bucketNoun;
+  const paceLabel = (feature ? 'Work items' : d.Units) + ' finished per ' + d.bucketNoun;
+  $('scEstRangeLabel').textContent = paceLabel;
+  /* WCAG 2.5.3 Label in Name: an aria-label REPLACES the visible one, so a box
+     reading "Items finished per week" that announces itself as "Estimated pace,
+     lowest" cannot be reached by a voice-control user saying what they can see.
+     The name starts with the words on screen and adds only which end it is —
+     the rule the WIP-limit boxes in the Teams dialog already follow. Set from
+     the same string as the label, because both of these move with the lens and
+     a second copy would drift the moment one did. */
+  $('scEstLo').setAttribute('aria-label', paceLabel + ', lowest');
+  $('scEstHi').setAttribute('aria-label', paceLabel + ', highest');
   /* Scope growth is the one knob in this block that BOTH lenses read, so it is
      the one that has to be relabelled rather than hidden. Its neighbours below
      are feature-only and hide instead. */
@@ -11801,9 +11810,12 @@ function renderScenario(d) {
      exists, and it runs on every change to it. Assigning the value it already
      has fires no toggle, so this cannot fight the reader's own press. */
   $('fcScenario').open = view.scenarioOpen === true;
-  $('scGrowthLabel').textContent = feature
+  const growthLabel = feature
     ? 'Each known feature grows by (%)'
     : 'The work you counted grows by (%)';
+  $('scGrowthLabel').textContent = growthLabel;
+  $('scGrowthLo').setAttribute('aria-label', growthLabel + ', lowest');
+  $('scGrowthHi').setAttribute('aria-label', growthLabel + ', highest');
   $('scUnavailableLabel').textContent = d.bucketNounPlural.charAt(0).toUpperCase()
     + d.bucketNounPlural.slice(1) + ' nobody is delivering';
 
