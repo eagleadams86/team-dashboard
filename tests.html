@@ -314,8 +314,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    the block's own ⓘ, the state of its Reset button, and the two halves of the
    hand-rolled disclosure that ⓘ forced the block into. 2680 the same day again,
    for the schedule's third confidence column and the two typed rows lining up,
-   and 2695 for the spinner throttle. */
-const EXPECTED = 2695;
+   and 2695 for the spinner throttle. 2740 on 2026-08-27 for the typed feature
+   size over a board that has a measured one. */
+const EXPECTED = 2740;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8503,6 +8504,253 @@ group('ARTs — the grouping, and the boundary it crosses');
        'and with twelve whole weeks behind it the data says off');
   }
 
+
+  /* ══════════════════════════════════════════════════════════
+     A TYPED FEATURE SIZE, over a board that HAS a measured one (2026-08-27).
+     Asked for by Charles: "in team-dashboard, I don't see a way to change how
+     many work items per feature I want to forecast when I have data in the app."
+     He was right that there wasn't one. The two boxes existed only in planning,
+     where there is nothing recorded to measure; with data the app measured the
+     size off finished features and refused to be told otherwise, and the only
+     knobs that could move it were percentages laid on top of the measurement.
+
+     What is pinned here is the SHAPE of the answer rather than the feature. It
+     had to be three things at once, and each of them is a way this could have
+     shipped wrong: opt-in (a size nobody asked to type must never displace a
+     measurement), loud (once it does, every sentence that was claiming a
+     measurement has to stop), and undoable (it is listed as an assumption, so
+     Reset has to reach it or the block is lying about what it can undo).
+     ══════════════════════════════════════════════════════════ */
+  group('the typed feature size — with data behind it');
+  {
+    /* ── The pure half ────────────────────────────────────────
+       The range is normalised ONCE and quoted by four sentences, so a clamp that
+       the printed range does not follow is a card stating a size the forecast
+       never used. */
+    is(TD.sizesFromRange(null), [], 'no range is no sizes');
+    is(TD.sizesFromRange({ lo: 5, hi: 5 }).slice(0, 3), [5, 5, 5],
+       'a single size repeats — a uniform set repeated is the same distribution, '
+       + 'and it clears the floor without lowering it');
+    ok(TD.sizesFromRange({ lo: 5, hi: 6 }).length >= TD.FEATURE_MIN_SIZES,
+       'and a two-wide range is padded to the floor too',
+       String(TD.sizesFromRange({ lo: 5, hi: 6 }).length));
+    is([...new Set(TD.sizesFromRange({ lo: 5, hi: 8 }))].sort((a, b) => a - b), [5, 6, 7, 8],
+       'a range is every size in it and nothing else — "I have no reason to '
+       + 'prefer one" is a uniform belief');
+    is(TD.sizeMedianOf([]), null, 'an empty list has no median');
+    is(TD.sizeMedianOf([9, 1, 5]), 5, 'and a median is taken over the sorted list');
+
+    /* THE ASSUMPTION IS RAISED BY THE REPLACEMENT, not by the typing. Planning
+       types a size too, and a line there reading "instead of measured off 0
+       finished features" would be pointing at an absence as though it were a
+       loss. `replacedSizes` is what tells the two apart. */
+    const sizeAssume = (typedSize, replacedSizes) =>
+      TD.featureAssumptions(TD.scenarioFrom(null), { typedSize, replacedSizes })
+        .filter(a => a.key === 'size');
+    is(sizeAssume(null, [1, 2, 3, 4, 5]).length, 0, 'a measured size asserts nothing');
+    is(sizeAssume({ lo: 5, hi: 10 }, null).length, 0,
+       'and neither does a typed one with no measurement behind it — that is planning');
+    is(sizeAssume({ lo: 5, hi: 10 }, [1, 2, 3, 4, 5]).length, 1,
+       'it is the two together that make a claim worth listing');
+    ok(/median of 3/.test(sizeAssume({ lo: 5, hi: 10 }, [1, 3, 3, 4, 9])[0].wording),
+       'and the claim says what was given up, not only what was chosen',
+       sizeAssume({ lo: 5, hi: 10 }, [1, 3, 3, 4, 9])[0].wording);
+
+    /* ── The board ────────────────────────────────────────────
+       Six finished features with three completed children each: the measured
+       distribution clears the floor at a median of 3, which is small enough that
+       a typed 20-30 could never be mistaken for it. Twelve whole weeks of item
+       throughput underneath, so a pace floor is never what fails here. */
+    const day = (n) => new Date(Date.UTC(2015, 0, n)).toISOString().slice(0, 10);
+    const sizedBoard = () => {
+      const features = [], rows = [];
+      for (let k = 1; k <= 6; k++) {
+        features.push({ c: '2015-02-2' + k, s: '2015-01-05', t: 'Feature', i: 'F-' + k });
+        for (let j = 1; j <= 3; j++)
+          rows.push({ c: '2015-01-0' + j, s: '2015-01-01', t: 'Story',
+                      i: 'S-' + k + '-' + j, p: 'F-' + k });
+      }
+      for (let w = 0; w < 12; w++) for (let n = 0; n < 2; n++)
+        rows.push({ c: day(5 + w * 7 + n), s: '2015-01-01', t: 'Story',
+                    i: 'P-' + w + '-' + n });
+      return { teams: [{ id: 'ts1', name: 'Sized', rows, features }],
+               settings: { featureTypes: ['Feature'] } };
+    };
+
+    const sDoc = win.document;
+    const fire = (id, fn) => { const e = sDoc.getElementById(id); fn(e);
+      e.dispatchEvent(new win.Event('change', { bubbles: true })); win.tdFlushForecast(); };
+    const setUnit = (v) => fire('unitSel', e => { e.value = v; });
+    const txt = (id) => sDoc.getElementById(id).textContent.replace(/\s+/g, ' ').trim();
+
+    plant(sizedBoard());
+    win.selectTab('dashboard');
+    /* Driven through the app's own controls rather than written into `td-view`
+       and reloaded: reloading the frame would hand every group after this one a
+       new window and a stale `TD`. The window has to reach the whole fixture,
+       and the two boxes have to start empty — a size left behind by an earlier
+       sitting would answer half of these assertions for reasons that have
+       nothing to do with them, which is the baseline the typed-pace group takes
+       for the same reason. */
+    const keptMonths = sDoc.getElementById('monthsSel').value;
+    fire('monthsSel', e => { e.value = 'all'; });
+    fire('scSizeOn', e => { e.checked = false; });
+    fire('scSizeLo', e => { e.value = ''; });
+    fire('scSizeHi', e => { e.value = ''; });
+    /* And the SCENARIO with them, both ways round. The two pace boxes are emptied
+       BY HAND before the Reset rather than left to it: a value an earlier group
+       typed sits in the DOM until a render rewrites it, and every change inside
+       this block reads all of its boxes — so one press of the size tick copies a
+       stale 4-to-7 pace straight back into the scenario the Reset just cleared.
+       This group's first draft failed exactly there, reading the planning group's
+       pace back as an assumption about feature size. */
+    fire('scEstLo', e => { e.value = ''; });
+    fire('scEstHi', e => { e.value = ''; });
+    sDoc.getElementById('scReset').click();
+    win.tdFlushForecast();
+    setUnit('features');
+    is(txt('fcAssumptions'), '',
+       'the board starts plain, or every assertion below is reading another '
+       + 'group\u2019s leftovers \u2014 and the block is EMPTIED when it has '
+       + 'nothing to say, not merely hidden holding the last one');
+    ok(/6 finished features/.test(txt('tilesForecast')),
+       'the board really is measuring its own feature size, or none of this is a replacement',
+       txt('tilesForecast').slice(-120));
+
+    /* ── Opt-in ───────────────────────────────────────────────
+       The tick is on screen with data and the boxes are not, which is the whole
+       difference from planning: there IS a measurement here, so replacing it is
+       something the reader has to say rather than something a blank box does. */
+    ok(!sDoc.getElementById('scSizeOnLine').hidden,
+       'with data on the feature lens the tick is offered — this is the ask');
+    ok(sDoc.getElementById('scSizeWrap').hidden,
+       'and the boxes stay shut behind it until it is pressed');
+    ok(/measured off your finished features/.test(txt('scSizeWhy')),
+       'the paragraph beside them names what a typed size would displace',
+       txt('scSizeWhy').slice(0, 80));
+
+    setUnit('items');
+    ok(sDoc.getElementById('scSizeOnLine').hidden,
+       'the item lens is offered neither — a feature size means nothing there, '
+       + 'and this block has had the orphaned-control complaint twice');
+    setUnit('features');
+
+    /* A TICKED BOX WITH NOTHING IN IT IS STILL THE MEASURED FORECAST. The same
+       two-part test the typed pace makes: ticking must not silently empty the
+       size distribution and stop the card answering. */
+    fire('scSizeOn', e => { e.checked = true; });
+    ok(!sDoc.getElementById('scSizeWrap').hidden, 'the tick opens the boxes');
+    ok(/6 finished features/.test(txt('tilesForecast')),
+       'but on its own it changes nothing — an empty range leaves the measurement '
+       + 'standing rather than emptying it',
+       txt('tilesForecast').slice(-120));
+    ok(!/Feature size/.test(txt('fcAssumptions')),
+       'and claims nothing about the size, because it moved nothing',
+       txt('fcAssumptions'));
+
+    /* ── Loud ─────────────────────────────────────────────────
+       Every sentence that was reporting a measurement has to stop. Each of these
+       was, before this shipped, a claim about finished features over a list the
+       app had synthesised from two typed numbers. */
+    fire('scSizeLo', e => { e.value = '20'; });
+    fire('scSizeHi', e => { e.value = '30'; });
+    ok(!/finished feature/.test(txt('tilesForecast')),
+       'once a size is typed the basis tile stops counting finished features',
+       txt('tilesForecast').slice(-140));
+    ok(/20–30 items a feature/.test(txt('tilesForecast'))
+       && /typed, not measured/.test(txt('tilesForecast')),
+       'and says the range and that nobody measured it', txt('tilesForecast').slice(-140));
+    ok(/how many of them you typed a feature takes/.test(txt('fcHint')),
+       'the sentence under the tiles stops crediting the finished features too');
+    ok(/Feature size/.test(txt('fcAssumptions'))
+       && /instead of measured/.test(txt('fcAssumptions')),
+       'it is listed where every other departure from the plain forecast is listed',
+       txt('fcAssumptions'));
+    ok(/median of 3/.test(txt('fcAssumptions')),
+       'naming what it displaced, so the reader can weigh the trade rather than '
+       + 'only see the choice');
+    ok(/1 setting on/.test(txt('fcScenarioSummary')),
+       'and it is counted in the summary, so a shut block cannot hide it',
+       txt('fcScenarioSummary'));
+    ok(/typed, not measured/.test(txt('forecastFiguresTable'))
+       && /20 to 30 items a feature/.test(txt('forecastFiguresTable')),
+       'the export carries it, because a percentile that leaves this app without '
+       + 'its basis is a number nobody can check');
+    ok(/6 finished features at a median of 3/.test(txt('forecastFiguresTable')),
+       'and carries what was given up in the same row — a spreadsheet reading '
+       + 'only "typed" invites the assumption there was nothing to type over');
+
+    /* It reaches the ANSWER, not only the sentences about it. Twenty to thirty
+       items a feature against a measured three is roughly seven times the work,
+       so the date has to move a long way out. */
+    const dateAt = () => (txt('tilesForecast').match(/\d{4}/) || [])[0];
+    ok(dateAt(), 'there is still an answer', txt('tilesForecast').slice(0, 80));
+    ok(/Feature 1/.test(txt('scheduleTable')),
+       'and the per-feature schedule is built from the same sizes rather than the '
+       + 'measured ones — the last row of that table and the tile above it must '
+       + 'never disagree about how big a feature is');
+
+    /* ── Undoable ─────────────────────────────────────────────
+       It is listed as an assumption, so a Reset that could not un-press it would
+       be lying in exactly the way the note on that button describes. */
+    ok(!sDoc.getElementById('scReset').disabled,
+       'Reset is live while a typed size is standing');
+    sDoc.getElementById('scReset').click();
+    win.tdFlushForecast();
+    ok(!sDoc.getElementById('scSizeOn').checked, 'and it un-ticks it');
+    ok(/6 finished features/.test(txt('tilesForecast')),
+       'putting the measured size back', txt('tilesForecast').slice(-120));
+    is(sDoc.getElementById('scSizeLo').value, '20',
+       'the NUMBER survives, so re-ticking does not cost a retype — and because '
+       + 'clearing it would be destructive in planning, where no tick governs it');
+
+    /* ── The board it rescues ─────────────────────────────────
+       Too few finished features to measure from is the case that sent Charles
+       looking for this control. It used to answer "widen the date window", which
+       is the one thing a reader with four finished features and a plan to argue
+       about on Thursday cannot do. */
+    plant({ teams: [{ id: 'ts2', name: 'Thin',
+      rows: [{ c: '2015-01-02', s: '2015-01-01', t: 'Story', i: 'S-1', p: 'F-1' },
+             { c: '2015-01-03', s: '2015-01-01', t: 'Story', i: 'S-2', p: 'F-1' }]
+        .concat(Array.from({ length: 24 }, (_, n) => ({ c: day(5 + (n >> 1) * 7 + (n & 1)),
+          s: '2015-01-01', t: 'Story', i: 'P-' + n }))),
+      features: [{ c: '2015-02-21', s: '2015-01-05', t: 'Feature', i: 'F-1' }] }],
+      settings: { featureTypes: ['Feature'] } });
+    win.renderAll();
+    setUnit('features');
+    const excuse = () => [...sDoc.querySelectorAll('.forecast-none')]
+      .map(n => n.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean)[0] || '';
+    ok(/Widen the date window/.test(excuse()),
+       'a thin board still offers the measurement first — ten finished features '
+       + 'are a better guess about the eleventh than anybody’s estimate');
+    ok(/Use a typed size instead of your finished features/.test(excuse()),
+       'and now names the second way out, in the words on the control',
+       excuse().slice(-120));
+    fire('scSizeOn', e => { e.checked = true; });
+    fire('scSizeLo', e => { e.value = ''; });
+    fire('scSizeHi', e => { e.value = ''; });
+    ok(/waiting for a size below/.test(txt('tilesForecast')),
+       'ticked and empty, the tile points at the box rather than at the history it '
+       + 'cannot conjure — the same courtesy the typed pace gets',
+       txt('tilesForecast').slice(0, 90));
+    ok(!/Widen the date window/.test(excuse()),
+       'and the card stops offering a window the reader has already declined');
+    fire('scSizeLo', e => { e.value = '8'; });
+    fire('scSizeHi', e => { e.value = '12'; });
+    ok(/\d{4}/.test(txt('tilesForecast')),
+       'with a size typed, a board that could not be forecast at all answers',
+       txt('tilesForecast').slice(0, 110));
+    ok(/nothing finished to measure|1 finished feature/.test(txt('forecastFiguresTable')),
+       'and still says how little was there to replace');
+
+    /* Back to a clean slate for every group after this one — the view keys this
+       group set, put back the way it found them. */
+    fire('scSizeOn', e => { e.checked = false; });
+    fire('scSizeLo', e => { e.value = ''; });
+    fire('scSizeHi', e => { e.value = ''; });
+    setUnit('items');
+    fire('monthsSel', e => { e.value = keptMonths; });
+  }
 
   plant({ teams: [{ id: 'z1', name: 'Back',
     rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] }], settings: {} });

@@ -230,6 +230,19 @@ device-local. No `SCHEMA` bump; it DOES travel in a share link (see below).
   stays the DEFAULT outcome rather than the only one — that is the whole point of the control. The
   card states the weakness rather than fudging it: a typed range has no quiet weeks and no spikes,
   so it spreads LESS than real periods do.
+- **A typed FEATURE SIZE replaces the measured one, and only where a measurement exists**
+  (2026-08-27). `view.planSizeOn` + `typedFeatureSizeRange()`; both are needed, so a ticked box
+  with no number leaves the measurement standing — the same two-part test `scenarioPaceOn` makes,
+  and for the same reason. **Off by default and deliberately NOT three-state like the pace tick:**
+  a default that followed the data would swap a measurement for a guess on somebody else's board
+  without their saying so. The tick is on screen only with data on the feature lens; planning has
+  no tick because it has no measurement, and the item lens has neither. The **join-rate floor goes
+  null with it** — that guard protects a measured distribution and there is none left. It raises an
+  assumption (so it is counted, listed and reachable by Reset) ONLY when `replacedSizes` is passed,
+  which is what tells the data path from planning. **Anything that reports the basis must check
+  `f.sizesTyped` first**: the basis tile, the figures row, the `how` sentence and the schedule all
+  claimed a measurement over a synthesised list until they did. Kept under the `planSize` key
+  prefix on purpose — renaming would drop every stored value at `loadView`'s whitelist.
 - **PARALLELISM CHANGES EACH FEATURE'S DATE AND NOT THE LAST ONE**, and the test asserts EXACT
   equality of the all-done 85th across 1, 3, 6 and 10 in parallel. Throughput is dealt per period
   whatever it is spent on, so under any work-conserving schedule the makespan is identical.

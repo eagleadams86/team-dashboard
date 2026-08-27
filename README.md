@@ -1920,6 +1920,7 @@ ran* — not an equivalent one, the same code — so the plain forecast is the p
 | **Features worked at once** | See below — it changes each feature's date and not the last one. |
 | **Periods nobody is delivering** | A shutdown, a conference, a holiday fortnight. A plain number. |
 | **Use a typed pace instead of this history** | For a team with no history to resample. **Ticked by default where there is none**, unticked where there is — see below. |
+| **Use a typed size instead of your finished features** | Feature lens only, and only where there is a measurement to replace. Off by default — see [A feature size you type, over a board that measures one](#a-feature-size-you-type-over-a-board-that-measures-one). |
 
 **All six knobs sit on one line where there is room for them, and three across where there is
 not.** Six fields come to 1168px of content plus their gaps at the widest labels the app can
@@ -2013,6 +2014,68 @@ plain one, claims nothing under the tiles, and is refused by the same eight-peri
 before. This is worth stating because it used to be wrong the other way: the box un-ticked itself
 whenever the range was empty, and since the range is hidden until the box is ticked, the control
 could never be switched on at all.
+
+### A Feature Size You Type, Over a Board That Measures One
+
+A feature forecast is item throughput converted through the sizes of your **finished** features.
+Where those sizes can be measured they should be: ten finished features are a better guess about
+the eleventh than anybody's estimate of it. But sometimes you are holding something the history
+is not — the last ten were a migration, the next batch is bigger, or too few have finished to
+measure at all — and until 2026-08-27 the app's only answer to that was *widen the date window*.
+The two typed-size boxes existed only in planning mode, which disappears the moment any team
+holds a row.
+
+So there is a second tick in **Typed, Not Measured**: *"Use a typed size instead of your finished
+features"*. It is on screen only on the **Features** lens and only where there is data — in
+planning there is no measurement to choose between and the boxes are simply there, and on the
+**Work items** lens a feature size means nothing.
+
+It had to be three things at once, and each is a way this could have gone wrong.
+
+**Opt-in.** Off by default, and deliberately not three-state like the typed-pace tick. That one
+has a default that follows your data; this one must not, because defaulting a typed size on
+wherever the finished features look thin would swap a measurement for a guess on somebody else's
+board without their ever saying so. **Ticking it and typing a range are two separate steps**, and
+only the second changes a figure — a ticked box with empty boxes leaves the measured size
+standing, exactly as a ticked pace with an empty range leaves the plain forecast standing.
+
+**Loud.** Once a size is typed, every sentence that was reporting a measurement stops:
+
+- The basis tile reads *"Built from 20–30 items a feature — typed, not measured"* rather than
+  *"Built from 6 finished features, sized at a median of 3 items each"*.
+- The line under the tiles says the answer is worked out from *how many of them you typed a
+  feature takes*.
+- It is listed **first** in *This is not the plain forecast* — ahead of the scope knobs, because a
+  reader scanning that list should meet the largest departure from their data at the top — and it
+  is counted in the summary, so a folded block cannot hide it.
+- The exported figures table carries it **and what it displaced**: *"typed, not measured · 20 to
+  30 items a feature, over 6 finished features at a median of 3"*. A percentile that arrives in a
+  spreadsheet saying only *typed* invites the reader on the other end to assume there was nothing
+  to type over. There usually was, and how much of it there was is the whole of whether the typed
+  number was a good idea.
+- The **per-feature schedule** is built from the same sizes. The last row of that table and the
+  tile above it must never disagree about how big a feature is.
+
+**Undoable.** Because it is listed as an assumption, **Reset to No Adjustments** reaches it — a
+Reset that could not un-press something it lists would be lying, which is the same test the
+typed-pace tick is held to. Reset un-ticks it and leaves the two numbers behind, so re-ticking
+does not cost a retype; clearing them would also be destructive in planning, where no tick governs
+them.
+
+**The board it rescues.** Fewer than five finished features used to end the forecast with *widen
+the date window until it covers more finished features* — the one thing a reader with four
+finished features and a planning conversation on Thursday cannot do. That message now names both
+ways out, and with the tick on but no number typed the tiles read *waiting for a size below*
+rather than *not enough history*, pointing at the box that is open rather than at history the
+reader has no way to conjure.
+
+**The join-rate floor does not apply to a typed size.** That guard exists to stop a half-filled
+Parent key column being read as a size distribution; under a typed size there is no measured
+distribution left for it to guard.
+
+**What it is not.** The two knobs that could already move feature size — *Each known feature grows
+by* and *How well understood are they* — are percentages laid **on top of** the measurement, and
+they still are. This is the size itself.
 
 ### What Pace Would It Take?
 

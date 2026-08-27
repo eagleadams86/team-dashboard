@@ -739,6 +739,13 @@ select { cursor: pointer; }
    content does. It DOES grow when the tick reveals the boxes — that is a reveal
    making room for what appeared, not a layout shifting under anybody. */
 .formpanel.sc-pace { margin-top: var(--sp-7); width: max-content; max-width: 100%; }
+/* TWO TICKS NOW, not one (2026-08-27). The size tick appears only where there is
+   a measurement for it to replace — with data, on the feature lens — so this panel
+   holds one control on most screens and two on that one. They stack in the order
+   their boxes do below, and the gap between them is the small one: they are two
+   of the same kind of thing, and the space that separates a tick from the row it
+   opens is the grid's own, further down. */
+.formpanel.sc-pace .checkline + .checkline { margin-top: var(--sp-4); }
 /* ── The one control that undoes the others ──────────────────────────────────
    A rule above it, so it is not read as one more field, and the disabled state
    is the honest one: `renderScenario` turns it on exactly when the stored
@@ -2632,14 +2639,21 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
                Everything else here adjusts your data; this replaces it. -->
           <fieldset class="formpanel sc-pace">
             <legend>Typed, Not Measured</legend>
+            <!-- THE SIZE TICK COMES FIRST, because its row does. Two ticks and
+                 two rows in the same order is the whole of the mapping between
+                 them; ordered any other way the reader has to work it out.
+
+                 It is on screen only where there is a MEASUREMENT for it to
+                 replace — with data, on the feature lens. In planning there is
+                 nothing recorded to measure, so the boxes below are the only
+                 answer the screen has and no tick gates them; on the item lens a
+                 feature size means nothing at all. -->
+            <label class="checkline" for="scSizeOn" id="scSizeOnLine" hidden>
+              <input type="checkbox" id="scSizeOn"><span>Use a typed size instead of your finished features</span>
+            </label>
             <label class="checkline" for="scEstOn">
               <input type="checkbox" id="scEstOn"><span id="scEstLabel">Use a typed pace instead of this history</span>
             </label>
-            <!-- Planning only, and only over features: the size of a feature is
-                 MEASURED everywhere else in this app, off finished features and
-                 their items. With nothing recorded there is nothing to measure,
-                 so the reader states it — the same trade the typed pace makes one
-                 row up, and stated in the same shape. -->
           <!-- ONE grid over BOTH rows (2026-08-27). They were a grid each, so each
                sized its own `max-content` label column — "Work items per feature"
                against "Work items finished per week" — and in planning, where
@@ -2660,9 +2674,13 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
                          inputmode="numeric" aria-label="Work items per feature, highest">
                 </div>
               </div>
-              <p class="hint" style="margin:0">Everywhere else this is measured from your
-                finished features. There are none yet, so say what you expect and the same
-                model runs over it. <strong>A feature counts only when it is finished</strong>
+              <!-- The first sentence is the one that changes: in planning it says
+                   there is nothing to measure, and with data it says what is being
+                   thrown away. Set from renderScenario so the two cannot drift into
+                   two different claims about the same boxes. Everything after it is
+                   true either way. -->
+              <p class="hint" style="margin:0"><span id="scSizeWhy"></span>
+                <strong>A feature counts only when it is finished</strong>
                 &mdash; a period whose pace runs out halfway through one has delivered the
                 ones before it, which is why a wider range here moves the answer more than
                 it looks like it should.</p>
@@ -5894,6 +5912,71 @@ function forecastFeaturesIn(samples, sizes, periods, trials) {
    `reason` names WHICH floor failed rather than saying "not enough data", since
    the three have three different fixes: widen the window, paste more finished
    features, or fill in the Parent key column. */
+/* ── The typed feature size ──────────────────────────────────────────────────
+   UP HERE, not down beside planningDerive where these started. The export block
+   the suite reads names them, and it runs at module-eval time: a `const` below it
+   is in the temporal dead zone, which takes the whole script down on load. */
+/* THE RANGE, normalised once, because four sentences now quote it. A typed 900
+   that the clamp pinned to 500 has to be PRINTED as 500 too, or the figures card
+   states a size the forecast never used. Null means "nothing typed". */
+function typedFeatureSizeRange() {
+  const lo = Math.max(0, Math.round(Number(view.planSizeLo)) || 0);
+  if (!(lo > 0)) return null;
+  const hi = Math.min(FORECAST_MAX_ITEMS, Math.max(lo, Math.round(Number(view.planSizeHi)) || lo));
+  return { lo, hi };
+}
+
+function sizesFromRange(r) {
+  if (!r) return [];
+  const base = [];
+  for (let n = r.lo; n <= r.hi; n++) base.push(n);
+  const out = [];
+  while (out.length < FEATURE_MIN_SIZES) out.push(...base);
+  return out;
+}
+
+/* PLANNING: no tick, because there is no measurement to choose between. The
+   boxes are the only thing on the screen that can answer, so they always count. */
+const planningSizes = () => sizesFromRange(typedFeatureSizeRange());
+
+/* WITH DATA: a tick AND a number, which is the same two-part test scenarioPaceOn
+   makes and for the same reason. A ticked box with nothing in it must leave the
+   measurement standing — the alternative is that ticking the box silently empties
+   the size distribution and the card stops answering, which reads as the tick
+   having broken the forecast rather than as a field waiting to be filled. */
+const typedFeatureSizeOn = () => view.planSizeOn === true && !!typedFeatureSizeRange();
+
+/* The median of a size list. Was written inline in featureForecastOf; there are
+   two lists to take it of now — the one the forecast used and the one a typed
+   size replaced — and they must be taken the same way. */
+const sizeMedianOf = (list) => (Array.isArray(list) && list.length)
+  ? list.slice().sort((a, b) => a - b)[Math.floor((list.length - 1) / 2)] : null;
+
+/* The scenario's assumptions, plus the one thing on this card that is not a
+   scenario knob at all. A typed size REPLACES a measurement rather than adjusting
+   it, so it belongs in the list under the tiles for exactly the reason that list
+   exists — but only where there was a measurement to replace. In planning every
+   number on the screen is typed and the card says so in its own sentence; a line
+   there reading "instead of measured off 0 finished features" would be pointing
+   at an absence as though it were a loss.
+
+   FIRST in the list, ahead of the knobs: a reader scanning "this is not the plain
+   forecast" should meet the largest departure from their data at the top. */
+function featureAssumptions(sc, o) {
+  const out = scenarioAssumptions(sc, 'features', 'work items');
+  if (!o.typedSize || !Array.isArray(o.replacedSizes)) return out;
+  const t = o.typedSize;
+  const range = t.lo === t.hi ? String(t.lo) : t.lo + '\u2013' + t.hi;
+  const words = t.lo === t.hi ? String(t.lo) : t.lo + ' to ' + t.hi;
+  const n = o.replacedSizes.length;
+  out.unshift({ key: 'size', label: 'Feature size', value: range,
+    wording: 'each feature typed at ' + words + ' work items instead of measured \u2014 '
+      + (n ? 'your ' + n + ' finished feature' + (n === 1 ? '' : 's') + ' took a median of '
+             + sizeMedianOf(o.replacedSizes) + ' each'
+           : 'nothing finished here to measure') });
+  return out;
+}
+
 function featureForecastOf(o) {
   const sizes = o.sizes || [], samples = o.itemSamples || [];
   const wanted = Math.max(1, Math.min(Math.round(o.featureCount) || 1, FORECAST_MAX_FEATURES));
@@ -5912,7 +5995,10 @@ function featureForecastOf(o) {
     : (!scenarioPaceOn(sc) && !samples.some(v => v > 0)) ? 'no-throughput'
     /* Checked BEFORE the size count, because a thin join is why the size count
        is low — reporting the symptom would send the reader to find more
-       finished features when the column they need is missing. */
+       finished features when the column they need is missing. NOT REACHED under
+       a typed size: the join rate is a fact about how completely the Parent key
+       column was filled in, and a size nobody measured does not depend on it.
+       Its caller passes a null rate there rather than this asking. */
     : (o.joinRate != null && o.joinRate < FEATURE_JOIN_MIN) ? 'thin-join'
     : sizes.length < FEATURE_MIN_SIZES ? 'few-sizes'
     : null;
@@ -5940,8 +6026,17 @@ function featureForecastOf(o) {
     method: 'decomposed',
     samples: samples.length,
     sizeCount: sizes.length,
-    sizeMedian: sizes.length ? sizes.slice().sort((a, b) => a - b)[Math.floor((sizes.length - 1) / 2)] : null,
+    sizeMedian: sizeMedianOf(sizes),
     joinRate: o.joinRate,
+    /* WHERE THE SIZES CAME FROM, said rather than inferred — three sentences on
+       the card turn on it, and every one of them would otherwise be claiming a
+       measurement over a number somebody typed. `typedSize` is the range as the
+       reader gave it (already clamped); `replaced*` describe the measurement it
+       displaced, and are null in planning where there was none. */
+    sizesTyped: !!o.typedSize,
+    typedSize: o.typedSize || null,
+    replacedCount: Array.isArray(o.replacedSizes) ? o.replacedSizes.length : null,
+    replacedMedian: Array.isArray(o.replacedSizes) ? sizeMedianOf(o.replacedSizes) : null,
     trials: FORECAST_TRIALS,
     minPeriods: FORECAST_MIN_PERIODS,
     minSizes: FEATURE_MIN_SIZES,
@@ -5954,7 +6049,7 @@ function featureForecastOf(o) {
     lostPeriods: o.lostPeriods || 0,
     coverageEnd: o.coverageEnd || null,
     scenario: sc,
-    assumptions: scenarioAssumptions(sc, 'features', 'work items'),
+    assumptions: featureAssumptions(sc, o),
     scopeRange: scenarioScopeRange(sc),
     estimated: scenarioPaceOn(sc),
     /* The pace is in WORK ITEMS even here — nobody speeds up by completing
@@ -8193,7 +8288,10 @@ window.TD = {
   forecastFeatureSchedule, scheduleRows, scheduleAllDone, FORECAST_SCHEDULE_TRIALS,
   DEFAULT_SCENARIO, CLARITY_STEPS, TEAM_CONFIDENCE_STEPS,
   FORECAST_SPREAD_MAX, FORECAST_MAX_PARALLEL, FORECAST_MAX_UNAVAILABLE,
-  featureBreakdown, featureForecastOf, forecastFeaturePeriods, forecastFeaturesIn,
+  featureBreakdown, featureForecastOf, featureAssumptions, forecastFeaturePeriods, forecastFeaturesIn,
+  /* The typed size, in its three parts: the normalised range, the list the model
+     is handed, and the two-part test that decides whether either is read at all. */
+  typedFeatureSizeRange, sizesFromRange, typedFeatureSizeOn, planningSizes, sizeMedianOf,
   featureNonZeroPeriods,
   FEATURE_MIN_SIZES, FEATURE_MIN_NONZERO, FEATURE_JOIN_MIN, FORECAST_MAX_FEATURES,
   /* Three constants the forecast tests have had to hardcode around until now.
@@ -8356,8 +8454,19 @@ const DEFAULT_SETTINGS = {
    out fresh each render so it can never go stale as the data moves on. */
 const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', activeTeamId: null,
   chartTab: 'flow', bucket: 'week', forecastItems: DEFAULT_FORECAST_ITEMS, forecastDate: '',
-  /* How big a feature is, typed. See planningSizes. */
-  planSizeLo: 0, planSizeHi: 0,
+  /* How big a feature is, typed. See typedFeatureSizeRange.
+     `planSizeOn` is the tick that lets it stand in for a MEASUREMENT, and it is
+     read only where there is one — with data, on the feature lens. In planning
+     the two numbers are the only size the screen has and answer on their own.
+     A plain boolean rather than the pace tick's three-state null: that one has a
+     default that follows the data, and this one must not. Defaulting a typed size
+     on wherever the finished features are thin would quietly swap a measurement
+     for a guess on somebody else's board, which is the one thing this control
+     exists to make the reader say out loud.
+     Kept under the `planSize` prefix it shipped with. A tidier name would drop
+     every stored value on the way in — loadView reads back only the keys
+     DEFAULT_VIEW names — and rename a field whose meaning did not change. */
+  planSizeLo: 0, planSizeHi: 0, planSizeOn: false,
   /* Whether "Adjust for what you know" is folded open. A <details> resets to its
      markup on every load, so a reader who had it open came back to it shut with
      their settings behind the fold — and the summary's "6 settings on" is the
@@ -9142,16 +9251,6 @@ function planningOn() {
    Repeated up to FEATURE_MIN_SIZES rather than lowering that floor: repeating a
    uniform set leaves the distribution identical, and nothing else in the feature
    model has to learn that planning exists. */
-function planningSizes() {
-  const lo = Math.max(0, Math.round(Number(view.planSizeLo)) || 0);
-  if (!(lo > 0)) return [];
-  const hi = Math.min(FORECAST_MAX_ITEMS, Math.max(lo, Math.round(Number(view.planSizeHi)) || lo));
-  const base = [];
-  for (let n = lo; n <= hi; n++) base.push(n);
-  const out = [];
-  while (out.length < FEATURE_MIN_SIZES) out.push(...base);
-  return out;
-}
 
 function planningDerive() {
   const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
@@ -9179,7 +9278,10 @@ function planningDerive() {
     const sizes = planningSizes();
     const f = forecast;
     forecast = featureForecastOf({
-      itemSamples: [], sizes, joinRate: null,
+      /* No `replacedSizes`, and that is the flag: there was no measurement here
+         to displace, so the typed size raises no assumption — see
+         featureAssumptions. It still travels, because four sentences quote it. */
+      itemSamples: [], sizes, joinRate: null, typedSize: typedFeatureSizeRange(),
       featureCount: f.items, targetDate: f.targetDate,
       horizonPeriods: f.horizonPeriods, countFrom: f.countFrom,
       countingFromToday: f.countingFromToday, bucket,
@@ -10803,10 +10905,15 @@ const METRIC_HELP = {
     ['Periods nobody is delivering takes time off ', b('the calendar rather than the pace'),
       ' \u2014 a shutdown, a conference, a holiday fortnight. The team still delivers what it '
       + 'delivers; there is simply less of the year to do it in.'],
-    ['A typed pace is for a team with ', b('no history to resample'), '. It is the one setting '
-      + 'that replaces your data rather than adjusting it, so treat its confidence as the most '
-      + 'generous reading rather than the safest: a range somebody typed has no quiet weeks and '
-      + 'no spikes in it, and real periods have both.'],
+    ['The two ticks under ', b('Typed, Not Measured'), ' are a different kind of control from '
+      + 'everything above them: they REPLACE a measurement rather than adjusting one. Treat what '
+      + 'comes out as the most generous reading rather than the safest \u2014 a range somebody '
+      + 'typed has no quiet weeks and no spikes in it, and real periods have both.'],
+    ['A typed pace is for a team with ', b('no history to resample'), '. A typed size is for a '
+      + 'feature forecast where the sizes you can measure are not the ones you are about to '
+      + 'build \u2014 the last ten were a migration, the next batch is bigger, or too few have '
+      + 'finished to measure at all. Where neither is true the measurement is the better guess, '
+      + 'and both ticks default to off.'],
     [b('Nothing you set here is hidden.'), ' The summary line counts what is on even when the '
       + 'block is shut, the tiles say \u201cadjusted\u201d rather than plain, and every knob that moved '
       + 'the number is listed in words under them. Past a point the forecast stops answering '
@@ -11865,11 +11972,30 @@ function renderDashboard() {
     if (fcCoverage) itemView.forecastCoverageEnd = fcCoverage;
     const itemDerive = derive(items, state.settings, itemView, state.stages);
     const bd = featureBreakdown(feats, items);
+    /* ── A SIZE THE READER TYPED, over the one the board measured ─────────
+       The second half of the decomposition is normally measured off finished
+       features, and where it can be it should be: ten finished features are a
+       better guess about the eleventh than anybody's estimate of it. But the
+       reader is sometimes holding something the history is not — the next batch
+       is bigger, the last ten were a migration, there are four finished features
+       and a plan to argue about on Thursday — and until now the app's only answer
+       to that was "widen the window".
+
+       So this is opt-in and loud: a tick beside the typed pace, an assumption in
+       the list under the tiles, and its own line on every card that would
+       otherwise be claiming a measurement. The JOIN RATE goes null with it — that
+       floor exists to stop a half-filled Parent key column being read as a size
+       distribution, and there is no measured distribution left for it to guard.
+       `bd.sizes` still travels as `replacedSizes`, so the card can say what was
+       given up rather than only what was chosen. */
+    const typedSize = typedFeatureSizeOn() ? typedFeatureSizeRange() : null;
+    const fcSizes = typedSize ? sizesFromRange(typedSize) : bd.sizes;
     const f = fcDerived.forecast;
     fcDerived = Object.assign({}, fcDerived, {
       forecast: featureForecastOf({
         itemSamples: itemDerive.empty ? [] : itemDerive.forecast.sampleSet,
-        sizes: bd.sizes, joinRate: bd.joinRate,
+        sizes: fcSizes, joinRate: typedSize ? null : bd.joinRate,
+        typedSize, replacedSizes: typedSize ? bd.sizes : null,
         featureCount: f.items, targetDate: f.targetDate,
         horizonPeriods: f.horizonPeriods, countFrom: f.countFrom,
         countingFromToday: f.countingFromToday, bucket: fcDerived.bucket,
@@ -11882,7 +12008,7 @@ function renderDashboard() {
     fcSchedule = fcDerived.forecast.when
       ? forecastFeatureSchedule(
           itemDerive.empty ? [] : itemDerive.forecast.sampleSet,
-          bd.sizes, fcDerived.forecast.items,
+          fcSizes, fcDerived.forecast.items,
           fcDerived.forecast.scenario, FORECAST_SCHEDULE_TRIALS)
       : null;
   }
@@ -12104,12 +12230,42 @@ function renderScenario(d) {
   /* Scope growth is the one knob in this block that BOTH lenses read, so it is
      the one that has to be relabelled rather than hidden. Its neighbours below
      are feature-only and hide instead. */
-  /* Only where it is the stand-in for a measurement: planning, over features.
-     With data behind it the app measures this and must never ask. */
+  /* ── The typed feature size, on two different screens ────────────────────
+     Same pair of boxes, two jobs, and which one it is doing decides what gates
+     them:
+
+       PLANNING — nothing has been recorded, so there is no measurement to choose
+       between and no tick. The boxes are simply there, because they are the only
+       thing on the screen that can answer.
+
+       WITH DATA — the app measures this off finished features. Replacing that is
+       a thing the reader has to say, so the tick is on screen and the boxes open
+       behind it, exactly as the typed pace's do.
+
+       ITEM LENS — neither. A feature size means nothing where the answer is in
+       work items, and this block has had the orphaned-control complaint twice.
+
+     The boxes are written from the view whichever screen it is, for the reason
+     every other box here is: a value hidden behind a lens or a tick has to be
+     given back when the reader comes back to it. */
   const planSize = !!d.planning && feature;
-  $('scSizeWrap').hidden = !planSize;
+  const sizeTick = !d.planning && feature;
+  $('scSizeOnLine').hidden = !sizeTick;
+  $('scSizeOn').checked = view.planSizeOn === true;
+  $('scSizeWrap').hidden = !(planSize || (sizeTick && view.planSizeOn === true));
   $('scSizeLo').value = view.planSizeLo ? String(view.planSizeLo) : '';
   $('scSizeHi').value = view.planSizeHi ? String(view.planSizeHi) : '';
+  /* One paragraph, two openings. Planning is stating an absence; a board with
+     data is naming what it is throwing away, and the second is the one worth
+     spending a sentence on — a size measured off finished features is a better
+     guess than a typed one unless the reader knows something the history does
+     not, and this is the only place that can say so. */
+  $('scSizeWhy').textContent = d.planning
+    ? 'Everywhere else this is measured from your finished features. There are none yet, '
+      + 'so say what you expect and the same model runs over it.'
+    : 'This replaces what the app measured off your finished features \u2014 the figures '
+      + 'card below says what that was. Type one only where you know something the history '
+      + 'does not; otherwise the measurement is the better guess.';
   /* Restored here rather than at boot: this is the render that knows the block
      exists, and it runs on every change to it. Assigning the value it already
      has fires no toggle, so this cannot fight the reader's own press. */
@@ -12158,7 +12314,14 @@ function renderScenario(d) {
      off `f.assumptions`: a ticked box with an empty range claims nothing and
      moves no number, so it raises no assumption — but it is still a thing the
      reader pressed, and a Reset that could not un-press it would be lying. */
-  $('scReset').disabled = scenarioIsUntouched(view.scenario);
+  $('scReset').disabled = scenarioIsUntouched(view.scenario)
+    /* The typed size is not in the scenario — it stands in for a measurement
+       rather than adjusting one — but where the tick is on screen and pressed it
+       is still a thing the reader pressed, and it is listed under the tiles as an
+       assumption. A Reset that could not un-press it would be lying in exactly
+       the way the note above describes. Where the tick is NOT on screen, neither
+       is anything for this button to undo. */
+    && !(sizeTick && view.planSizeOn === true);
 
   /* A shut block must never hide an adjustment. */
   const on = f.assumptions.length;
@@ -12167,8 +12330,13 @@ function renderScenario(d) {
       + (on === 1 ? '' : 's') + ' on</span>'
     : 'Adjust for what you know';
 
-  /* Under the tiles, in words, every time. */
+  /* Under the tiles, in words, every time. EMPTIED when there is nothing to say,
+     rather than only hidden: a block left holding the last scenario's wording is
+     a claim about this forecast that happens to be invisible, and the next thing
+     to read it — a test, an export, a copy of the page — has no way to know that.
+     The other faces in this renderer all clear what they cannot fill. */
   $('fcAssumptions').hidden = !on;
+  if (!on) $('fcAssumptions').innerHTML = '';
   if (on) {
     $('fcAssumptions').innerHTML = '<strong>This is not the plain forecast.</strong> '
       + 'It has been adjusted:<ul>'
@@ -12213,12 +12381,25 @@ function renderForecastFigures(d, scope) {
        + (f.samples === 1 ? d.bucketNoun : d.bucketNounPlural)
        + (f.method === 'decomposed' ? ' of work-item throughput' : ''), '']);
   if (f.method === 'decomposed') {
+    /* Read off the forecast's own normalised range rather than the raw boxes: a
+       typed 900 that the clamp pinned to 500 was being exported as 900 beside an
+       answer built from 500. */
+    const t = f.typedSize;
+    const tRange = t ? (t.lo === t.hi ? String(t.lo) : t.lo + ' to ' + t.hi) : '';
     rows.push(d.planning
-      ? ['Feature sizes', '', 'typed, not measured',
-         (view.planSizeLo === view.planSizeHi ? String(view.planSizeLo)
-           : view.planSizeLo + ' to ' + view.planSizeHi) + ' items a feature']
-      : ['Feature sizes', '', f.sizeCount + ' finished features',
-         'median ' + f.sizeMedian + ' items']);
+      ? ['Feature sizes', '', 'typed, not measured', tRange + ' items a feature']
+      /* WHAT WAS GIVEN UP, in the same row. A percentile that leaves this app in
+         a spreadsheet saying only "typed" invites the reader on the other end to
+         assume there was nothing to type over. There usually was, and how much of
+         it there was is the whole of whether the typed number was a good idea. */
+      : f.sizesTyped
+        ? ['Feature sizes', '', 'typed, not measured',
+           tRange + ' items a feature, over ' + (f.replacedCount
+             ? f.replacedCount + ' finished feature'
+               + (f.replacedCount === 1 ? '' : 's') + ' at a median of ' + f.replacedMedian
+             : 'nothing finished to measure')]
+        : ['Feature sizes', '', f.sizeCount + ' finished features',
+           'median ' + f.sizeMedian + ' items']);
   }
   rows.push(['Counting from', '', prettyDate(f.countFrom), '']);
   if (scope && scope.kind !== 'team') rows.push(['Whose pace', '', scope.phrase, '']);
@@ -12440,7 +12621,8 @@ function renderForecast(d, scope, stale) {
      so it moves when either half moves. */
   const how = f.method === 'decomposed'
     ? ' A feature answer is worked out from how fast work items finish and how many of them '
-      + 'your finished features took \u2014 not from how often a feature completes, which on '
+      + (f.sizesTyped ? 'you typed a feature takes' : 'your finished features took')
+      + ' \u2014 not from how often a feature completes, which on '
       + 'most boards is too rare to resample. It assumes a feature is done when its items are: '
       + 'integration, sign-off and a demo are not in these numbers.'
     : '';
@@ -12516,10 +12698,13 @@ function renderForecast(d, scope, stale) {
      wherever it is: planning has no history by definition, and a team three
      weeks old is in exactly the same position with a paste to look forward to. */
   const noAnswerFoot = f.tooWide ? 'too uncertain to answer'
-    /* A planning forecast that HAS its pace and still cannot answer is missing
-       the other typed half. Naming the pace there would send the reader to
-       re-check a box they have already filled in. */
-    : (d.planning && f.reason === 'few-sizes') ? 'waiting for a size below'
+    /* A forecast that HAS its pace and still cannot answer is missing the other
+       typed half. Naming the pace there would send the reader to re-check a box
+       they have already filled in. True on two screens: planning, where the size
+       is only ever typed, and a board whose reader has ticked the typed size and
+       not yet put a number in it. */
+    : (f.reason === 'few-sizes' && (d.planning || view.planSizeOn === true))
+        ? 'waiting for a size below'
     : (f.scenario && f.scenario.estOn === true && !f.estimated) ? 'waiting for a pace below'
     : f.estimated ? 'no pace to draw from' : 'not enough history to forecast';
   const rp = f.requiredPace;
@@ -12599,6 +12784,19 @@ function renderForecast(d, scope, stale) {
                 + ' items a feature, also typed. Nothing here was measured.'
               : 'a pace you typed, not measured \u2014 ' + d.unitMany + ' a ' + d.bucketNoun,
           'forecastSamples')
+    /* A TYPED SIZE IS CHECKED BEFORE THE MEASURED ONE, for the reason planning is
+       checked before both: the tile below states a count of finished features and
+       a median measured off them, and under a typed size that count is the length
+       of a list this app synthesised from a range. It reads as a measurement and
+       is not one. */
+    : (f.method === 'decomposed' && f.sizesTyped)
+      ? tile('Built from',
+          escapeHtml(f.typedSize.lo === f.typedSize.hi ? String(f.typedSize.lo)
+            : f.typedSize.lo + '\u2013' + f.typedSize.hi) + ' items a feature',
+          'typed, not measured \u2014 paced by ' + f.samples + ' whole '
+            + periodNoun(f.samples) + ' of item throughput'
+            + ((scope && scope.kind !== 'team') ? ' across ' + scope.phrase : ''),
+          'forecastSamples')
     : f.method === 'decomposed'
       ? tile('Built from', f.sizeCount + ' finished feature' + (f.sizeCount === 1 ? '' : 's'),
           'sized at a median of ' + f.sizeMedian + ' items each, paced by '
@@ -12651,11 +12849,26 @@ function renderForecast(d, scope, stale) {
         + 'measuring how completely your export was filled in rather than how the work breaks '
         + 'down. Add a Parent key column covering the whole export, or widen the scope to the '
         + 'teams that own those features.';
-    if (f.reason === 'few-sizes')
+    /* Three readers, three fixes, and the tick says which. Where it is on — or
+       where there is no measurement at all — the reader has already said they are
+       typing this and the only thing missing is the number; pointing them at the
+       date window there would send them to widen a window that is not the
+       problem. This branch also covers planning, which used to fall through to
+       the measured wording and offer to widen a window over no data. */
+    if (f.reason === 'few-sizes') {
+      if (d.planning || view.planSizeOn === true)
+        return 'A feature forecast also needs to know how many work items a feature takes. '
+          + 'Type that range in the two boxes under \u201cAdjust for what you know\u201d '
+          + 'below \u2014 it is what every size in these runs is drawn from, and until it is '
+          + 'there these answers have nothing to say.';
       return 'A feature forecast is built from how many items your FINISHED features took, and '
         + 'this window holds ' + f.sizeCount + ' of them against the ' + f.minSizes + ' it '
         + 'needs. Below that the answer is a fact about which few you happen to hold rather '
-        + 'than about the board. Widen the date window until it covers more finished features.';
+        + 'than about the board. Widen the date window until it covers more finished features '
+        + '\u2014 or, under \u201cAdjust for what you know\u201d below, tick '
+        + '\u201cUse a typed size instead of your finished features\u201d and say what you '
+        + 'expect. That answer is your estimate with the arithmetic done, not a measurement.';
+    }
     if (f.reason === 'stale-team')
       return 'Trimming this window back to where every team in scope still had data leaves '
         + f.samples + ' whole ' + periodNoun(f.samples) + ', short of the '
@@ -15717,6 +15930,7 @@ $('fcScenario').addEventListener('change', () => {
      and this is a stand-in for the measurement itself. Stored beside it. */
   view.planSizeLo = num('scSizeLo');
   view.planSizeHi = num('scSizeHi');
+  view.planSizeOn = $('scSizeOn').checked;
   view.scenario = scenarioFrom({
     growthLo: num('scGrowthLo'), growthHi: num('scGrowthHi'),
     extraLo: num('scExtraLo'), extraHi: num('scExtraHi'),
@@ -15757,6 +15971,12 @@ $('fcScenarioToggle').addEventListener('click', () => {
 
 $('scReset').addEventListener('click', () => {
   view.scenario = null;
+  /* The TICK goes; the two numbers stay. Un-ticking is what "no adjustments"
+     means here — the forecast goes back to the measured size — and the numbers
+     behind it are worth keeping so re-ticking does not cost a retype. Clearing
+     them would also be destructive in planning, where they are the only size the
+     screen has and no tick governs them. */
+  view.planSizeOn = false;
   saveView();
   renderDashboard();
   window.toast('Scenario reset \u2014 this is the plain forecast again');
@@ -16476,6 +16696,7 @@ $('clearConfirm').addEventListener('click', () => {
   view.scenario = null;
   view.planSizeLo = 0;
   view.planSizeHi = 0;
+  view.planSizeOn = false;
   /* ── Back to the welcome card ─────────────────────────────────────────────
      Asked for by Charles (2026-08-26), and the toast below has been promising it
      in as many words since long before it was true. Two flags kept it away, and
