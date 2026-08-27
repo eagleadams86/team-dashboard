@@ -310,8 +310,10 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    the same day. And to 2600 on 2026-08-27, when the orphaned-field sweep gained
    a second target: the scenario's own knob grid, which is not in a dialog and so
    had never been walked — then to 2620 the same day for the box widths, which
-   found two boxes narrower than the value their own `max` accepts. */
-const EXPECTED = 2620;
+   found two boxes narrower than the value their own `max` accepts, and 2640 for
+   the block's own ⓘ, the state of its Reset button, and the two halves of the
+   hand-rolled disclosure that ⓘ forced the block into. */
+const EXPECTED = 2660;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8366,23 +8368,29 @@ group('ARTs — the grouping, and the boundary it crosses');
        'the card going back to naming the thing it actually lacks');
 
     /* ── The fold is remembered ───────────────────────────────
-       A <details> resets to its markup on every load, so a reader who had it
-       open came back to it shut with their settings behind the fold — and the
-       summary's "6 settings on" was the only hint anything was there. */
-    const fold = pDoc.getElementById('fcScenario');
-    ok(fold.open, 'the planning door leaves the block folded open');
+       Markup resets on every load, so a reader who had it open came back to it
+       shut with their settings behind the fold — and the summary's "6 settings
+       on" was the only hint anything was there.
+
+       Read through the BUTTON's aria-expanded rather than the body's `hidden`:
+       the two are set together by setScenarioOpen, and the one that would be
+       forgotten by a careless edit is the one a screen reader is listening to. */
+    const foldBtn = pDoc.getElementById('fcScenarioToggle');
+    const foldBody = pDoc.getElementById('fcScenarioBody');
+    const isOpen = () => foldBtn.getAttribute('aria-expanded') === 'true';
+    ok(isOpen(), 'the planning door leaves the block folded open');
+    ok(!foldBody.hidden, 'with the body it controls actually on screen');
     is(JSON.parse(win.localStorage.getItem('td-view')).scenarioOpen, true,
        'and that is remembered, not just applied');
-    fold.open = false;
-    fold.dispatchEvent(new win.Event('toggle'));
+    foldBtn.click();
     is(JSON.parse(win.localStorage.getItem('td-view')).scenarioOpen, false,
        'shutting it is remembered too');
+    ok(foldBody.hidden, 'and the body goes with the button that claims it is shut');
     win.renderAll();
-    ok(!fold.open, 'and the next render leaves it shut rather than reopening it');
-    fold.open = true;
-    fold.dispatchEvent(new win.Event('toggle'));
+    ok(!isOpen(), 'and the next render leaves it shut rather than reopening it');
+    foldBtn.click();
     win.renderAll();
-    ok(fold.open, 'both ways round \u2014 a render must never fight the reader\u2019s own press');
+    ok(isOpen(), 'both ways round \u2014 a render must never fight the reader\u2019s own press');
 
     /* Back to a working app for every group after this one. */
     plant({ teams: [{ id: 'pl2', name: 'Started', rows: Array.from({ length: 12 }, (_, i) => ({
@@ -9561,7 +9569,7 @@ group('a card with no chart matches the one beside it');
 
     ok(!sd.getElementById('spanel-forecast').hidden,
        'the forecast panel is the one on screen, or this measures a hidden grid');
-    ok(sd.getElementById('fcScenario').open,
+    ok(!sd.getElementById('fcScenarioBody').hidden,
        'and the scenario block is folded open, or every box below has no size');
 
     /* ── The ask itself ─────────────────────────────────────── */
@@ -9754,6 +9762,143 @@ group('a card with no chart matches the one beside it');
        'while a box that holds words still fills its column — the rule is about '
        + 'fields whose content has a known size, not about narrow boxes',
        words ? Math.round(words.getBoundingClientRect().width) + 'px' : 'missing');
+
+    f.remove();
+    if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
+    if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the scenario block explains itself');
+
+  /* ── Charles, 2026-08-27: "now make it actually look nice and user friendly"
+       ────────────────────────────────────────────────────────────────────────
+     Three things came out of that, and all three are the kind that a later tidy
+     silently undoes:
+
+     1. The block had NO ⓘ. Seven controls, four-word labels, and nothing on
+        screen saying what any of them did to the answer — the only app surface
+        with knobs and no explanation behind a dot.
+     2. A ⓘ inside a <summary> toggles the <details> as the click's DEFAULT
+        ACTION, so reading the help folded the block shut behind the window.
+        Cancelling that is one line and looks like a line worth deleting.
+     3. Reset to No Adjustments was live when there was nothing to reset. */
+  {
+    const keep = { state: localStorage.getItem('td-state'),
+                   view: localStorage.getItem('td-view') };
+    localStorage.setItem('td-state', JSON.stringify({
+      schema: TD.SCHEMA, arts: [], stages: [],
+      teams: [{ id: 'ex1', name: 'Explained',
+        rows: Array.from({ length: 14 }, (_, i) => ({
+          c: '2015-0' + (i < 9 ? '1' : '2') + '-' + String((i % 9) * 3 + 2).padStart(2, '0'),
+          s: '2015-01-02', t: 'Story' })) }],
+      settings: {}
+    }));
+    localStorage.setItem('td-view', JSON.stringify({ activeTab: 'dashboard',
+      chartTab: 'forecast', months: 'all', scenarioOpen: true }));
+
+    const f = document.createElement('iframe');
+    f.setAttribute('data-td-tests', '');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;left:-9999px;width:1240px;height:1400px;border:0';
+    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html' + BUST; document.body.appendChild(f); });
+    const xw = f.contentWindow, xd = f.contentDocument;
+    const toggle = xd.getElementById('fcScenarioToggle');
+    const body = xd.getElementById('fcScenarioBody');
+    const open = () => toggle.getAttribute('aria-expanded') === 'true';
+
+    /* ── The dot, and where it is allowed to be ─────────────── */
+    const dot = xd.querySelector('#fcScenario .scenario-head [data-help]');
+    ok(!!dot, 'the scenario block has a ⓘ of its own');
+    is(dot && dot.dataset.help, 'scenario', 'pointing at its own entry rather than borrowing one');
+
+    /* THE WHOLE REASON THIS BLOCK IS NOT A <details> ANY MORE. A <summary> is a
+       button in the accessibility tree, so a ⓘ inside one is a nested
+       interactive control — axe fails it, and a screen reader cannot reliably
+       reach the inner one. Nothing here may put it back inside the control. */
+    ok(!dot.closest('summary'), 'and NOT inside a <summary>, which is itself a button');
+    ok(dot.parentElement === toggle.parentElement,
+       'it is the fold button\u2019s sibling, not its child');
+    ok(!toggle.querySelector('button'), 'so the fold button contains no control of its own');
+
+    ok(open(), 'the block is open before the dot is pressed');
+    dot.click();
+    ok(xd.getElementById('helpDialog').open, 'pressing it opens the help window');
+    is(xd.getElementById('helpTitle').textContent, 'Adjust for What You Know',
+       'on the right page of it');
+    ok(open() && !body.hidden,
+       'and the block is STILL open underneath — reading the help must not fold '
+       + 'away the thing being explained');
+    xd.getElementById('helpDialog').close();
+
+    /* The dot is a sibling of the span, not inside it: renderScenario rewrites
+       that span's innerHTML on every render and would take a child with it. */
+    xw.renderAll();
+    ok(!!xd.querySelector('#fcScenario .scenario-head [data-help]'),
+       'and it survives a re-render, because it is not inside the span that gets rewritten');
+
+    /* The two halves of a hand-rolled disclosure, which a <details> kept in step
+       for free and nothing does now but setScenarioOpen. */
+    toggle.click();
+    ok(!open() && body.hidden, 'pressing the fold shuts both the claim and the body');
+    toggle.click();
+    ok(open() && !body.hidden, 'and opens both again');
+    is(toggle.getAttribute('aria-controls'), 'fcScenarioBody',
+       'with the button naming the body it controls');
+
+    /* ── A button that can do nothing is disabled ───────────── */
+    const reset = xd.getElementById('scReset');
+    ok(reset.disabled, 'Reset is dead on arrival — there is nothing to reset');
+    const setNum = (id, v) => { const b2 = xd.getElementById(id); b2.value = v;
+      b2.dispatchEvent(new xw.Event('change', { bubbles: true })); };
+    setNum('scGrowthLo', '20');
+    ok(!reset.disabled, 'and comes alive the moment a knob moves');
+
+    xd.getElementById('scReset').click();
+    ok(reset.disabled, 'pressing it puts the block back and turns it off again');
+
+    /* A ticked box with nothing in it moves NO number, so it raises no
+       assumption — and it is still something the reader pressed. The two
+       questions have two functions, and this is the one that tells them apart.
+
+       THE TICK'S DEFAULT FOLLOWS THE DATA (see paceDefaultOn), so this team may
+       well arrive with it already on and one press would be UNticking it. Two
+       presses where it is, so what is being tested is a stored `true` either
+       way — the first draft of this assumed a starting state and passed while
+       measuring the opposite one. */
+    const pace = xd.getElementById('scEstOn');
+    if (pace.checked) pace.click();
+    pace.click();
+    ok(pace.checked, 'the typed-pace box is ticked, whichever way it arrived');
+    ok(!reset.disabled,
+       'and a ticked pace with an empty range counts — it claims nothing, but a '
+       + 'Reset that could not un-tick it would be lying');
+    is(xd.getElementById('fcScenarioSummary').textContent.trim(), 'Adjust for what you know',
+       'while the summary correctly still says nothing is adjusted');
+
+    /* ── The explanation sits WITH the field ────────────────── */
+    const wrap = xd.getElementById('scEstWrap');
+    ok(!wrap.hidden, 'the tick reveals the typed-pace boxes');
+    ok(wrap.closest('fieldset.formpanel') === xd.getElementById('scEstOn').closest('fieldset.formpanel'),
+       'which live in the same panel as the tick that revealed them, rather than '
+       + 'floating as a sibling of the knobs above');
+    const field = wrap.querySelector(':scope > div');
+    const prose = wrap.querySelector(':scope > p');
+    const fr = field.getBoundingClientRect(), pr = prose.getBoundingClientRect();
+    ok(pr.left - fr.right < 40,
+       'and the paragraph starts beside the boxes, not across the panel from them',
+       Math.round(pr.left - fr.right) + 'px between them');
+    ok(Math.abs(pr.top - fr.top) < 6, 'starting on the same line as its field',
+       Math.round(pr.top - fr.top) + 'px apart');
+    /* A paragraph running the full width of this block is one 1100px line. The
+       threshold is loose on purpose — what matters is that a cap is in force at
+       all, not that it is exactly 66ch, and pinning the exact figure would fail
+       the day somebody changed the body font. */
+    ok(pr.width < 750, 'with the prose capped to a readable measure', Math.round(pr.width) + 'px');
+    ok(pr.width < wrap.getBoundingClientRect().width - 300,
+       'well inside the width it would otherwise take',
+       Math.round(pr.width) + ' of ' + Math.round(wrap.getBoundingClientRect().width));
+    xd.getElementById('scReset').click();
 
     f.remove();
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);

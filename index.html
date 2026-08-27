@@ -621,12 +621,29 @@ select { cursor: pointer; }
 .forecast-scenario { grid-column: 1 / -1; border: 1px solid var(--border-control);
   border-radius: var(--radius); padding: 12px 16px; background: var(--surface);
   container: scenario / inline-size; }
-.forecast-scenario > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 600;
-  color: var(--text-secondary); list-style-position: outside; }
-.forecast-scenario[open] > summary { margin-bottom: var(--sp-5); }
+/* The head is a ROW: the fold's own button, and the ⓘ beside it as a sibling
+   rather than a child — see the note on the markup for why that matters. */
+.scenario-head { display: flex; align-items: center; }
+/* Everything a <summary> was giving it for free, said out loud. `text-align:
+   left` and the reset background/border are what stop the shared .btn-ish
+   defaults from making this look like a control to press rather than a heading
+   to open. */
+.scenario-toggle { display: inline-flex; align-items: center; gap: 6px;
+  padding: 0; border: 0; background: none; min-height: 0;
+  cursor: pointer; text-align: left;
+  font-family: inherit; font-size: var(--fs-sm); font-weight: 600;
+  color: var(--text-secondary); }
+.scenario-toggle:hover { color: var(--text-primary); }
+/* A real span rather than a ::before, so no screen reader reads out "black
+   right-pointing small triangle" where the UA's own marker said nothing. */
+/* No font-size of its own: U+25B8 is the SMALL triangle, and shrinking it as
+   well left a marker noticeably fainter than the one the UA used to draw. */
+.scenario-toggle .caret { display: inline-block; }
+.scenario-toggle[aria-expanded="true"] .caret { transform: rotate(90deg); }
+.scenario-head:has(> [aria-expanded="true"]) { margin-bottom: var(--sp-5); }
 /* Says WHAT is on when the block is shut, so a closed scenario is never hiding
    an adjustment. */
-.forecast-scenario > summary .on { font-weight: 400; color: var(--text-muted); }
+.scenario-toggle .on { font-weight: 400; color: var(--text-muted); }
 /* ── The scenario's knobs, three across ──────────────────────────────────────
    Not `.pairs`. That class exists to close the gap a field is left in when the
    count does not divide by the column count, and it does it by fixing the count
@@ -669,15 +686,37 @@ select { cursor: pointer; }
 }
 /* It follows the grid now, so it needs the gap the grid's own rows have. */
 #scScopeNote { margin-top: var(--sp-3); }
-/* ── A FIELD BESIDE A PARAGRAPH ALIGNS ON THE TOP, NOT THE BOTTOM ────────────
-   These two rows pair a short field with five lines of explanation, and
-   `.grid.two`'s `align-items: end` — right when every cell is a label and a
-   control — sat the field on the FLOOR of the row with the void above it. It
-   was always there; it became the most visible thing in the block the moment
-   the boxes stopped being 225px wide and filling it. A field belongs beside the
-   first line of its own explanation. */
-#scEstWrap, #scSizeWrap { align-items: start; }
-#scEstWrap > div, #scSizeWrap > div { justify-content: flex-start; }
+/* ── A FIELD BESIDE ITS OWN EXPLANATION ──────────────────────────────────────
+   These two were `.grid.two.pairs` — two equal columns — which put a 160px pair
+   of boxes in the left half and its paragraph in the right, seven hundred pixels
+   away from the thing it explains. The reader had to cross the panel to find out
+   what they were typing into.
+
+   `max-content` for the field and a capped measure for the prose puts them next
+   to each other, and the cap is the one #helpBody already uses: a paragraph
+   running the full width of this block is a single 1100px line, which is worse
+   to read than the gap was. Aligned on the TOP, not the bottom — a sentence and
+   a box start together. */
+.sc-typed { display: grid; grid-template-columns: max-content minmax(0, 66ch);
+  gap: 4px 16px; align-items: start; margin-top: var(--sp-4); }
+.sc-typed > p { margin: 0; }
+@container scenario (max-width: 640px) {
+  .sc-typed { grid-template-columns: minmax(0, 1fr); }
+}
+/* The panel is the app's own; only its spacing inside this block is here. The
+   gap is the largest on the scale because a LEGEND sits on that top border — at
+   12px it read as an underline to the row of boxes above rather than as the head
+   of something new, which is the one thing the panel exists to say. */
+/* `.formpanel.sc-pace`, not `.sc-pace`: `fieldset.formpanel` sets `margin: 0`
+   and out-specifies a bare class, so the gap was being zeroed and the legend sat
+   on the row of boxes above it. */
+.formpanel.sc-pace { margin-top: var(--sp-7); }
+/* ── The one control that undoes the others ──────────────────────────────────
+   A rule above it, so it is not read as one more field, and the disabled state
+   is the honest one: `renderScenario` turns it on exactly when the stored
+   scenario differs from the default it would be reset to. */
+.sc-foot { margin-top: var(--sp-6); padding-top: var(--sp-6);
+  border-top: 1px solid var(--border); }
 /* Two number boxes reading "3 to 7", which is one control rather than two —
    hence one label above the pair and an aria-label on each half. */
 .row-pair { display: flex; align-items: center; gap: 8px; }
@@ -2469,8 +2508,40 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              It is not in the header strip and not in Settings, for the same
              reason the two question boxes are not: it changes nothing outside
              this group. -->
-        <details class="forecast-scenario" id="fcScenario">
-          <summary><span id="fcScenarioSummary">Adjust for what you know</span></summary>
+        <!-- ── NOT A <details>, and the reason is the ⓘ (2026-08-27) ────────
+             This was `<details>/<summary>` and it should have stayed one, except
+             that a <summary> IS a button in the accessibility tree — so the help
+             dot, which is also a button, was a nested interactive control. axe
+             fails that outright (and this repo's promise is that every page
+             passes it in all four themes), and the reason it fails is real: a
+             screen reader cannot reliably reach a control nested inside another.
+
+             There was no placement inside a <details> that worked. Anything but
+             the summary disappears with the rest of the body when the block is
+             shut, which is exactly when somebody wants to know what is behind
+             it. So the fold is a plain disclosure button with `aria-expanded`
+             and `aria-controls` — the canonical pattern — and the dot is its
+             SIBLING rather than its child.
+
+             WHAT THIS COSTS: a <details> is opened by a browser's own
+             find-in-page when a match is inside it, and a hidden div is not.
+             `hidden="until-found"` is the modern answer to exactly that and is
+             not usable here — this file carries a global
+             `[hidden] { display: none !important }` (needed because .grid's
+             display beats the UA rule), which would flatten it back to plain
+             hidden. Not worth loosening a global with an !important on it for a
+             block that holds seven form controls and no prose to search. -->
+        <div class="forecast-scenario" id="fcScenario">
+          <div class="scenario-head">
+            <button type="button" class="scenario-toggle" id="fcScenarioToggle"
+                    aria-expanded="false" aria-controls="fcScenarioBody">
+              <span class="caret" aria-hidden="true">▸</span><span
+                id="fcScenarioSummary">Adjust for what you know</span>
+            </button>
+            <button type="button" class="tile-help" data-help="scenario"
+                    aria-label="What does Adjust for what you know mean?">i</button>
+          </div>
+          <div class="scenario-body" id="fcScenarioBody" hidden>
 
           <!-- ONE grid, three across, and the order is the arithmetic: the first
                three are the knobs `scenarioScopeRange` multiplies together, the
@@ -2523,7 +2594,16 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
                happens to be beside it. -->
           <p class="hint" id="scScopeNote" hidden></p>
 
-          <div style="margin-top:var(--sp-5)">
+          <!-- ── Typed, not measured ──────────────────────────────────────
+               A fieldset, and the app's own `.formpanel` rather than anything new:
+               the item dialog's stage-day group and the backup window's three
+               panels are the same shape, so this reads as a part of the block
+               rather than as a second design. What it buys is the thing the flat
+               list could not say — that the tick and the boxes it reveals are ONE
+               control, and a different KIND of thing from the knobs above them.
+               Everything else here adjusts your data; this replaces it. -->
+          <fieldset class="formpanel sc-pace">
+            <legend>Typed, Not Measured</legend>
             <label class="checkline" for="scEstOn">
               <input type="checkbox" id="scEstOn"><span id="scEstLabel">Use a typed pace instead of this history</span>
             </label>
@@ -2532,7 +2612,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
                  their items. With nothing recorded there is nothing to measure,
                  so the reader states it — the same trade the typed pace makes one
                  row up, and stated in the same shape. -->
-            <div class="grid two pairs" id="scSizeWrap" style="margin-top:var(--sp-3)" hidden>
+            <div class="sc-typed" id="scSizeWrap" hidden>
               <div>
                 <label for="scSizeLo">Work items per feature</label>
                 <div class="row-pair">
@@ -2550,7 +2630,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
                 ones before it, which is why a wider range here moves the answer more than
                 it looks like it should.</p>
             </div>
-            <div class="grid two pairs" id="scEstWrap" style="margin-top:var(--sp-3)" hidden>
+            <div class="sc-typed" id="scEstWrap" hidden>
               <div>
                 <label for="scEstLo" id="scEstRangeLabel">Items finished per period</label>
                 <div class="row-pair">
@@ -2568,13 +2648,18 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
                 while this is on: multiplying a guess by a guess compounds two people&rsquo;s
                 pessimism.</p>
             </div>
-          </div>
+          </fieldset>
 
-          <div class="row spread" style="margin-top:var(--sp-5)">
+          <!-- A rule above it, because it is the one control here that undoes
+               every other one and a button flush against the last field reads as
+               another field. DISABLED while there is nothing to undo: this app
+               has had the orphaned-control complaint twice, and a live button
+               that cannot change anything is the same fault in a smaller shape. -->
+          <div class="sc-foot">
             <button class="btn small" type="button" id="scReset">Reset to No Adjustments</button>
-            <span></span>
           </div>
-        </details>
+          </div>
+        </div>
 
         <!-- Under the tiles rather than inside an ⓘ, which is the standard the
              forecast hint already sets: somebody reading a number off a shared
@@ -5548,6 +5633,28 @@ const EST_KEYS = new Set(['estOn', 'estLo', 'estHi']);
 const scenarioIsDefault = (s) =>
   !!s && !scenarioPaceOn(s)
   && Object.keys(DEFAULT_SCENARIO).every(k => EST_KEYS.has(k) || s[k] === DEFAULT_SCENARIO[k]);
+
+/* A DIFFERENT QUESTION, and the difference is worth the second name (2026-08-27).
+   The one above asks whether this scenario produces the PLAIN ANSWER, which is
+   why it forgives a ticked box with nothing in it — that box moves no number.
+   This one asks whether the reader has PRESSED anything, which is what the Reset
+   button undoes, and a ticked box is something they pressed. So the est keys are
+   not exempt here, `estOn: false` counts (its default is null — "not said" — so a
+   stored false is a reader who unticked it), and a null scenario, which the one
+   above calls not-default, is the emptiest state there is. */
+const scenarioIsUntouched = (s) => !s
+  || Object.keys(DEFAULT_SCENARIO).every(k => s[k] === DEFAULT_SCENARIO[k]);
+
+/* THE FOLD, IN ONE PLACE. Three callers open or shut this block — the renderer
+   restoring it from the view, the planning door, and the reader pressing it —
+   and a hand-rolled disclosure has two things to keep in step rather than the
+   one a <details> had. Anything that sets only `hidden` leaves a button claiming
+   `aria-expanded="false"` over an open block, which is the sort of thing nothing
+   on screen contradicts. */
+function setScenarioOpen(open) {
+  $('fcScenarioToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+  $('fcScenarioBody').hidden = !open;
+}
 
 /* THE KNOBS A LENS ACTUALLY READS. Three of the seven are about FEATURES — how
    many more turn up, how well understood they are, how many are worked at once —
@@ -10637,6 +10744,37 @@ function renderTitle() {
    per paragraph: a page where half the words are bold has no emphasis left. */
 const b = (text) => ({ b: text });
 const METRIC_HELP = {
+  /* The block had no ⓘ of its own until 2026-08-27 — seven controls, each with a
+     four-word label, and nothing on screen saying what any of them did to the
+     answer. Everything below is said somewhere else too (in words under the
+     tiles, once a knob is on), which is the rule this app follows: the ⓘ is
+     where you go BEFORE you have set anything, not the only place a claim
+     appears. */
+  scenario: { title: 'Adjust for What You Know', body: [
+    ['Every forecast here assumes the next few periods look like the last few. This is where '
+      + 'you say how they will not \u2014 and ', b('every knob defaults to doing nothing'),
+      '. Untouched, the app runs the same sampler it always ran, so the plain forecast is the '
+      + 'plain forecast, and Reset to No Adjustments puts it back exactly.'],
+    ['The scope knobs say ', b('there is more work than you counted'), ' \u2014 growth inside '
+      + 'what you counted, work you did not count at all, and how well understood it is. They '
+      + 'multiply, so two of them set to +20% is +44% rather than +40%, and the line under them '
+      + 'says what they came to together.'],
+    ['The team knob scales the pace being resampled, and it only ever scales it ', b('down'),
+      '. A reorganisation that makes a team faster is the most-abused claim in this business, '
+      + 'and this app will not supply the arithmetic for it.'],
+    ['Periods nobody is delivering takes time off ', b('the calendar rather than the pace'),
+      ' \u2014 a shutdown, a conference, a holiday fortnight. The team still delivers what it '
+      + 'delivers; there is simply less of the year to do it in.'],
+    ['A typed pace is for a team with ', b('no history to resample'), '. It is the one setting '
+      + 'that replaces your data rather than adjusting it, so treat its confidence as the most '
+      + 'generous reading rather than the safest: a range somebody typed has no quiet weeks and '
+      + 'no spikes in it, and real periods have both.'],
+    [b('Nothing you set here is hidden.'), ' The summary line counts what is on even when the '
+      + 'block is shut, the tiles say \u201cadjusted\u201d rather than plain, and every knob that moved '
+      + 'the number is listed in words under them. Past a point the forecast stops answering '
+      + 'altogether and names the knob to turn back first \u2014 stacked guesses reach a spread '
+      + 'wide enough that the answer is no longer one.'],
+  ] },
   defectRate: { title: 'Defect Rate', body: [
     ['How much of what we finish is defect work? Plots items whose Type matches the defect '
       + 'text in Settings as ', b('a share of everything completed'), '.'],
@@ -11936,7 +12074,7 @@ function renderScenario(d) {
   /* Restored here rather than at boot: this is the render that knows the block
      exists, and it runs on every change to it. Assigning the value it already
      has fires no toggle, so this cannot fight the reader's own press. */
-  $('fcScenario').open = view.scenarioOpen === true;
+  setScenarioOpen(view.scenarioOpen === true);
   const growthLabel = feature
     ? 'Each known feature grows by (%)'
     : 'The work you counted grows by (%)';
@@ -11976,6 +12114,12 @@ function renderScenario(d) {
       : 'The scope setting above multiplies the work by ')
       + range.lo.toFixed(2) + '\u00d7 to ' + range.hi.toFixed(2) + '\u00d7.';
   }
+
+  /* Live only when it would undo something. Read off the STORED scenario, not
+     off `f.assumptions`: a ticked box with an empty range claims nothing and
+     moves no number, so it raises no assumption — but it is still a thing the
+     reader pressed, and a Reset that could not un-press it would be lying. */
+  $('scReset').disabled = scenarioIsUntouched(view.scenario);
 
   /* A shut block must never hide an adjustment. */
   const on = f.assumptions.length;
@@ -14996,7 +15140,7 @@ $('welcomePlanBtn').addEventListener('click', () => {
      the next load rather than something the next render shuts again. */
   view.scenarioOpen = true;
   saveView();
-  $('fcScenario').open = true;
+  setScenarioOpen(true);
   /* After the render, on the box they have to fill in for any of this to
      answer — the one thing on the screen that is asking them a question. */
   $('scEstLo').focus();
@@ -15472,11 +15616,14 @@ $('fcPi').addEventListener('click', () => {
   renderDashboard();
 });
 
-/* The fold's own state, remembered. `toggle` rather than a click handler on the
-   summary: a <details> opens from the keyboard and from a find-in-page match
-   too, and only this event sees all three. */
-$('fcScenario').addEventListener('toggle', () => {
-  const open = $('fcScenario').open;
+/* The fold's own state, remembered. A click handler is enough now that the fold
+   is a button: a button is pressed by Enter and Space as a click, so the keyboard
+   comes free, and the third route the old `toggle` listener existed to catch —
+   a browser's find-in-page opening a <details> — is the one this shape gives up.
+   See the note on the markup for why it does. */
+$('fcScenarioToggle').addEventListener('click', () => {
+  const open = $('fcScenarioToggle').getAttribute('aria-expanded') !== 'true';
+  setScenarioOpen(open);
   if (view.scenarioOpen === open) return;
   view.scenarioOpen = open;
   saveView();

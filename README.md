@@ -1730,10 +1730,9 @@ It answers two questions, from the same set of deals:
 | **Time to finish** | a number of items | the date that many will be done by, at 50%, 85% and 95% confidence |
 | **Items by a date** | a target date | how many will be finished by then, at the same three confidences |
 
-**Adjust for what you know remembers whether you left it open.** A `<details>` resets to its
-markup on every load, so a reader who had it folded open came back to it shut with their settings
-behind the fold — and the summary's *"6 settings on"* was the only thing that would have told them
-anything was there.
+**Adjust for what you know remembers whether you left it open.** Markup resets on every load, so
+a reader who had it folded open came back to it shut with their settings behind the fold — and the
+heading's *"6 settings on"* was the only thing that would have told them anything was there.
 
 Both boxes sit inside the tab rather than in the control strip at the top of the dashboard,
 because they change nothing outside this group. Everything in the strip *does* reach them: the
@@ -1930,6 +1929,25 @@ same reason: a row is never left with a field alone beside a hole.
 
 **And each box is the size of what goes in it** — see [A box is as wide as what goes in
 it](#a-box-is-as-wide-as-what-goes-in-it).
+
+**The block explains itself.** It carries an ⓘ of its own — for a long time it was the only set of
+controls in the app with none — and the window behind it says what each knob does to the answer
+before you have set anything. **Reset to No Adjustments is disabled while there is nothing to
+reset**, which is a stricter test than "is the forecast still plain": a ticked typed-pace box with
+an empty range claims nothing and moves no number, but it is something you pressed, and a Reset
+that could not un-press it would be lying.
+
+**A typed pace, and the feature sizes that go with it, sit in a panel of their own** — the same
+`fieldset` the item form and the backup window use. Everything above it *adjusts* your data; this
+*replaces* it, and the panel is what says so. Each of those fields sits beside its own
+explanation rather than across the block from it.
+
+That ⓘ is also why the fold is a plain button with `aria-expanded` rather than a `<details>`. A
+`<summary>` is a button in the accessibility tree, so a help dot inside one is a nested
+interactive control — axe fails it, and a screen reader cannot reliably reach the inner one. No
+placement inside a `<details>` worked, because anything but the summary disappears with the body
+exactly when somebody wants to know what is behind it. The cost is that a browser's find-in-page
+no longer opens the block on a match inside it.
 
 **Four of the seven are about features, and they do not exist on the item lens.** Everything
 below scope growth in that table — features discovered later, how well understood they are, how
