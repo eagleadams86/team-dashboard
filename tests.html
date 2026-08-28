@@ -318,7 +318,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    size over a board that has a measured one, and 2749 the same day for what
    Charles found in it: the size row riding with the pace tick in planning, and
    Reset actually emptying the two boxes. */
-const EXPECTED = 2783;
+const EXPECTED = 2794;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3321,19 +3321,32 @@ async function run(TD, win) {
        the words move. */
     is(JSON.stringify(asFeats.throughput), JSON.stringify(asItems.throughput),
        'the same list gives the same figures whatever it is called');
-    /* EVERY summary figure but ONE. `agedNow` parted company with the rest when
-       features got an ageing threshold of their own: the item threshold is
-       defaulted and always in force, the feature one ships empty, and this
-       fixture sets no feature threshold — so the two views count the same list
-       and only one of them has a rule to count it against. Compared with the
-       field dropped rather than by listing the fields that survive, so a figure
-       added to `summary` later is still covered by this. */
-    const dropAged = (o) => { const c = Object.assign({}, o); delete c.agedNow; return c; };
-    is(JSON.stringify(dropAged(asFeats.summary)), JSON.stringify(dropAged(asItems.summary)),
-       'including every summary figure but the aged count');
+    /* EVERY summary figure BUT TWO, and the two are named rather than the
+       survivors listed, so a figure added to `summary` later is still covered
+       by this.
+
+       `agedNow` parted company when features got an ageing threshold of their
+       own: the item threshold is defaulted and always in force, the feature one
+       ships empty, and this fixture sets none — so the two views count the same
+       list and only one of them has a rule to count it against.
+
+       `unplannedShare` parted company for a stronger reason: a defect is a KIND
+       OF WORK ITEM, so there is no such figure as the defect rate of a feature.
+       The arithmetic returns 0 over a list of features — none of them is a Bug
+       — and a 0 there is a claim of perfect quality on a board that may have
+       plenty of bugs. */
+    const dropUnit = (o) => {
+      const c = Object.assign({}, o); delete c.agedNow; delete c.unplannedShare; return c;
+    };
+    is(JSON.stringify(dropUnit(asFeats.summary)), JSON.stringify(dropUnit(asItems.summary)),
+       'including every summary figure but the two the unit decides');
     is(asItems.summary.agedNow, 0, 'which the item view states off its own defaulted threshold');
     is(asFeats.summary.agedNow, null,
        'and the feature view leaves at null, because no feature threshold is set');
+    is(asItems.summary.unplannedShare, 0,
+       'the item view states a real defect share, zero though it is on this fixture');
+    is(asFeats.summary.unplannedShare, null,
+       'and the feature view has none to state — not zero, which would claim perfect quality');
 
     is(asItems.unit, 'items', 'the unit is reported back');
     is(asFeats.unit, 'features', 'both ways');
@@ -3382,6 +3395,56 @@ async function run(TD, win) {
     is(lf.rows[0].d.summary.sleDays, null, 'and deliberately NOT in the feature view');
     is(lf.rows[0].d.summary.sleMet, null, 'so there is no verdict on a promise nobody made');
     is(lf.rows[0].d.summary.overWipLimit, null, 'and none on the limit either');
+
+    /* ── THE DEFECT RATE IS NOT A FEATURE-LEVEL FIGURE ─────────────────────
+       And the All Teams table has to agree with the dashboard about that. It
+       did not for a while: the summary tile guarded on the unit and this
+       table's column did not, so the same data read "— not a feature-level
+       figure" on the dashboard and "0.0%" one tab to the left. The 0.0% was not
+       a rounding artefact — every feature is a Feature and none is a Bug, so
+       the arithmetic genuinely returns zero, which is a claim of perfect
+       quality on a board that may have plenty of bugs.
+
+       Fixed at source rather than at each reader: `unplannedShare` is null over
+       features in derive(), so the table's own `or()` renders its em dash with
+       no guard of its own, and so does anything written next. Asserted on the
+       ROW derives and on the TRAIN, because they are two different derive()
+       calls and only one of them was ever wrong. */
+    const withBugs = win.TDState.sanitizeTeams([
+      { id: 'a', name: 'A',
+        rows: [{ c: '2026-01-09', s: '2026-01-06', t: 'Bug' },
+               { c: '2026-01-10', s: '2026-01-06', t: 'Story' }],
+        features: [{ c: '2026-01-16', s: '2026-01-06', t: 'Feature', i: 'A-1' }] }]);
+    const bi = TD.deriveTeams(withBugs, S7, { months: 'all', bucket: 'week' }, []);
+    const bf = TD.deriveTeams(withBugs, S7,
+      { months: 'all', bucket: 'week', unit: 'features' }, []);
+    near(bi.rows[0].d.summary.unplannedShare, 0.5,
+         'a team row states its real defect share in the item view — one bug of two');
+    is(bf.rows[0].d.summary.unplannedShare, null,
+       'and has none to state in the feature view — null, never the 0 the maths returns');
+    near(bi.train.summary.unplannedShare, 0.5, 'the train states one too');
+    is(bf.train.summary.unplannedShare, null, 'and drops it the same way');
+    /* The tile and the table column read the SAME field, which is what makes
+       the two views of it incapable of disagreeing again. */
+    is(bf.train.unit, 'features',
+       'the train knows which unit it is, so the note under the table can say why');
+
+    /* The column itself stays put. A heading that came and went would shift
+       every column beside it, and `view.teamSort` could be resting on the one
+       that left. */
+    /* Unconditionally, never behind an `if (cols)` — a guard like that turns a
+       missing hook into a silent pass, which is the shape of test this suite has
+       been bitten by before. */
+    const featCols = win.tdTeamColumns(bf.train);
+    const itemCols = win.tdTeamColumns(bi.train);
+    is(featCols.map(c => c.key).join(','), itemCols.map(c => c.key).join(','),
+       'the table has exactly the same columns in both units — none comes or goes');
+    const defectCol = featCols.find(c => c.key === 'defects');
+    is(defectCol.fmt(bf.rows[0].d.summary.unplannedShare), '—',
+       'and the defect cell formats the null as this table\u2019s own em dash');
+    is(defectCol.get(bf.rows[0].d), null, 'because the figure it reaches for is not there');
+    near(itemCols.find(c => c.key === 'defects').get(bi.rows[0].d), 0.5,
+         'where in the item view the very same column finds one');
   }
 
   /* ────────────────────────────────────────────────────────── */

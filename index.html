@@ -7873,7 +7873,28 @@ function derive(rows, settings, view, stages) {
      all, dragging the figure toward zero. Null when nothing completed in the
      window — no share to state. */
   const completedTotal = throughput.reduce((a, b) => a + b, 0);
-  const unplannedShare = completedTotal > 0 ? unplannedTotal / completedTotal : null;
+  /* NULL OVER FEATURES, and not because the figure is unwanted — because there
+     is no such figure. A defect is a KIND OF WORK ITEM, so "the defect rate of
+     a feature" is a category error rather than a number this app declines to
+     show, and over a list of features the arithmetic above returns 0: every
+     feature is a Feature, none of them is a Bug, and the honest reading of that
+     zero is "nothing here can be a defect", not "nothing here was one".
+
+     Guarded HERE rather than at each reader, which is the lesson of the version
+     before this: the tile knew and the All Teams column did not, so the same
+     data read "—  not a feature-level figure" on the dashboard and "0.0%" one
+     tab to the left. A claim of perfect quality on a board that may have plenty
+     of bugs is the one reading on this screen that would be actively false
+     rather than merely less useful — the argument the defect card's own empty
+     face is built on — and a guard that has to be remembered in three places is
+     a guard that will be missed in a fourth.
+
+     This is the second figure `derive()` decides from the unit rather than
+     merely naming, after the ageing threshold above. Both are the same shape of
+     exception and neither is a second set of maths: the maths did run, and what
+     the unit decides is whether its answer means anything. */
+  const unplannedShare = unit === 'features' ? null
+    : (completedTotal > 0 ? unplannedTotal / completedTotal : null);
 
   /* Everything the window covers: what finished inside it, plus what is open
      now — the same population `windowItemCount` states in the note above the
@@ -9532,6 +9553,13 @@ window.TDState = { sanitizeTeams, sanitizeArts, sanitizeStages, hydrateState, no
   hydrateStageDays, mergeFeatures, countFeatureLinks, SCHEMA };
 /* Click-to-copy's pure part, and the entry point the suite drives. */
 window.tdDots = { dotUnder, copyDotKey, dotTipFooter, onlyTopDot };
+/* The All Teams table's column list, for the suite. It is a pure function of a
+   derived train and it decides two things worth pinning: WHICH columns the
+   table has — one that came and went with the unit would shift every heading
+   beside it, and `view.teamSort` could be resting on the one that left — and
+   how each cell formats a figure that is not there. The CSV export builds from
+   the same list, so a column pinned here is a column pinned in both. */
+window.tdTeamColumns = teamColumns;
 /* The live Chart.js instances, for the suite alone. It is how the two scatters
    are pinned as still carrying the click-to-copy handlers — wiring a renderer
    forgets is exactly the kind of regression no pure test can see. */
@@ -12052,9 +12080,15 @@ function renderDashboard() {
     /* Reads a dash over features rather than 0.00%, for the reason the card
        below it carries: a defect is a kind of work item, so the figure is not
        zero, it does not exist. A dash is what this app shows for a figure it
-       cannot work out, and the card says why. */
+       cannot work out, and the card says why.
+
+       THE VALUE no longer asks which unit it is — `unplannedShare` is null over
+       features at source, so the ordinary null check covers it. The FOOT still
+       asks, because there are two different reasons for that null and the whole
+       job of the foot is to say which one applies: nothing completed in the
+       window, or nothing here could have been a defect in the first place. */
     tile((state.settings.unplannedLabel || 'Unplanned') + ' rate',
-      (d.unit === 'features' || s.unplannedShare == null) ? '—' : pct1(s.unplannedShare),
+      s.unplannedShare == null ? '—' : pct1(s.unplannedShare),
       d.unit === 'features' ? 'not a feature-level figure' : 'share of completed work',
       'defectRate');
 
@@ -13148,6 +13182,13 @@ function teamColumns(train) {
       get: (d) => d.summary.wipRatio, fmt: (v) => or(v, (x) => num1(x) + '×') },
     { key: 'aged', label: 'Aged', desc: true,
       get: (d) => d.summary.agedNow, fmt: (v) => or(v, String) },
+    /* NO UNIT GUARD HERE, and that is the point rather than an omission:
+       `unplannedShare` is null over features at source, so `or` renders this
+       table's own em dash for the same reason it does in every other
+       not-applicable cell. The column stays in place rather than disappearing
+       when Count is switched — a column that comes and goes would shift every
+       heading beside it, and the sort could be resting on the one that left.
+       The note under the table says why the cells are empty; see windowNote. */
     { key: 'defects', label: defect + ' rate', desc: true,
       get: (d) => d.summary.unplannedShare, fmt: (v) => or(v, pct1) },
     /* Ascending on the first press: the interesting end is the OLDEST export,
@@ -13443,7 +13484,24 @@ function renderAllTeams() {
        train row in the <tfoot> is the one line that uses the train's own fence,
        and its cell says so on hover. */
     (teamOutliers ? '<br>each team ignoring its own outliers &mdash; '
-      + teamOutliers + ' item' + (teamOutliers === 1 ? '' : 's') + ' in total' : '');
+      + teamOutliers + ' item' + (teamOutliers === 1 ? '' : 's') + ' in total' : '') +
+    /* WHY ONE COLUMN IS ALL DASHES. A tile can carry its own reason on its foot
+       and a card can carry one on its face; a table cell has nowhere to put a
+       sentence, and an ⓘ on the heading is ruled out three comments up — nine
+       of them put this table into a sideways scroll. So the reason goes in the
+       one place under the table that already carries this kind of caveat, next
+       to the outlier line above it.
+
+       Said only in the feature view, where the column is empty for a reason
+       nobody can read off the screen. In the item view the same cells can be
+       empty because a team finished nothing, which the rest of that team's row
+       of dashes already explains. */
+    (train.unit === 'features'
+      ? '<br>the ' + escapeHtml((state.settings.unplannedLabel || 'unplanned').toLowerCase())
+        + ' rate is not a feature-level figure &mdash; a '
+        + escapeHtml((state.settings.unplannedLabel || 'unplanned').toLowerCase())
+        + ' is a kind of work item'
+      : '');
 
 
   const s = train.summary;

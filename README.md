@@ -296,7 +296,7 @@ people actually scan for:
 | **85th cycle time** | Who is slow, and who is unpredictable? |
 | **In progress** / **WIP vs month** | Who is overloaded? |
 | **Aged** | Who has work going stale? |
-| **Defect rate** | Who has a quality problem? |
+| **Defect rate** | Who has a quality problem? — empty in the feature view, and the note under the table says why |
 | **Data to** | …and whose figures are worth trusting at all |
 
 **Throughput trend** and **Data to** carry an ⓘ of their own, because they are the two columns
@@ -1670,7 +1670,7 @@ disagree — there is only one reading.
 | | Why |
 |---|---|
 | **The WIP limit and the cycle time target** | Both are promises a team made about its **board**. Three features in flight against a limit of six would read "inside it" — a reassurance about a promise nobody made — and a 54-day feature against a 10-day target would read "not met", a failure nobody signed up to. In the feature view a team has neither set, exactly as a team that has never set them. |
-| **The defect rate** | A defect is a *kind of work item*. Over features the chart would plot a flat zero and the tile would read 0.00% — a claim of perfect quality on a board that may have plenty of bugs. It is the one reading that would be actively false rather than merely less useful, so it is the one card the switch takes away, with a note saying why. |
+| **The defect rate** | A defect is a *kind of work item*. Over features the chart would plot a flat zero and the tile would read 0.00% — a claim of perfect quality on a board that may have plenty of bugs. It is the one reading that would be actively false rather than merely less useful, so it is the one card the switch takes away, with a note saying why. The figure itself is **null over features at source**, not merely hidden by each thing that reads it: the tile, the All Teams column and its CSV all get nothing to state without a guard of their own. That is the fix for the version where the tile knew and the table did not, and the same data read "— not a feature-level figure" on the dashboard and "0.0%" one tab to the left. The All Teams column stays in place and fills with dashes rather than disappearing — a column that came and went would shift every heading beside it, and the sort could be resting on the one that left — with the reason in the note under the table. |
 | **The date window on the progress table** | *Features still open* counts the whole feature. "How far along is this" is a question about the thing, not about a slice of the calendar, and a progress figure that moved when you changed the date picker would be unreadable. |
 
 **And one thing is replaced rather than dropped:** the ageing threshold. See below.
