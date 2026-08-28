@@ -318,7 +318,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    size over a board that has a measured one, and 2749 the same day for what
    Charles found in it: the size row riding with the pace tick in planning, and
    Reset actually emptying the two boxes. */
-const EXPECTED = 2836;
+const EXPECTED = 2839;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8235,6 +8235,12 @@ group('ARTs — the grouping, and the boundary it crosses');
      'a payload leading with a plus is still defused — it is not a number');
   is(TD.csvCell('-1+1'), "'-1+1", 'nor is a sum that merely starts with a digit');
   is(TD.csvCell('-3abc'), "'-3abc", 'which the old lookahead let straight past');
+  /* TAB and CR ride in the lead set beside the four printable characters: a
+     reader that strips the whitespace finds the formula underneath. Neither can
+     begin a number, so the carve-out above is untouched by their being there. */
+  is(TD.csvCell('\tHYPERLINK(x)'), "'\tHYPERLINK(x)", 'a leading tab is a lead');
+  is(TD.csvCell('\rcmd'), '"\'\rcmd"', 'and a carriage return, quoted because it is one');
+  is(TD.toTsv([['\tHYPERLINK(x)']]), "'\tHYPERLINK(x)", 'the clipboard carries the same lead set');
   is(TD.toTsv([['+4.3', '-1+1']]), '+4.3\t\'-1+1',
      'and the clipboard flavour draws the line in the same place');
   /* Net flow is negative for half the weeks on a busy board, so quoting a

@@ -1920,11 +1920,20 @@ Teams comparison into a Monday status mail.
 - **`tableToRows` pads to the widest row.** A colspan empty state would otherwise emit a
   one-column row in a nine-column file: valid CSV, and every spreadsheet reads the rest of that
   row under the wrong headings.
-- **The formula guard is a security boundary, not a formatting nicety.** `=`, `+`, `@` and a
-  dash-not-followed-by-a-digit get a leading apostrophe. A team name is the one free-text field
-  this app stores and a share link is how somebody else's text reaches this browser, so a CSV is
-  simply the one place the escaping is not HTML. A **negative number is deliberately left alone**
-  — net flow is negative half the time and quoting it would break the arithmetic.
+- **The formula guard is a security boundary, not a formatting nicety.** A cell opening with
+  one of OWASP's six leads — `=` `+` `-` `@` TAB CR — gets a leading apostrophe unless the
+  WHOLE cell is a number (`PLAIN_NUMBER`). The tab and the carriage return are in the set
+  because a reader that strips the leading whitespace then finds the formula underneath;
+  neither can begin a number, so they cost the carve-out nothing. A team name is the one
+  free-text field this app stores and a share link is how somebody else's text reaches this
+  browser, so a CSV is simply the one place the escaping is not HTML. A **number is
+  deliberately left alone** — net flow is negative half the time and quoting it would break
+  the arithmetic.
+  **These two lines are the family's one CSV rule.** As of 2026-08-27 the identical
+  `FORMULA_LEAD` / `PLAIN_NUMBER` pair is in all seven exporters — here, Golf Handicap,
+  PAPTrack, Sprint Predictability, the starter and both lottery pages — and a change to it
+  belongs in all of them. Money Map is the one deliberate exception: it builds its rows from
+  state, so it can pass an `isText` flag and guard only the cells it knows are text.
 - **Tabs for the clipboard, commas for the file.** A pasted CSV lands as one column and needs
   Text to Columns; a file must be a CSV to open as a spreadsheet. `cellText` collapses all
   whitespace, which is what makes a tab safe as a delimiter with no quoting.

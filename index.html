@@ -16625,8 +16625,16 @@ function tableToRows(table) {
    and made that column text. And `-1+1`, `+A1` and `-alpha` are now all quoted,
    where the old lookahead let `-3abc` past: it only asked whether the character
    after the sign was a digit. A DDE payload leading with a plus is still
-   defused, because `+cmd|'/c calc'!A0` is not a number. */
-const FORMULA_LEAD = /^[=+@-]/;
+   defused, because `+cmd|'/c calc'!A0` is not a number.
+
+   The lead set is OWASP's full list — `=` `+` `-` `@` TAB CR — not the four
+   printable ones. A cell opening with a tab or a carriage return is the same
+   attack wearing a coat: some readers strip the whitespace and then find a
+   formula underneath. Neither can begin a number, so the carve-out below is
+   untouched by their being here. This is the family's one CSV rule; the same
+   two lines are in Golf Handicap, PAPTrack, Sprint Predictability, the starter
+   and both lottery pages, and a change to it belongs in all seven. */
+const FORMULA_LEAD = /^[=+@\-\t\r]/;
 const PLAIN_NUMBER = /^[+-]?[0-9]+(\.[0-9]+)?$/;
 
 function csvCell(v) {

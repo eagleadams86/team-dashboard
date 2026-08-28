@@ -2372,11 +2372,12 @@ shared view strips is stripped because it would *write*; this writes nothing and
 back figures already on the recipient's screen. Sending a link is how a colleague gets these
 numbers — letting them paste the table into their own notes is the point of it.
 
-One detail worth knowing: a spreadsheet treats a cell opening with `=`, `+` or `@` as a
-**formula**, so a team called `=1+1` would be executable the moment the file is opened. Those
-cells get a leading apostrophe, which Excel, Numbers and Sheets all read as "this is text". A
-genuine negative number is left alone — net flow is negative for half the weeks on a busy board,
-and quoting it would break the arithmetic you exported a CSV to do.
+One detail worth knowing: a spreadsheet treats a cell opening with `=`, `+`, `-` or `@` — or
+with a tab or a carriage return in front of one of them — as a **formula**, so a team called
+`=1+1` would be executable the moment the file is opened. Those cells get a leading apostrophe,
+which Excel, Numbers and Sheets all read as "this is text". A genuine number is left alone —
+net flow is negative for half the weeks on a busy board, and quoting it would break the
+arithmetic you exported a CSV to do.
 
 The two tables in the **Settings** and **Teams & Stages** windows have no export buttons: they are
 configuration — a Display→Value mapping, and a list of names — rather than figures anybody puts
