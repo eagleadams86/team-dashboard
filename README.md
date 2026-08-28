@@ -1665,6 +1665,13 @@ no second set of maths anywhere: `derive()` takes a list of records and works ou
 so switching the unit is switching which list goes in. That is why the two readings can never
 disagree — there is only one reading.
 
+**The same picker is on Your Data**, above the table, because that tab shows one of the two
+lists and the strip is not on it — before, the only way off "Loaded Features" was to visit the
+Dashboard, throw the switch there and come back. It is the same control rather than a second
+one: same label, same `Count`, and throwing either box moves the other. The rest of the strip
+deliberately does not follow it there — a work type filter, a date window and *Group by* all
+narrow a population, and none of them means anything to a raw list.
+
 **Three things deliberately do not carry over:**
 
 | | Why |

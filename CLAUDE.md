@@ -320,6 +320,35 @@ device-local. No `SCHEMA` bump; it DOES travel in a share link (see below).
   not added there silently never arrives. `countFrom` did exactly that for a day: it worked on a
   pooled scope, which goes through `deriveTeams` and its own object, and did nothing on a single
   team. **If you add a view field the forecast reads, add it in BOTH places.**
+## The Unit Switch Is on Two Tabs (2026-08-27) — no schema change
+
+Reported by Charles standing on "Loaded Features" with no way out of it: the Count switch lived
+only in `#viewControls`, `selectTab` hides that strip off the two number tabs
+(`NUMBER_TABS`), and `renderDataTable` follows `featureUnit()` — so Your Data showed one of a
+team's two lists with no control to change which. Naming the list in the heading, which is what
+the app did about this before, says which one you got; it does not offer the other.
+
+- **`#unitFieldData` is the SAME control, not a second one.** Same label word, same two option
+  values, same `view.unit`, same handler (`['unitSel','unitSelData'].forEach`), and
+  `renderUnitControl` sets BOTH boxes from `featureUnit()` on every render. There is no path
+  where one reads Features and the other Work items — tested both directions, because a copy
+  that only follows goes stale the first time somebody uses the original.
+- **The rest of the strip deliberately did NOT follow it there.** The work type filter, the date
+  window and Group by all narrow a population and mean nothing to a raw list. The unit is the
+  one control in that strip that chooses WHICH population — its own comment in the markup says
+  so — and a tab showing a population is a tab it belongs on. If anyone later proposes showing
+  the whole strip on Your Data, this is why not.
+- **It sits on its own line above the table, not in the heading row.** A field is a label line
+  over a control line; dropped among the one-line buttons it would sit out of line with all of
+  them, which is the orphaned-field complaint this app has had twice.
+- **`#unitFieldData { max-width: 160px }`, and 160 is not a number chosen here** — it is what
+  `.controls .field`'s `min-width` resolves to, so the same control is the same size on both
+  tabs. Every select in this app is `width: 100%`; uncapped it drew a 1200px box for two words.
+- **It cannot lock behind you.** `renderEmptyState` gates `#loadedCard` on the team's WORK ITEMS
+  (`activeRows()`), not on the list being shown, so switching to a team's empty feature list
+  keeps the card, the "No features loaded yet." note AND the switch. Pinned by test.
+- Hidden in print alongside `#viewControls .field`, for the same reason those are.
+
 ## Forecast Placement — Kept Under Dashboard (2026-08-27) — no schema change
 
 Charles asked whether the forecast should be its own top-level tab. **It stays a section of the

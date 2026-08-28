@@ -318,7 +318,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    size over a board that has a measured one, and 2749 the same day for what
    Charles found in it: the size row riding with the pace tick in planning, and
    Reset actually emptying the two boxes. */
-const EXPECTED = 2820;
+const EXPECTED = 2836;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8070,6 +8070,102 @@ group('ARTs — the grouping, and the boundary it crosses');
     uSel.dispatchEvent(new win.Event('change', { bubbles: true }));
     is(win.document.getElementById('unitSel').value, wasUnit,
        'the unit is put back, so nothing after this group reads a feature list');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the unit switch is on Your Data too');
+
+  /* ── A TAB THAT SHOWS A LIST MUST OFFER TO CHANGE WHICH ───────────────────
+     Reported by Charles standing on "Loaded Features" with no way out of it:
+     the only unit switch was in the strip, the strip is hidden on Your Data, so
+     changing which list this tab shows meant going to the Dashboard, throwing
+     the switch and coming back. The heading naming the list — which is what the
+     app did about this before — says which one you got; it does not offer the
+     other. */
+  {
+    const uWas = win.document.getElementById('unitSel').value;
+    plant({ teams: [{ id: 'ud1', name: 'Two Lists',
+      rows: [{ c: '2026-03-10', s: '2026-03-01', t: 'Story', i: 'DAE-1', p: 'DAE-90' },
+             { c: '2026-03-12', s: '2026-03-02', t: 'Story', i: 'DAE-2', p: 'DAE-90' }],
+      features: [{ c: '2026-03-12', s: '2026-03-01', t: 'Feature', i: 'DAE-90' }] },
+      /* A second team with work items and NO features, for the dead-end check
+         at the foot of this group. */
+      { id: 'ud2', name: 'Items Only',
+        rows: [{ c: '2026-03-11', s: '2026-03-02', t: 'Bug' }] }],
+      settings: { featureTypes: ['Feature'] } });
+    win.selectTab('data');
+
+    const d = win.document;
+    const strip = d.getElementById('unitSel');
+    const here = d.getElementById('unitSelData');
+    const fire = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('change', { bubbles: true })); };
+    const heading = () => d.getElementById('dataHeading').firstChild.textContent;
+
+    ok(!!here, 'the Your Data tab has a unit switch of its own');
+    ok(!d.getElementById('unitFieldData').hidden,
+       'offered on a team that has both lists');
+    /* An accessible name, not a placeholder: every other control in this app is
+       a label over a box, and a bare select would be the one that is not. */
+    const lbl = d.querySelector('label[for="unitSelData"]');
+    ok(!!lbl && lbl.textContent.trim().length > 0, 'with a real label pointing at it',
+       lbl && lbl.textContent);
+    is(lbl.textContent.trim(), d.querySelector('label[for="unitSel"]').textContent.trim(),
+       'reading the same word as the strip’s copy — one control, said once');
+    is([...here.options].map(o => o.value), [...strip.options].map(o => o.value),
+       'and offering the same two lists');
+
+    /* ── ONE CONTROL, TWO BOXES ─────────────────────────────────────────────
+       Both directions, because a copy that only follows is a copy that goes
+       stale the first time somebody uses the original. */
+    fire(here, 'features');
+    is(heading(), 'Loaded Features ', 'throwing it here changes the list on this tab');
+    is(strip.value, 'features', 'and moves the strip’s copy with it');
+    is(d.getElementById('btnClear').textContent, 'Clear This Team’s Features',
+       'everything the heading governs follows too');
+
+    fire(strip, 'items');
+    is(here.value, 'items', 'and throwing the strip’s copy moves this one back');
+    is(heading(), 'Loaded Data ', 'with the tab’s list following');
+
+    /* ── NEITHER IS OFFERED WHEN THERE IS NOTHING TO SWITCH BETWEEN ─────────
+       The same gate, so the two cannot disagree about whether this app has two
+       lists at all. */
+    plant({ teams: [{ id: 'ud3', name: 'Nothing to Switch',
+      rows: [{ c: '2026-03-10', s: '2026-03-01', t: 'Story' }] }], settings: {} });
+    win.selectTab('data');
+    ok(d.getElementById('unitField').hidden && d.getElementById('unitFieldData').hidden,
+       'with no features anywhere, both boxes go — not one of them');
+
+    /* ── AND IT IS NEVER A DOOR THAT LOCKS BEHIND YOU ──────────────────────
+       A team with work items and no features of its own, standing on the empty
+       feature list. The card is gated on the team's WORK ITEMS rather than on
+       the list showing, so the switch is still there to get back out with — the
+       orphaned-control fault this app has had reported twice. */
+    plant({ teams: [{ id: 'ud1', name: 'Two Lists',
+      rows: [{ c: '2026-03-10', s: '2026-03-01', t: 'Story', i: 'DAE-1', p: 'DAE-90' }],
+      features: [{ c: '2026-03-12', s: '2026-03-01', t: 'Feature', i: 'DAE-90' }] },
+      { id: 'ud2', name: 'Items Only',
+        rows: [{ c: '2026-03-11', s: '2026-03-02', t: 'Bug' }] }],
+      settings: { featureTypes: ['Feature'] } });
+    win.selectTab('data');
+    fire(d.getElementById('teamSel'), 'ud2');
+    win.selectTab('data');
+    fire(d.getElementById('unitSelData'), 'features');
+    ok(!d.getElementById('loadedCard').hidden,
+       'the card stays up over a team’s empty feature list');
+    ok(!d.getElementById('unitFieldData').hidden,
+       'and so does the switch that put the reader there');
+    ok(/No features loaded yet/.test(d.getElementById('dataTable').textContent),
+       'which says the list is empty rather than showing nothing at all');
+    fire(d.getElementById('unitSelData'), 'items');
+    is(heading(), 'Loaded Data ', 'and one press gets back out');
+
+    /* Put the view back — `view.unit` lives in td-view, which outlives the run.
+       The group above this one restores it for the same reason. */
+    fire(strip, uWas);
+    is(d.getElementById('unitSel').value, uWas,
+       'the unit is put back, so nothing after this group reads the wrong list');
+    plant({ teams: [], settings: {} });
   }
 
   /* ────────────────────────────────────────────────────────── */

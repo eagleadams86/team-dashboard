@@ -792,6 +792,13 @@ select { cursor: pointer; }
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 12px 18px; margin-bottom: 18px; }
 .controls .field { min-width: 160px; }
+/* The same control's Your Data copy (#unitFieldData). The strip sizes its own
+   by flexing it against four neighbours; this one stands alone in a card, and
+   every select in this app is width:100% — so uncapped it drew a 1200px box to
+   hold two words, which is the orphaned-field look in its other direction. 160px
+   is not a number chosen here: it is what `.controls .field` above resolves to,
+   so the same control is the same size on both tabs. */
+#unitFieldData { max-width: 160px; }
 /* The strip bottom-aligns its children so the selects sit on one line whatever
    height their labels wrap to — but the window note has no control to line up
    with, so flex-end just left it sitting low against the taller fields beside
@@ -1783,7 +1790,7 @@ main:focus { outline: none; }
      furniture. */
   .skip, .subtabs, .applink, .tile-help, .chart-max, .table-scroll .btn,
   header select, header label, #toast, #chartMaxi, #shareBar,
-  [data-export], dialog, #viewControls .field { display: none !important; }
+  [data-export], dialog, #viewControls .field, #unitFieldData { display: none !important; }
   /* The window note stays, and it is the one thing here that must: a figure on
      paper is worthless without the dates it covers. Its container is a flex row
      for the pickers that have just gone. */
@@ -2197,6 +2204,41 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <p class="hint">Press an item to edit it, or add one by hand. A row pasted from an export
         and a row typed in here are the same thing once they are saved — both go through the
         same checks, and both are yours to correct.</p>
+      <!-- ── THE SECOND HALF OF THE UNIT SWITCH (2026-08-27) ─────────────────
+           This tab shows ONE of a team's two lists, and until now the only way
+           to change which was to leave for the Dashboard, throw the switch in
+           the strip, and come back — reported by Charles standing on "Loaded
+           Features" with no way out of it. The heading naming the list was the
+           whole of the answer, and naming a thing is not the same as offering
+           to change it.
+
+           IT IS THE STRIP'S CONTROL, NOT A SECOND ONE. Same label, same two
+           options, same `view.unit`, same handler, and `renderUnitControl` sets
+           both boxes from `featureUnit()` on every render — so neither can
+           drift from what is actually being counted, and throwing either one
+           moves the other. What is deliberately NOT copied here is the rest of
+           the strip: a work type filter, a date window and Group by all narrow
+           a population, and none of them means anything to a raw list. This one
+           control is different, and the strip's own note says why — it is the
+           only one there that chooses WHICH population rather than which slice
+           of it. A tab showing a population is a tab that control belongs on.
+
+           Its own line above the table rather than up in the heading row beside
+           the buttons: a field is a label line over a control line, and dropped
+           into a row of one-line buttons it would sit out of line with all of
+           them — the orphaned-field complaint this app has had twice.
+
+           SAFE FROM ORPHANING: the card it sits in is gated on the team's WORK
+           ITEMS (renderEmptyState), not on the list on screen, so switching to
+           a team's empty feature list cannot take the switch away with the
+           table. -->
+      <div class="field" id="unitFieldData" hidden style="margin-top:var(--sp-5)">
+        <label for="unitSelData">Count</label>
+        <select id="unitSelData">
+          <option value="items">Work items</option>
+          <option value="features">Features</option>
+        </select>
+      </div>
       <div id="dataTable" style="margin-top:var(--sp-5)"></div>
     </div>
 
@@ -13726,12 +13768,13 @@ function renderDataTable() {
   const noun = feature ? 'feature' : 'item';
   $('rowCount').textContent = rows.length
     ? '(' + rows.length + ' ' + noun + (rows.length === 1 ? '' : 's') + ')' : '';
-  /* The heading names the list, because this tab does NOT carry the unit switch
-     — the strip at the top is for the two number views, and a work-type filter
-     or a date window means nothing to a raw list. So the reader who threw the
-     switch on the dashboard and came here needs the page itself to say which of
-     the two lists they are looking at; without it, a shorter table reads as
-     missing data. */
+  /* The heading names the list. It was written when this tab did NOT carry the
+     unit switch, to stop a shorter table reading as missing data — and it STAYS
+     now that the switch is here (see #unitFieldData), because the two say
+     different things: the switch is what you are asking for, the heading is
+     what you got. They are the same on a team that has both lists and are not
+     on a team that does not, which is exactly the case the heading was for. It
+     is also what the export filename is named from. */
   $('dataHeading').firstChild.textContent = feature ? 'Loaded Features ' : 'Loaded Data ';
   /* Only while there is a table to take. The card itself is already hidden until
      rows exist (renderEmptyState), but the buttons are drawn from here, so this
@@ -14092,12 +14135,18 @@ function renderUnitControl() {
      scope of eight features is as ordinary a thing to plan as forty items. */
   const offered = anyFeatures() || planningOn();
   $('unitField').hidden = !offered;
+  /* The Your Data copy follows the same gate, so the two appear and disappear
+     together: a switch offered on one tab and missing on the other would be the
+     app disagreeing with itself about whether this team has two lists. */
+  $('unitFieldData').hidden = !offered;
   /* Read back through featureUnit() rather than off `view`, so the box always
      shows what is actually being counted. A saved 'features' with no features
      left is silently items everywhere else in the app; a select still reading
      "Features" would be the one thing on screen contradicting that. */
-  $('unitSel').value = (planningOn() ? planningFeatureUnit() : featureUnit())
+  const shown = (planningOn() ? planningFeatureUnit() : featureUnit())
     ? 'features' : 'items';
+  $('unitSel').value = shown;
+  $('unitSelData').value = shown;
 }
 
 function renderAll() {
@@ -16158,11 +16207,20 @@ $('bucketSel').addEventListener('change', e => {
    what the charts are counting, and because whether the strip should be showing
    this control at all can change with it — deleting the last feature while
    standing on the feature view has to put the reader back on items AND take the
-   switch away. */
-$('unitSel').addEventListener('change', e => {
-  view.unit = e.target.value === 'features' ? 'features' : 'items';
-  saveView();
-  renderAll();
+   switch away.
+
+   TWO BOXES, ONE CONTROL. The Your Data tab carries its own copy (see the
+   markup) because that tab shows one of the two lists and the strip is not on
+   it. They share this handler rather than having one each, and renderAll ends
+   at renderUnitControl setting BOTH from featureUnit() — so throwing either
+   moves the other, and there is no path where one box says Features while the
+   other says Work items. */
+['unitSel', 'unitSelData'].forEach(id => {
+  $(id).addEventListener('change', e => {
+    view.unit = e.target.value === 'features' ? 'features' : 'items';
+    saveView();
+    renderAll();
+  });
 });
 
 /* The forecast's own two controls. renderDashboard rather than renderAll: they
