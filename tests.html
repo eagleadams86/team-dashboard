@@ -318,7 +318,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    size over a board that has a measured one, and 2749 the same day for what
    Charles found in it: the size row riding with the pace tick in planning, and
    Reset actually emptying the two boxes. */
-const EXPECTED = 2794;
+const EXPECTED = 2802;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -5003,7 +5003,12 @@ const stripComments = (src) => {
     const table = code.slice(at, code.indexOf('\n};', at));
     const entries = table.split(/\n  (?=\w+: \{)/).slice(1);
     ok(entries.length > 15, 'the help table was found at all — ' + entries.length + ' entries');
-    is(entries.filter((e) => !/^\w+: \{ title: .+, body: \[$/m.test(e.split('\n')[0]))
+    /* A TITLE OR A BODY MAY BE A FUNCTION since 2026-08-27 — three entries whose
+       subject changes with the Count switch resolve their unit when the window
+       opens, so `body: () => [` is as legal a shape as `body: [`. Widened here
+       rather than worked around in the table: the shape this line pins is "one
+       line, headed, opening its body" and that is still exactly what it pins. */
+    is(entries.filter((e) => !/^\w+: \{ title: .+, body: (?:\(\) => )?\[$/m.test(e.split('\n')[0]))
        .map((e) => e.split(':')[0]), [],
        'each entry is headed and opens its body array on the same line');
     /* Bodies are one string per line joined with +, so a short one is a stub
@@ -5028,6 +5033,46 @@ const stripComments = (src) => {
     ok(/function helpBtn\(key, label\) \{\s*\n\s*if \(!METRIC_HELP\[key\]\) return '';/.test(code),
        'a key with no entry draws no dot at all, which is what stands in for the '
        + "cross-check the sibling suites can run");
+
+    /* ── THE WINDOW IS NAMED IN THE UNIT ON SCREEN (2026-08-27) ──────────────
+       Found by sweeping every help window in the family. Every label, axis and
+       chart title here reads `Unit`/`Units` out of derive() — that block exists
+       so nobody spells "item" out — and METRIC_HELP was the one set of words
+       that could not, being a module-level literal. So with the Count switch on
+       Features, three windows opened headed Item beside a tile reading Feature:
+       `cycleScatter` ("Every Finished Item" over "Every finished feature"),
+       `itemAge` ("Work Item Age" over "Work feature age") and `forecastHowMany`
+       ("Items by a Date" over "Features by a date"). The dots' own aria-labels
+       followed the switch the whole time; only the window they opened did not.
+       Pinned against the SOURCE, since the table is a const this frame cannot
+       reach — the three must resolve their noun, and none of the others may
+       hard-code one, which is the half that catches the next entry written. */
+    const unitAware = ['cycleScatter', 'itemAge', 'forecastHowMany'];
+    for (const key of unitAware) {
+      const e = entries.find((x) => x.startsWith(key + ':')) || '';
+      ok(/title: \(\) =>[^\n]*helpUnits?\(\)/.test(e),
+         key + ' names its unit when the window opens, not when the table was written');
+      ok(!/title: \(\) =>[^\n]*'[^']*\b(Item|Items|Feature|Features)\b/.test(e),
+         'and ' + key + ' spells no unit noun into its own title');
+    }
+    /* forecastHowMany is the one whose BODY had to move too: its last paragraph
+       makes a counting claim ("it counts items, not points or value"), which is
+       a wrong statement about the figure in the other unit rather than merely a
+       wrong noun. */
+    const fhm = entries.find((e) => e.startsWith('forecastHowMany:')) || '';
+    ok(/body: \(\) => \[/.test(fhm) && /helpUnits\(\)\.toLowerCase\(\)/.test(fhm),
+       'and forecastHowMany\u2019s body counts in the unit on screen, since a reader told '
+       + 'the forecast counts items while the tile promises features has been told the '
+       + 'wrong thing about the figure');
+    /* SORTED both sides: the answer is a set, and pinning it in table order
+       would fail the day somebody moves an entry, which is not this rule. */
+    is(entries.filter((e) => !unitAware.includes(e.split(':')[0]))
+       .filter((e) => /^\w+: \{ title: '[^']*\b(Item|Items|Feature|Features)\b/.test(e))
+       .map((e) => e.split(':')[0]).sort(),
+       ['featureProgress', 'featureSize', 'schedule'],
+       'and the only entries left hard-coding a unit are the three that are about '
+       + 'FEATURES whichever list is counted \u2014 a new one spelling a noun into its '
+       + 'title fails here');
   }
 
 

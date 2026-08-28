@@ -1910,6 +1910,31 @@ that means concretely, and what a later edit must not tidy back:
   picker, count and delete were shouldered into each other. **The help window no longer takes
   that default at all** — since 2026-08-23 it is sized by its own text (see below), which comes
   out at 666px.
+- **A HELP TITLE OR BODY MAY BE A FUNCTION, and three of them are** (2026-08-27, found by
+  sweeping every help window in the family). Everything else on this page reads its unit
+  noun out of derive()'s `Unit`/`Units` block — that block exists so nobody spells "item"
+  out — but `METRIC_HELP` is a module-level literal, so its titles were the one set of
+  words on screen that could not follow the Count switch. With it on Features, three
+  windows opened headed **Item** beside a tile reading **Feature**: `cycleScatter`,
+  `itemAge` and `forecastHowMany`. The dots' own aria-labels had been following the
+  switch the whole time; only the window they opened did not.
+  `helpUnit()` / `helpUnits()` sit beside `featureUnit()` and are resolved when the
+  window OPENS, and the click handler calls a `title`/`body` that is a function — the
+  arrangement Sprint Predictability already uses for a metric's `target` line.
+  Three things worth keeping. It reads **`featureUnit()`, not `view.unit`**, because that
+  is this app's single answer to "which list are we reading" and already guards a dozen
+  readers: a stored `'features'` with no features left has to read as items here too, or
+  the window names a list the page is not showing. **`forecastHowMany`'s BODY moved as
+  well**, and it is the only one that had to — its last paragraph makes a counting claim
+  ("it counts items, not points or value"), which in the other unit is a wrong statement
+  about the figure rather than merely a wrong noun. And **`featureSize`, `featureProgress`
+  and `schedule` still hard-code a noun on purpose**: those three are about FEATURES
+  whichever list is being counted, and a test pins that they are the only ones left doing
+  it, so a new entry spelling a unit into its title fails.
+  **Known and deliberately not done:** `cycleScatter`'s and `itemAge`'s BODIES still say
+  "item" throughout (~7 and ~12 times). Much of that prose is genuinely item-specific —
+  issue keys, work types, workflow stages — so substituting a noun through it would make
+  claims that are not true of features. That is a content rewrite, not a naming fix.
 - **No `thead` on either table.** There is nothing a heading would add — a count says
   "217 items", a picker shows the train it is set to, and a name box is a name box. Each control
   keeps its own `aria-label`, which a visible heading was never going to give it.

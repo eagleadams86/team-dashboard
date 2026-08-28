@@ -9527,6 +9527,20 @@ const featureUnit = () => anyFeatures() && (view.unit === 'features' || !anyItem
    into featureUnit(), which guards a dozen readers of two lists that really do
    have to exist. */
 const planningFeatureUnit = () => planningOn() && view.unit === 'features';
+
+/* THE UNIT'S NAME FOR A HELP WINDOW, resolved when the window opens rather than
+   when the table is written (2026-08-27). Every label, axis and chart title on
+   this page already reads `Unit`/`Units` out of derive() — that block exists so
+   nobody spells "item" out — but METRIC_HELP is a module-level literal, so its
+   titles were the one set of words on screen that could not. Three of them said
+   Item beside a tile that said Feature: the dot's own aria-label followed the
+   switch, the window it opened did not.
+   `featureUnit()` and not `view.unit`, because that is the app's single answer
+   to "which list are we reading" and it already guards a dozen readers — a
+   stored 'features' with no features left has to read as items here too, or the
+   window names a list the page is not showing. */
+const helpUnit = () => (featureUnit() ? 'Feature' : 'Item');
+const helpUnits = () => helpUnit() + 's';
 const unitRowsOf = (team) => !team ? []
   : (featureUnit() ? (team.features || []) : (team.rows || []));
 
@@ -11367,7 +11381,7 @@ const METRIC_HELP = {
       + 'open, and none of that shows in the numbers themselves. Paste a fresh export for '
       + 'that team before drawing any conclusion about it.'],
   ] },
-  cycleScatter: { title: 'Every Finished Item', body: [
+  cycleScatter: { title: () => 'Every Finished ' + helpUnit(), body: [
     ['How long did each item actually take? ', b('One dot per item'), ', at the time it took, '
       + 'on the day it finished — where the chart beside it averages within each period, '
       + 'which is exactly what hides the one item that took five months.'],
@@ -11385,7 +11399,7 @@ const METRIC_HELP = {
       + 'if your paste had a Key column, and otherwise its work type and the date it '
       + 'finished.'],
   ] },
-  itemAge: { title: 'Work Item Age', body: [
+  itemAge: { title: () => 'Work ' + helpUnit() + ' Age', body: [
     [b('What do I do today?'), ' Every item still in progress, plotted at the age it has '
       + 'reached so far — not how long it took, because none of these has finished. The aged '
       + 'work chart beside it counts how many were stale at the end of each period; this one '
@@ -11425,15 +11439,23 @@ const METRIC_HELP = {
       + 'guess whichever row you pick, and the fix for that is steadier delivery, not a later '
       + 'date.'],
   ] },
-  forecastHowMany: { title: 'Items by a Date', body: [
+  /* TITLE AND BODY BOTH, and this is the one of the three where the body had to
+     move too: its last paragraph makes a counting claim ("it counts items, not
+     points or value"), which is the sentence that misleads in the other unit —
+     a reader told the forecast counts items while the tile beside it promises
+     features has been told the wrong thing about the figure, not merely shown
+     the wrong noun. */
+  forecastHowMany: { title: () => helpUnits() + ' by a Date', body: () => [
     ['How much will be finished by a date you have been given? The same '
       + FORECAST_TRIALS.toLocaleString() + ' runs, asked the other way round.'],
     ['Note the answers ', b('count down as you get more confident'), ', where the dates above '
       + 'count up: a smaller number is the safer promise, so 95% confidence buys you a lower '
       + 'figure, not a higher one. Every row says “at least” for that reason.'],
-    ['It counts items, not points or value, so it is ', b('only as good as your items being '
-      + 'roughly comparable in size'), ' — which, on a board whose cycle times cluster, they '
-      + 'usually are.'],
+    ['It counts ' + helpUnits().toLowerCase() + ', not points or value, so it is ',
+      b('only as good as your ' + helpUnits().toLowerCase()
+        + ' being roughly comparable in size'), ' — which, on a board whose cycle times '
+      + 'cluster, they usually are. One unusually large '
+      + helpUnit().toLowerCase() + ' is the case it reads worst.'],
   ] },
   forecastSamples: { title: 'Whole Periods Behind the Forecast', body: [
     ['How many completed periods the forecast had to deal from. It is the same set the '
@@ -14515,8 +14537,12 @@ document.addEventListener('click', e => {
   if (!btn) return;
   const h = METRIC_HELP[btn.dataset.help];
   if (!h) return;
-  $('helpTitle').textContent = h.title;
-  renderHelpBody($('helpBody'), h.body);
+  /* A title or a body may be a FUNCTION, called here — the arrangement Sprint
+     Predictability already uses for a metric's `target` line. It is what lets an
+     entry whose subject changes with the Count switch say which unit it is
+     about; everything else stays a plain string and is untouched. */
+  $('helpTitle').textContent = typeof h.title === 'function' ? h.title() : h.title;
+  renderHelpBody($('helpBody'), typeof h.body === 'function' ? h.body() : h.body);
   openModal($('helpDialog'));
 });
 $('helpCloseBtn').addEventListener('click', () => $('helpDialog').close());
