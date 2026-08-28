@@ -2278,11 +2278,25 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
          what to make of it. Rendered by renderDashboard(). -->
     <div id="dashTiles" class="tiles" hidden></div>
 
-    <!-- Charts are grouped by what the data means rather than by metric family:
-         Flow is how long work takes, Delivery is how much comes out, Health is
-         the state of the board. Charts that move together sit together, so a
-         group can be read as one picture. -->
-    <div class="subtabs" role="tablist" aria-label="Chart groups" id="dashSubtabs">
+    <!-- The first three are charts, grouped by what the data MEANS rather than by
+         metric family: Flow is how long work takes, Delivery is how much comes
+         out, Health is the state of the board. Charts that move together sit
+         together, so a group can be read as one picture.
+
+         THE FOURTH IS NOT A CHART GROUP, and the label on this tablist used to
+         say it was ("Chart groups", until 2026-08-27). Forecast is the one
+         section here you TYPE into — three question boxes, seven scenario
+         knobs, a typed-pace fieldset and two export tables — and its charts are
+         the working rather than the output. A screen reader announcing "chart
+         groups, 4 of 4, Forecast" was describing the one tab the phrase did not
+         fit. "Dashboard sections" covers all four and promises less.
+
+         The CODE still says chartTab / CHART_GROUPS / selectChartTab. Left
+         alone deliberately: `view.chartTab` is saved state and travels in a
+         share link, so renaming it would strand every reader's saved tab on the
+         next load to fix a word nobody outside this file reads. The label an
+         assistive technology speaks is the one that had to be true. -->
+    <div class="subtabs" role="tablist" aria-label="Dashboard sections" id="dashSubtabs">
       <button class="subtab" role="tab" id="stab-flow" aria-controls="spanel-flow"
         aria-selected="true" tabindex="0">Flow</button>
       <button class="subtab" role="tab" id="stab-delivery" aria-controls="spanel-delivery"
@@ -2534,10 +2548,25 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             </div>
           </div>
           <p class="hint" id="fcHint"></p>
-          <!-- Its own line rather than more sentences in the hint: it is the one
-               thing here that says a figure was computed over a DIFFERENT window
-               from the charts above, and that has to be findable rather than
+          <!-- ── The two divergence notes ────────────────────────────────────
+               Everything else on this tab is the one team in the header picker.
+               These two lines are the only place that stops being true, so each
+               says so outright: a figure must never move for a reason that is
+               not on the page.
+
+               TWO ELEMENTS, NOT ONE, and in this order — WHO first, then over
+               WHAT. They are separate claims with separate causes: the scope is
+               a choice the reader made in the box directly above, the coverage
+               trim is something their data did to them. Merged into one
+               paragraph the second reads as a footnote to the first, and it is
+               the one that changes a number. Both fire together often (pooling
+               is what exposes a short export in the first place), which is
+               exactly why they must stay legible as two.
+
+               Their own lines rather than more sentences in the hint, for the
+               reason that note already had: this has to be findable rather than
                buried at the end of a paragraph nobody finishes. -->
+          <p class="note info" id="fcScopeNote" hidden></p>
           <p class="note info" id="fcStale" hidden></p>
         </div>
 
@@ -12896,6 +12925,39 @@ function renderForecast(d, scope, stale) {
               ? ' That is ' + behindDays + ' ' + (behindDays === 1 ? 'day' : 'days')
                 + ' ago \u2014 every date below is that much early unless you count from today.'
               : ''));
+
+  /* ── WHOSE numbers these are, when they are not this team’s ─────────────
+     The Dashboard tab makes one implicit promise: everything on it is the team
+     in the header picker. This card is the only thing that can break it —
+     "Whose pace" pools a train or the whole estate — and until now nothing
+     said so in those terms. The scope was NAMED in four places (the hint, the
+     two chart titles and the figures table), which is not the same claim: a
+     reader who has just been looking at Flow reads "dealt from the Payments
+     train pooled" as extra detail about the team they are already on.
+
+     So this is the coverage note’s sibling and is written to the same standard
+     it set — it names what is DIFFERENT from the rest of the screen, not just
+     what this card did. It names the control too, because the control is two
+     inches above it and is the thing to change if the answer is unwanted.
+
+     SILENT IN PLANNING MODE. With no history there are no tiles and no other
+     sections — renderDashboard hides all three and the tiles with them — so a
+     line contrasting this card with charts that are not on screen would be the
+     page describing something the reader cannot see.
+
+     SILENT WHEN THE POOL IS THIS TEAM. A train with one team on it, picked by
+     that team, is the same rows through the same derive: no divergence to
+     report, and claiming one would be its own false alarm. */
+  const fcTeam = activeTeam();
+  const pooledElsewhere = !!(scope && scope.kind !== 'team'
+    && !(scope.teams.length === 1 && fcTeam && scope.teams[0].id === fcTeam.id));
+  $('fcScopeNote').hidden = !pooledElsewhere || !!d.planning;
+  if (!$('fcScopeNote').hidden) {
+    $('fcScopeNote').textContent = 'The tiles above and the Flow, Delivery and Health '
+      + 'charts are ' + (fcTeam ? fcTeam.name : 'the team in the picker') + ' alone. This '
+      + 'forecast is not \u2014 \u201cWhose pace\u201d is set to ' + scope.phrase
+      + ', and the team picker in the header does not reach it.';
+  }
 
   /* What the coverage trim took off, and who caused it. Said outright rather
      than left to the reader to notice that a pooled window is shorter than the

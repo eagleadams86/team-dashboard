@@ -320,6 +320,45 @@ device-local. No `SCHEMA` bump; it DOES travel in a share link (see below).
   not added there silently never arrives. `countFrom` did exactly that for a day: it worked on a
   pooled scope, which goes through `deriveTeams` and its own object, and did nothing on a single
   team. **If you add a view field the forecast reads, add it in BOTH places.**
+## Forecast Placement — Kept Under Dashboard (2026-08-27) — no schema change
+
+Charles asked whether the forecast should be its own top-level tab. **It stays a section of the
+Dashboard tab**, and the reason is the strip above it: `months`, `bucket`, `filterValue`, the
+custom From/To pair and the Count switch ALL feed the forecast — see the view object
+`renderDashboard` hands `deriveTeams` and `derive`. A forecast here is a resample of the history
+in whatever window that strip is set to. Sitting beside Flow, Delivery and Health is what tells
+a reader that widening from 3 months to 12 moves the forecast too; promoted, it would be a
+top-level tab silently governed by a control last touched on a different one — the fault this
+file already records against Settings when Settings left the strip. Planning mode already does
+the promotion where it is warranted: `renderDashboard` hides the other three and forces
+`selectChartTab('forecast')`.
+
+**The counter-case is real and worth re-reading before anyone changes this.** Forecast is ~305
+lines of markup against Flow's 61, Delivery's 32 and Health's 103 — more than the other three
+combined — and it is the only one you TYPE into. If a second forecasting surface ever lands,
+promote them together; one section outgrowing its siblings is not on its own a reason.
+
+Two defects that placement had were fixed the same day:
+
+- **The tablist is named `aria-label="Dashboard sections"`, not "Chart groups".** Forecast is not
+  a chart group — its charts are the working and the tables are the output — so a screen reader
+  announcing "chart groups, 4 of 4, Forecast" was mislabelling the one tab the phrase did not
+  fit. **The code still says `chartTab` / `CHART_GROUPS` / `selectChartTab` on purpose**:
+  `view.chartTab` is saved state and travels in a share link, so renaming it would strand every
+  reader's saved section on the next load to fix a word only this file reads.
+- **`#fcScopeNote` says when the forecast is not this team.** The Dashboard tab makes one
+  implicit promise — everything on it is the team in the header picker — and "Whose pace" is the
+  only control that breaks it. The scope was already NAMED in four places (the hint, both chart
+  titles, the figures table), which is a weaker claim: somebody who has just been reading Flow
+  takes "dealt from the Payments Train pooled" as extra detail about the team they are on. The
+  new line names what is DIFFERENT, and names the control that did it. It is `#fcStale`'s
+  sibling and deliberately a SECOND element rather than more sentences in it — who first, then
+  over what; they are separate claims with separate causes, and the pair fires together often
+  because pooling is what exposes a short export in the first place. **Two exemptions, both
+  tested:** silent in planning mode (there are no tiles or other sections to contrast with), and
+  silent when the pool is one team that is already the picked one (same rows, same derive — a
+  divergence note there would be a false alarm on a card whose whole job is to be believed).
+
 ## The Three Forecast Extras (2026-08-25) — no schema change
 
 Asked for straight after phase 5 shipped, having been left out of it. All three are additions
@@ -2244,7 +2283,7 @@ type. What must not regress:
 
 ## The Monte Carlo Forecast (2026-08-20)
 
-The fourth chart group, and the only one that looks forward. It resamples this team's own
+The fourth section of the Dashboard tab, and the only one that looks forward. It resamples this team's own
 recorded throughput ten thousand times and reports how often each outcome came up. What must
 not regress:
 

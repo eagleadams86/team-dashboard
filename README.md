@@ -1868,6 +1868,14 @@ With two or more teams the tab gains a **Whose pace** picker: the team on screen
 name, the teams on no ART, or all of them. Everything else on the dashboard stays the team in the
 header — only the forecast widens.
 
+**And the card says so, in those words.** Pick a train and a line appears above the answers
+naming the team the tiles and the Flow, Delivery and Health charts are still showing, and the
+picker that took this one somewhere else. Naming the scope was never quite enough on its own:
+somebody who has just been reading Flow reads "dealt from the Payments Train pooled" as extra
+detail about the team they are already on. It stays away when there is nothing to report —
+on your own team, and on a train that carries only the team you already had picked, which is
+the same rows through the same arithmetic.
+
 **It pools the work items, it does not add up the teams' answers.** One draw takes a calendar
 period and asks what the whole train delivered in it, so a week they all lost — a freeze, an
 incident, planning week, a holiday — is counted once, as it happened. Adding up independent
@@ -2269,8 +2277,8 @@ Every chart card has a **⤢** button in its top-right corner. Press it and that
 window — the same chart, the same figures, drawn at four or five times the size, which is the
 difference between "there is a spike around week 29" and being able to read which week it is.
 Press it again, press **Esc**, or click the margin around the card to come back. Everything
-else on the page stays exactly where you left it, including which tab and which chart group you
-were on.
+else on the page stays exactly where you left it, including which tab and which section of the
+dashboard you were on.
 
 **The menu stays put.** The header — the team picker, the theme, Teams & Stages, Back up and
 Share — is still there above the chart and still works, so you can flick a chart between two

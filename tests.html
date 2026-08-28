@@ -318,7 +318,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    size over a board that has a measured one, and 2749 the same day for what
    Charles found in it: the size row riding with the pace tick in planning, and
    Reset actually emptying the two boxes. */
-const EXPECTED = 2802;
+const EXPECTED = 2820;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9881,6 +9881,141 @@ group('a card with no chart matches the one beside it');
     f.remove();
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
     if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the forecast says when it is not this team');
+
+  /* ── THE DASHBOARD TAB'S ONE IMPLICIT PROMISE ─────────────────────────────
+     Everything on that tab is the team in the header picker. "Whose pace" is
+     the only control that breaks it, and the scope being NAMED on the card
+     ("dealt from the Payments Train pooled") is a weaker claim than saying it
+     differs from the tiles and charts the reader was just looking at. Pinned
+     BOTH directions: a note that is always up is as useless as one that never
+     is, and the exemptions below are where an always-up one would have shown. */
+  {
+    /* Sixteen weeks of three a week, so the forecast clears its period floor
+       and the card is a real one rather than a refusal. */
+    const scRows = (shift) => {
+      const out = [];
+      for (let w = 16; w >= 1; w--) for (let i = 0; i < 3; i++) {
+        const t = Date.now() - ((w * 7 + shift + i) * 86400000);
+        out.push({ c: new Date(t).toISOString().slice(0, 10),
+                   s: new Date(t - 3 * 86400000).toISOString().slice(0, 10), t: 'Story' });
+      }
+      return out;
+    };
+    plant({ arts: [{ id: 'sn1', name: 'Payments Train' },
+                   { id: 'sn2', name: 'Lone Train' }],
+            teams: [{ id: 'sa', name: 'Kestrel', artId: 'sn1', rows: scRows(0) },
+                    { id: 'sb', name: 'Merlin', artId: 'sn1', rows: scRows(1) },
+                    { id: 'sc', name: 'Osprey', artId: 'sn2', rows: scRows(2) }],
+            settings: {} });
+    win.selectTab('dashboard');
+    win.selectChartTab('forecast');
+
+    const scopeSel = win.document.getElementById('fcScope');
+    const scopeNote = win.document.getElementById('fcScopeNote');
+    const teamSel = win.document.getElementById('teamSel');
+    /* Through the picker's own change event, not by setting view state: the
+       note is drawn by the render that event triggers, and a test that skips
+       the control cannot see a handler that stopped firing. */
+    const fire = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('change', { bubbles: true })); };
+
+    ok(!win.document.getElementById('fcScopeField').hidden,
+       'three teams is enough for the scope picker to be offered at all');
+
+    /* SET, not assumed. `forecastScope` lives in `td-view`, which plant() does
+       not touch and which the browser carries between runs — so a scope left
+       behind by a previous run (or by somebody using the app in this profile)
+       booted this group already pooled and failed the check below. It passed
+       the first time it was ever run and failed the second, which is the
+       ambient-state trap this file warns about at the top. */
+    fire(scopeSel, '');
+    ok(scopeNote.hidden,
+       'on this team alone there is no divergence, so the note stays away');
+
+    /* '~all' is FC_SCOPE_ALL. Written out because a top-level const is not a
+       property of window, so the suite cannot read the name from the app. */
+    ok([...scopeSel.options].some(o => o.value === '~all'),
+       'the picker offers every team, which is the value the next checks use');
+    fire(scopeSel, '~all');
+    ok(!scopeNote.hidden, 'pooling every team raises the note');
+    ok(/Kestrel/.test(scopeNote.textContent),
+       'which names the team the rest of the tab is still showing',
+       scopeNote.textContent);
+    ok(/Flow, Delivery and Health/.test(scopeNote.textContent),
+       'and what on that tab is showing it — the contrast is the whole point');
+    ok(/Whose pace/.test(scopeNote.textContent),
+       'and the control to change it, two inches above the note');
+    ok(/all 3 teams/.test(scopeNote.textContent),
+       'the scope said in the picker’s own words', scopeNote.textContent);
+
+    fire(scopeSel, 'sn1');
+    ok(!scopeNote.hidden && /Payments Train/.test(scopeNote.textContent),
+       'a train carrying two teams is a divergence too', scopeNote.textContent);
+
+    /* ── THE ONE POOL THAT IS NOT A DIVERGENCE ────────────────────────────
+       A train carrying exactly the team already in the picker is the same rows
+       through the same derive: nothing to report, and a false alarm on a card
+       whose whole job is to be believed is worse than silence. */
+    fire(teamSel, 'sc');
+    win.selectChartTab('forecast');
+    fire(scopeSel, 'sn2');
+    ok(scopeNote.hidden,
+       'a one-team train, picked by that team, pools nothing and says nothing',
+       scopeNote.textContent);
+
+    /* Back to a train with somebody else on it, from the same team, to prove
+       the exemption above is about the POOL and not about having switched team. */
+    fire(teamSel, 'sa');
+    win.selectChartTab('forecast');
+    fire(scopeSel, 'sn1');
+    ok(!scopeNote.hidden, 'and the note returns the moment the pool is more than one team');
+
+    fire(scopeSel, '');
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ── SILENT WHERE THERE IS NOTHING TO CONTRAST WITH ──────────────────────
+     In planning mode renderDashboard hides the tiles and the other three
+     sections, so a line pointing at "the Flow, Delivery and Health charts"
+     would be pointing at a screen that has none. The scope is deliberately
+     pooled here — without that this check would pass on the team-scope branch
+     and never reach the guard it exists for. */
+  {
+    plant({ teams: [{ id: 'pn1', name: 'Nothing Yet', rows: [] },
+                    { id: 'pn2', name: 'Also Nothing', rows: [] }], settings: {} });
+    const planBtn = win.document.getElementById('welcomePlanBtn');
+    ok(!!planBtn, 'two empty teams still get the welcome card’s forecast door');
+    planBtn.click();
+    const pScope = win.document.getElementById('fcScope');
+    ok(!win.document.getElementById('fcScopeField').hidden,
+       'and the scope picker with it, so the pooled branch is reachable here');
+    pScope.value = '~all';
+    pScope.dispatchEvent(new win.Event('change', { bubbles: true }));
+    ok(win.document.getElementById('fcScopeNote').hidden,
+       'planning mode raises no divergence note even pooled — there is nothing '
+       + 'above it to differ from');
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ── THE TABLIST NO LONGER CALLS THE FORECAST A CHART GROUP ──────────────
+     Forecast is the one section on that strip you type into, and its charts are
+     the working rather than the output. A screen reader announcing "chart
+     groups, 4 of 4, Forecast" was describing the one tab the phrase did not fit. */
+  {
+    const strip = win.document.getElementById('dashSubtabs');
+    is(strip.getAttribute('role'), 'tablist', 'the strip is still a tablist');
+    ok(!/chart/i.test(strip.getAttribute('aria-label') || ''),
+       'and its accessible name no longer promises charts',
+       strip.getAttribute('aria-label'));
+    ok((strip.getAttribute('aria-label') || '').trim().length > 0,
+       'a tablist on a page that has two still needs a name of its own',
+       strip.getAttribute('aria-label'));
+    is([...strip.querySelectorAll('[role="tab"]')].map(t => t.textContent.trim()),
+       ['Flow', 'Delivery', 'Health', 'Forecast'],
+       'the four it names, in the order the reader meets them');
   }
 
   /* ────────────────────────────────────────────────────────── */
