@@ -11053,7 +11053,14 @@ group('a card with no chart matches the one beside it');
   /* A card with nothing drawn under it offers no button at all: lead time on a
      team with no created dates is the case that is always reachable. */
   const leadCard = mDoc.getElementById('cardLeadTime');
-  ok(!leadCard.querySelector('.chart-max').hidden,
+  /* The COMPUTED DISPLAY, never the `hidden` property. `.chart-max` declares
+     `display: flex`, and an author rule beats the browser's own
+     `[hidden] { display: none }` whatever their specificities — so the attribute
+     read true while the button sat there on screen, offering a chart that isn't
+     drawn. Found in Money Map on 2026-08-30 and fixed in all four apps that
+     carry this feature; an assertion on `.hidden` was deaf to it in every one. */
+  const shownBtn = (btn) => win.getComputedStyle(btn).display !== 'none';
+  ok(shownBtn(leadCard.querySelector('.chart-max')),
      'lead time is on offer for a team that has created dates');
 
   /* The header stays live while a chart fills the window — that is the point of
@@ -11065,8 +11072,11 @@ group('a card with no chart matches the one beside it');
   const teamPicker = mDoc.getElementById('teamSel');
   teamPicker.value = 'mx2';
   teamPicker.dispatchEvent(new win.Event('change', { bubbles: true }));
-  ok(leadCard.querySelector('.chart-max').hidden,
+  ok(!shownBtn(leadCard.querySelector('.chart-max')),
      'a team with no created dates has no lead time chart, so no button either');
+  is(Math.round(leadCard.querySelector('.chart-max').getBoundingClientRect().width), 0,
+     'and the button takes no room on the card it has gone from — a button that does '
+     + 'nothing is worse than no button');
   ok(win.tdMaxi.current() === null,
      'and the window came back down rather than holding an empty card up');
   ok(leadCard.parentElement !== overlay, 'with the card back on the page it came from');
