@@ -11,6 +11,28 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## Chart text is on the ramp, and in the app's face (2026-08-30) — no schema change
+
+**`applyChartTextDefaults()` sets four Chart.js defaults before every
+construction: `color`, `borderColor`, `font.family` and `font.size = fsPx('xs')`.**
+Sprint Predictability's block, ported the same day the family's tooltips were
+swept — these two apps share their chrome, so a chart in one and a chart in the
+other have to be the same text beside each other.
+
+This app already passed `font: { size: fsPx('xs') }` to every axis and title it
+NAMES. What that left behind were the two it does not name — **the tooltip and
+the legend**, at Chart.js's built-in 12px — and every one of them in Chart.js's
+built-in Helvetica rather than the face the page is set in.
+
+- **Set BEFORE the construction.** Chart.js copies the defaults into the chart at
+  that moment and never looks at them again, which is why the call sits at the
+  top of `renderChart` — and why `chartTrainThroughput`, the one chart built
+  outside `renderChart`, calls it for itself. The suite pins that second call
+  site by name, because it is the one that would quietly keep whatever the last
+  chart happened to leave set.
+- The explicit `font: { size: fsPx('xs') }` on the axes is the same value and is
+  left in place.
+
 ## Only Numbers, Dates and Two Guarded Labels Are Ever Saved (2026-08-12/13, amended 2026-08-20/21)
 
 - **⌕ Find / ⌘K is Money Map's window, ported (2026-08-23)** — `searchApp(st, query)` is PURE over the state it is handed; two-character minimum, `SEARCH_CAP` of 80 with the overflow COUNTED so the cap is never silent, and the count span (`role="status"`) is the live region rather than the results list. **It adds no field and stores nothing**: a team name, an ART name, a stage name, a stage alias, a ≤40-char work type and a key-shaped issue key are the only words this app keeps at all, so Find can only ever reach what the whitelists already let in — do not "improve" it by matching anything that is not already stored. An item hit carries the INDEX into its own team's rows (what `openItemDialog` takes), which is why `goToSearchHit` sets the team before it renders. The item snippet reads the COMPLETION date only — the sort reads whichever date the row has, but an in-progress row shown as its start date reads as one that finished that day. `renderSearchResults` fences a shared view down to team and ART hits, since the data tab and the stages window are not there. `SEARCH_VIEW_LABEL` must name every visible tab plus `stage`; tests assert both directions, and the header-order sweep pins where the button sits. Mirrored into Sprint Predictability and Golf Handicap in the same pass — a change to one belongs in all three — and the Task Dashboard has one too, which makes six windows in five apps plus the starter.

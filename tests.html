@@ -318,7 +318,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    size over a board that has a measured one, and 2749 the same day for what
    Charles found in it: the size row riding with the pace tick in planning, and
    Reset actually emptying the two boxes. */
-const EXPECTED = 2839;
+const EXPECTED = 2847;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -10953,6 +10953,47 @@ group('a card with no chart matches the one beside it');
     f.remove();
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
     if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('chart text is on the ramp, and in the app’s own face');
+
+  /* Chart text is painted onto a canvas, so it inherits nothing: every size in a
+     Chart.js config is a raw number of pixels, which is the one thing the rem
+     ramp exists to stop the page containing. This app already passed
+     `font: { size: fsPx('xs') }` to every axis and title it NAMES — which left
+     the two it does not name, the tooltip and the legend, at Chart.js's built-in
+     12px, and left all of them in Chart.js's built-in Helvetica rather than the
+     face the page is set in. Swept across the family on 2026-08-30. */
+  {
+    const ramp = win.fsPx('xs');
+    ok(ramp > 0, 'the app resolves the chrome step to pixels', ramp);
+    is(win.Chart.defaults.font.size, ramp, 'the chart default is the ramp’s xs step');
+    is(win.Chart.defaults.font.family, win.getComputedStyle(win.document.body).fontFamily,
+       'and the face is the page’s, not Chart.js’s Helvetica');
+    /* Something has to be PLOTTED before a tooltip's resolved font can be read,
+       and whatever ran before this left the frame with nothing in it. Planted
+       here rather than assumed, for the reason the whole suite is written this
+       way: a check that silently reads zero charts passes on any bug at all. */
+    plant({ stages: [], arts: [], settings: {},
+            teams: [{ id: 'fz1', name: 'Fonts', rows: [
+              { c: '2026-08-09', s: '2026-08-02', k: '2026-07-28', t: 'Story', i: 'FZ-1' },
+              { c: '2026-08-12', s: '2026-08-04', k: '2026-07-30', t: 'Bug', i: 'FZ-2' }] }] });
+    win.renderAll();
+    const drawn = Object.values(win.tdCharts()).filter(Boolean);
+    ok(drawn.length > 0, 'there are charts to read it off', drawn.length);
+    const tips = drawn.map((c) => c.options.plugins.tooltip);
+    ok(tips.every((t) => t.bodyFont.size === ramp && t.titleFont.size === ramp),
+       'every tooltip is drawn at it — the default has to be set BEFORE the chart is '
+       + 'constructed, because Chart.js copies it in at that moment',
+       JSON.stringify(tips.map((t) => t.bodyFont.size)));
+    ok(tips.every((t) => t.bodyFont.family === win.Chart.defaults.font.family),
+       'and in the same face');
+    /* The train chart is the one built outside renderChart, so it is the one
+       that would quietly keep whatever the last chart happened to leave set. */
+    ok(/applyChartTextDefaults\(\);\s*\n\s*trainChart = new Chart/.test(APP_SRC),
+       'the train chart asks for the defaults itself, since it does not go through '
+       + 'renderChart');
   }
 
   /* ────────────────────────────────────────────────────────── */
