@@ -1025,6 +1025,14 @@ select { cursor: pointer; }
   color: var(--text-secondary); cursor: pointer; }
 .chart-max:hover { color: var(--text-primary); background: var(--surface-alt);
   border-color: var(--text-secondary); }
+/* The icon is never the thing that was clicked. Pressing this button rewrites
+   its own innerHTML to the arrows-in icon, which DETACHES whatever the pointer
+   actually landed on — and a detached node answers null to every `closest()` a
+   delegated handler further up might ask. Nothing here acts on a null answer
+   today; Money Map's card heading did, and pressing the button there folded the
+   card instead of filling the window (2026-08-30, reported within the hour).
+   One line closes the class, in all four apps that carry this feature. */
+.chart-max svg { pointer-events: none; }
 .chart-card .chart-name, .chart-card .chart-title { padding-right: 34px; }
 
 /* The overlay starts BELOW the sticky header — --maxi-top is the header's own
