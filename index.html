@@ -11716,7 +11716,7 @@ function renderTeamRows() {
     const tr = document.createElement('tr');
     const only = state.teams.length === 1;
     tr.innerHTML =
-      '<td><input type="text" data-team="' + t.id + '" maxlength="120" value="' + escapeHtml(t.name) +
+      '<td><input type="text" data-team="' + escapeHtml(t.id) + '" maxlength="120" value="' + escapeHtml(t.name) +
         '" aria-label="Name of team, row ' + (i + 1) + '"></td>' +
       projCell(t, i) +
       artCell(t, i) +
@@ -12439,8 +12439,21 @@ function renderFeatureCards(d, bd) {
         backgroundColor: tint(token('--series-1'), 0.45),
         borderColor: token('--series-1'), borderWidth: 1,
         categoryPercentage: 1, barPercentage: 1 }] }, options: opts });
+    /* A canvas is a bitmap to a screen reader — the same rule drawCharts'
+       describe() applies to every other chart. The title already carries the
+       count, the median and the percentile, so it is the text alternative; the
+       features themselves are listed on the Your Data tab under the Count
+       switch. Stripped below when the chart is not drawn, like chartAgedWork,
+       so a stale label can never describe a canvas that is not there. */
+    const szCanvas = $('chartFeatureSize');
+    szCanvas.setAttribute('role', 'img');
+    szCanvas.setAttribute('aria-label', 'Items per feature — '
+      + $('titleFeatureSize').textContent
+      + '. Every underlying feature is listed on the Your Data tab.');
   } else if (charts.chartFeatureSize) {
     charts.chartFeatureSize.destroy(); delete charts.chartFeatureSize;
+    const szCanvas = $('chartFeatureSize');
+    szCanvas.removeAttribute('aria-label'); szCanvas.removeAttribute('role');
   }
 
   /* ── What is still open, and how far along ──────────────────────────────── */
@@ -17534,7 +17547,7 @@ const SHARE_WARN_AT = 8000;
 function openShare() {
   const active = activeTeam();
   $('shareTeams').innerHTML = state.teams.map(t =>
-    '<label class="checkline"><input type="checkbox" data-share-team="' + t.id + '"' +
+    '<label class="checkline"><input type="checkbox" data-share-team="' + escapeHtml(t.id) + '"' +
     (active && t.id === active.id ? ' checked' : '') + '><span>' + escapeHtml(t.name) +
     (t.rows.length ? ' (' + t.rows.length + ' item' + (t.rows.length === 1 ? '' : 's') + ')' : ' (empty)') +
     '</span></label>').join('');
@@ -17775,7 +17788,7 @@ function renderCleanupTeams(preset) {
   const keep = preset || new Set(
     Array.from(box.querySelectorAll('input:checked')).map(i => i.dataset.cleanTeam));
   box.innerHTML = state.teams.map(t =>
-    '<label class="checkline"><input type="checkbox" data-clean-team="' + t.id + '"' +
+    '<label class="checkline"><input type="checkbox" data-clean-team="' + escapeHtml(t.id) + '"' +
     (keep.has(t.id) && t.rows.length ? ' checked' : '') + (t.rows.length ? '' : ' disabled') +
     '><span>' + escapeHtml(t.name) +
     (t.rows.length ? ' (' + t.rows.length + ' item' + (t.rows.length === 1 ? '' : 's') + ')' : ' (empty)') +

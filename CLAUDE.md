@@ -342,6 +342,27 @@ device-local. No `SCHEMA` bump; it DOES travel in a share link (see below).
   not added there silently never arrives. `countFrom` did exactly that for a day: it worked on a
   pooled scope, which goes through `deriveTeams` and its own object, and did nothing on a single
   team. **If you add a view field the forecast reads, add it in BOTH places.**
+## Features Age Against Their Own Threshold (2026-08-27) — SCHEMA 12 → 13
+
+`settings.featureAgedDays`, and it **ships EMPTY**. The Aged work card in the feature view was
+counting features against the item threshold — a fortnight is a coaching convention about work
+items and does not survive the change of unit, so read against features it flagged boards that
+were behaving normally.
+
+- **Null means "not set" and must SURVIVE as null, never as 0.** It is in `NULLABLE_SETTINGS`
+  beside `outlierDays`, and `normalizeSettings` keeps only a number > 0. There is no number this
+  app is entitled to assume about somebody else's features, so with nothing set there is no aged
+  figure, no aged chart and no threshold line — not a figure computed against zero. Every reader
+  of an aged feature figure has to pass null through rather than defaulting it.
+- **SCHEMA 12 → 13 in the same commit as the whitelist entry**, per the rule at the top: an older
+  build would strip the key on load and push the stripped copy back. Settings ride into a share
+  link whole, so the threshold travels; `SHARE_PAYLOAD_V` unchanged.
+- **The demo sets 30 days at Load-sample time (`DEMO_FEATURE_AGED`)** — a number for those two
+  boards, not a default the app holds — so the feature view tells the same story about the same
+  teams the item view does, and the load-sample confirm names it.
+- `privacy.html`'s storage list already covered it ("the thresholds"); its effective date moved
+  to 2026-08-27 with this change.
+
 ## The Unit Switch Is on Two Tabs (2026-08-27) — no schema change
 
 Reported by Charles standing on "Loaded Features" with no way out of it: the Count switch lived
@@ -2492,7 +2513,9 @@ app now holds identifiers out of a work system, and the answer to "where does th
     could not read straight off GitHub, and the data stays in localStorage,
     which every page on the origin could already reach. It cuts the other way
     too — `activate` must only ever delete caches with this app's `td-shell-`
-    prefix, or it wipes a sibling's.
+    prefix, or it wipes a sibling's. (The SHELL list also carries the manifest
+    and the four install icons since 2026-08-22 — still all public files in this
+    repo, which is the rule.)
   - *"A caching bug serves stale code to an app whose data shape moves."* Still
     the real risk. **The worker is network-first for everything**: you can only
     be served cached code on a visit where the network did not answer. The
@@ -2504,8 +2527,10 @@ app now holds identifiers out of a work system, and the answer to "where does th
   runs with **no CSP at all**, permanently installed. Hence: tiny, no `eval`, no
   `importScripts`, no dynamic import, no cross-origin URL anywhere in it — and
   hence `worker-src 'self'` spelled out in the page CSP rather than left to the
-  `worker-src → child-src → script-src` fallback chain, which would inherit
-  script-src's gstatic and accounts.google.com hosts.
+  `worker-src → child-src → script-src` fallback chain — which, when this was
+  written, would have inherited script-src's gstatic and accounts.google.com
+  hosts. Those went with sync (2026-08-20); the directive stays spelled out so
+  no origin ever added to script-src can reach the worker by fallback.
 - **`sw-kill.js` is the escape hatch, and it exists BEFORE it is needed.** A bad
   page is fixed by pushing a new one; a bad worker is resident and can keep
   serving itself. `cp sw-kill.js sw.js`, commit, push — every installed copy
@@ -2544,7 +2569,7 @@ app now holds identifiers out of a work system, and the answer to "where does th
   When a rule in this file changes, change the matching test in the same commit.
 - **tests.html busts its own cache, on the frames AND on the source fetches
   (2026-08-22), and that is not tidiness.** `const BUST = '?t=' + Date.now()` goes
-  on all six hidden `iframe.src`es and through `bustFetch()` on every read of a
+  on every hidden `iframe.src` (six when this was written, twelve now) and through `bustFetch()` on every read of a
   file this repo ships. The frame cache and the HTTP cache are different caches
   and they can disagree: in the lottery repo the same harness reported
   **all-green against a page three features out of date**, because the
@@ -2848,7 +2873,8 @@ page out of five is not a convention.
 - **Decorative glyphs on buttons are `aria-hidden` everywhere, not just in the header.** The
   header row got the treatment on 2026-08-21 and the rest of the app did not, so a screen
   reader still read "downwards black arrow, Export JSON" in every dialog. Around 50 buttons
-  across the family were wrapped in the same pass. The sync button is the exception that
-  proves it: its label is rewritten with `textContent` as the state changes, so a span there
-  would be blown away — it carries an `aria-label`, re-stated in every branch of `updateUI()`
-  so it can never be left describing the previous state.
+  across the family were wrapped in the same pass. The sync button was the exception that
+  proved it: its label was rewritten with `textContent` as the state changed, so a span there
+  would have been blown away — it carried an `aria-label` re-stated in every branch of
+  `updateUI()` instead. Both went with sync's removal (2026-08-20); the pattern is recorded
+  here for the next state-changing button.
