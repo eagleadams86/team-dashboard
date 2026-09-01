@@ -11,6 +11,98 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## A Filter Row May Name Several Work Types (2026-09-01) — no schema change
+
+Asked for by Charles, who had already typed `Stories and Tasks → Story, Task` into
+the list and wanted to know whether that was the right shape before it was built.
+It was, and the reason is that **this app already had the convention twice**:
+`featureTypes` and the stage aliases are both comma-separated lists of work-type
+labels typed into one box. A third spelling of "several labels in one field" —
+a multi-select, a chip editor, a checkbox list of the types found in the paste —
+would have been one more thing to learn for a board that already knows this one.
+
+**NO SCHEMA BUMP AND NO MIGRATION, and that is not a happy accident.** `value`
+is the string it always was; only what reads it changed. A saved copy, a backup
+file and a share link all still carry exactly what they carried, and — because
+the family's five stateful apps HALT on data newer than the code — a reader on a
+cached build is not locked out of their own dashboard by a settings nicety. The
+worst an old build does with `Story, Task` is match nothing.
+
+- **`filterTypes(value)` is the one rule about what a filter keeps**, and it
+  returns `null` for "no filter" rather than an empty array, so a caller cannot
+  read "everything" as "nothing matches". `derive()` reads it; so does
+  `currentFilterValue()`, which decides whether the empty-state wording claims a
+  filter is on. **Those two must never disagree** and briefly did while the
+  wording had its own `=== 'all'` test: `All, Bug` removed nothing and still said
+  it had. Any third reader asks `filterTypes` too.
+- **"All" ANYWHERE in a list means no filter**, not a match on a type called
+  "all". A list that already contains everything is everything. This is wider
+  than the old rule (the whole value had to read `All`) and deliberately so.
+- **MATCHING IS EXACT, PER ENTRY, and this is the half of the feature that needs
+  the tests.** A list makes "starts with" the natural assumption, and a
+  contains-match would have `Task` silently collecting `Sub-task`. On a
+  dashboard an over-full view is worse than an empty one: empty is visibly wrong
+  and gets fixed, slightly-too-full is invisible and gets reported to a stand-up
+  as a fact. Two thirds of the new assertions are about what a grouped row
+  LEAVES BEHIND, not what it collects.
+- **The boundary got STRICTER, not looser.** The Value box needed room for eight
+  labels (`FILTER_VALUE_MAX = FILTER_TYPES_MAX * 42`, stated as the arithmetic so
+  raising one cannot silently truncate the other), and a flat 336-character cap
+  would have let one 336-character sentence through where 120 used to sit —
+  in a field that **travels in a share link**, so it is attacker-controlled text.
+  So `normalizeSettings` stopped capping and started REBUILDING: `cleanFilterValue`
+  holds every entry to `cleanWorkType` (dropped whole, never truncated), caps the
+  count, and re-joins. It keeps the spelling it was given — it tidies a value, it
+  never restyles one — and it runs only where a document arrives from outside,
+  never on a keystroke, because rewriting a half-typed value under the cursor is
+  the one thing a tidy-up must not do.
+
+### Two things about the table, asked for in the same breath
+
+- **The list reorders.** `moveFilter` rather than the `moveInList` beside
+  `rowActs`, because that one finds its row BY ID and a filter row has none and
+  wants none: it is a display name, a value and a position, and nothing outside
+  the list points at a particular row. The cost is the focus restore, which has
+  to look up the button at the row's NEW INDEX. Keep it — without it, moving a
+  row with the keyboard rebuilds every button in the table and drops focus back
+  at the top of the dialog after every single press.
+- **The `All` row is greyed.** Its two boxes have always been `readonly` and have
+  always looked editable: they took the caret, took a click, and swallowed every
+  keystroke. **`readonly`, NOT `disabled`** — a disabled input is skipped by the
+  keyboard and goes unannounced in several screen readers, so the row that
+  explains what "no filter" means would stop existing for the reader who most
+  needs it read out. There is an assertion saying exactly that, so nobody
+  "simplifies" it to `disabled` later. The colours are two tokens the pack
+  already has (`--text-muted` on `--surface-alt`, 4.73:1 at worst across the four
+  themes) — no new palette value, per the a11y-without-drift rule.
+- **`.rowacts .spacer`, and it is not cosmetic.** This is the only table in the
+  app where SOME rows have a delete and one does not — the teams table drops
+  every delete at once, when a single team is left — and right-aligning two
+  buttons against three put the `All` row's ↑ directly under its neighbours' ↓.
+  An empty box the width of the missing button, not a disabled one, because a
+  button nobody may press is still a stop on the way through with the keyboard.
+  Pinned by MEASURING the two arrows' left edges, not by looking for a `<span>`:
+  a spacer of the wrong width is still a spacer. Verified to bite — removing it
+  fails that assertion by exactly 36px, the button plus its gap.
+- **Order is the one thing the `All` row can still change.** Its arrows are live
+  and its delete is still hidden. What makes a row read-only is its NAME, not its
+  position, and a reader who wants Defects at the top of a five-row picker is not
+  touching anything.
+- **THE ROW GREW FROM ONE BUTTON TO THREE, AND 72 PIXELS CAME OUT OF THE TEXT
+  COLUMNS.** On a phone the Display box read "Stories an" and the Value box
+  "Story, Ta" — truncated controls, which is exactly what the no-orphaned-fields
+  rule exists to stop, and invisible at desktop width where the feature was built.
+  Fixed the way the Teams table already fixes it: a floor on both text columns
+  (150px / 170px, the wider one for the box that may hold a list) plus
+  `.table-scroll`, so the table outgrows the dialog and scrolls in its own box.
+  **Any future column added to a settings table has to be checked at 375px**,
+  because the failure is silent at the width it was written at.
+- **A row nobody has typed into yet is named by its POSITION.** The three buttons
+  take their `aria-label` from `f.display || 'work type row N'`. The delete used
+  to read the display name straight, so a fresh row's delete announced as
+  "Remove " — an unnamed control, and the shape of thing an axe run with a
+  placeholder in the box will happily green-light.
+
 ## Chart text is on the ramp, and in the app's face (2026-08-30) — no schema change
 
 **`applyChartTextDefaults()` sets four Chart.js defaults before every

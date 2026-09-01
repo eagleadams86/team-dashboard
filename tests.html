@@ -323,8 +323,15 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    argument used to be. The repetition gate gets the most of it: it is the leg
    that replaced "no status name is ever stored", so it is tested from both
    sides on two 200-row pastes that differ in nothing but how much their status
-   column repeats. */
-const EXPECTED = 2960;
+   column repeats. And to 3041 on 2026-09-01 for grouped work-type filters: a
+   filter row's Value became a comma-separated list, the list reordered, and the
+   All row was greyed. Two thirds of that jump is the exact-match half of the
+   feature — a list makes "starts with" the easy assumption, so Story-and-Task
+   is pinned as leaving a Sub-task where it is, not just as collecting two
+   types. The demo gained a grouped row in the same change, because sample data
+   has to reach every feature and the shipped filter list deliberately cannot
+   show this one. */
+const EXPECTED = 3041;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -2246,6 +2253,76 @@ async function run(TD, win) {
   is(TD.derive([], SAMPLE_SETTINGS, { filterValue: '', months: 3 }).empty, true, 'no rows means empty');
   is(TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: 'Nothing matches this', months: 3 }).empty, true,
      'a filter that matches nothing means empty');
+
+  /* ────────────────────────────────────────────────────────── */
+  /* ── One filter row, several work types ───────────────────────────────────
+     The Value box is a comma-separated list, so "Stories and Tasks" can be one
+     choice in the picker. Two things are worth pinning and they pull in
+     opposite directions: a grouped row really does keep BOTH types, and a
+     grouped row is still an EXACT match per entry — the whole risk of this
+     feature is a list that quietly reads as "starts with" and over-collects. */
+  group('filterTypes — a filter row may name more than one work type');
+
+  is(TD.filterTypes(''), null, 'an empty box is no filter');
+  is(TD.filterTypes(null), null, 'and so is nothing at all');
+  is(TD.filterTypes('All'), null, '"All" is no filter, whatever its case');
+  is(TD.filterTypes('all'), null, 'lowercase included');
+  /* Null and not ['bug'], because a list that already contains everything IS
+     everything. The alternative — matching a type literally called "all"
+     alongside Bug — is a board nobody has, and the reader who typed this meant
+     the obvious thing. */
+  is(TD.filterTypes('All, Bug'), null, 'and "All" anywhere in a list still means all of it');
+  is(TD.filterTypes('Bug'), ['bug'], 'one type is a list of one');
+  is(TD.filterTypes('Story, Task'), ['story', 'task'], 'two types, split on the comma');
+  is(TD.filterTypes('  Story ,Task  '), ['story', 'task'], 'spacing around the comma is the typist\u2019s business');
+  is(TD.filterTypes('Story, , Task'), ['story', 'task'], 'an empty entry is dropped, not matched as blank');
+  is(TD.filterTypes('Story, story, STORY'), ['story'], 'the same type twice is one type');
+  is(TD.filterTypes(', , ,'), null, 'a box holding only commas is no filter, not a filter on nothing');
+  /* The label guard the pasted Type column already gets. A share link carries
+     every settings field, so this box is attacker-controlled text, and the cap
+     is what stops it being somewhere a sentence out of a work system can ride
+     along. Dropped WHOLE, never truncated — a 40-character slice of a summary
+     is still a summary. */
+  const overlongType = 'x'.repeat(41);
+  is(TD.filterTypes(overlongType), null, 'an entry too long to be a label is dropped whole');
+  is(TD.filterTypes(overlongType + ', Bug'), ['bug'],
+     'and dropping it does not take the good entry beside it');
+  is(TD.filterTypes('x'.repeat(40)), ['x'.repeat(40)], 'exactly 40 is still a label');
+  is(TD.filterTypes(Array.from({ length: 12 }, (_, i) => 'T' + i).join(', ')).length,
+     TD.FILTER_TYPES_MAX, 'the list is capped at FILTER_TYPES_MAX entries');
+  is(TD.FILTER_VALUE_MAX, TD.FILTER_TYPES_MAX * 42,
+     'and the write cap is that many entries of a full-length label plus its separator');
+
+  /* cleanFilterValue is the same list rebuilt as TEXT, for the untrusted
+     boundary. The one thing it must not do is restyle a value somebody typed. */
+  is(TD.cleanFilterValue('Story, Task'), 'Story, Task', 'a tidy value comes back untouched');
+  is(TD.cleanFilterValue('Story,Task'), 'Story, Task', 'and a tight one is spaced out');
+  is(TD.cleanFilterValue('Sub-task'), 'Sub-task', 'the spelling it was given is the spelling it keeps');
+  is(TD.cleanFilterValue(overlongType + ', Bug'), 'Bug', 'an entry no label could be is dropped here too');
+  is(TD.cleanFilterValue(42), '', 'anything that is not a string is not a value');
+  is(TD.cleanFilterValue('a, b, c, d, e, f, g, h, i, j').split(', ').length, TD.FILTER_TYPES_MAX,
+     'and the same cap applies at the boundary');
+  ok(TD.cleanFilterValue('x'.repeat(200) + ', ' + 'y'.repeat(200)).length === 0,
+     'so a 400-character value cannot survive the boundary as one long string');
+
+  const dGroup = TD.derive(p.rows, SAMPLE_SETTINGS, { filterValue: 'Bug, Unplanned', months: 'all' });
+  is(dGroup.itemCount, dBug.itemCount + dUnplanned.itemCount,
+     'a grouped row keeps every item either type would have kept');
+  is(dGroup.itemCount, 41, 'which on this data is 41 items');
+  /* The half of it that a "does it group?" test alone would never see. Matching
+     is exact PER ENTRY, so a grouped row collects the types it names and
+     nothing that merely starts with one of them. */
+  const subRows = TD.parsePastedRows(
+    'Issue key\tCreated\tIn Progress\tResolved\tIssue Type\n' +
+    'AAA-1\t2015-01-01\t2015-01-02\t2015-01-05\tTask\n' +
+    'AAA-2\t2015-01-01\t2015-01-02\t2015-01-05\tSub-task\n' +
+    'AAA-3\t2015-01-01\t2015-01-02\t2015-01-05\tStory\n', 'auto').rows;
+  is(TD.derive(subRows, SAMPLE_SETTINGS, { filterValue: 'Story, Task', months: 'all' }).itemCount, 2,
+     'Story and Task collect two items and leave the Sub-task where it is');
+  is(TD.derive(subRows, SAMPLE_SETTINGS, { filterValue: 'Task', months: 'all' }).itemCount, 1,
+     'and one type on its own is exact for the same reason');
+  is(TD.derive(subRows, SAMPLE_SETTINGS, { filterValue: 'All, Story', months: 'all' }).itemCount, 3,
+     'a list containing All removes nothing at all');
 
   /* ────────────────────────────────────────────────────────── */
   /* ── Ignoring outliers ────────────────────────────────────────────────────
@@ -6573,6 +6650,192 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and the feature box says outright that empty is off, not unfilled');
   uiDoc.getElementById('settingsCloseBtn').click();
 
+  /* ────────────────────────────────────────────────────────── */
+  /* ── The work type filter list: order, and a locked row that looks it ──────
+     Three things land together here because they are one row of the same table.
+     A filter row may now name several types; the list reorders like the teams
+     and ARTs above it; and the All row, which has always been read-only and has
+     always looked editable, is greyed.
+
+     Driven through the dialog rather than through the state, because all three
+     are things about the TABLE. Whether a filter groups two types is decided in
+     derive and pinned up in the pure groups; whether a reader can see which row
+     they may not type in is only ever decided by what is on screen. */
+  group('the work type filter list — reorder, group, and a row that is visibly locked');
+
+  /* THE SAME TEAM THE GROUP HAS BEEN USING, re-planted only to put three rows in
+     the filter list. Written out rather than varied, because everything after
+     this block is still reading that team — its WIP limit draws a line on a
+     chart forty assertions further down, and dropping it took the whole rest of
+     the run out the first time this group was written. Restored at the end for
+     the same reason. */
+  const uiTeam = () => ({ id: 'ui1', name: 'Bounded', wipLimit: 2, sleDays: 10, rows: [
+    { c: '2015-01-12', s: '2015-01-05', t: 'Story' },
+    { c: '2015-01-19', s: '2015-01-05', t: 'Story' },
+    { s: '2015-01-16', t: 'Story' },
+    { s: '2015-01-17', t: 'Story' },
+    { s: '2015-01-18', t: 'Story' } ] });
+  plant({ teams: [uiTeam()], settings: { filters: [
+    { display: 'All', value: 'All' },
+    { display: 'Defects', value: 'Bug' },
+    { display: 'Stories and Tasks', value: 'Story, Task' }
+  ] } });
+  uiDoc.getElementById('settingsBtn').click();
+
+  const fRows = () => [...uiDoc.querySelectorAll('#filterRows tr')];
+  const fArrow = (i, dir) =>
+    uiDoc.querySelector('#filterRows [data-movefilter="' + i + '"][data-dir="' + dir + '"]');
+  is(fRows().length, 3, 'the three planted rows are drawn');
+
+  /* ── The locked row ─────────────────────────────────────────────────────── */
+  const lockedBoxes = [...fRows()[0].querySelectorAll('input')];
+  is(lockedBoxes.length, 2, 'the All row has its two boxes');
+  ok(lockedBoxes.every((b) => b.readOnly), 'and both are read-only');
+  ok(!fRows()[0].querySelector('[data-del]'), 'with no delete, because All is not removable');
+  ok(!!fRows()[1].querySelector('[data-del]'), 'where an ordinary row has one');
+  /* The point of the change: read-only and LOOKING it. Compared against the row
+     below rather than against a colour, so this says "these two are painted
+     differently" — which is what a reader sees — and cannot be broken by a
+     theme change or by the palette moving underneath it. */
+  const lockedCS = win.getComputedStyle(lockedBoxes[0]);
+  const freeCS = win.getComputedStyle(fRows()[1].querySelector('input'));
+  ok(/^rgb/.test(lockedCS.backgroundColor) && /^rgb/.test(freeCS.backgroundColor),
+     'both boxes resolve a real background', lockedCS.backgroundColor + ' / ' + freeCS.backgroundColor);
+  ok(lockedCS.backgroundColor !== freeCS.backgroundColor,
+     'the All row is filled differently from a row you may type in',
+     lockedCS.backgroundColor + ' vs ' + freeCS.backgroundColor);
+  ok(lockedCS.color !== freeCS.color, 'and its text is dimmed to match',
+     lockedCS.color + ' vs ' + freeCS.color);
+  is(lockedCS.cursor, 'not-allowed', 'and the pointer says so before the first keystroke');
+  /* READ-ONLY, NOT DISABLED, and this is the assertion that keeps it that way. A
+     disabled input is skipped by the keyboard and goes unannounced in several
+     screen readers, so the row that explains what "no filter" means would stop
+     existing for the reader who most needs it read out. */
+  ok(lockedBoxes.every((b) => !b.disabled),
+     'read-only and not disabled, so the row is still reachable and announced');
+
+  /* ── The arrows ─────────────────────────────────────────────────────────── */
+  ok(fArrow(0, -1) && fArrow(0, 1) && fArrow(2, -1) && fArrow(2, 1),
+     'every row carries both arrows');
+  ok(fArrow(0, -1).disabled, 'the top row cannot go up');
+  ok(!fArrow(0, 1).disabled, 'but it can go down — order is the one thing the All row may change');
+  ok(fArrow(2, 1).disabled, 'and the bottom row cannot go down');
+  ok(!fArrow(1, -1).disabled && !fArrow(1, 1).disabled, 'a middle row moves either way');
+  /* Ends are DISABLED rather than hidden, the rule the teams table already
+     follows: a button that vanishes makes the row jump and slides the delete
+     under a pointer that was aiming at an arrow. */
+  is(fRows()[0].querySelectorAll('[data-movefilter]').length, 2,
+     'a disabled arrow is still drawn, so no row ever changes width');
+  /* And the All row, which has no delete, holds the space one would take, or its
+     two arrows right-align against its neighbours' three and the up arrow lands
+     under everyone else's down arrow. Measured rather than asserted from the
+     markup: a spacer of the wrong width would still be a spacer. */
+  {
+    const lockedUp = fArrow(0, -1).getBoundingClientRect();
+    const freeUp = fArrow(1, -1).getBoundingClientRect();
+    ok(lockedUp.width > 0 && freeUp.width > 0, 'both arrows are really laid out',
+       lockedUp.width + ' / ' + freeUp.width);
+    ok(Math.abs(lockedUp.left - freeUp.left) < 1,
+       'the arrows line up down the column, delete or no delete',
+       lockedUp.left + ' vs ' + freeUp.left);
+  }
+  /* Reordering is not destructive and must not light up as though it were —
+     the same split `.icon-btn` and `.icon-btn.danger` carry everywhere else. */
+  ok([...uiDoc.querySelectorAll('#filterRows [data-movefilter]')].every((b) => !b.classList.contains('danger')),
+     'no arrow is dressed as a delete');
+  /* The row grew from ONE button to THREE when the arrows landed, and those 72
+     pixels came straight out of the two text columns: on a phone the Display box
+     read "Stories an" and the Value box "Story, Ta" — the truncated control the
+     no-orphaned-fields rule exists to stop. A floor on both columns plus the
+     scroller the Teams table already sits in is the fix. Measured, because a
+     floor set on the wrong column is still a floor. */
+  ok(!!uiDoc.querySelector('table.filters').closest('.table-scroll'),
+     'the table sits in a scroller, so a narrow screen scrolls it rather than squeezing it');
+  {
+    const dW = fRows()[1].querySelector('[data-k="display"]').getBoundingClientRect().width;
+    const vW = fRows()[1].querySelector('[data-k="value"]').getBoundingClientRect().width;
+    ok(dW >= 130 && vW >= 150,
+       'and neither text box can be squeezed below a readable width',
+       Math.round(dW) + ' / ' + Math.round(vW));
+  }
+
+  fArrow(2, -1).click();
+  is(win.tdGet().settings.filters.map((f) => f.display), ['All', 'Stories and Tasks', 'Defects'],
+     'pressing up moves the row one place along the list');
+  is([...uiDoc.querySelectorAll('#filterSel option')].map((o) => o.textContent),
+     ['All', 'Stories and Tasks', 'Defects'],
+     'and the picker on the dashboard follows the order it was given');
+  /* Move something with the keyboard and every button in the table is rebuilt,
+     so without this the focus falls back to the top of the dialog after every
+     single press. It lands on the same arrow at the row's NEW index. */
+  is(uiDoc.activeElement && uiDoc.activeElement.dataset.movefilter, '1',
+     'and the keyboard follows the row it just moved');
+  /* All is movable, and the row that ends up above it is not suddenly locked:
+     what makes a row read-only is its NAME, not its position. */
+  fArrow(1, -1).click();
+  is(win.tdGet().settings.filters.map((f) => f.display), ['Stories and Tasks', 'All', 'Defects'],
+     'the All row moves like any other — only its text is fixed');
+  ok(fRows()[1].querySelector('input').readOnly && !fRows()[0].querySelector('input').readOnly,
+     'and the lock travels with it rather than staying on the top row');
+  fArrow(1, -1).click();
+  fArrow(2, -1).click();
+  is(win.tdGet().settings.filters.map((f) => f.display), ['All', 'Defects', 'Stories and Tasks'],
+     'and back, which is two presses because a swap is its own undo');
+
+  /* ── Room for a list ────────────────────────────────────────────────────── */
+  const valBox = uiDoc.querySelector('#filterRows input[data-i="2"][data-k="value"]');
+  const dispBox = uiDoc.querySelector('#filterRows input[data-i="2"][data-k="display"]');
+  is(valBox.value, 'Story, Task', 'a grouped row shows the list it holds');
+  is(Number(valBox.maxLength), TD.FILTER_VALUE_MAX,
+     'the Value box has room for a full list, not one label');
+  is(Number(dispBox.maxLength), 120, 'while Display is a short label like the rest of them');
+  /* Pasted text skips maxlength entirely, so the cap is applied again where the
+     value is written. */
+  valBox.value = 'z'.repeat(TD.FILTER_VALUE_MAX + 200);
+  valBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  is(win.tdGet().settings.filters[2].value.length, TD.FILTER_VALUE_MAX,
+     'and a pasted value is capped as it is written, not merely as it is typed');
+  /* Put it back through the app's own handler. A group that leaves 336 z's in a
+     saved filter has planted a trap for whatever runs next on this profile —
+     the shape of bug this suite has already been bitten by once. */
+  valBox.value = 'Story, Task';
+  valBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  is(win.tdGet().settings.filters[2].value, 'Story, Task', 'and the row is left as it was found');
+
+  /* ── A row nobody has typed into yet ────────────────────────────────────────
+     Its position stands in for the name it does not have, the way its own two
+     inputs already labelled themselves. The delete beside it read "Remove " on
+     an unnamed row until the arrows landed and the fallback was written. */
+  uiDoc.getElementById('btnAddFilter').click();
+  const newIdx = win.tdGet().settings.filters.length - 1;
+  is(fArrow(newIdx, -1).getAttribute('aria-label'), 'Move work type row ' + (newIdx + 1) + ' up',
+     'a row with no name yet is named by its position, not left as "Move  up"');
+  is(uiDoc.querySelector('#filterRows [data-del="' + newIdx + '"]').getAttribute('aria-label'),
+     'Remove work type row ' + (newIdx + 1),
+     'and so is its delete, which read "Remove " before the fallback existed');
+  ok(!fArrow(newIdx - 1, 1).disabled,
+     'and the row that was last can move down again — adding one redraws the whole table');
+  uiDoc.querySelector('#filterRows [data-del="' + newIdx + '"]').click();
+  is(win.tdGet().settings.filters.length, 3, 'and removing it leaves the three the group planted');
+
+  /* ── And the note above the table says all of it ─────────────────────────── */
+  const fNote = uiDoc.getElementById('filterRows').closest('div').previousElementSibling;
+  const fNoteText = [...uiDoc.querySelectorAll('#settingsDialog .manage-note')]
+    .map((e) => e.textContent).join(' ');
+  ok(/separating them with commas/.test(fNoteText),
+     'the table says, where the value is typed, that a row may hold several types');
+  ok(/Sub-task/.test(fNoteText),
+     'and warns with an example that the match is exact, which is the thing a list makes easy to assume otherwise');
+  ok(/greyed out/.test(fNoteText), 'and explains why one row is greyed rather than leaving it looking broken');
+  ok(fNote && fNote.matches('p.manage-note'),
+     'and it is the paragraph directly above the table, not prose somewhere else in the dialog');
+
+  uiDoc.getElementById('settingsCloseBtn').click();
+  /* Back to the group's own fixture — default settings and the team whose two
+     limits the assertions below still read. */
+  plant({ teams: [uiTeam()], settings: {} });
+  win.renderAll();
+
   /* And the chart's own note carries the reasoning, which neither box has room
      for: the threshold is what decides whether this chart leads or lags. */
   uiDoc.querySelector('[data-help="agedWork"]').click();
@@ -8161,6 +8424,36 @@ group('ARTs — the grouping, and the boundary it crosses');
   const savedView = JSON.parse(win.localStorage.getItem('td-view') || '{}');
   is(savedView.activeTeamId, demoOf(again, 'Team Long Tail').id,
      'and it lands on Team Long Tail, the team whose numbers have the most to say');
+
+  /* ── The demo reaches the grouped filter row too ──────────────────────────
+     The rule this suite holds the demo to is that sample data reaches EVERY
+     feature, and a filter row naming several work types cannot be shown from
+     the shipped list — those two rows are deliberately the smallest honest
+     guess at a stranger's board. So the demo adds one, over data that really
+     carries all four types. */
+  {
+    const dFilters = win.tdGet().settings.filters;
+    const grouped = dFilters.find((f) => f.display === 'Stories and Tasks');
+    ok(!!grouped, 'the demo sets up a filter row that names more than one type',
+       JSON.stringify(dFilters.map((f) => f.display)));
+    is(grouped && grouped.value, 'Story, Task', 'and it is the two types its name promises');
+    /* Which is only a demo of anything if both types are really in the data —
+       a grouped row over types nobody exports is the empty filter the default
+       list was trimmed to avoid. */
+    const demoTypes = new Set(again.flatMap((t) => t.rows.map((r) => r.type)));
+    ok(demoTypes.has('Story') && demoTypes.has('Task'),
+       'over teams that really export both', [...demoTypes].join(', '));
+    is(TD.derive(demoOf(again, 'Team Healthy Flow').rows, win.TDState.normalizeSettings({}),
+         { filterValue: 'Story, Task', months: 'all' }).itemCount,
+       demoOf(again, 'Team Healthy Flow').rows
+         .filter((r) => (r.type === 'Story' || r.type === 'Task') && (r.completed || r.started)).length,
+       'and picking it really does keep both types and nothing else');
+    /* The list a reader tuned is never added to. */
+    plant({ teams: [], settings: { filters: [{ display: 'All', value: 'All' }] } });
+    loadDemo();
+    is(win.tdGet().settings.filters.map((f) => f.display), ['All'],
+       'a filter list somebody has already changed is left exactly as they left it');
+  }
 
   /* Both empty surfaces offer it, because either can be the first one seen: boot
      opens on Your Data when there are no rows, and #dashEmpty is what pressing
