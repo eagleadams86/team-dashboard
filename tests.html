@@ -5553,6 +5553,21 @@ const stripComments = (src) => {
        'and the only entries left hard-coding a unit are the three that are about '
        + 'FEATURES whichever list is counted \u2014 a new one spelling a noun into its '
        + 'title fails here');
+
+    /* THE TOP BAND'S TWO CATCHES (2026-09-01). Asked by Charles, looking at a
+       work item view drawing 21 items raised-but-not-started in a week, when
+       the parser drops any row with neither date: it can, because "not started"
+       is read as of the WEEK being plotted, and every item in that band started
+       later. Both halves are pinned because both are claims about what the
+       chart does not show \u2014 survivorship, and a band that thickens over weeks
+       already drawn once a later export arrives \u2014 and a note that keeps one and
+       loses the other leaves the same question half answered. */
+    const cfdHelp = entries.find((e) => e.startsWith('cfd:')) || '';
+    ok(/did eventually start/.test(cfdHelp) && /never the backlog as it stands/.test(cfdHelp),
+       'the CFD note says its top band holds only work that started later, and is not '
+       + 'the backlog as it stands');
+    ok(/change behind you/.test(cfdHelp) && /weeks already/.test(cfdHelp),
+       'and that a later export thickens that band over weeks that are already drawn');
   }
 
 

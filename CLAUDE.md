@@ -932,6 +932,21 @@ time card in Flow.
 - **The backlog band is absent without created dates, never flat at zero** — a flat zero is a
   claim that there is no backlog where the truth is that the export cannot see one. Same stance
   the lead time chart takes on the same column.
+- **THE TOP BAND IS SURVIVORSHIP, AND THE HELP SAYS SO SINCE 2026-09-01.** Charles asked how a
+  work item view can show 21 items raised-but-not-started in a week when the parser drops any row
+  with neither date (`featurePipeline`, the one exemption, is features only). It can, because
+  *not started* is read as of the WEEK being plotted: an item raised in week 26 and picked up in
+  week 31 sits in the top band for the five weeks between, and it is in the paste at all because
+  it has a start date. So the band draws the wait DELIVERED work really had, never the backlog as
+  it stands — and it closes to nothing at the right edge, since every stored item started on or
+  before `endDate`. A right edge that does NOT close means a typed `customTo` cutting the axis
+  before some starts.
+- **Which means the chart changes shape behind the reader**, and that is the half a note could
+  easily keep quiet about. Next month's export brings the items that have started since, and they
+  thicken a band over weeks already drawn — the same week, read twice, honestly reporting two
+  different numbers. The understatement is worst nearest the present. Both halves are in the
+  `cfd` help entry and both are pinned in `tests.html`: a note that keeps one and loses the other
+  leaves the same question half answered.
 - Three colours from the pack's ramp — `--series-1`, `--series-3`, `--series-5`, the widest
   separation five tokens allow. **The app's first three-series chart**; everything else needed
   two, which is why the pair at the top of `drawCharts` is a pair. Colour is not the only cue: the

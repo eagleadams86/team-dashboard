@@ -11877,6 +11877,18 @@ const METRIC_HELP = {
       ', rather than drawn as a flat zero claiming there is no backlog. An item with no start '
       + 'date has never observably been in progress, so it goes straight to the bottom band '
       + 'on the day it closed.'],
+    ['That band holds only work that ', b('did eventually start'),
+      '. Not started is read as of the week under the pointer rather than as of today, and an '
+      + 'item is in this export at all because it has a start date \u2014 so one raised in week 26 '
+      + 'and picked up in week 31 sits up there for the five weeks between. What it draws is '
+      + 'the wait delivered work really had, never the backlog as it stands: anything raised '
+      + 'and still untouched was left out of the paste, which is why the band closes to '
+      + 'nothing at the right edge, where the window ends at the newest date in your data.'],
+    [b('So the shape can change behind you.'), ' Paste next month\u2019s export and the items '
+      + 'that have started since arrive with it, thickening this band over weeks already '
+      + 'drawn \u2014 the same week, read twice, honestly reporting two different numbers. The '
+      + 'understatement is worst nearest the present, so read the last few weeks of the top '
+      + 'band as a floor rather than as a count.'],
   ] },
   netFlow: { title: 'Net Flow', body: [
     ['Is our completion pace consistent? ', b('Items completed minus items started'), '.'],
