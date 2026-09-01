@@ -75,7 +75,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
        is why this closes before it and why .wrap stays an ordinary <div>. -->
   <main>
   <h1>Flow Metrics — Privacy Policy</h1>
-  <p class="meta">Effective August 27, 2026</p>
+  <p class="meta">Effective September 1, 2026</p>
 
 
   <p>Flow Metrics is built to work entirely in your browser. This page explains exactly what
@@ -85,11 +85,11 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   <p>The only data the app holds is what you paste or type in: team names, an optional
   <em>project id</em> for each team, an optional work-in-progress limit and cycle time target for
   each team (two numbers you set, which the charts are drawn against),
-  the names of any workflow stages you set up, and for each team a
+  the names of any workflow stages you set up, the list of statuses read out of your exports
+  (see below), and for each team a
   list of work items — a completed date, an optional start date, an optional created date, an
   optional work type, an optional issue key, an optional parent key and, where your export
-  carried them, which stage the
-  item is currently in and a number of days against each stage. A team may also hold a separate
+  carried them, which status the item is in and a number of days against each stage. A team may also hold a separate
   list of <em>features</em>, each one the same handful of dates and keys as a work item — plus the
   shared settings (labels, the text that
   marks unplanned work, the text that marks a feature, the thresholds, whether days are counted
@@ -99,7 +99,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
  (theme, chosen team, date window). No account
   is required to use the app, and there is no analytics, tracking or advertising of any kind.</p>
 
-  <p><strong>The issue key is the one identifier the app keeps</strong>, and it is kept so that a
+  <p><strong>The issue key is the one identifier the app keeps about an item</strong>, and it is kept so that a
   dot on a chart can be named and then looked up in your own work system. It is checked against
   the <em>shape</em> of a key — up to ten letters or digits, a dash, and up to six digits, and
   nothing else — rather than trimmed to fit, so a cell that is anything other than a key is
@@ -112,7 +112,8 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   say how many items a feature took. <strong>A <em>Parent summary</em> column is never read.</strong>
   It is typed by hand and so is prose, and this app stores no prose: any column whose heading names
   it as a summary, description, comment, note, title, reason or justification is taken out of
-  consideration entirely before your export is read, so no part of it can reach any field at all.
+  consideration entirely before your export is read, so no part of it can reach any field at all —
+  the status list below included.
   A copy saved before that date simply has no parent keys.</p>
 
   <p><strong>The project id is the letters at the front of those keys</strong> — DAE, for
@@ -122,26 +123,62 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   label used to route a paste; it changes no figure, and it is never sent in a share link,
   because someone reading a link has nothing to paste.</p>
 
-  <p><strong>Workflow stages are yours, and no status name from your export is ever
-  stored.</strong> A stage is something you create and name in the app — <em>Build</em>,
-  <em>Review</em> — and you tell the app which Jira statuses feed it by typing their names
-  yourself. When you paste an export, the status names in it — whether they are column headings
-  in a Time in Status export or the values in an ordinary <em>Status</em> column — are matched
-  against what you typed, turned into a stage or a number of days, and then thrown away with the
-  rest of the pasted text. From a Status column only work still in progress is filed at all;
-  finished items are skipped. What is saved is the stage name you chose and a number. That is also
-  why the app has no button that picks status names up out of an export: doing so would put
-  work-system text into storage, which is the one thing it is built not to do. A share link
-  carries the stage names and the day counts, because they are what the figures are; it does
-  not carry the list of statuses you typed. Before August 21, 2026 there were no stages at all;
-  a copy saved before then simply has none.</p>
+  <p><strong>Your statuses are stored, once each, in a list you can see and empty.</strong>
+  This changed on September 1, 2026, and it reversed what this page used to say. When you paste an
+  export with a <em>Status</em> column, the statuses in it are added to a list you can read and
+  delete from in the Teams &amp; Stages window. A work item stores a <em>pointer</em> into that
+  list and never the word itself, so the words live in exactly one place — that list — however
+  many thousands of items you paste.</p>
 
-  <p>Note what is <em>not</em> stored: no ticket titles or summaries, no descriptions, no
-  status names, no names of people, and no free-text or comment fields anywhere. Apart from the
-  key, the app only ever needs dates, numbers and a type, and the work type is held to a short
-  category label — a cell that looks like anything longer (a ticket summary, a description) is
-  discarded rather than saved. The rest of what you paste is read for its dates and numbers on
-  the spot and never stored.</p>
+  <p>A status has no shape a check can test for. "Fix the login bug on prod" is twenty-five
+  characters of letters and spaces, which is every shape a status label has, so the test that
+  lets an issue key in cannot work here. What guards this instead is the column rather than the
+  value, and it is worth stating plainly because it is the whole reason the app is willing to
+  keep these words at all:</p>
+
+  <ul>
+    <li><strong>The app never guesses which column is the status.</strong> It reads one only when
+    a column is headed exactly <em>Status</em> or <em>Current status</em>. A column headed as a
+    summary, description, comment, note, title, reason or justification is put out of reach of
+    every field before your export is read at all.</li>
+    <li><strong>A status column repeats itself and prose does not.</strong> A whole workflow is
+    about ten statuses however many items you have; a column of summaries has a different value
+    on nearly every row. So the app counts how many different values that column holds before it
+    stores anything, and if it looks like free text it stores <em>nothing at all</em> from it —
+    not the short values, not a shortened version, nothing — and tells you so.</li>
+    <li><strong>The list is capped at 40 and shown to you.</strong> Every entry is on screen in
+    the Teams &amp; Stages window with a delete button beside it, and a status you delete is
+    removed from every item that pointed at it.</li>
+    <li><strong>Each label is held to a short, plain shape</strong> — at most 40 characters and
+    six words, letters, digits and a handful of separators. Anything else is dropped whole rather
+    than shortened. This is the weakest of the four and is not what makes the feature safe;
+    the one above it is.</li>
+  </ul>
+
+  <p><strong>Only work still in progress is read.</strong> Every export says <em>Done</em> or
+  <em>Closed</em> against everything it has ever finished, which is most of the file, and a
+  finished item's current status says nothing about how work flows. So finished rows are skipped
+  and their statuses never reach the list.</p>
+
+  <p><strong>Workflow stages are still yours, and grouping is optional.</strong> A stage is
+  something you create and name in the app — <em>Build</em>, <em>Review</em> — and you say which
+  statuses belong to it by ticking them. You do not have to: the charts read by status on their
+  own. A <em>Time in Status</em> export names its statuses in its column <em>headings</em> rather
+  than in any column, so those are still matched against names you type yourself, and only the
+  day counts are stored from them. A share link carries the stage names, the day counts and the
+  statuses the items in it are actually in — a link without them would show the person you sent
+  it to a different picture from yours — but not the status names you typed into a stage's
+  matching box. Before August 21, 2026 there were no stages at all, and before September 1, 2026
+  no statuses were stored; a copy saved before then simply has none.</p>
+
+  <p>Note what is <em>not</em> stored: no ticket titles or summaries, no descriptions, no names
+  of people, and no free-text or comment fields anywhere — there is nowhere in this app you can
+  type a sentence and have it saved, and the status list is filled from a column the app has
+  measured, never from a box you type into. Apart from the key and the status, the app only ever
+  needs dates, numbers and a type, and the work type is held to a short category label — a cell
+  that looks like anything longer (a ticket summary, a description) is discarded rather than
+  saved. The rest of what you paste is read for its dates and numbers on the spot and never
+  stored.</p>
 
   <h2>Where That Data Lives</h2>
   <div class="card">
@@ -173,10 +210,11 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   account, and nothing the recipient already has saved in their own browser is touched.
   A link is a frozen snapshot: it can't be edited through, and it can't be withdrawn once
   sent, so share it as deliberately as you would email a spreadsheet. It carries the same
-  fields the app stores, <strong>issue keys included</strong> — they are what names the items
-  on the charts, and a link without them would show the recipient a different picture from
-  yours. It carries stage names and day counts for the same reason, but only the stages the
-  items in the link actually spent time in.</p>
+  fields the app stores, <strong>issue keys and status names included</strong> — they are what
+  names the items and the columns on the charts, and a link without them would show the
+  recipient a different picture from yours. It carries stage names and day counts for the same
+  reason. Only what the link's own items need travels: the stages they spent time in, and the
+  statuses they are actually sitting in — not your whole list.</p>
 
   <h2>What Is Never Sent Anywhere</h2>
   <ul>

@@ -33,13 +33,17 @@ built-in Helvetica rather than the face the page is set in.
 - The explicit `font: { size: fsPx('xs') }` on the axes is the same value and is
   left in place.
 
-## Only Numbers, Dates and Two Guarded Labels Are Ever Saved (2026-08-12/13, amended 2026-08-20/21)
+## Only Numbers, Dates and Guarded Labels Are Ever Saved (2026-08-12/13, amended 2026-08-20/21, and REVERSED IN PART 2026-09-01 — see The Status Is Stored Now)
 
-- **⌕ Find / ⌘K is Money Map's window, ported (2026-08-23)** — `searchApp(st, query)` is PURE over the state it is handed; two-character minimum, `SEARCH_CAP` of 80 with the overflow COUNTED so the cap is never silent, and the count span (`role="status"`) is the live region rather than the results list. **It adds no field and stores nothing**: a team name, an ART name, a stage name, a stage alias, a ≤40-char work type and a key-shaped issue key are the only words this app keeps at all, so Find can only ever reach what the whitelists already let in — do not "improve" it by matching anything that is not already stored. An item hit carries the INDEX into its own team's rows (what `openItemDialog` takes), which is why `goToSearchHit` sets the team before it renders. The item snippet reads the COMPLETION date only — the sort reads whichever date the row has, but an in-progress row shown as its start date reads as one that finished that day. `renderSearchResults` fences a shared view down to team and ART hits, since the data tab and the stages window are not there. `SEARCH_VIEW_LABEL` must name every visible tab plus `stage`; tests assert both directions, and the header-order sweep pins where the button sits. Mirrored into Sprint Predictability and Golf Handicap in the same pass — a change to one belongs in all three — and the Task Dashboard has one too, which makes six windows in five apps plus the starter.
+- **⌕ Find / ⌘K is Money Map's window, ported (2026-08-23)** — `searchApp(st, query)` is PURE over the state it is handed; two-character minimum, `SEARCH_CAP` of 80 with the overflow COUNTED so the cap is never silent, and the count span (`role="status"`) is the live region rather than the results list. **It adds no field and stores nothing**: a team name, an ART name, a stage name, a stage alias, a status label, a ≤40-char work type and a key-shaped issue key are the only words this app keeps at all, so Find can only ever reach what the whitelists already let in — do not "improve" it by matching anything that is not already stored. An item hit carries the INDEX into its own team's rows (what `openItemDialog` takes), which is why `goToSearchHit` sets the team before it renders. The item snippet reads the COMPLETION date only — the sort reads whichever date the row has, but an in-progress row shown as its start date reads as one that finished that day. `renderSearchResults` fences a shared view down to team and ART hits, since the data tab and the stages window are not there. `SEARCH_VIEW_LABEL` must name every visible tab plus `stage`; tests assert both directions, and the header-order sweep pins where the button sits. Mirrored into Sprint Predictability and Golf Handicap in the same pass — a change to one belongs in all three — and the Task Dashboard has one too, which makes six windows in five apps plus the starter.
 - **THE WINDOW ITSELF IS PINNED, PROPERTY BY PROPERTY, AND THE SAME BLOCK IS IN ALL SIX APPS VERBATIM (2026-08-23).** 700px on 18px of padding — the Back Up & Restore window's size, the family's other fixed-width window — with the heading, the intro line, the box, the hit and its three lines, and the "Nothing matches" line all declared inside the `#searchDialog` block rather than borrowed from whatever quiet-text class the app happens to have. That borrowing is what made one window into six: 360px and 420px wide, a 320px box inside a 360px dialog, a hittab at `--fs-sm` here and `--fs-xs` there, `.04em` typed out beside `--ls-label`, and four different colours on the same sentence. A change to any of it belongs in all six. Two details worth keeping: `#searchDialog > p` is the DIRECT child only (the results list's message is a `<p>` too, and an id in that selector would out-rank `.searchresults .hint` and hand it the intro line's colour), and the block deliberately declares NO dialog chrome — backdrop, shadow, a field's touch-height floor, and the max-height Money Map divides by its own zoom all belong to the app's `dialog` rule and are shared with every other window it opens.
 - **The header buttons wear a glyph in front of the word** (2026-08-21) — plain text characters, NOT emoji and not an icon font: one more file to fetch is the last thing a header painted this early needs, and a text glyph inherits the theme's colour for free, so it can never become the thing that carries a meaning by hue. Each is `aria-hidden` — the word beside it is already the whole label. The glyphs are Money Map's own where the same button exists there (`⇩` Back up, `↗` Share, `⚙` settings), so one action looks the same in every app, and `☰` is the list/manage one the three list-managing apps share. Added to Sprint Predictability, Flow Metrics, Golf Handicap and PAPTrack in the same commit.
-- **A row is three ISO dates, one short work-type label, one issue key and a
-  set of NUMBERS keyed by stage id.
+- **A row is three ISO dates, one short work-type label, one issue key, one
+  status id and a set of NUMBERS keyed by stage id.
+  A ROW STILL HOLDS NO WORD** — the status is an id into `state.statuses`, which
+  is where the words live; see The Status Is Stored Now.
+  What follows was written before 2026-09-01 and is left standing because the
+  clause above is the only part of it that moved.
   Nothing else. There are no free-text or comment fields anywhere in this app —
   don't add one.** A team carries a name, an optional `artId`, an optional
   project id — added 2026-08-20 and guarded by the same shape as the front of a
@@ -50,8 +54,11 @@ built-in Helvetica rather than the face the page is set in.
   which is what keeps it a switch rather than a place to put a word.
   See the project id section below. `state.stages` carries names
 
-  and aliases the reader typed; **nothing on a row is ever a word** — see the
-  workflow stages section, which is the longest one in this file for a reason.
+  and aliases the reader typed, plus the status ids it groups; `state.statuses`
+  carries the status labels read off an export. **Nothing on a ROW is ever a
+  word, and that survived 2026-09-01 intact** — see The Status Is Stored Now,
+  then the workflow stages section, which is the longest one in this file for a
+  reason.
 - **The issue key was added on 2026-08-20 at Charles's explicit request**, and it
   reverses the "no ticket keys, ever" line this file used to carry. It is worth
   knowing why it was allowed where a summary field never would be: a key is
@@ -67,9 +74,12 @@ built-in Helvetica rather than the face the page is set in.
   this?".
   **A status was in fact the next thing wanted (2026-08-21), and it did NOT get
   in on this reasoning** — it could not, because it fails that test outright.
-  What got in was a stage the reader names in a dialog and a number of days. If
-  that distinction is not clear, read the workflow stages section before
-  touching anything near it.
+  What got in then was a stage the reader names in a dialog and a number of days.
+  **It got in on 2026-09-01 on a DIFFERENT argument entirely** — a property of
+  the COLUMN rather than of the value — and that argument is written out under
+  The Status Is Stored Now. The sentence above still stands as written: the
+  regex test remains the test for a per-row VALUE, and a status still fails it.
+  Do not read the status's admission as loosening it.
 - `cleanWorkType()` pins the type to a ≤40-char label at BOTH boundaries — the
   paste (`parsePastedRows`) and every read-back (`hydrateRows`). A longer cell (a
   ticket summary in the wrong column) is **dropped whole, never truncated** — 40
@@ -143,12 +153,14 @@ built-in Helvetica rather than the face the page is set in.
   now `persist()` plus the viewOnly guard — and the distinction is kept anyway:
   persist() means "write the shape down", save() means "the user changed
   something", and collapsing them would lose the only marker of which is which.)
-- Settings labels, team names, ART names and stage names are short and capped
-  (120); rows carry **one identifier and no other** — the issue key,
-  shape-checked — and no titles, summaries, statuses or names of people.
+- Settings labels, team names, ART names, stage names and status labels are
+  short and capped; rows carry **two identifiers and no other** — the issue key,
+  shape-checked, and a status id pointing into `state.statuses` — and no titles,
+  summaries or names of people.
   `privacy.html` promises exactly that, keep it true and update its effective
   date in the same commit as any storage change (it went to 2026-08-20 with the
-  key and to 2026-08-21 with stages).
+  key, to 2026-08-21 with stages, to 2026-08-27 with the feature ageing
+  threshold and to 2026-09-01 with the status vocabulary).
 
 - **Which tab you were on IS remembered, for the two number views only.** `view.activeTab`, restored at boot. It used to be deliberately not saved — the old comment said "a reload should open on the dashboard" — which was out of step with both siblings (Sprint Predictability keeps `settings.view`, Money Map keeps `ui.activeTab`) and with the fact that All Teams is where somebody with several teams works. Changed 2026-08-21 after it was reported as annoying. Settings and Your Data are NOT remembered, on purpose. No new guard was needed: `selectTab` already refuses a hidden or unknown tab and falls back to the dashboard, which is exactly the All-Teams-disappears-below-two-teams case.
 - **The All Teams Throughput trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **The header names the metric** — it shipped as a bare "Trend" and that was not enough beside eight other columns that each name theirs. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart.
@@ -1038,10 +1050,115 @@ from the same mark, all on `sw.js`'s SHELL list.
   the 64 viewport and the mark's furthest point is 23.8 from centre. Widen a bar or drop its base
   and re-check that number — it is written down in `make_favicon.py`.
 
+## The Status Is Stored Now (2026-09-01) — SCHEMA 13 → 14
+
+**This section REVERSES the safety argument the section below it is built on, at Charles's
+explicit request.** That section — and this file's storage policy, and `privacy.html`, and the
+README — all said the same thing: no status name is ever stored. They were rewritten in this
+commit rather than left contradicting the code. Read this before that one; that one is now the
+history of how the field got in, and this is the rule.
+
+`state.statuses` is a list of `{id, label}`, capped at `STATUS_MAX` (40). A row carries `r.status`
+(`u` on the wire) — **an id into that list, never a word**. A stage gains `st.statuses`, the ids
+it groups. `st.match` — the typed aliases — **stays**, and is not vestigial: see below.
+
+### The four legs, and which two carry the weight
+
+The old argument could not be repaired, only replaced: a status has no shape a regex can check,
+so a cap in its place would be the theatre this file already warned about. What holds instead:
+
+1. **THE APP NEVER GUESSES A STATUS COLUMN.** `HEADER_PATTERNS.status` is anchored, with no
+   headerless fallback — both already true before this change. `PROSE_HEADING` still excludes a
+   prose heading from every role.
+2. **A STATUS COLUMN REPEATS AND PROSE DOES NOT.** A workflow is ~10 statuses across a whole
+   export; a summary column has ~one distinct value per row. `statusColumnUsable` tests it at
+   the paste boundary, **all-or-nothing, before anything is stored** — the same class of test
+   `detectColumns` already used for the headerless work-type detector. This is a property of the
+   COLUMN, which is exactly what the value could not supply.
+3. **A ROW STORES AN ID.** The words live once, in a capped list the reader can see and delete in
+   the stages window. Blast radius of a mistake: one visible entry, not 400 cells.
+4. **Shape hygiene per label** (`cleanStatusLabel`): ≤40 chars, ≤6 words, a character whitelist,
+   dropped whole. **SECONDARY, AND THE TESTS SAY SO** — one assertion pins that a short summary
+   ("Login redesign") CLEARS every shape test, precisely so nobody cites leg 4 as the boundary.
+
+**Legs 1 and 2 are the argument. If either is ever weakened, the feature is no longer safe and
+this section is void.** In particular: never add a headerless fallback for the status role, and
+never make the repetition gate per-cell instead of per-column — half-reading a prose column is
+the worst of both answers.
+
+**NOT PRECEDENT FOR A SUMMARY FIELD, and the reason is leg 2 rather than any cap.** A summary
+column fails the repetition test by construction — that is what makes it a summary. The test to
+apply to the next request is *"does this column repeat the way a closed vocabulary does?"*, not
+*"a status is stored, so why not this?"*.
+
+### What the change bought, and it is not only the storage
+
+- **THE STAGE IS DERIVED, NOT FROZEN.** `stageOf(row, stages)` is the ONE place a row's stage is
+  answered: a row with a status resolves through the stage's ticked list **at read time**; a row
+  without one falls back to the stored `r.stage`. So re-ticking a status **re-buckets rows pasted
+  weeks ago**, where the old design could only ever affect the next export. Nothing reads
+  `r.stage` directly any more except `stageOf` and the boundary code — keep it that way.
+  The legacy fallback is NOT a migration step and must not become one: rewriting old rows would
+  mean inventing a status label this app never saw.
+- **The age chart has three rungs, still a switch and still no picker**: stage → status → work
+  type. The status rung is the one that matters in practice — a board that pastes an export gets
+  the canonical axis with no set-up at all. Work type is NOT legacy; it is what a board with no
+  Status column still gets, and Team Bare Export still draws it.
+- **`st.match` still does one job nothing else can**: a Time in Status export names its statuses
+  in its column HEADINGS, which are not values in any column and so never reach the vocabulary.
+  Aliases also **auto-tick** a matching status into their stage as it is adopted
+  (`res.statusTicks` → `adoptStatuses`), which is the upgrade path — a reader who set stages up
+  before this build gets their next paste grouped with nothing re-typed. The demo exercises
+  exactly that path, which is why `demoStages` still ships aliases and empty tick lists.
+- **The "adopt this heading" button that was refused for a year now exists**, as the tick list.
+  It is allowed because the objection has gone, not because it was overruled: the objection was
+  that one click would copy work-system text into permanent storage, and there is no such copy —
+  ticking moves an id between two lists the app already holds.
+
+### Things that did NOT change, and the pull to change them is real
+
+- **In-flight only.** Every export says Done against most of the file. The vocabulary would be
+  "more complete" with Done in it; completeness is not a reason to store anything. Pinned.
+- **`refOf()` is untouched.** A row reaches the problem list because its columns look wrong, so
+  its cells are the ones that cannot be trusted. The paste report DOES name statuses it KEPT —
+  those passed legs 2 and 4 and are stored data — and never a cell it REFUSED. That distinction
+  is the whole of it.
+- **No free-text input anywhere.** The item form's status control is a `<select>` over the stored
+  vocabulary. If it ever becomes a text box, leg 2 has been bypassed and the argument is void.
+- **The transition-log export shape is still refused**, and the reason survives: it is not one
+  column of repeated labels to measure, so leg 2 has nothing to bite on.
+- **`SHARE_PAYLOAD_V` NOT bumped**, matching every field before it. Statuses DO travel — the
+  recipient's age chart is drawn from them — windowed to what the link's own rows use, and a
+  stage travels if it groups one of them (or the recipient prunes the tick as a dangling id and
+  the sender's grouping arrives as none). The ALIASES still do not travel.
+
+### The boundary work, all in this commit
+
+`sanitizeStatuses` (leg 4 at the other door, cap, dedupe on `normalizeAlias`, `ID_OK`,
+`PROTO_KEY`); `sanitizeStages` gains `statuses` with **first stage wins a contested status**, the
+same answer a contested alias gets; `hydrateRow` gains `status`; `serializeRows` emits `u`
+omit-when-empty; `hydrateState` prunes dangling status ids **on rows AND features** and prunes a
+stage's tick list, then drops a status nothing points at — **except one a stage has ticked**,
+because losing that the moment its last item completed would silently un-group the next paste.
+`countStageDays` counts `r.status` too, so `tdAdopt`'s losing-a-field prompt covers it (a per-item
+status column is not re-typeable — the same test that sent stage times in and kept ARTs out).
+Delete-all takes `state.statuses`. **A THIRD REFERENCE FROM A RECORD TO A STAGE NOW EXISTS**
+(`g`, legacy `w`, and a ticked status) — `renderStageRows`'s count column and the stage-delete
+confirm both go through `stageOf`, which is the `w`-versus-`g` bug's own lesson applied ahead of
+time rather than after.
+
+
 ## Workflow Stages (2026-08-21) — SCHEMA 7 → 8
 
-`state.stages` is a list of `{id, name, match[]}` and each row carries an optional `stages`
-object of day counts keyed by stage id (`g` on the wire). It is what blocked time, flow
+> **SUPERSEDED IN PART ON 2026-09-01.** The first bullet's argument — "no status name is ever
+> stored" — was reversed deliberately; read **The Status Is Stored Now** above before acting on
+> anything here. It is left standing rather than rewritten because everything else in it is
+> still live (the alias rules, the two export shapes, the column guards, the day counts, the
+> honesty rules on the figures) and because the argument it makes is why the replacement had to
+> be a different KIND of argument rather than a weaker version of this one.
+
+`state.stages` is a list of `{id, name, match[], statuses[]}` and each row carries an optional
+`stages` object of day counts keyed by stage id (`g` on the wire). It is what blocked time, flow
 efficiency and a stage-by-stage age chart have always been waiting on — and it is the first
 field in this app whose source is a **Jira status**, which is the field every rule at the top of
 this file was written to keep out. **Read this whole section before changing anything near it.**
@@ -1710,6 +1827,12 @@ read "not saved — a reload should open on the dashboard", which stopped being 
 `view.activeTab` landed.
 
 ## The Current Stage (2026-08-21) — SCHEMA 8 → 9
+
+> **SUPERSEDED IN PART ON 2026-09-01.** The `w` this section added is now the LEGACY half of
+> the field: a row that carries a status resolves its stage through `stageOf` at read time and
+> writes no `w` at all. The in-flight-only rule, the anchored heading and the axis-switch-not-a-
+> picker decision all survive unchanged and are still governed here. See **The Status Is Stored
+> Now** above.
 
 `r.stage` on each row (`w` on the wire), read from an ordinary **Status** column. It exists
 because Charles's own export has statuses and no durations, which is the ordinary Jira case —
