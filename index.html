@@ -3126,10 +3126,12 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     pasted moves with it</strong>; nothing needs re-pasting.</p>
   <p class="manage-note"><strong>Ticking a status is enough.</strong> A status you have ticked
     into a stage also claims that status's column in a <strong>Time in Status</strong> export —
-    so one tick does both jobs, and a set-up made by ticking needs nothing typed.
-    The <strong>status names</strong> box is for what ticking cannot reach: a status that is
-    not in your list yet because no export has shown it to this app, and an old spelling your
-    board has since renamed. Type those exactly as Jira spells them; capitals and punctuation
+    so one tick does both jobs, and a set-up made by ticking needs nothing typed. A status
+    nobody is currently sitting in still reaches your list, from the
+    <em>Days in&nbsp;…</em> heading of its own column, so there is normally something to tick.
+    The <strong>status names</strong> box is for what neither can reach: an old spelling your
+    board has since renamed, or a status whose column heading was too long or oddly punctuated
+    to be read as a name. Type those exactly as Jira spells them; capitals and punctuation
     don't matter, and a typed name wins where it disagrees with a tick.</p>
   <!-- Said here because this is the box that gets it wrong: the export heads its
        columns "Days in Code Review", and the obvious thing to do is type that.
@@ -4381,6 +4383,61 @@ function detectColumns(rows, header, order, stages, statuses) {
       }, [])
     : [];
 
+  /* ── A HEADING MAY TEACH THE VOCABULARY A STATUS (2026-09-01) ──────────────
+     DECIDED WITH CHARLES, and it reverses "there is no adopt-this-heading
+     button" deliberately rather than in passing — the reason that rule was
+     written ("no status name is ever stored") stopped being true the day before,
+     when the vocabulary shipped. What is left of the old argument is the real
+     question: what evidence admits a word into storage?
+
+     For a status VALUE the answer is the repetition gate — a status column
+     repeats and prose does not — which is a property of a column of values and
+     has nothing to bite on in a single header cell. THE EVIDENCE HERE IS A
+     DIFFERENT KIND AND IS AT LEAST AS STRONG:
+
+       1. the heading carries the wrapper, which is the export declaring in its
+          own words that the column below is a number of days in a status;
+       2. every filled cell under it is a plain day count, so there is no prose
+          in the column to be the thing that got stored; and
+       3. the remainder still passes cleanStatusLabel — the same whitelist every
+          adopted status goes through, 40 characters, six words, no punctuation
+          a status does not have.
+
+     An EMPTY column passes rule 2 vacuously, and that is deliberate rather than
+     overlooked: the case this exists for is a status nobody is sitting in — a
+     `Days in CERT` column with nothing in it, which is precisely why the word
+     appears in no cell and could not be learned any other way. An empty column
+     cannot hold prose either.
+
+     THE OPEN-ENDED STATUSES ARE EXCLUDED, which keeps the in-flight-only rule
+     whole: "Done never reaches your list" is a decision this app already made
+     about status values, and letting Done in through the header would reverse it
+     by the back door and spend a slot on a word the app has no use for.
+
+     This is a list of candidate WORDS and nothing more. Nothing is adopted here
+     — parsePastedRows does that, after the rows, so a status somebody is
+     actually sitting in gets the slot first. */
+  const allDayCounts = (i) => rows.every(r => {
+    const v = String(r[i] == null ? '' : r[i]).trim();
+    return v === '' || cleanStageDays(v) != null;
+  });
+  map.stageHeadingWords = [];
+  /* Wrapped headings this could not offer, as a COUNT: the heading was too long
+     or too oddly punctuated to be a status name, which is the one case where
+     the reader has to type it themselves and so is worth a sentence. The
+     open-ended exclusions are NOT counted — that is policy working, not a
+     failure — and neither is a column with something other than day counts in
+     it, which the bad-cell tally already speaks for. */
+  map.stageHeadingSkipped = 0;
+  if (Array.isArray(header)) header.forEach((h, i) => {
+    const bare = stageHeadingBare(h);
+    if (!bare || STAGE_OPEN_ENDED.has(bare)) return;
+    if (!allDayCounts(i)) return;
+    const label = cleanStatusLabel(stageHeadingLabel(h));
+    if (!label) { map.stageHeadingSkipped++; return; }
+    map.stageHeadingWords.push({ index: i, label });
+  });
+
   /* A Set, not a list: started and created may share an index, and a list would
      make the type detector below think one more column was consumed than is.
      The key belongs in it too — with two rows of two distinct types the type
@@ -4975,6 +5032,20 @@ function stageHeadingBare(h) {
   const n = normalizeAlias(h);
   const bare = n.replace(STAGE_HEADING_WRAPPER, '');
   return bare && bare !== n ? bare : '';
+}
+
+/* The same phrase off the ORIGINAL heading, spelling intact. stageHeadingBare
+   answers "which status is this column about?" for matching, where case is
+   noise; this one answers "what would that status be CALLED?" for the
+   vocabulary, where the reader has to recognise the word in a list. Tolerant of
+   the same separators normalizeAlias collapses, so "Days-in-Code Review" is
+   stripped rather than left whole — and where it cannot strip, it returns ''
+   and the heading simply teaches nothing, which costs the reader one typed
+   status and never a wrong one. */
+const STAGE_HEADING_WRAPPER_RAW = /^\s*(?:days?|time)[\s_-]+(?:spent[\s_-]+)?in[\s_-]+/i;
+function stageHeadingLabel(h) {
+  if (typeof h !== 'string' || !stageHeadingBare(h)) return '';
+  return h.replace(STAGE_HEADING_WRAPPER_RAW, '').trim();
 }
 
 /* Statuses whose "days in" figure is an OPEN INTERVAL — it runs to the moment
@@ -5603,6 +5674,41 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
     rows.push(out);
   });
 
+  /* ── The headings, LAST ─────────────────────────────────────────────────────
+     After every row, so a status somebody is actually sitting in takes a slot
+     before one that only a column heading knows about — if the list fills, the
+     one still in use is the one worth keeping. See detectColumns for the three
+     rules that decided which headings got this far.
+
+     `headingStatuses` is NAMED on screen, like every other status this paste
+     adopted: these are stored data now, the same class of thing as a stage
+     name, and the reader is entitled to see what the app has just decided to
+     keep. It is also the actionable half — a word in the list does nothing
+     until it is ticked into a stage. */
+  const headingStatuses = [];
+  let statusesHeadingFull = 0;
+  /* Where the CELLS stopped. `statusesNew` is the slice up to here, so the two
+     sentences in the report do not both name the same word: one says what your
+     rows taught the app, the other what your headings did, and the reader's next
+     move is different for each. */
+  const statusesBeforeHeadings = statusList.length;
+  (cols.stageHeadingWords || []).forEach(w => {
+    const before = statusList.length;
+    const id = statusIdFor(statusList, statusByNorm, w.label);
+    /* cleanStatusLabel already passed in detectColumns, so the only way to fail
+       here is a full list. */
+    if (!id) { statusesHeadingFull++; return; }
+    if (statusList.length > before) {
+      headingStatuses.push(w.label);
+      /* The same courtesy the value path pays: a stage whose typed alias already
+         answers to this word gets the tick offered, so somebody who set their
+         stages up with aliases sees them keep working AND gains a list they can
+         edit. */
+      const st = stageIdForStatus(w.label, stages);
+      if (st) statusTicks.push({ stageId: st, statusId: id });
+    }
+  });
+
   return { rows, features, featuresNoKey,
            badCompleted, badStarted, badCreated, startAfterDone, raisedAfterStart,
            unfinished, undated, skippedHeader, dateOrder: resolved, orderGuessed, columns: cols,
@@ -5615,9 +5721,15 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
               rows point into it. The caller adopts the two together or neither —
               see the note on statusList above. */
            statuses: statusList,
-           statusesNew: statusList.slice(statusesBefore),
+           statusesNew: statusList.slice(statusesBefore, statusesBeforeHeadings),
            statusTicks,
            statusesDropped, statusesOverflow,
+           /* Learned from a column heading rather than from a cell — reported
+              apart from statusesNew because the reader's next move is different:
+              these arrived with a column of day counts attached and do nothing
+              until they are ticked into a stage. */
+           headingStatuses,
+           statusesHeadingSkipped: (cols.stageHeadingSkipped || 0) + statusesHeadingFull,
            /* Set only when a Status heading claimed a column and leg 2 turned it
               down. Carries COUNTS and the column's position — never a cell, and
               never the heading, which is itself a pasted cell. */
@@ -9277,7 +9389,7 @@ window.TD = {
      pinned directly: the first decides which columns are read at all, and the
      second only ever shows a warning, which is the kind of thing that rots
      quietly if nothing asserts it. */
-  stageHeadingBare, STAGE_OPEN_ENDED,
+  stageHeadingBare, stageHeadingLabel, STAGE_OPEN_ENDED,
   /* The current-stage half: the value matcher and the two synthetic column
      labels the stage axis uses. */
   stageIdForStatus, AGE_NO_STAGE, AGE_OTHER_STAGES,
@@ -16470,6 +16582,36 @@ function stagesReadHtml(res) {
         + (res.statusesDropped === 1 ? 'it was' : 'they were')
         + ' left out rather than shortened.';
     }
+  }
+  /* Learned from the headings, said here rather than in the status block above:
+     that block only runs when the paste HAS a Status column, and this can happen
+     on an export that has none. Named, on the same terms statusesNew is named —
+     stored data the reader is entitled to see — and paired with the one action
+     that turns a word into a figure. */
+  if (res.headingStatuses && res.headingStatuses.length) {
+    const n = res.headingStatuses.length;
+    html += '<br>' + (n === 1
+      ? 'One status was added to your list from a column heading: '
+      : n + ' statuses were added to your list from column headings: ')
+      + res.headingStatuses.map(x => '<strong>' + escapeHtml(x) + '</strong>').join(', ')
+      /* WHAT IT CAN SEE, not what it supposes. The obvious sentence here is
+         "nothing is sitting in them" — and on an export with no Status column,
+         or one leg 2 refused, that is a claim about somebody's board this app
+         has no way to check. What it does know is that the word reached it
+         through a heading and through no cell it read. */
+      + '. Each was learned from its heading: none of them appears in a status '
+      + 'cell this paste could read. '
+      + '<strong>Tick ' + (n === 1 ? 'it' : 'each one') + ' into a stage</strong> under '
+      + 'Teams &amp; Stages and paste again to read the days under '
+      + (n === 1 ? 'that column' : 'those columns') + '.';
+  }
+  if (res.statusesHeadingSkipped) {
+    html += '<br>' + res.statusesHeadingSkipped + ' day-count column'
+      + (res.statusesHeadingSkipped === 1 ? ' did' : 's did')
+      + ' not add a status to your list \u2014 the heading was too long, held punctuation no '
+      + 'status has, or your list is already full at ' + STATUS_MAX + '. Type '
+      + (res.statusesHeadingSkipped === 1 ? 'that status' : 'those statuses')
+      + ' into the stage\u2019s status names box instead.';
   }
   if (cols.length) {
     /* Several columns can feed one stage, so this reads as "these columns → this

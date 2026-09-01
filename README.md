@@ -1440,6 +1440,24 @@ can be ticked into a stage. That is what makes a `Days in Ready for Work` column
 everything in Ready for Work is still waiting to be picked up. It is only the word that is
 learned: no such row is loaded, counted, or shown anywhere.
 
+**And a `Days in …` column heading tells it too, when nobody is sitting in that status at all.**
+If nothing in your export is in CERT, the word "CERT" appears in no cell — only in the heading —
+and there would otherwise be no way to match that column to a stage. So the heading offers it,
+under three rules that all have to hold:
+
+1. the heading carries the `Days in` / `Time in` wrapper, which is your export saying what the
+   column below it holds;
+2. **every filled cell in that column is a plain number of days** — one cell of anything else
+   and the whole heading is refused, which is what keeps prose out; and
+3. the remaining words pass the same whitelist every status goes through: 40 characters, six
+   words, no punctuation a status name does not have.
+
+An empty column passes rule 2, deliberately — a status nobody is in is exactly the case this
+exists for, and an empty column cannot hold prose. `Days in Done` and the other terminal
+statuses are left out, as they are everywhere else here. The parse report names what it learned
+this way, separately from what your rows taught it, because a status off a heading does nothing
+until you tick it into a stage.
+
 Matching ignores capitals and punctuation — `In-Progress` and `In Progress` are the same
 status, stored once — but a typed name is matched **exactly, never partially**. An alias of
 `Testing` will not quietly swallow a *Waiting on Testing Env* column and add somebody's

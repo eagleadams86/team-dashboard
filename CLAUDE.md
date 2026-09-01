@@ -11,6 +11,58 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## A Heading May Teach the Vocabulary (2026-09-01) — no schema change, DECIDED WITH CHARLES
+
+**This reverses "there is no adopt-this-heading button", and it is the reversal the
+*Workflow Stages* section asked to be made deliberately.** The rule's stated reason was
+"no status name is ever stored", and that stopped being true on 2026-09-01 when the
+vocabulary shipped. What survived the change is the real question — *what evidence
+admits a word into storage?* — and the answer for a heading turns out to be a different
+kind of evidence from the repetition gate, not a weaker one.
+
+**Three rules, all three required.** A wrapped heading offers its status to the
+vocabulary only when:
+
+1. the heading carries the `Days in` / `Time in` wrapper — the export declaring, in its
+   own words, that the column below it is a number of days in a status;
+2. **every filled cell under it is a plain day count** (`cleanStageDays`), so there is
+   no prose in that column to be the thing that got stored; and
+3. the remainder passes `cleanStatusLabel` — the same whitelist every adopted status
+   goes through: 40 characters, six words, no punctuation a status does not have.
+
+- **Rule 2 is the safety argument and it is worth stating why it is strong.** The
+  repetition gate exists because a status VALUE can be prose — a summary column
+  mistaken for a status column — and it works by measuring a property of a column of
+  values. A single header cell has no repetition to measure, so that gate cannot be
+  applied here at all. What CAN be applied is the column underneath: prose does not sit
+  under a column of numbers. One unreadable cell refuses the whole heading.
+- **An EMPTY column passes rule 2 vacuously, and that is deliberate.** The case this
+  feature exists for is a status nobody is sitting in — `Days in CERT` with nothing in
+  it — which is exactly why the word appears in no cell and cannot be learned any other
+  way. An empty column cannot hold prose either. Pinned, because it looks like an
+  oversight and is the point.
+- **`STAGE_OPEN_ENDED` is excluded**, so `Done never reaches your list` is not reversed
+  through the back door. Those are the statuses whose day count is not a duration; the
+  app already refuses them from values and warns when a stage claims their column.
+- **Headings are adopted LAST, after every row**, so a status somebody is actually
+  sitting in takes a slot before one only a heading knows about. If the list fills at
+  `STATUS_MAX`, the one still in use is the one kept.
+- **`statusesNew` is now the slice up to the heading pass, and `headingStatuses` is the
+  rest.** Two sentences in the report, never naming the same word twice, because the
+  reader's next move differs: a status off a cell is already grouping the age chart; a
+  status off a heading does nothing until it is ticked into a stage.
+- **The report says what it can SEE.** The obvious sentence — "nothing is sitting in
+  these" — is a claim about a board this app cannot check on an export with no Status
+  column. It says instead that the word reached it through a heading and through no
+  cell it read. Third time this trap has come up in one feature; see the note on the
+  Time in Stage card.
+- **`stageHeadingLabel` is the case-preserving twin of `stageHeadingBare`.** Matching
+  wants the normalised form because case is noise between exports; the vocabulary wants
+  the spelling the export used, because the reader has to recognise the word in a list.
+  Where the raw stripper cannot cut (a heading like `Days-in-Code Review`, which
+  normalises fine but does not match the raw pattern) it returns '' and the heading
+  teaches nothing — one status to type, never a wrong one.
+
 ## A Status on a Row That Did Not Load (2026-09-01) — no schema change
 
 The third report in the same chain, and the door still shut after the first two:
@@ -40,12 +92,8 @@ paste went that way.
 - **The tick is offered on the same terms the main path offers it**, so a stage already
   aliased `Ready for Work` does not have to be re-ticked because the only rows carrying
   that status were ones the app could not measure.
-- **What this does NOT fix, deliberately: a status with nothing in it anywhere.** If no
-  row in the paste sits in that status, no cell carries the word and it is still only
-  reachable by typing it into the stage's status names box — which is what that box is
-  now documented for. Adopting it from the `Days in …` HEADING instead is the
-  "adopt this heading" button, and that is still a decision to take with Charles rather
-  than in passing. Put to him 2026-09-01; **[PENDING]** at the time of writing.
+- **The other half of the report — a status with nothing in it anywhere — was put to
+  Charles the same day and he took it.** See *A Heading May Teach the Vocabulary* below.
 
 ## A Ticked Status Claims Its Column (2026-09-01) — no schema change, DECIDED WITH CHARLES
 
@@ -1428,9 +1476,12 @@ this file was written to keep out. **Read this whole section before changing any
   takes nothing away from the argument above: what is refused here is a status *name*, and a box
   takes a number. See *Days in Each Stage, Typed In*.
 - **That is why matching is by ALIASES YOU TYPE and there is no "adopt this heading" button.**
-  (AMENDED 2026-09-01 — a status TICKED into a stage matches a heading too. That is not this
-  button and does not weaken it: a tick compares a heading against a label already in storage,
-  where the button would write a heading into storage. See *A Ticked Status Claims Its Column*.)
+  (AMENDED 2026-09-01, twice, and the second one REVERSES this bullet. First: a status TICKED
+  into a stage matches a heading too, which is not this button — a tick compares a heading
+  against a label already in storage. Then: a wrapped heading whose column holds nothing but
+  day counts DOES teach the vocabulary its status. Taken deliberately, with Charles, on the
+  grounds this bullet itself set out. See *A Ticked Status Claims Its Column* and *A Heading
+  May Teach the Vocabulary*.)
   It is the obvious convenience and it is deliberately absent: one click that copies
   work-system text into permanent storage is exactly the thing this design exists to avoid.
   The project id's "create the team from the report" button is not precedent — a project id has
