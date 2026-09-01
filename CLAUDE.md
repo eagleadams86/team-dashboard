@@ -11,6 +11,60 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## A Ticked Status Claims Its Column (2026-09-01) — no schema change, DECIDED WITH CHARLES
+
+The second half of the section below, and it only showed up once the first half was
+shipped and Charles pasted his export again: the report still said no stage claimed
+any of eighteen day-count columns. **His stages were grouped by TICKING statuses,
+and ticks write `stage.statuses` (ids) while the heading matcher read `stage.match`
+(typed text).** The age chart grouped perfectly, the alias box was empty, and the two
+halves of the feature could not see each other.
+
+**This was put to Charles as a decision rather than fixed in passing**, because the
+*Workflow Stages* section says this area is one to decide deliberately and write
+down. He chose it. The alternatives offered were leaving aliases as the only heading
+matcher (he types his statuses once) and auto-filling the alias box on tick (the
+label stored twice, and an untick with no obvious meaning).
+
+- **`stageColumnsFor(header, stages, statuses)` now also matches a heading against the
+  LABELS of the statuses ticked into each stage.** The vocabulary is threaded from
+  `parsePastedRows` through `detectColumns`; all three call sites already passed
+  `state.statuses`.
+- **NOTHING NEW IS STORED, and that is the entire permission for this.** The label is
+  already in `state.statuses` — it got there through the repetition gate and
+  `cleanStatusLabel`, the argument that replaced "no status name is ever stored" — so
+  comparing a heading against it is the same act as comparing it against a typed
+  alias: the heading is compared and discarded with the rest of the paste.
+  **This is NOT the "adopt this heading" button**, which stays absent and stays
+  forbidden: that one would write a column heading INTO storage. The direction is the
+  whole distinction.
+- **A ticked status is matched EXACTLY, on the same terms a typed alias is.** It
+  inherits the rule rather than a friendlier version of it: `Days in Waiting on
+  Development Env` is still not development time, and a ticked `Done` still trips the
+  open-interval warning.
+- **Typed aliases win, and the two passes are WHOLE-LIST rather than interleaved per
+  stage** — every alias is read into the map before any tick. A reader who typed
+  something was being specific; a tick losing to it needs no report, because
+  `sanitizeStages` already makes one status belong to exactly one stage.
+- **The vocabulary a parse starts from, never the one it leaves behind.** `readAs`
+  gets `statusList`, the copy taken before adoption, so a status this paste is
+  adopting for the first time cannot claim a heading in the same paste. The tick that
+  joins it to a stage is the reader's act and comes after they have seen it arrive.
+  Pinned — the alternative is a paste that invents its own rule mid-parse.
+- **Three pieces of copy said "only a typed alias can match a heading" and are now
+  amended, not deleted**: the stages dialog's last paragraph, the note over
+  `stageForStatusId`, and the header comment on the stage feature. What is still true
+  is the narrower claim, and it is worth keeping: a status this app has never been
+  SHOWN is not in the list to be ticked, so a typed name remains the only way to match
+  a heading naming a status that has never appeared in a Status column, or an old
+  spelling the board has since renamed. That is what the box is for now, and the
+  dialog says so.
+- **The Time in Stage card's empty state was making the report's old mistake**, one
+  card along: "your export says where each item IS, but not how long it has been
+  there" is a claim about a file the card cannot see, and on this export it was
+  wrong — eighteen columns of durations sat in it. It now says what is missing, not
+  why, and points at the parse report, which is the one place that counts them.
+
 ## A Real Export Wraps Its Status Names, and the Report Lied About It (2026-09-01) — no schema change
 
 Reported by Charles with a 1,781-row Time in Status export: twelve day-count columns,
@@ -1338,6 +1392,9 @@ this file was written to keep out. **Read this whole section before changing any
   takes nothing away from the argument above: what is refused here is a status *name*, and a box
   takes a number. See *Days in Each Stage, Typed In*.
 - **That is why matching is by ALIASES YOU TYPE and there is no "adopt this heading" button.**
+  (AMENDED 2026-09-01 — a status TICKED into a stage matches a heading too. That is not this
+  button and does not weaken it: a tick compares a heading against a label already in storage,
+  where the button would write a heading into storage. See *A Ticked Status Claims Its Column*.)
   It is the obvious convenience and it is deliberately absent: one click that copies
   work-system text into permanent storage is exactly the thing this design exists to avoid.
   The project id's "create the team from the report" button is not precedent — a project id has
@@ -1353,7 +1410,8 @@ this file was written to keep out. **Read this whole section before changing any
   column and add somebody's environment queue to their test time — a wrong number nobody can
   see. `normalizeAlias` collapses case and punctuation, so `In-Progress` and `In Progress` are
   one status; that is the only latitude there is.
-  **AMENDED 2026-09-01** — see *A Real Export Wraps Its Status Names* above. A HEADING now has a
+  **AMENDED 2026-09-01, twice** — see *A Real Export Wraps Its Status Names* and *A Ticked Status
+  Claims Its Column* above. A ticked status matches on exactly these terms too. A HEADING now has a
   `Days in` / `Time in` phrase read off the front before the comparison, because that is how a
   real export names these columns; what is left still has to equal an alias in full, so the
   Waiting-on-Testing-Env case above is unchanged and still pinned. Exact is exact; the wrapper

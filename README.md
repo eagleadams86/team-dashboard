@@ -1377,13 +1377,19 @@ if you have grouped anything, **by status** if you have statuses and have not, a
 type** if your export had no Status column. The last is not a legacy mode — it is what a board
 without that column still gets.
 
-**The typed status names box is still there, and still does one job nothing else can.** A
-**Time in Status** export names its statuses in its column **headings**, and a heading is not a
-value in any column, so it can only be matched against a name you have typed. Type them exactly
-as Jira spells them; capitals and punctuation do not matter. Those same typed names also tick a
-matching status into their stage the first time it is read, so a set-up made before this change
-keeps working with nothing re-typed. Several statuses can feed one stage and their days are
-added together; if two stages claim one status, the app says so rather than picking one quietly.
+**Ticking a status into a stage is enough — it also claims that status's column in a Time in
+Status export.** One tick does both jobs: it groups the work item age chart, and it tells the app
+that a `Days in Code Review` column belongs to your Review stage.
+
+**The typed status names box is still there, for what a tick cannot reach.** A **Time in Status**
+export names its statuses in its column **headings**, and a heading is not a value in any column,
+so a status that has never appeared in an export's Status column is not in your list to be
+ticked — a typed name is the only way to match it. An old spelling your board has since renamed
+is the other case. Type them exactly as Jira spells them; capitals and punctuation do not matter,
+and a typed name wins where it disagrees with a tick. Those same typed names also tick a matching
+status into their stage the first time it is read, so a set-up made before any of this keeps
+working with nothing re-typed. Several statuses can feed one stage and their days are added
+together; if two stages claim one status, the app says so rather than picking one quietly.
 
 **Or type the days in.** Once a stage exists it gets a box on the Add/Edit Work Item form, so a
 board kept by hand — or a couple of figures read off a Jira screen without exporting anything —
@@ -1439,20 +1445,24 @@ Most Time in Status exports do. They name a column for the status it measures an
 front saying what the number underneath is: `Days in Backlog`, `Days in Ready for Work`,
 `Days in In Progress`, `Days in SIT`.
 
-**Type the status, not the whole heading.** The words in front are read off — `Days in`,
-`Day in`, `Time in` and `Time spent in`, in any capitalisation — and the status inside is what
-has to match an alias:
+**The status inside the heading is what matters, not the whole heading.** The words in front are
+read off — `Days in`, `Day in`, `Time in` and `Time spent in`, in any capitalisation — and the
+status inside has to be one you have matched to a stage, by **ticking it** or by typing it:
 
-| Stage | Alias to type | Columns it then reads |
+| Stage | Status matched to it | Columns it then reads |
 |---|---|---|
 | Backlog | `Backlog` | `Days in Backlog`, and a `Backlog` cell in a Status column |
 | Ready for Work | `Ready for Work` | `Days in Ready for Work`, and the cell |
 | In Progress | `In Progress` | `Days in In Progress`, and the cell |
 | SIT | `SIT` | `Days in SIT`, and the cell |
 
-One alias, both jobs — and that is the reason to type the bare status. The same list matches the
-**column headings**, which carry the durations, *and* the **Status cell** on work still in
-flight, which is what puts an item on the
+**If those statuses are already in your list, tick them and you are done** — no typing at all.
+Paste any export with a Status column once and the statuses in it join your list; tick each one
+into a stage in Teams & Stages, then paste your Time in Status export.
+
+If you would rather type, type the **bare status**, not the heading. One entry, both jobs: it
+matches the **column headings**, which carry the durations, *and* the **Status cell** on work
+still in flight, which is what puts an item on the
 [work item age](#work-item-age-what-to-do-this-morning) chart. An alias typed out as
 `Days in SIT` still reads the column, so nothing set up before September 2026 stopped working —
 but it can never match a status cell, so it gets you half the feature.
@@ -1461,11 +1471,14 @@ Reading the wrapper off is **not** a loosening of the exact-match rule. What is 
 phrase comes off still has to equal your alias in full: `Days in Waiting on Testing Env` becomes
 `Waiting on Testing Env`, which an alias of `Testing` still does not match.
 
-> **Before 2026-09-01 this did not work at all.** An alias of `Code Review` did not match a
-> `Days in Code Review` column, every day count in the file was dropped, and — worse — the parse
-> report said the paste held no day counts, which was the app describing its own miss as a fact
-> about your export. Both halves are fixed: the heading is read, and when nothing matches, the
-> report now says how many columns are headed as a number of days and that no stage claimed them.
+> **Before 2026-09-01 this did not work at all**, and it failed in three places at once. An
+> alias of `Code Review` did not match a `Days in Code Review` column, so every day count in the
+> file was dropped. A stage grouped by **ticking** statuses — the way this app invites — had no
+> typed alias, so it could not match a heading however it was spelled. And the parse report said
+> the paste held no day counts, which was the app describing its own miss as a fact about your
+> export. All three are fixed: the heading's wrapper is read off, a tick claims its column, and
+> when nothing matches the report says how many columns are headed as a number of days and that
+> no stage claimed them.
 
 **Two columns such an export almost always has should be aliased to nothing at all**, and both
 look like they should be:

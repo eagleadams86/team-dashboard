@@ -335,8 +335,13 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    matching and most of that jump is the rules it must not break: not a substring
    rule, not a way into "Days Blocked", and not a silent claim on "Days in Done".
    The last of those is the one to watch, because the fix is what made a bare
-   "Done" alias able to reach that column at all. */
-const EXPECTED = 3077;
+   "Done" alias able to reach that column at all. And to 3090 the same day for the
+   half of it that turned up when the fix reached Charles's own export: a stage
+   grouped by TICKING statuses had no typed alias, so it still matched no heading.
+   A tick claims its column now, and most of those thirteen pin what the tick did
+   NOT become — a looser match, a way past a typed alias, or a route from a paste
+   to its own rule. */
+const EXPECTED = 3090;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -1143,6 +1148,77 @@ async function run(TD, win) {
   ].join('\n'), 'auto', []);
   is(unreadable.columns.completed, 1,
      'a completion column whose dates are unreadable is still found, not skipped past');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('workflow stages — a TICKED status claims its column too');
+
+  /* The second half of what Charles hit (2026-09-01). His stages were grouped by
+     TICKING statuses, which is what the app invites since the vocabulary
+     shipped — and ticks write ids into `stage.statuses`, where the heading
+     matcher only ever read `stage.match`. So the age chart grouped happily, the
+     alias box was empty, and eighteen day-count columns had nothing to match
+     against. Decided with Charles rather than assumed: a tick now claims the
+     column too. */
+  const VOCAB = [{ id: 'q-dev', label: 'Development' }, { id: 'q-cr', label: 'Code Review' },
+                 { id: 'q-comp', label: 'Compliance Review' }, { id: 'q-done', label: 'Done' }];
+  const tkStages = [
+    { id: 'tb', name: 'Build',  match: [], statuses: ['q-dev'] },
+    { id: 'tr', name: 'Review', match: [], statuses: ['q-cr', 'q-comp'] }
+  ];
+
+  is(TD.stageColumnsFor(['Days in Development', 'Days in Code Review'], tkStages, VOCAB)
+       .map(c => c.stageId), ['tb', 'tr'],
+     'THE BUG: a stage with NO typed alias reads its columns from the statuses ticked into it');
+  is(TD.stageColumnsFor(['Development', 'Code Review'], tkStages, VOCAB).map(c => c.stageId),
+     ['tb', 'tr'], 'and an unwrapped heading the same way — the two fixes compose');
+  is(TD.stageColumnsFor(['Days in Compliance Review'], tkStages, VOCAB).map(c => c.stageId), ['tr'],
+     'two statuses ticked into one stage feed it, exactly as two aliases do');
+  is(TD.stageColumnsFor(['Days in Development'], tkStages), [],
+     'with no vocabulary passed there is nothing to join an id to a label, and nothing matches');
+  is(TD.stageColumnsFor(['Days in Design'], tkStages, VOCAB), [],
+     'a status nobody ticked is still not read — a paste can never add its own rule');
+
+  /* Exactness is unchanged: a tick is matched on the same terms a typed alias
+     is, so it inherits the whole rule rather than a friendlier version of it. */
+  is(TD.stageColumnsFor(['Days in Waiting on Development Env'], tkStages, VOCAB), [],
+     'a ticked status is matched EXACTLY too — it is not a looser rule wearing the same name');
+
+  const tkDone = [{ id: 'tf', name: 'Finished', match: [], statuses: ['q-done'] }];
+  is(TD.stageColumnsFor(['Days in Done'], tkDone, VOCAB).map(c => c.openEnded), [true],
+     'and a ticked Done is flagged on the same terms a typed one is');
+
+  /* A TYPED ALIAS WINS, and whole-list rather than per stage: every alias is
+     read before any tick, so a reader who was specific is not overruled by a
+     tick on a stage that happens to come first. */
+  const bothWays = [
+    { id: 'wt', name: 'Ticked', match: [], statuses: ['q-cr'] },
+    { id: 'wa', name: 'Typed',  match: ['Code Review'], statuses: [] }
+  ];
+  is(TD.stageColumnsFor(['Days in Code Review'], bothWays).map(c => c.stageId), ['wa'],
+     'a typed alias beats a tick even when the ticked stage is listed first');
+  is(TD.stageColumnsFor(['Days in Code Review'], bothWays, VOCAB).map(c => c.stageId), ['wa'],
+     'and beats it with the vocabulary in hand, which is the case that could have gone either way');
+
+  /* Nothing is STORED by any of this — the whole reason it is allowed. */
+  const tickPaste = [
+    'Issue key\tCreated\tIn Progress\tResolved\tIssue Type\tStatus\tDays in Development\tDays in Code Review',
+    'DAE-1\t2026-08-01\t2026-08-02\t2026-08-09\tStory\tDone\t3.5\t2'
+  ].join('\n');
+  const tp = TD.parsePastedRows(tickPaste, 'auto', tkStages, [], VOCAB);
+  is(tp.columns.stages.map(c => [c.index, c.stageId]), [[6, 'tb'], [7, 'tr']],
+     'and it works through a real paste, not only through the matcher');
+  is(tp.rows[0].stages, { tb: 3.5, tr: 2 }, 'the day counts land against the tkStages stages');
+  ok(!/Development|Code Review/i.test(JSON.stringify(tp.rows)),
+     'NO STATUS NAME survives: the label was read from storage and compared, never written back');
+
+  /* The vocabulary a parse STARTS from, not the one it leaves behind. A status
+     this paste is adopting for the first time cannot claim a heading in the same
+     paste — the tick that joins it to a stage is the reader's, and it comes
+     after they have seen the status arrive. */
+  const fresh = TD.parsePastedRows(tickPaste, 'auto',
+    [{ id: 'tb', name: 'Build', match: [], statuses: [] }], [], []);
+  is(fresh.columns.stages, [],
+     'a first paste adopts its statuses and claims no column with them — the tick comes after');
 
   /* ────────────────────────────────────────────────────────── */
   group('workflow stages — the export Charles actually has');

@@ -3124,11 +3124,13 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     stage is worth adding when several statuses are really one part of your workflow, or when
     you want them in your own order. <strong>Change a grouping and every item you have already
     pasted moves with it</strong>; nothing needs re-pasting.</p>
-  <p class="manage-note">The <strong>status names</strong> box is still here and still matters
-    for one job: a <strong>Time in Status</strong> export names its statuses in its column
-    <em>headings</em>, and a heading is not a value in any column, so it can only be matched by
-    a name you have typed. Type them exactly as Jira spells them; capitals and punctuation
-    don't matter. Anything you tick above is matched already.</p>
+  <p class="manage-note"><strong>Ticking a status is enough.</strong> A status you have ticked
+    into a stage also claims that status's column in a <strong>Time in Status</strong> export —
+    so one tick does both jobs, and a set-up made by ticking needs nothing typed.
+    The <strong>status names</strong> box is for what ticking cannot reach: a status that is
+    not in your list yet because no export has shown it to this app, and an old spelling your
+    board has since renamed. Type those exactly as Jira spells them; capitals and punctuation
+    don't matter, and a typed name wins where it disagrees with a tick.</p>
   <!-- Said here because this is the box that gets it wrong: the export heads its
        columns "Days in Code Review", and the obvious thing to do is type that.
        Both work, but only one of them also matches the status as a VALUE in a
@@ -4209,7 +4211,7 @@ function columnStats(rows, order) {
  * Cycle time keeps working; lead time comes out equal to it, which is honest,
  * and the parse note says so.
  */
-function detectColumns(rows, header, order, stages) {
+function detectColumns(rows, header, order, stages, statuses) {
   const stats = columnStats(rows, order);
   /* The stage columns are worked out FIRST, and every heading-matched role below
      then looks PAST them before it looks at them.
@@ -4234,7 +4236,7 @@ function detectColumns(rows, header, order, stages) {
      unchanged — the date still wins, and stageClash below still reports it. What
      has changed is that it now happens only when the role has nowhere else to
      go. */
-  const stageCols = stageColumnsFor(header, stages);
+  const stageCols = stageColumnsFor(header, stages, statuses);
   const stageSkip = new Set(stageCols.map(sc => sc.index));
   /* The second half of the same guard, and the half the first cannot do without.
      Hiding the stage columns only protects a heading the reader has ALREADY
@@ -4687,10 +4689,12 @@ function projectIdOf(key) {
        where they render; `statuses` is a list of ids into `state.statuses`.
      • A row stores NUMBERS: `{stageId: days}`, plus at most two ids.
 
-   The ALIASES stay, and they are not vestigial: they are the only thing that
-   can match a Time in Status export's column HEADINGS, which are not values in
-   any column and so never reach the vocabulary. They also carry every document
-   written before this build.
+   The ALIASES stay, and they are not vestigial: a Time in Status export's column
+   HEADINGS are not values in any column and so never reach the vocabulary, which
+   leaves a typed name the only way to match a status this app has never been
+   shown. They also carry every document written before this build.
+   AMENDED 2026-09-01: they are no longer the ONLY thing that matches a heading —
+   a status TICKED into a stage claims its column too. See stageColumnsFor.
 
    The export to ask Jira for is a **Time in Status** one in its days-per-status
    shape: one row per issue, one column per status, every per-item cell a
@@ -4990,13 +4994,49 @@ function stageHeadingBare(h) {
 const STAGE_OPEN_ENDED = new Set(['done', 'closed', 'resolved', 'complete',
   'completed', 'cancelled', 'canceled', 'rejected', 'abandoned']);
 
-function stageColumnsFor(header, stages) {
+function stageColumnsFor(header, stages, statuses) {
   if (!Array.isArray(header) || !Array.isArray(stages)) return [];
   const byAlias = new Map();
   stages.forEach(st => {
     if (!st || typeof st.id !== 'string') return;
     (Array.isArray(st.match) ? st.match : []).forEach(a => {
       const n = normalizeAlias(a);
+      if (n && !byAlias.has(n)) byAlias.set(n, st.id);
+    });
+  });
+  /* ── A TICKED STATUS CLAIMS ITS COLUMN TOO (2026-09-01) ────────────────────
+     Decided deliberately with Charles, because the note this replaces said this
+     area needed deciding rather than drifting: a stage's typed aliases were the
+     only thing that could match a heading, and since the vocabulary shipped the
+     day before, ticking was the way the app invites you to group a status. So a
+     reader who grouped by TICKING — which is the documented way, and which the
+     age chart reads happily — had an empty alias list and could not match a
+     column heading at all. Eighteen day-count columns in Charles's export, a
+     grouping that was visibly working, and nothing to join them with.
+
+     NOTHING NEW IS STORED, and that is the whole of why this is allowed. The
+     status LABEL is already in `state.statuses` — it got there through the
+     repetition gate and cleanStatusLabel, which is the argument that replaced
+     "no status name is ever stored" — so matching a heading against it is the
+     same act as matching a heading against a typed alias: the heading is
+     compared and then discarded with the rest of the paste. This is NOT the
+     "adopt this heading" button, which stays absent: that one would write a
+     column heading into storage, and nothing here writes anything.
+
+     ALIASES STILL WIN, and both passes are whole-list rather than interleaved
+     per stage, so every typed alias beats every tick. A reader who typed
+     something is a reader who was specific about it, and `duplicateStageAliases`
+     only reports clashes between typed aliases — a tick losing to somebody's
+     own alias is the quiet case that needs no report, because sanitizeStages
+     already makes one status belong to exactly one stage. */
+  const labelOf = new Map();
+  (Array.isArray(statuses) ? statuses : []).forEach(x => {
+    if (x && typeof x.id === 'string') labelOf.set(x.id, x.label);
+  });
+  stages.forEach(st => {
+    if (!st || typeof st.id !== 'string') return;
+    (Array.isArray(st.statuses) ? st.statuses : []).forEach(sid => {
+      const n = normalizeAlias(labelOf.get(sid));
       if (n && !byAlias.has(n)) byAlias.set(n, st.id);
     });
   });
@@ -5054,10 +5094,17 @@ function stageIdForStatus(value, stages) {
    them claim, exactly as the first stage wins a contested alias, and
    sanitizeStages makes that impossible to store in the first place.
 
-   Note the deliberate asymmetry with stageIdForStatus above: that one matches
-   TEXT, and it still has a job — a Time in Status export's column headings are
-   not values in any column, so they never reach the vocabulary and can only be
-   matched by an alias somebody typed. This one matches an ID. */
+   Note the asymmetry with stageIdForStatus above: that one matches TEXT, and it
+   still has a job — a Time in Status export's column headings are not values in
+   any column, so they never reach the vocabulary and a heading naming a status
+   this app has never seen can only be matched by an alias somebody typed. This
+   one matches an ID.
+
+   AMENDED 2026-09-01: what changed is that a heading is no longer matched by
+   typed aliases ALONE. stageColumnsFor also compares it against the labels of
+   the statuses ticked into each stage, so the two halves of the feature answer
+   to one act. The ticks are still ids in storage; it is stageColumnsFor that
+   joins an id to its label, once, at parse time. */
 function stageForStatusId(statusId, stages) {
   if (!statusId || !Array.isArray(stages)) return '';
   for (const st of stages) {
@@ -5154,7 +5201,13 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
     if (rows.length && looksLikeHeader(rows[0])) { head = rows.shift(); skipped = true; }
     const ord = (!order || order === 'auto') ? detectDateOrder(rows) : order;
     return { rows, header: head, skippedHeader: skipped, resolved: ord,
-             cols: detectColumns(rows, head, ord, stages) };
+             /* `statusList`, which is the vocabulary this paste STARTED from —
+                not what it will leave behind. A status adopted by this very
+                paste cannot retroactively claim a heading in it: the tick that
+                joins a status to a stage is the reader's, and it happens after
+                they have seen the status arrive. Same rule the ticks themselves
+                follow, one step earlier. */
+             cols: detectColumns(rows, head, ord, stages, statusList) };
   };
 
   let read = readAs(splitCells);
@@ -13756,12 +13809,23 @@ function renderStageTime(d) {
           + ' work type filter — this team has some, just not here. Widen '
           + '\u201cShow data for most recent\u201d, or pick another type — or All — above.'
         : teamHasCurrent
-          ? 'Your export says where each item IS, but not how long it has been there — so this '
-            + 'table has nothing to measure. Your stages are still working: the work item age '
-            + 'chart above groups by them, which answers what is sitting in each stage right '
-            + 'now. What this needs is a number of days per stage, from a Time in Status export '
-            + 'or from the boxes on the item itself — open a row in Loaded Data and fill in the '
-            + 'stages you know.'
+          /* IT SAYS WHAT IS MISSING, NOT WHY (2026-09-01). This used to open
+             "your export says where each item IS, but not how long it has been
+             there" — a claim about somebody's file that this card cannot see
+             and, on the export that prompted the wrapper fix, was flatly wrong:
+             eighteen columns of day counts sat in it, unread because no stage
+             claimed their statuses. The parse report is the one place that
+             knows, and it now counts them, so this card points there instead of
+             guessing. The same failure as the report's own old proxy, one card
+             along: a reassurance stated as a fact is a wrong number with the
+             number left out. */
+          ? 'Nothing in this team carries a number of days per stage yet, so this table has '
+            + 'nothing to measure. Your stages are still working: the work item age chart '
+            + 'above groups by them, which answers what is sitting in each stage right now. '
+            + 'If your export has “Days in …” columns, the parse report on the Paste tab says '
+            + 'how many of them no stage claimed — match those statuses to a stage in '
+            + 'Teams & Stages and paste it again. Or type the days: open a row in Loaded Data '
+            + 'and fill in the stages you know.'
           : 'None of this team\u2019s items carry stage times yet. Paste a Time in Status export '
             + '— one row per issue, one column per status — and the days land in the stage each '
             + 'status is matched to. Or type them: open any row in Loaded Data, or add an item, '
@@ -16402,7 +16466,8 @@ function stagesReadHtml(res) {
        with a status you listed — and the sentence after it is the only part
        that varies, on evidence rather than on a proxy. */
     html += '<br>No stage columns in this paste, so <em>Time in stage</em> stays empty: nothing '
-      + 'here is headed with a status you have listed against a stage.';
+      + 'here is headed with a status you have matched to a stage — by ticking it or by '
+      + 'typing it.';
     const dur = (res.columns && res.columns.stageDurationCols) || [];
     if (dur.length) {
       /* NAMED BY POSITION and by COUNT, like every other column in this report,
@@ -16414,15 +16479,15 @@ function stagesReadHtml(res) {
         + (dur.length === 1 ? '' : ' — the first is column ' + (dur[0] + 1) + ' —')
         + ' and no stage claimed '
         + (dur.length === 1 ? 'it' : 'any of them') + '.</strong> A heading like '
-        + '<em>Days in Code Review</em> is read as the status inside it, so the alias to '
-        + 'type is the status: <em>Code Review</em>. Open <strong>Teams &amp; Stages</strong> '
-        + 'in the header and check the statuses you listed there against this export\u2019s '
-        + 'own column headings.';
+        + '<em>Days in Code Review</em> is read as the status inside it, so what a stage needs '
+        + 'is that status: <strong>tick it under the stage</strong> in Teams &amp; Stages, or '
+        + 'type it into that stage\u2019s status names box if it is not in your list yet. '
+        + 'Then paste this again.';
     } else {
       html += ' That needs a <strong>Time in Status</strong> export, with a column per status '
-        + 'holding a number of days — so either this is not one, or the statuses you listed '
-        + 'are spelled differently there. Open <strong>Teams &amp; Stages</strong> in the '
-        + 'header to check them against this export\u2019s own column headings.';
+        + 'holding a number of days — so either this is not one, or its headings spell those '
+        + 'statuses differently. Open <strong>Teams &amp; Stages</strong> in the header to '
+        + 'check them against this export\u2019s own column headings.';
     }
   }
   if (clash.length) {
