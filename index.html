@@ -3129,6 +3129,19 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <em>headings</em>, and a heading is not a value in any column, so it can only be matched by
     a name you have typed. Type them exactly as Jira spells them; capitals and punctuation
     don't matter. Anything you tick above is matched already.</p>
+  <!-- Said here because this is the box that gets it wrong: the export heads its
+       columns "Days in Code Review", and the obvious thing to do is type that.
+       Both work, but only one of them also matches the status as a VALUE in a
+       plain export's Status column, and a reader who types the long form gets
+       their durations and no grouping and no way to see why. -->
+  <p class="manage-note"><strong>Type the status, not the whole heading.</strong> A real export
+    heads these columns <em>Days in Code Review</em> or <em>Time in Code Review</em>; the words
+    in front are read off and the status inside is what has to match, so
+    <em>Code Review</em> is the alias to type. It is also the spelling that matches a plain
+    export's <strong>Status</strong> column, which the long one cannot.
+    <strong>Leave <em>Days in Done</em> and <em>Days Blocked</em> out.</strong> The first keeps
+    growing after the work has finished, and the second runs at the same time as whatever
+    status the item is really in &mdash; neither is time spent in a stage.</p>
   <div class="table-scroll">
     <table class="manage" id="stageTable" aria-label="Workflow stages"><tbody id="stageRows"></tbody></table>
   </div>
@@ -4340,6 +4353,32 @@ function detectColumns(rows, header, order, stages) {
   map.stageClash = map.stages.filter(sc => roleCols.includes(sc.index));
   map.stages = map.stages.filter(sc => !roleCols.includes(sc.index));
 
+  /* Columns whose heading SAYS it holds a number of days and which no stage
+     asked for. Not a role and never read — a COUNT for the parse report, and
+     the only reason it exists is that the report used to guess this and guess
+     it wrong.
+
+     "No day counts in this paste" was printed on a paste with twelve of them,
+     because the report decided between "nothing matched" and "this export has
+     no durations" by asking whether a Status column had been found — a proxy
+     for a question it had no answer to. A heading carrying the wrapper is an
+     answer: the export is telling the reader, in its own words, that the column
+     underneath is a number of days. So the report can now say which of the two
+     things happened rather than picking one.
+
+     Deliberately NOT a shape test on the values. A column of plain numbers is
+     also story points, an estimate, a sprint count and a comment tally, and a
+     report that nagged about the alias spellings every time somebody pasted an
+     estimate column would be a report people stop reading. */
+  map.stageDurationCols = Array.isArray(header)
+    ? header.reduce((out, h, i) => {
+        if (stageHeadingBare(h)
+            && !map.stages.some(sc => sc.index === i)
+            && !map.stageClash.some(sc => sc.index === i)) out.push(i);
+        return out;
+      }, [])
+    : [];
+
   /* A Set, not a list: started and created may share an index, and a list would
      make the type detector below think one more column was consumed than is.
      The key belongs in it too — with two rows of two distinct types the type
@@ -4894,6 +4933,63 @@ function cleanSleDays(v) {
    together. Two STAGES claiming one alias is the opposite — a contradiction the
    app must not resolve silently — so the first stage in the list keeps the
    alias and duplicateStageAliases() puts the clash on screen. */
+/* ── The words a real export wraps around the status name (2026-09-01) ──────
+   A Time in Status export does not head its columns with the status alone. The
+   real thing reads "Days in Code Review", "Days in Development", "Days in
+   Compliance Review" — the status with a phrase in front of it saying what the
+   number underneath is. The aliases are typed off the STATUS, because that is
+   what the field asks for and what the same alias has to match as a cell value
+   in stageIdForStatus, so on a real paste "code review" met "days in code
+   review" and nothing matched at all. Reported by Charles on 2026-09-01 with a
+   1,781-row export carrying twelve such columns, every one of them dropped.
+
+   SO THE WRAPPER IS STRIPPED OFF THE HEADING, AND NOTHING ELSE IS. What is left
+   still has to equal an alias EXACTLY — this is not the substring rule that was
+   turned down and must stay turned down. "Days in Waiting on Testing Env"
+   strips to "waiting on testing env", which an alias of "Testing" still does
+   not match, so the environment queue still cannot be added to somebody's test
+   time. The anchor is what makes that true: the phrase is only ever removed
+   from the FRONT, and only when it is one of the four spellings below.
+
+   The whole heading is tried first, so a reader who worked around this by
+   typing "Days in Code Review" into the aliases box keeps working, and so does
+   the vanishingly unlikely board with a status genuinely called that.
+
+   "Days Blocked" is deliberately out of reach of this: it has no "in", so it
+   strips to nothing and is matched only as itself. That column is the Flagged
+   flag and runs CONCURRENTLY with whatever status the item is in — it is an
+   overlay, not a stage — and this must not become the change that quietly
+   let it in. */
+const STAGE_HEADING_WRAPPER = /^(?:days?|time)\s+(?:spent\s+)?in\s+/;
+
+/* The status inside a wrapped heading, normalised — '' when the heading is not
+   wrapped, so a caller can tell "this column says it holds days" from "this
+   column is named for a status". Both readings of it are used: the second form
+   to match an alias with, and the fact that there WAS one to tell the parse
+   report that this paste carries durations nothing claimed. */
+function stageHeadingBare(h) {
+  const n = normalizeAlias(h);
+  const bare = n.replace(STAGE_HEADING_WRAPPER, '');
+  return bare && bare !== n ? bare : '';
+}
+
+/* Statuses whose "days in" figure is an OPEN INTERVAL — it runs to the moment
+   the export was taken and grows on every re-run, so it is not how long the
+   work took and averaging it says nothing. `Days in Done` is the one every
+   changelog export has, and it has always been the column this app's notes tell
+   readers to alias to nothing; now that a bare "Done" alias can reach it by
+   itself, saying so on screen is the difference between a warning and a wrong
+   number nobody can see.
+
+   The column is still CLAIMED when a stage asks for it. Refusing it silently
+   would be this app deciding what somebody's workflow means, which is exactly
+   what the alias design exists to avoid — so the reader is told instead, and
+   the figure is theirs to keep or drop. Matched against the BARE form however
+   the column was claimed, so an alias typed as "Days in Done" is caught on the
+   same terms as one typed as "Done". */
+const STAGE_OPEN_ENDED = new Set(['done', 'closed', 'resolved', 'complete',
+  'completed', 'cancelled', 'canceled', 'rejected', 'abandoned']);
+
 function stageColumnsFor(header, stages) {
   if (!Array.isArray(header) || !Array.isArray(stages)) return [];
   const byAlias = new Map();
@@ -4906,8 +5002,13 @@ function stageColumnsFor(header, stages) {
   });
   const out = [];
   header.forEach((h, i) => {
-    const id = byAlias.get(normalizeAlias(h));
-    if (id) out.push({ index: i, stageId: id });
+    const whole = normalizeAlias(h);
+    const bare = stageHeadingBare(h);
+    /* Whole heading first, stripped second — see the note above. */
+    const form = byAlias.has(whole) ? whole : (bare && byAlias.has(bare) ? bare : '');
+    if (!form) return;
+    out.push({ index: i, stageId: byAlias.get(form),
+               openEnded: STAGE_OPEN_ENDED.has(bare || whole) });
   });
   return out;
 }
@@ -9066,6 +9167,12 @@ window.TD = {
      whole feature can be pinned without a dialog or a paste box on screen. */
   normalizeAlias, cleanStageAlias, cleanStageDays, stageColumnsFor, duplicateStageAliases,
   stageTimesOf, STAGE_DAYS_MAX, STAGE_ALIAS_MAX, STAGE_ALIAS_MAX_LEN,
+  /* The wrapper a real export puts in front of the status name, and the set of
+     statuses whose day count is an open interval. Exported so both can be
+     pinned directly: the first decides which columns are read at all, and the
+     second only ever shows a warning, which is the kind of thing that rots
+     quietly if nothing asserts it. */
+  stageHeadingBare, STAGE_OPEN_ENDED,
   /* The current-stage half: the value matcher and the two synthetic column
      labels the stage axis uses. */
   stageIdForStatus, AGE_NO_STAGE, AGE_OTHER_STAGES,
@@ -16262,18 +16369,61 @@ function stagesReadHtml(res) {
       '</strong> as days in ' + nameOf(id) +
       (list.length > 1 ? ' (added together)' : '')).join(', ') +
       '. Only the day counts are saved — the status names in your headings are not.';
-  } else if (state.stages.length && res.columns.status < 0) {
-    html += '<br>No stage columns in this paste: none of the headings match a status you have '
-      + 'listed against a stage. Open <strong>Teams &amp; Stages</strong> in the header and check the '
-      + 'spellings against this export\u2019s own column headings.';
+    /* The open interval, said on screen rather than only in the notes. A stage
+       fed by a status work never leaves measures the time since the item
+       finished, not the time the work took, and it grows every time the export
+       is re-run — so the figure is not wrong once, it is wrong differently on
+       every paste. The reader keeps it if they meant it: the app declining a
+       column a stage asked for would be the app deciding what somebody's
+       workflow means. The example is a fixed phrase, not a heading out of the
+       paste — this report still echoes no pasted cell. */
+    const openEnded = cols.filter(sc => sc.openEnded);
+    if (openEnded.length) {
+      html += '<br><strong>Column ' + openEnded.map(sc => sc.index + 1).join(', ')
+        + ' measures time in a status the work never leaves</strong> — a '
+        + '<em>days in Done</em> figure runs to the moment the export was taken and gets '
+        + 'bigger every time you re-run it, so it is not how long the work took. It feeds '
+        + [...new Set(openEnded.map(sc => nameOf(sc.stageId)))].join(' and ')
+        + '. Take that status off the stage in <strong>Teams &amp; Stages</strong> unless '
+        + 'you meant it.';
+    }
   } else if (state.stages.length) {
-    /* A status column was read, so the reader is not missing anything — this
-       export is simply not the kind that carries durations. Said as a fact
-       rather than as the miss above, which would read as a problem with a
-       set-up that is working. */
-    html += '<br>No day counts in this paste, so <em>Time in stage</em> stays empty — that '
-      + 'needs a <strong>Time in Status</strong> export, with a column per status holding a '
-      + 'number of days.';
+    /* ONE branch where there were two, and the split is what made this report
+       lie. It chose between "none of your headings matched" and "this export
+       has no durations in it" by asking whether a Status column had been found
+       — which answers neither question. A paste with twelve "Days in ..."
+       columns and a Status column beside them got the second sentence: the
+       reassuring one, saying as a fact that the export carried nothing to read,
+       while the reader's set-up sat there working and unmatched. A wrong number
+       is what this report exists to prevent, and a wrong reassurance is the
+       same failure with the number left out.
+
+       So the fact both cases share is stated first — nothing here is headed
+       with a status you listed — and the sentence after it is the only part
+       that varies, on evidence rather than on a proxy. */
+    html += '<br>No stage columns in this paste, so <em>Time in stage</em> stays empty: nothing '
+      + 'here is headed with a status you have listed against a stage.';
+    const dur = (res.columns && res.columns.stageDurationCols) || [];
+    if (dur.length) {
+      /* NAMED BY POSITION and by COUNT, like every other column in this report,
+         and the first one is named so the reader can find the block in the
+         export they still have open. A dozen column numbers in a row would be a
+         sentence nobody finishes. */
+      html += ' <strong>' + dur.length + ' column' + (dur.length === 1 ? ' is' : 's are')
+        + ' headed as a number of days'
+        + (dur.length === 1 ? '' : ' — the first is column ' + (dur[0] + 1) + ' —')
+        + ' and no stage claimed '
+        + (dur.length === 1 ? 'it' : 'any of them') + '.</strong> A heading like '
+        + '<em>Days in Code Review</em> is read as the status inside it, so the alias to '
+        + 'type is the status: <em>Code Review</em>. Open <strong>Teams &amp; Stages</strong> '
+        + 'in the header and check the statuses you listed there against this export\u2019s '
+        + 'own column headings.';
+    } else {
+      html += ' That needs a <strong>Time in Status</strong> export, with a column per status '
+        + 'holding a number of days — so either this is not one, or the statuses you listed '
+        + 'are spelled differently there. Open <strong>Teams &amp; Stages</strong> in the '
+        + 'header to check them against this export\u2019s own column headings.';
+    }
   }
   if (clash.length) {
     html += '<br><strong>Column ' + clash.map(sc => sc.index + 1).join(', ') + '</strong> matches '

@@ -1435,33 +1435,53 @@ environment queue to your test time.
 
 ### If Your Export Names Its Columns "Days in …"
 
-A changelog-derived export — the kind a script builds from Jira's own history rather than from a
-marketplace field — usually names its columns for the status they measure: `Days in Backlog`,
-`Days in Ready for Work`, `Days in In Progress`, `Days in SIT`. Give each stage **two aliases**,
-the column heading and the bare status name:
+Most Time in Status exports do. They name a column for the status it measures and put a phrase in
+front saying what the number underneath is: `Days in Backlog`, `Days in Ready for Work`,
+`Days in In Progress`, `Days in SIT`.
 
-| Stage | Aliases |
-|---|---|
-| Backlog | `Days in Backlog`, `Backlog` |
-| Ready for Work | `Days in Ready for Work`, `Ready for Work` |
-| In Progress | `Days in In Progress`, `In Progress` |
-| SIT | `Days in SIT`, `SIT` |
+**Type the status, not the whole heading.** The words in front are read off — `Days in`,
+`Day in`, `Time in` and `Time spent in`, in any capitalisation — and the status inside is what
+has to match an alias:
 
-The second one is not redundant. The same list does two jobs: it matches the **column headings**,
-which carry the durations, and it matches the **Status cell** on work still in flight, which is
-what puts an item on the [work item age](#work-item-age-what-to-do-this-morning) chart. One
-without the other gets you half the feature.
+| Stage | Alias to type | Columns it then reads |
+|---|---|---|
+| Backlog | `Backlog` | `Days in Backlog`, and a `Backlog` cell in a Status column |
+| Ready for Work | `Ready for Work` | `Days in Ready for Work`, and the cell |
+| In Progress | `In Progress` | `Days in In Progress`, and the cell |
+| SIT | `SIT` | `Days in SIT`, and the cell |
+
+One alias, both jobs — and that is the reason to type the bare status. The same list matches the
+**column headings**, which carry the durations, *and* the **Status cell** on work still in
+flight, which is what puts an item on the
+[work item age](#work-item-age-what-to-do-this-morning) chart. An alias typed out as
+`Days in SIT` still reads the column, so nothing set up before September 2026 stopped working —
+but it can never match a status cell, so it gets you half the feature.
+
+Reading the wrapper off is **not** a loosening of the exact-match rule. What is left after the
+phrase comes off still has to equal your alias in full: `Days in Waiting on Testing Env` becomes
+`Waiting on Testing Env`, which an alias of `Testing` still does not match.
+
+> **Before 2026-09-01 this did not work at all.** An alias of `Code Review` did not match a
+> `Days in Code Review` column, every day count in the file was dropped, and — worse — the parse
+> report said the paste held no day counts, which was the app describing its own miss as a fact
+> about your export. Both halves are fixed: the heading is read, and when nothing matches, the
+> report now says how many columns are headed as a number of days and that no stage claimed them.
 
 **Two columns such an export almost always has should be aliased to nothing at all**, and both
 look like they should be:
 
 - **`Days in Done`** is not a duration. It counts from the moment the item finished to the moment
   you took the export, so it grows every time you re-run the script. Alias it and the biggest
-  stage on your chart is one that means "how long ago did this finish".
+  stage on your chart is one that means "how long ago did this finish". **A stage aliased `Done`
+  reaches that column now** — that follows from reading the wrapper off — so the app says so on
+  screen when it happens: the parse report names the column, names the stage it feeds, and tells
+  you to take the status off unless you meant it. It still keeps the figure; it is yours.
+  `Closed`, `Resolved`, `Cancelled` and `Rejected` are warned about on the same terms.
 - **`Days Blocked`** is usually the *Flagged* flag, and a flag runs **at the same time** as
   whatever status the item is sitting in — the item is blocked *and* in SIT, not blocked
   *instead of* SIT. Its days are already inside the other columns, so counting it as a stage
-  counts them twice.
+  counts them twice. It is also out of reach of the wrapper rule above — there is no "in" in it,
+  so only an alias of `Days Blocked` itself can ever claim it.
 
 Leave both out of your aliases and the app ignores them. You do not need to delete them from the
 file.

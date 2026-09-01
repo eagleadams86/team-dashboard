@@ -330,8 +330,13 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    is pinned as leaving a Sub-task where it is, not just as collecting two
    types. The demo gained a grouped row in the same change, because sample data
    has to reach every feature and the shipped filter list deliberately cannot
-   show this one. */
-const EXPECTED = 3041;
+   show this one. And to 3077 on 2026-09-01 for the wrapper a real Time in Status
+   export puts in front of its status names — the change is four characters of
+   matching and most of that jump is the rules it must not break: not a substring
+   rule, not a way into "Days Blocked", and not a silent claim on "Days in Done".
+   The last of those is the one to watch, because the fix is what made a bare
+   "Done" alias able to reach that column at all. */
+const EXPECTED = 3077;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -967,6 +972,69 @@ async function run(TD, win) {
   is(TD.stageColumnsFor(['Compliance Review'], STG), [],
      'a status nobody has listed is simply not read — a paste can never add its own rule');
 
+  /* ── The words a real export wraps around the status (2026-09-01) ──────────
+     Reported by Charles: a 1,781-row Time in Status export whose twelve day-count
+     columns are headed "Days in Code Review", "Days in Development" and so on,
+     against aliases typed as the statuses themselves — which is what the field
+     asks for, and what the same alias has to be to match a plain export's Status
+     column. Nothing matched, and the report said the paste held no day counts. */
+  is(TD.stageColumnsFor(['Days in Development', 'Days in Code Review', 'Days in Testing'], STG)
+       .map(c => c.stageId), ['sb', 'sr', 'st'],
+     'the shape a real Time in Status export actually has: the status is read out of the heading');
+  is(TD.stageColumnsFor(['Time in Testing'], STG).map(c => c.stageId), ['st'],
+     'and "Time in" says the same thing as "Days in"');
+  is(TD.stageColumnsFor(['Days spent in Testing'], STG).map(c => c.stageId), ['st'],
+     'as does the longer spelling of it');
+  is(TD.stageColumnsFor(['DAYS IN code-review'], STG).map(c => c.stageId), ['sr'],
+     'the wrapper is matched on the normalised form, like everything else here');
+
+  /* THE RULE THAT MUST SURVIVE THE CHANGE. Stripping a phrase off the front is
+     not the substring match that was turned down: what is left still has to
+     equal an alias exactly. */
+  is(TD.stageColumnsFor(['Days in Waiting on Testing Env'], STG), [],
+     'stripping the wrapper does NOT make this a substring rule — the env queue is still not test time');
+  is(TD.stageColumnsFor(['Days in Test'], STG), [],
+     'and the stage NAME is still not an alias, wrapped or not');
+  is(TD.stageColumnsFor(['Cycle days in Testing'], STG), [],
+     'the phrase comes off the FRONT only, so a heading that merely contains it is untouched');
+  is(TD.stageColumnsFor(['Days in'], STG), [],
+     'a heading that is nothing but the wrapper strips to nothing and matches nothing');
+
+  const blocked = [{ id: 'bl', name: 'Blocked', match: ['Blocked'] }];
+  is(TD.stageColumnsFor(['Days Blocked'], blocked), [],
+     'DAYS BLOCKED IS STILL OUT OF REACH — it has no "in", so the Flagged overlay cannot become a stage');
+  is(TD.stageColumnsFor(['Blocked'], blocked).map(c => c.stageId), ['bl'],
+     'a column headed as the status itself is a different matter, and is the reader\u2019s to claim');
+
+  const typedLong = [{ id: 'lo', name: 'Long', match: ['Days in Testing'] }];
+  is(TD.stageColumnsFor(['Days in Testing'], typedLong).map(c => c.stageId), ['lo'],
+     'an alias typed as the whole heading — the workaround — still works');
+  is(TD.stageColumnsFor(['Days in Testing'], typedLong.concat(STG)).map(c => c.stageId), ['lo'],
+     'and the whole heading is tried FIRST, so it beats the stripped form when both are listed');
+
+  const HB = TD.stageHeadingBare;
+  is(HB('Days in Code Review'), 'code review', 'the status inside a wrapped heading, normalised');
+  is(HB('Time spent in Code Review'), 'code review', 'all four spellings of the wrapper come off');
+  is(HB('Code Review'), '',
+     'an unwrapped heading has NO bare form — the report needs to tell the two apart');
+  is(HB('Days Blocked'), '', 'and neither has the one column that must never become a stage');
+  is(HB(''), '', 'an empty heading is not a wrapped one');
+
+  /* An open interval, claimed but flagged. A bare "Done" alias can now reach
+     "Days in Done", which until this change only an alias typed out in full
+     could — so the warning is the thing standing between a reader and a stage
+     whose figure grows every time they re-run the export. */
+  const doneStage = [{ id: 'sd', name: 'Done', match: ['Done'] }];
+  is(TD.stageColumnsFor(['Days in Done'], doneStage).map(c => [c.stageId, c.openEnded]),
+     [['sd', true]], 'a stage that asks for Done gets its column AND is flagged for it');
+  is(TD.stageColumnsFor(['Days in Development'], STG)[0].openEnded, false,
+     'an ordinary stage carries no flag');
+  is(TD.stageColumnsFor(['Days in Done'], [{ id: 'z', name: 'Z', match: ['Days in Done'] }])
+       .map(c => c.openEnded), [true],
+     'and the flag is read off the STATUS, so the long-form alias is caught on the same terms');
+  ok(TD.STAGE_OPEN_ENDED.has('cancelled') && TD.STAGE_OPEN_ENDED.has('resolved'),
+     'the other terminal statuses are in the same set — none of them is time the work spent moving');
+
   const stageClash = [{ id: 'a', name: 'A', match: ['Testing'] }, { id: 'b', name: 'B', match: ['Testing'] }];
   is(TD.stageColumnsFor(['Testing'], stageClash).map(c => c.stageId), ['a'],
      'two stages claiming one status: the first in the list keeps it');
@@ -1075,6 +1143,78 @@ async function run(TD, win) {
   ].join('\n'), 'auto', []);
   is(unreadable.columns.completed, 1,
      'a completion column whose dates are unreadable is still found, not skipped past');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('workflow stages — the export Charles actually has');
+
+  /* The paste that started this (2026-09-01), cut down to its shape: a real
+     Time in Status export, a Status column beside the durations, and stages set
+     up with the statuses typed as the field asks for them. Every one of these
+     assertions failed before the wrapper was read. */
+  const realStages = [
+    { id: 'rb', name: 'Build',   match: ['Development'] },
+    { id: 'rr', name: 'Review',  match: ['Code Review', 'Compliance Review'] },
+    { id: 'rd', name: 'Deploy',  match: ['Deployment'] }
+  ];
+  const real = TD.parsePastedRows([
+    'Issue Type\tIssue key\tParent key\tStatus\tCreated\tIn Progress\tResolved'
+      + '\tDays in Backlog\tDays in Code Review\tDays in Compliance Review'
+      + '\tDays in Deployment\tDays in Development\tDays in Done\tDays in In Progress',
+    'Story\tNDRCT-46\tNDRCT-7\tDone\t2026-07-21\t2026-07-22\t2026-07-30'
+      + '\t6.1\t1.06\t0.15\t2.86\t8.99\t15.27\t3.54',
+    'Bug\tNDRCT-47\tNDRCT-7\tDone\t2026-07-21\t2026-07-21\t2026-07-24'
+      + '\t0.95\t4.97\t\t0\t5.99\t7.27\t0.22'
+  ].join('\n'), 'auto', realStages);
+
+  is(real.columns.stages.map(c => [c.index, c.stageId]),
+     [[8, 'rr'], [9, 'rr'], [10, 'rd'], [11, 'rb']],
+     'THE BUG: four columns read where nothing was read before, and two of them feed one stage');
+  is(real.rows[0].stages, { rr: 1.21, rd: 2.86, rb: 8.99 },
+     'the day counts land, and Code Review and Compliance Review are added together');
+  is(real.rows[1].stages, { rr: 4.97, rd: 0, rb: 5.99 },
+     'an empty cell is no data for that stage, and a 0 in the next column is still a real zero');
+
+  /* The guards this must not have cost. Three of these headings answer a date
+     role's regex, and one of them is now hidden from it by a stage as well. */
+  is(real.columns.completed, 6, '"Days in Done" is still not the completion date');
+  is(real.columns.started, 5, 'nor is "Days in In Progress" the start date');
+  is(real.columns.created, 4, 'and the created date is still its own column');
+  is(real.columns.type, 0, 'a column of day counts is still not mistaken for the work type');
+  is(real.columns.status, 3, 'the Status column is read as it always was');
+  is(real.columns.parent, 2, 'and so is the parent key');
+  ok(!/Days in|Code Review|Development|Deployment/i.test(JSON.stringify(real.rows)),
+     'NO STATUS NAME survives, wrapper or no wrapper — the rows still carry ids and numbers only');
+
+  /* Aliased to nothing, so unclaimed — and counted, which is the whole of the
+     second fix. */
+  is(real.columns.stageDurationCols, [7, 12, 13],
+     'the day-count columns no stage asked for are counted for the parse report');
+  const openReal = TD.parsePastedRows(
+    ['Resolved\tDays in Done', '2026-08-09\t20'].join('\n'), 'auto',
+    [{ id: 'od', name: 'Finished', match: ['Done'] }]);
+  is(openReal.columns.stages.map(c => c.openEnded), [true],
+     'a stage that asks for Done reaches its column now, and the report is told to warn about it');
+
+  /* ── What the parse report is allowed to CLAIM (2026-09-01) ────────────────
+     The report used to pick between "none of your headings matched" and "this
+     export has no durations in it" by asking whether a Status column had been
+     found — a proxy for a question it had no answer to. On the paste above,
+     with its dozen day-count columns, it printed the reassuring one. */
+  const missed = TD.parsePastedRows([
+    'Issue Type\tIssue key\tStatus\tCreated\tIn Progress\tResolved\tDays in CERT\tDays in Design',
+    'Story\tNDRCT-46\tDone\t2026-07-21\t2026-07-22\t2026-07-30\t1.5\t2'
+  ].join('\n'), 'auto', realStages);
+  is(missed.columns.stages, [],
+     'no alias covers these statuses, so nothing is read — a paste can never add its own rule');
+  ok(missed.columns.status >= 0 && missed.columns.stageDurationCols.length === 2,
+     'and the report can now see BOTH: a status column was read AND this paste has day counts in it');
+
+  const noDurations = TD.parsePastedRows([
+    'Issue Type\tIssue key\tStatus\tCreated\tIn Progress\tResolved\tStory Points',
+    'Story\tNDRCT-46\tDone\t2026-07-21\t2026-07-22\t2026-07-30\t5'
+  ].join('\n'), 'auto', realStages);
+  is(noDurations.columns.stageDurationCols, [],
+     'a plain export carries none, and a column of story points is NOT guessed to be one');
 
   /* ────────────────────────────────────────────────────────── */
   group('workflow stages — the storage boundary');

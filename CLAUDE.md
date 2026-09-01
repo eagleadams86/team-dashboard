@@ -11,6 +11,60 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## A Real Export Wraps Its Status Names, and the Report Lied About It (2026-09-01) — no schema change
+
+Reported by Charles with a 1,781-row Time in Status export: twelve day-count columns,
+stages set up, and *Time in stage* empty. Two separate faults, one visible and one
+not, and the invisible one is the more instructive.
+
+- **The match now reads a wrapper off the HEADING: `Days in`, `Day in`, `Time in`,
+  `Time spent in`, anchored at the front, on the normalised form.** Nothing else is
+  stripped. A real export heads its columns `Days in Code Review`; the aliases box
+  asks for a status and says so; `code review` never met `days in code review`, so
+  every duration in the file was dropped. The whole heading is still tried FIRST, so
+  an alias typed out in full — the workaround, and what the README told people to do
+  until today — keeps working, and so does a board with a status genuinely called
+  that.
+- **This is NOT the substring rule, which stays turned down.** What is left after the
+  phrase comes off must still equal an alias in full: `Days in Waiting on Testing Env`
+  strips to `waiting on testing env`, which an alias of `Testing` still does not match.
+  The anchor is what makes that true, and `Cycle days in Testing` is pinned as
+  untouched for the same reason. **`Days Blocked` has no "in" and so cannot be reached
+  by this at all** — the Flagged overlay must never become a stage, and this must not
+  become the change that quietly let it in.
+- **The cost the fix takes on, and pays for on screen: a bare `Done` alias can now
+  reach `Days in Done`.** Only an alias typed out in full could before. That column is
+  an open interval — it runs to the moment the export was taken and grows on every
+  re-run — so the parse report now names the column, names the stage it feeds, and
+  says to take the status off unless it was meant. `STAGE_OPEN_ENDED` holds the rest
+  (`closed`, `resolved`, `cancelled`, `rejected`, `abandoned`). **The column is still
+  CLAIMED**: refusing a column a stage asked for would be the app deciding what
+  somebody's workflow means, which is the thing the alias design exists to avoid. Warn,
+  do not overrule. The flag is read off the BARE form however the column was claimed,
+  so the long-form alias is caught on the same terms.
+- **THE REPORT USED A PROXY FOR A QUESTION IT HAD NO ANSWER TO, and that is the bug
+  worth remembering.** It chose between "none of your headings matched" and "no day
+  counts in this paste" by asking whether a Status column had been found. On this
+  export it printed the second: a *reassurance*, stated as a fact about somebody's
+  data, on a paste with twelve day-count columns in it. A wrong number is what this
+  report exists to prevent, and a wrong reassurance is the same failure with the
+  number left out. The two branches are now one: the fact both cases share is stated
+  first, and only the sentence after it varies — on `columns.stageDurationCols`, which
+  counts columns whose heading SAYS it holds days and which no stage claimed.
+- **`stageDurationCols` is a heading test, deliberately not a shape test on the
+  values.** A column of plain numbers is also story points, an estimate and a comment
+  tally; a report that nagged about alias spellings every time somebody pasted an
+  estimate column is a report people stop reading. A heading carrying the wrapper is
+  the export saying in its own words what the column holds, and that is evidence. It
+  is a count for the report and is never read into anything.
+- **Still no heading is ever echoed.** The report names columns by position and stages
+  by the reader's own name, exactly as before; the `Days in Code Review` in the new
+  sentence is a fixed example in the source, not a cell out of the paste. The
+  serialise-and-grep assertion covers the wrapped shape now too.
+- The dialog copy says *type the status, not the whole heading*, and says why: the bare
+  status is the only spelling that also matches a plain export's **Status** column, so
+  the long form gets you durations, no grouping, and no way to see why.
+
 ## A Filter Row May Name Several Work Types (2026-09-01) — no schema change
 
 Asked for by Charles, who had already typed `Stories and Tasks → Story, Task` into
@@ -1299,6 +1353,11 @@ this file was written to keep out. **Read this whole section before changing any
   column and add somebody's environment queue to their test time — a wrong number nobody can
   see. `normalizeAlias` collapses case and punctuation, so `In-Progress` and `In Progress` are
   one status; that is the only latitude there is.
+  **AMENDED 2026-09-01** — see *A Real Export Wraps Its Status Names* above. A HEADING now has a
+  `Days in` / `Time in` phrase read off the front before the comparison, because that is how a
+  real export names these columns; what is left still has to equal an alias in full, so the
+  Waiting-on-Testing-Env case above is unchanged and still pinned. Exact is exact; the wrapper
+  is not part of the status.
 - **Two columns may feed ONE stage and are added together** (the point of aliases — a workflow
   with "Ready for Code Review" and "Code Review" is one Review stage). **Two stages claiming one
   alias is the opposite**: a contradiction the app must not resolve silently, so the first in the
@@ -1334,7 +1393,9 @@ this file was written to keep out. **Read this whole section before changing any
   column deliberately — an export of nothing but work in flight has an empty `Resolved`, and
   that is still the completion date.
 - **Two columns of a changelog export must NOT be aliased to a stage, and both look like they
-  should be.** `Days in Done` is an open interval that runs to the moment the export was taken,
+  should be.** (Since 2026-09-01 `Days in Done` is reachable by a bare `Done` alias and the
+  report warns when a stage claims it; `Days Blocked` still cannot be reached except by its own
+  full spelling. See the amendment above.) `Days in Done` is an open interval that runs to the moment the export was taken,
   so it grows on every re-run — alias it and the biggest stage on the chart is one that means
   "how long ago did this finish". `Days Blocked` is the **Flagged** flag, which runs
   *concurrently* with whatever status the item is sitting in — on a real row the four real
