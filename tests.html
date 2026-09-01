@@ -317,8 +317,14 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    and 2695 for the spinner throttle. 2740 on 2026-08-27 for the typed feature
    size over a board that has a measured one, and 2749 the same day for what
    Charles found in it: the size row riding with the pace tick in planning, and
-   Reset actually emptying the two boxes. */
-const EXPECTED = 2847;
+   Reset actually emptying the two boxes. And to 2960 on 2026-09-01 for the
+   status vocabulary — the largest single jump this number has taken, because
+   the change it covers REVERSED the rule the stage feature's whole safety
+   argument used to be. The repetition gate gets the most of it: it is the leg
+   that replaced "no status name is ever stored", so it is tested from both
+   sides on two 200-row pastes that differ in nothing but how much their status
+   column repeats. */
+const EXPECTED = 2960;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -824,8 +830,8 @@ async function run(TD, win) {
      'and by an ALIAS — which is typed once in a dialog and then never shown again');
   is(sFind('code review').hits[0].snippet, 'matches Ready for Code Review, Code Review',
      'the aliases are the answer to the question that brought you here');
-  is(sFind('build').hits[0].snippet, 'no aliases yet',
-     'a stage matching nothing says so — that IS the finding');
+  is(sFind('build').hits[0].snippet, 'nothing grouped yet',
+     'a stage matching and grouping nothing says so — that IS the finding');
   is(sFind('code review').hits[0].view, 'stage', 'a stage hit opens Teams & Stages');
 
   is(sWhere('DAE-1'), ['DAE-1 — Kestrel'], 'an item is found by its issue key');
@@ -1169,7 +1175,8 @@ async function run(TD, win) {
   /* The whitelist rule at the top of CLAUDE.md, pinned for this field: a stored
      shape that is not in the whitelist is stripped. */
   const strayStage = StS.sanitizeStages([{ id: 's', name: 'A', match: [], colour: 'red', wip: 3 }])[0];
-  is(Object.keys(strayStage), ['id', 'name', 'match'], 'a stray key on a stage is stripped, not carried');
+  is(Object.keys(strayStage), ['id', 'name', 'match', 'statuses'],
+     'a stray key on a stage is stripped, not carried');
 
   /* ────────────────────────────────────────────────────────── */
   group('workflow stages — the wire format stays byte-identical without them');
@@ -1182,7 +1189,7 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 13, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 14, 'SCHEMA was bumped in the same commit as the whitelist widening');
 
 
   /* ══════════════════════════════════════════════════════════
@@ -1276,6 +1283,12 @@ async function run(TD, win) {
   is(SIS('', STG), '', 'an empty cell is no stage');
   is(SIS('Code Review', []), '', 'and with no stages set up, nothing matches at all');
 
+  /* The stages as they stand AFTER a paste has applied its auto-ticks — what
+     the app itself does in adoptStatuses. Written out here rather than reaching
+     for app state, because parsePastedRows is pure and its tests must stay so. */
+  const ticked = (res) => STG.map(st => Object.assign({}, st, {
+    statuses: res.statusTicks.filter(t => t.stageId === st.id).map(t => t.statusId) }));
+
   const statusPaste = [
     'Issue key\tIn Progress\tResolved\tIssue Type\tStatus',
     'DAE-1\t2026-08-02\t\tStory\tCode Review',
@@ -1286,10 +1299,33 @@ async function run(TD, win) {
   const statusRes = TD.parsePastedRows(statusPaste, 'auto', STG);
   is(statusRes.columns.status, 4, 'the Status column is found by its anchored heading');
   is(statusRes.columns.type, 3, 'and is NOT mistaken for the work type, which it looks exactly like');
-  is(statusRes.rows.map(r => r.stage || ''), ['sr', '', '', ''],
-     'only the matched in-flight row carries a stage');
+  /* THE STAGE IS NO LONGER FROZEN ON THE ROW. A row carries the status it was
+     in and works its stage out through stageOf against whatever grouping is in
+     force when it is READ — which is what makes a re-tick re-bucket work that
+     was pasted weeks ago. So the row's own `stage` is empty and the answer
+     comes from the pair. */
+  is(statusRes.rows.map(r => r.stage || ''), ['', '', '', ''],
+     'the paste writes no frozen stage on a row that has a status');
+  is(statusRes.rows.map(r => TD.stageOf(r, ticked(statusRes))), ['sr', '', '', ''],
+     'and only the matched in-flight row resolves to one');
   is(statusRes.unmatchedStatus, 1,
      'the unmatched one is COUNTED — a whole export matching nothing is a set-up problem');
+
+  /* The vocabulary the same paste worked out. Both in-flight statuses are kept,
+     including the one no stage answers to: being ungrouped is not a reason to
+     throw a word away, it is a reason to show it in the dialog so somebody can
+     group it. The finished row's "Done" is NOT here — the in-flight rule holds
+     on the way into the vocabulary exactly as it held on the way onto a row. */
+  is(statusRes.statuses.map(x => x.label), ['Code Review', 'Compliance Review'],
+     'the statuses of work in flight are adopted, ungrouped ones included');
+  ok(!statusRes.statuses.some(x => /done/i.test(x.label)),
+     'and a finished row\u2019s status never reaches the list — the in-flight rule holds here too');
+  is(statusRes.statusesNew.length, 2, 'both are reported as new, for the paste report to name');
+  /* The alias the reader typed BEFORE this build is what ties the new status to
+     their existing stage, so a returning reader re-types and re-ticks nothing.
+     This is the upgrade path, pinned. */
+  is(statusRes.statusTicks.length, 1, 'the one status an existing alias answers to is auto-ticked');
+  is(statusRes.statusTicks[0].stageId, 'sr', 'into the stage whose alias matched it');
 
   /* The reason the finished row above scores nothing. Every export says Done
      against everything it has ever closed, which is most of the file. */
@@ -1299,8 +1335,13 @@ async function run(TD, win) {
   is(allDone.unmatchedStatus, 0,
      'so a healthy export full of Done rows reports no unmatched statuses at all');
 
+  /* THE CLAIM THAT SURVIVED THE REVERSAL, and the one worth keeping most. The
+     app stores status names now — but NOT ON A ROW. A row carries an id into a
+     capped list the reader can see and delete; the words live in exactly one
+     place. So this assertion reads exactly as it always did, over the rows,
+     and it is leg 3 of the safety argument stated as a test. */
   ok(!/Code Review|Compliance Review|Done/i.test(JSON.stringify(statusRes.rows)),
-     'and NO status name survives the parse — the rows carry a stage id or nothing');
+     'NO status name is on a row — a row carries an id into the vocabulary, or nothing');
 
   /* A row that is DROPPED loaded nothing, so it cannot have loaded an unmatched
      status. The backlog is the ordinary case and it is most of a real export:
@@ -1332,8 +1373,15 @@ async function run(TD, win) {
   is(droppedStage.badStageCells.reduce((n, c) => n + c.count, 0), 1,
      'an unreadable day count on a DROPPED row is not reported as left out');
 
-  is(TD.parsePastedRows(statusPaste, 'auto', []).rows.every(r => !r.stage), true,
+  /* With no stages the statuses are still read, and that is the whole change:
+     the age chart gets its axis from a paste alone, where before this build a
+     board with no aliases typed in got work type until somebody set stages up. */
+  const noStageSetup = TD.parsePastedRows(statusPaste, 'auto', []);
+  is(noStageSetup.rows.every(r => !r.stage), true,
      'with no stages set up the same paste stores no stage at all');
+  is(noStageSetup.statuses.map(x => x.label), ['Code Review', 'Compliance Review'],
+     'but the statuses are still read — stages are a grouping, not the price of admission');
+  is(noStageSetup.statusTicks.length, 0, 'and there is nothing to auto-tick them into');
 
   /* The anchored heading, and the real Jira neighbours a loose /status/ eats. */
   const headOnly = (h) => TD.parsePastedRows(
@@ -1406,6 +1454,403 @@ async function run(TD, win) {
     curAgeRows.map(r => Object.assign({}, r, { stage: '' })), SAMPLE_SETTINGS, curAgeView, ageStages);
   is(noneInStage.ageing.byStage, false,
      'stages that exist but reach no item in flight leave the type axis alone');
+
+  /* Every fixture in the status-vocabulary groups is scoped, the way the
+     features and delete-a-stage groups already are: this is a long stretch of
+     one straight-line function, and a fixture name that escapes it collides
+     with one two thousand lines away for reasons nobody can see. */
+  {
+  /* ══════════════════════════════════════════════════════════
+     THE STATUS VOCABULARY — the reversal of 2026-09-01.
+
+     Until this build the safety of the whole stage feature was one sentence:
+     no status name is ever stored. It is stored now, deliberately, and the
+     argument that replaced it has four legs (see cleanStatusLabel in
+     index.html). Legs 1 and 2 carry the weight and are pinned hardest here;
+     leg 4 is pinned too, but a suite that only covered leg 4 would be exactly
+     the misreading the code comment warns against.
+     ══════════════════════════════════════════════════════════ */
+  group('the status vocabulary — leg 2, the repetition gate');
+
+  /* THE GUARD THE VALUE COULD NOT GIVE US, and the one assertion this whole
+     feature stands on. A summary column headed "Status" — which is the shape a
+     mismapped export has — is refused WHOLE. Not shortened, not partly read,
+     not the short values kept and the long ones dropped. */
+  const proseCol = ['Issue key\tIn Progress\tStatus'];
+  for (let i = 1; i <= 200; i++) {
+    /* 187 distinct values across 200 rows, which is what prose looks like. The
+       repeats are there so the count is not trivially the row count. */
+    proseCol.push('DAE-' + i + '\t2026-08-02\tFix the login bug on prod ' + (i % 187));
+  }
+  const prose = TD.parsePastedRows(proseCol.join('\n'), 'auto', STG);
+  is(prose.statuses.length, 0, 'a Status column of 187 values in 200 rows stores NOTHING');
+  ok(prose.rows.every(r => !r.status), 'not one row carries a status id off it');
+  ok(!!prose.statusColumnRefused, 'and the refusal is reported rather than silent');
+  is(prose.statusColumnRefused.distinct, 187, 'by its distinct count');
+  is(prose.statusColumnRefused.filled, 200, 'and how many cells it looked at');
+  /* The refusal carries NO cell and NO heading. A heading is a pasted cell, and
+     the column that has just been judged prose is the last one to start
+     quoting — this report has never echoed one and does not start here. */
+  ok(!/login|prod/i.test(JSON.stringify(prose.statusColumnRefused)),
+     'and it names a POSITION and two counts — never a cell out of the column');
+  /* Leg 1 still standing underneath it: the role is claimed even when refused,
+     so the headerless work-type detector cannot pick the column up instead. */
+  ok(prose.columns.status >= 0, 'the role stays claimed, keeping the type detector off it');
+  ok(prose.columns.type !== prose.columns.status,
+     'so a refused status column is never filed as the work type');
+
+  /* The same 200 rows with a real workflow in that column. Same width, same
+     length, same heading — only the repetition differs, which is the whole
+     claim. */
+  const realCol = ['Issue key\tIn Progress\tStatus'];
+  const WF = ['To Do', 'In Progress', 'Code Review', 'Testing', 'Blocked', 'Ready to Deploy'];
+  for (let i = 1; i <= 200; i++) {
+    realCol.push('DAE-' + i + '\t2026-08-02\t' + WF[i % WF.length]);
+  }
+  const real = TD.parsePastedRows(realCol.join('\n'), 'auto', STG);
+  is(real.statuses.length, 6, 'six distinct values across 200 rows IS a workflow, and is read');
+  is(real.statusColumnRefused, null, 'nothing is refused');
+  ok(real.rows.every(r => r.status), 'and every in-flight row carries an id');
+
+  /* Below the row floor the ratio is not applied at all — four rows in four
+     statuses is an ordinary small paste, and 1.0 is the only ratio it can have.
+     The same reasoning that made the work-type detector prefer a count. */
+  const tiny = TD.parsePastedRows([
+    'Issue key\tIn Progress\tStatus',
+    'DAE-1\t2026-08-02\tTo Do',
+    'DAE-2\t2026-08-02\tIn Progress',
+    'DAE-3\t2026-08-02\tCode Review',
+    'DAE-4\t2026-08-02\tTesting'
+  ].join('\n'), 'auto', STG);
+  is(tiny.statuses.length, 4, 'a four-row paste with four statuses is read, ratio 1.0 and all');
+  is(TD.statusColumnUsable({ filled: 4, distinct: 4, distinctRatio: 1 }), true,
+     'the predicate says so directly, below the floor');
+  is(TD.statusColumnUsable({ filled: 200, distinct: 187, distinctRatio: 0.935 }), false,
+     'and refuses the same ratio above it');
+  is(TD.statusColumnUsable({ filled: 500, distinct: 41, distinctRatio: 0.082 }), false,
+     'the absolute cap bites whatever the ratio says — 41 statuses is not a workflow');
+  is(TD.statusColumnUsable({ filled: 0, distinct: 0, distinctRatio: 1 }), false,
+     'an empty column is not a status column');
+  is(TD.statusColumnUsable(null), false, 'and neither is no column at all');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the status vocabulary — leg 4, the shape of one label');
+
+  const CSL = TD.cleanStatusLabel;
+  is(CSL('In Progress'), 'In Progress', 'an ordinary status passes, stored exactly as written');
+  is(CSL('  Ready for   Code Review '), 'Ready for Code Review', 'runs of whitespace collapse');
+  is(CSL("Won't Do"), "Won't Do", 'an apostrophe is a character real statuses have');
+  is(CSL('Blocked/Waiting'), 'Blocked/Waiting', 'and so is a slash');
+  is(CSL('UAT (Client)'), 'UAT (Client)', 'and brackets');
+  is(CSL('Pending Business Owner Sign Off'), 'Pending Business Owner Sign Off',
+     'five words is still a status somebody has');
+  /* DROPPED WHOLE, never truncated — the rule every guard in this app follows.
+     Forty characters of a summary is still work-system text. */
+  is(CSL('x'.repeat(TD.STATUS_LABEL_MAX)), 'x'.repeat(TD.STATUS_LABEL_MAX),
+     'the cap itself passes');
+  is(CSL('x'.repeat(TD.STATUS_LABEL_MAX + 1)), '', 'and one character past it is dropped WHOLE');
+  is(CSL('a b c d e f g'), '', 'seven words is a sentence, not a status');
+  /* The character whitelist. Each of these is a shape prose has and a status
+     does not, and each is refused before the length is even considered. */
+  is(CSL('Fix the login bug, then deploy'), '', 'a comma is refused');
+  is(CSL('Status: blocked'), '', 'and a colon');
+  is(CSL('He said "no"'), '', 'and a quote');
+  is(CSL('<b>Review</b>'), '', 'and markup, which is why the value is inert wherever it lands');
+  is(CSL('a|b'), '', 'and a pipe');
+  is(CSL('=1+1'), '', 'a formula lead cannot even start a label');
+  is(CSL('+Review'), '', 'nor a plus');
+  is(CSL('-Review'), '', 'nor a minus');
+  is(CSL('@Review'), '', 'nor an at sign');
+  is(CSL('In' + String.fromCharCode(1) + 'Progress'), '',
+     'a control character is REFUSED by the whitelist rather than stripped before it');
+  is(CSL(''), '', 'an empty cell is no status');
+  is(CSL('   '), '', 'nor is whitespace');
+  is(CSL('...'), '', 'nor punctuation that normalises to nothing');
+  is(CSL(42), '', 'and a non-string is not a label');
+  /* THE LIMIT OF LEG 4, asserted so nobody mistakes it for the boundary. A
+     short summary passes every shape test here — which is exactly why leg 2
+     exists and why this group is not the one that keeps the app safe. */
+  is(CSL('Login redesign'), 'Login redesign',
+     'a short summary CLEARS every shape test — leg 4 is hygiene, leg 2 is the guard');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the status vocabulary — the list itself');
+
+  /* One status, one entry, whatever an export's spelling does. The same
+     latitude the aliases get, and for the same reason: two entries would split
+     one column of the age chart in half for a reason nobody could see. */
+  const dedupe = TD.parsePastedRows([
+    'Issue key\tIn Progress\tStatus',
+    'DAE-1\t2026-08-02\tIn Progress',
+    'DAE-2\t2026-08-02\tIn-Progress',
+    'DAE-3\t2026-08-02\tin progress'
+  ].join('\n'), 'auto', []);
+  is(dedupe.statuses.map(x => x.label), ['In Progress'],
+     'three spellings of one status are ONE entry — the first one seen');
+  is(new Set(dedupe.rows.map(r => r.status)).size, 1, 'and all three rows point at it');
+
+  /* The cap reached from a list that is already full when an otherwise
+     perfectly ordinary column arrives. Not a silent drop: the report says so,
+     because a full list means the column is probably not what it looks like. */
+  const full = [];
+  for (let i = 0; i < TD.STATUS_MAX; i++) full.push({ id: 'x' + i, label: 'Filler ' + i });
+  const overflowed = TD.parsePastedRows([
+    'Issue key\tIn Progress\tStatus',
+    'DAE-1\t2026-08-02\tCode Review',
+    'DAE-2\t2026-08-02\tCode Review'
+  ].join('\n'), 'auto', [], [], full);
+  is(overflowed.statuses.length, TD.STATUS_MAX, 'a full list takes no more');
+  is(overflowed.statusesOverflow, 2,
+     'and the cells left without one are COUNTED, not dropped silently');
+  ok(overflowed.rows.every(r => !r.status), 'so those rows carry no id');
+
+  /* More distinct values than the cap and leg 2 refuses the column outright,
+     before the per-label cap is ever consulted — the right answer, and the
+     stronger one. */
+  const vocManyRows = ['Issue key\tIn Progress\tStatus'];
+  for (let i = 1; i <= TD.STATUS_MAX + 5; i++) {
+    vocManyRows.push('DAE-' + i + '\t2026-08-02\tStage ' + i);
+  }
+  const vocMany = TD.parsePastedRows(vocManyRows.join('\n'), 'auto', []);
+  is(vocMany.statuses.length, 0, 'a column with more distinct values than the cap is refused whole');
+  ok(!!vocMany.statusColumnRefused, 'by leg 2, before the per-label cap is ever consulted');
+
+  /* A label leg 4 refuses is tallied apart from one the cap refused: the two
+     mean completely different things to somebody reading the report. */
+  const dropped = TD.parsePastedRows([
+    'Issue key\tIn Progress\tStatus',
+    'DAE-1\t2026-08-02\tCode Review',
+    'DAE-2\t2026-08-02\tBlocked: waiting on the vendor to confirm',
+    'DAE-3\t2026-08-02\tCode Review'
+  ].join('\n'), 'auto', []);
+  is(dropped.statusesDropped, 1, 'a cell leg 4 refuses is counted as dropped');
+  is(dropped.statusesOverflow, 0, 'and not as an overflow, which says something else entirely');
+  is(dropped.statuses.map(x => x.label), ['Code Review'], 'and never reaches the list');
+
+  /* A status the vocabulary refuses can still be GROUPED by an alias somebody
+     typed, because a stage id is not a word. This is the whole pre-2026-09-01
+     path, kept alive for exactly this case. */
+  const colonStage = [{ id: 'sx', name: 'Blocked', match: ['Blocked: waiting on the vendor'],
+                        statuses: [] }];
+  const colonPaste = TD.parsePastedRows([
+    'Issue key\tIn Progress\tStatus',
+    'DAE-1\t2026-08-02\tBlocked: waiting on the vendor'
+  ].join('\n'), 'auto', colonStage);
+  is(colonPaste.statuses.length, 0, 'a label the whitelist refuses never enters the vocabulary');
+  is(colonPaste.rows[0].stage, 'sx',
+     'but a typed alias still groups it — the legacy path, and a stage id is not a word');
+  is(colonPaste.rows[0].status, undefined, 'with no status id beside it');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the status vocabulary — grouping is optional, and it applies backwards');
+
+  /* THE PROMISE THIS WHOLE CHANGE WAS MADE FOR. The old design froze a row's
+     stage at paste time, so adding an alias could only ever affect the NEXT
+     export. Now the stage is worked out at read time, so re-ticking a status
+     re-buckets work that was pasted weeks ago — with no re-paste, and no
+     second copy of the data. */
+  const vocab = [{ id: 'u1', label: 'Code Review' }, { id: 'u2', label: 'Testing' }];
+  const retroRows = [
+    { started: D(2026, 8, 1), completed: null, type: 'Story', status: 'u1' },
+    { started: D(2026, 8, 2), completed: null, type: 'Story', status: 'u2' },
+    /* One finished row, because derive() returns its empty shape for a list
+       with nothing completed in it — and a board of nothing but work in flight
+       has no throughput to draw the rest of the dashboard from either. It is
+       not in flight, so it adds no column to the axis under test. */
+    { started: D(2026, 7, 1), completed: D(2026, 8, 9), type: 'Story', status: '' }
+  ];
+  const retroView = { filterValue: '', months: 'all', bucket: 'week', asOf: D(2026, 8, 10) };
+  const apart = [{ id: 'sr', name: 'Review', match: [], statuses: ['u1'] },
+                 { id: 'st', name: 'Test',   match: [], statuses: ['u2'] }];
+  const together = [{ id: 'sr', name: 'Review', match: [], statuses: ['u1', 'u2'] },
+                    { id: 'st', name: 'Test',   match: [], statuses: [] }];
+  const dApart = TD.derive(retroRows, SAMPLE_SETTINGS, retroView, apart, vocab);
+  is(dApart.ageing.columnNames, ['Review', 'Test'], 'two statuses in two stages draw two columns');
+  const dTogether = TD.derive(retroRows, SAMPLE_SETTINGS, retroView, together, vocab);
+  is(dTogether.ageing.columnNames, ['Review'],
+     'and re-ticking one into the other re-buckets BOTH rows — the same rows, not re-pasted');
+  is(dTogether.ageing.columns, ['Review (2)'], 'with the count following it');
+
+  /* stageOf is the one place that question is answered, and it is pinned
+     directly so nothing has to infer it from a chart. */
+  is(TD.stageOf({ status: 'u1' }, apart), 'sr', 'a row resolves its stage through its status');
+  is(TD.stageOf({ status: 'u2' }, together), 'sr', 'and follows the grouping when it changes');
+  is(TD.stageOf({ status: 'uX' }, apart), '', 'a status in no stage resolves to no stage');
+  is(TD.stageOf({ stage: 'sr' }, apart), 'sr',
+     'a LEGACY row with no status still reads its stored stage — documents from before this build');
+  is(TD.stageOf({ status: 'u1', stage: 'st' }, apart), 'sr',
+     'and the status wins if a hand-edited copy somehow carries both');
+  is(TD.stageOf(null, apart), '', 'and no row is no stage');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the status vocabulary — the age chart ladder');
+
+  const ladderRows = [
+    { started: D(2026, 8, 1), completed: null, type: 'Story', status: 'u1' },
+    { started: D(2026, 8, 2), completed: null, type: 'Story', status: 'u1' },
+    { started: D(2026, 8, 3), completed: null, type: 'Bug',   status: 'u2' },
+    { started: D(2026, 8, 4), completed: null, type: 'Task',  status: '' },
+    { started: D(2026, 7, 1), completed: D(2026, 8, 9), type: 'Story', status: '' }
+  ];
+  /* Rung one: a grouping exists and reaches something in flight. */
+  const rung1 = TD.derive(ladderRows, SAMPLE_SETTINGS, retroView, apart, vocab);
+  is(rung1.ageing.byStage, true, 'a grouping that reaches work in flight takes the top rung');
+  is(rung1.ageing.byStatus, false, 'and the status rung stands down');
+  /* Rung two: statuses, no grouping. THE NEW RUNG — a board that has pasted an
+     export gets the canonical axis with no set-up at all, where before this
+     build it got work type until somebody typed a list of aliases. */
+  const rung2 = TD.derive(ladderRows, SAMPLE_SETTINGS, retroView, [], vocab);
+  is(rung2.ageing.byStage, false, 'with nothing grouped the stage rung stands down');
+  is(rung2.ageing.byStatus, true, 'and the status rung takes it');
+  is(rung2.ageing.columnNames, ['Code Review', 'Testing', 'No status'],
+     'ranked busiest-first like the type axis — a vocabulary has no order the reader chose');
+  is(rung2.ageing.columns, ['Code Review (2)', 'Testing (1)', 'No status (1)'],
+     'the tick carries the count, because a status is a PLACE and that is the figure wanted');
+  is(rung2.axisTitles.itemAgeX, 'Status', 'and the axis says so');
+  /* Rung three: neither. NOT legacy — it is what a board with no Status column
+     still gets, and Team Bare Export still draws it. */
+  const rung3 = TD.derive(ladderRows, SAMPLE_SETTINGS, retroView, [], []);
+  is(rung3.ageing.byStatus, false, 'with no vocabulary the status rung stands down too');
+  is(rung3.ageing.columns, ['Story', 'Bug', 'Task'], 'and the work-type axis is unchanged');
+  is(rung3.axisTitles.itemAgeX, 'Work type', 'with its own axis title');
+  /* A vocabulary that reaches nothing in flight leaves the rung below alone,
+     exactly as a stage list that reaches nothing does. */
+  const noneInStatus = TD.derive(ladderRows.map(r => Object.assign({}, r, { status: '' })),
+    SAMPLE_SETTINGS, retroView, [], vocab);
+  is(noneInStatus.ageing.byStatus, false,
+     'a vocabulary that reaches no item in flight leaves the type axis alone');
+
+  /* The fold, on the new rung. A dozen statuses would draw a dozen columns two
+     dots wide, so the long tail folds and the count is stated. */
+  const manyVocab = [], manyStatusRows = [];
+  for (let i = 0; i < 12; i++) {
+    manyVocab.push({ id: 'v' + i, label: 'Status ' + i });
+    for (let j = 0; j <= (12 - i); j++) {
+      manyStatusRows.push({ started: D(2026, 8, 1), completed: null, type: 'Story',
+                            status: 'v' + i });
+    }
+  }
+  manyStatusRows.push({ started: D(2026, 7, 1), completed: D(2026, 8, 9), type: 'Story',
+                        status: '' });
+  const folded = TD.derive(manyStatusRows, SAMPLE_SETTINGS, retroView, [], manyVocab);
+  ok(folded.ageing.columnNames.indexOf(TD.AGE_OTHER_STATUSES) >= 0,
+     'past the column cap the tail folds into one column of its own');
+  ok(folded.ageing.foldedTypes > 0, 'and how many went into it is stated, not silently dropped');
+  is(folded.ageing.columnNames[folded.ageing.columnNames.length - 1], TD.AGE_OTHER_STATUSES,
+     'which sits on the right, keeping that edge the quiet corner the lines are labelled in');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the status vocabulary — the storage boundary');
+
+  const StV = win.TDState;
+  /* Leg 4 again, at the OTHER door. Leg 2 guards a paste; a backup file, a
+     share link and a hand-edited localStorage do not arrive through one, and
+     nothing they claim about how repetitive their column was can be checked. */
+  const dirty = StV.sanitizeStatuses([
+    { id: 'a', label: 'Code Review' },
+    { id: 'b', label: 'Fix the login bug, on prod' },
+    { id: 'c', label: '<img src=x onerror=alert(1)>' },
+    { id: 'd', label: 'x'.repeat(80) },
+    { id: 'e', label: 'code-review' },
+    { id: 'f', label: 42 },
+    { id: 'g' }
+  ]);
+  is(dirty.map(x => x.label), ['Code Review'],
+     'every label crosses cleanStatusLabel again on the way in, and prose is dropped WHOLE');
+  is(StV.sanitizeStatuses([{ id: 'bad id!', label: 'Review' }])[0].id === 'bad id!', false,
+     'an unsafe id is replaced, like every other id arriving from outside');
+  is(StV.sanitizeStatuses([{ id: '__proto__', label: 'Review' }])[0].id === '__proto__', false,
+     'and __proto__ is refused, on the rule PROTO_KEY exists for');
+  is(StV.sanitizeStatuses([{ id: 'a', label: 'Review' }, { id: 'a', label: 'Testing' }])
+       .map(x => x.id === 'a'), [true, false], 'a duplicate id gets a fresh one');
+  const capped = [];
+  for (let i = 0; i < TD.STATUS_MAX + 10; i++) capped.push({ id: 'c' + i, label: 'Stage ' + i });
+  is(StV.sanitizeStatuses(capped).length, TD.STATUS_MAX,
+     'the list is capped, so a hand-edited copy cannot plant hundreds of words');
+  is(StV.sanitizeStatuses('not a list'), [], 'and a non-list is no vocabulary');
+  is(Object.keys(StV.sanitizeStatuses([{ id: 'a', label: 'Review', colour: 'red' }])[0]),
+     ['id', 'label'], 'a stray key on a status is stripped, not carried');
+
+  /* The row's own field. A VALUE, like `w` beside it, and pruned the same way. */
+  const vocRound = StV.hydrateState({
+    schema: StV.SCHEMA,
+    statuses: [{ id: 'u1', label: 'Code Review' }],
+    stages: [{ id: 'sr', name: 'Review', match: [], statuses: ['u1', 'ghost'] }],
+    teams: [{ id: 't1', name: 'T',
+      rows: [
+        { s: '2026-08-02', t: 'Story', u: 'u1' },
+        { s: '2026-08-02', t: 'Story', u: 'ghost' },
+        { s: '2026-08-02', t: 'Story', u: 'bad id!' },
+        { s: '2026-08-02', t: 'Story', u: 42 }
+      ],
+      features: [{ k: '2026-08-01', i: 'DAE-9', t: 'Feature', u: 'ghost' }] }]
+  });
+  is(vocRound.teams[0].rows.map(r => r.status), ['u1', '', '', ''],
+     'a dangling, unsafe or non-string status pointer is dropped, like a dangling stage id');
+  /* BOTH LISTS. A feature is a row, holds the same field, and the last three
+     times a stage field was pruned on `rows` alone it left an orphan nothing
+     on screen would ever draw and nothing would ever clear. */
+  is(vocRound.teams[0].features[0].status, '',
+     'and a FEATURE is pruned on the same pass — the fault this app has had three times');
+  is(vocRound.stages[0].statuses, ['u1'],
+     'a stage tick list is pruned of ids the vocabulary no longer has');
+
+  /* A status nothing points at is dropped; one a STAGE has ticked survives with
+     no rows on it, because the tick is a decision the reader made and losing it
+     the moment the last item completed would silently un-group the next paste. */
+  const kept = StV.hydrateState({
+    schema: StV.SCHEMA,
+    statuses: [{ id: 'u1', label: 'Code Review' }, { id: 'u2', label: 'Testing' },
+               { id: 'u3', label: 'Orphan' }],
+    stages: [{ id: 'sr', name: 'Review', match: [], statuses: ['u2'] }],
+    teams: [{ id: 't1', name: 'T', rows: [{ s: '2026-08-02', t: 'Story', u: 'u1' }] }]
+  });
+  is(kept.statuses.map(x => x.id), ['u1', 'u2'],
+     'a status a row uses stays, one a stage groups stays, and one nothing points at goes');
+
+  /* Two stages cannot claim one status: the same contradiction two stages
+     claiming one alias is, given the same answer — first in the list keeps it,
+     so stageForStatusId never has a precedence rule to get wrong. */
+  const contested = StV.sanitizeStages([
+    { id: 'sa', name: 'A', match: [], statuses: ['u1'] },
+    { id: 'sb', name: 'B', match: [], statuses: ['u1'] }
+  ]);
+  is(contested.map(st => st.statuses), [['u1'], []],
+     'a status claimed by two stages goes to the FIRST, exactly as a contested alias does');
+
+  /* The wire. Byte-identical for a board that has never seen a Status column,
+     which is what keeps the first save after this build from rewriting the
+     whole stored document. */
+  const vocWire = StV.serializeRows([
+    { completed: null, started: D(2026, 8, 2), created: null, type: 'Story', key: '',
+      stages: null, stage: '', status: 'u1' },
+    { completed: null, started: D(2026, 8, 2), created: null, type: 'Story', key: '',
+      stages: null, stage: '', status: '' }
+  ]);
+  is(vocWire[0].u, 'u1', 'the status rides as `u`');
+  ok(!('u' in vocWire[1]), 'and is absent when there is none, like every optional field here');
+  is(Object.keys(vocWire[1]), ['c', 's', 't'],
+     'so a board with no Status column serialises exactly as it did before this build');
+  /* And the round trip back, which is where a hostile document would land. */
+  is(StV.serializeRows(StV.hydrateRows([{ c: '2026-08-09', s: '2026-08-02', t: 'Story',
+     u: 'x'.repeat(80) }])), [{ c: '2026-08-09', s: '2026-08-02', t: 'Story' }],
+     'an over-long status id never reaches the wire again');
+
+  /* A whole document written by the build BEFORE this one still reads the same:
+     stages, aliases, `w` on the rows, and no vocabulary anywhere. */
+  const legacyDoc = StV.hydrateState({
+    schema: 13,
+    stages: [{ id: 'sb', name: 'Build', match: ['Development'] }],
+    teams: [{ id: 't1', name: 'T', rows: [{ s: '2026-08-02', t: 'Story', w: 'sb' }] }]
+  });
+  is(legacyDoc.statuses, [], 'a document from before this build has no vocabulary');
+  is(legacyDoc.teams[0].rows[0].stage, 'sb', 'its rows keep the stage they were pasted with');
+  is(legacyDoc.stages[0].match, ['Development'], 'and its aliases are untouched');
+  is(legacyDoc.stages[0].statuses, [], 'with an empty tick list beside them');
+  is(TD.stageOf(legacyDoc.teams[0].rows[0], legacyDoc.stages), 'sb',
+     'and it still resolves to its stage — the legacy path, not a migration');
+
+  }
 
   /* ────────────────────────────────────────────────────────── */
   group('click a dot, copy its issue key');
@@ -2921,8 +3366,8 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 13, 'the schema marker is 13 — the version that gave features their own '
-     + 'ageing threshold');
+  is(St.SCHEMA, 14, 'the schema marker is 14 — the version that started storing the status '
+     + 'itself, and made stages a grouping over it');
 
 
   /* ────────────────────────────────────────────────────────── */
@@ -3206,7 +3651,8 @@ async function run(TD, win) {
     const hostile = S3.hydrateFeatures([{ k: '2026-01-03', i: 'DAE-9', t: 'Feature',
       summary: 'Customer data export', assignee: 'a name' }]);
     is(Object.keys(hostile[0]).sort(),
-       ['completed', 'created', 'key', 'parentKey', 'stage', 'stages', 'started', 'type'],
+       ['completed', 'created', 'key', 'parentKey', 'stage', 'stages', 'started', 'status',
+        'type'],
        'a feature carries the row allowlist and nothing else');
   }
 
@@ -3214,8 +3660,8 @@ async function run(TD, win) {
   group('features at the storage boundary');
   {
     const S4 = win.TDState;
-    is(S4.SCHEMA, 13, 'the feature layer took the schema to 12, and the feature ageing '
-       + 'threshold to 13');
+    is(S4.SCHEMA, 14, 'the feature layer took the schema to 12, the feature ageing '
+       + 'threshold to 13, and the status vocabulary to 14');
 
     const t = S4.sanitizeTeams([{ id: 'a', name: 'X', rows: [],
       features: [{ c: '2026-01-12', s: '2026-01-06', t: 'Feature', i: 'DAE-1' }] }])[0];
@@ -4539,6 +4985,40 @@ async function run(TD, win) {
   is((spFeatStage.stages || []).map(st => st.name), ['Review'],
      'a stage named only by a FEATURE still travels, so its day count has a name at the far end');
   is(spFeatStage.teams[0].features[0].g, { fsx: 2 }, 'and the count itself rides along');
+
+  /* ── The status vocabulary in a link (2026-09-01) ─────────────────────
+     The first WORDS out of a work system that a link has ever carried, so this
+     is the block to stop at. They travel for the reason issue keys do: the
+     recipient's age chart is drawn from them, and a link that dropped them
+     would show a different picture from the sender's. */
+  plant({
+    statuses: [{ id: 'u1', label: 'Code Review' }, { id: 'u2', label: 'Testing' }],
+    stages: [{ id: 'vsr', name: 'Review', match: ['Code Review'], statuses: ['u1'] },
+             { id: 'vsx', name: 'Unused', match: [], statuses: ['u2'] }],
+    teams: [{ id: 'team-a', name: 'Alpha', rows: [
+      { c: '2015-01-21', s: '2015-01-14', t: 'Bug' },
+      { s: '2015-01-14', t: 'Story', u: 'u1' }
+    ] }]
+  });
+  const spVocab = Sh.buildSharePayload(['team-a']);
+  is((spVocab.statuses || []).map(x => x.label), ['Code Review'],
+     'only the statuses the shared rows actually use travel — not the whole list');
+  is((spVocab.stages || []).map(st => st.name), ['Review'],
+     'and a stage travels because it GROUPS one of them, where before it needed a day count');
+  is((spVocab.stages || [])[0].statuses, ['u1'],
+     'carrying its tick, or the recipient would prune it as a dangling id and lose the grouping');
+  /* The ALIASES still do not travel: they are matching rules for a paste box
+     the recipient does not have, and that decision is unchanged. */
+  ok(!JSON.stringify((spVocab.stages || []).map(st => st.match || [])).includes('Code Review'),
+     'the aliases still do not travel');
+  is(spVocab.v, Sh.SHARE_PAYLOAD_V,
+     'and SHARE_PAYLOAD_V is NOT bumped — an older build drops the block and draws the type axis');
+  /* A board with no vocabulary writes no key at all, so a link from it is
+     byte-identical to one from before this build. */
+  plant({ teams: [{ id: 'team-a', name: 'Alpha',
+                    rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Bug' }] }] });
+  is(Sh.buildSharePayload(['team-a']).statuses, undefined,
+     'a board with no statuses publishes no `statuses` key at all, not an empty one');
 
   /* ────────────────────────────────────────────────────────── */
   group('Share links — how much history rides along');
@@ -6683,8 +7163,8 @@ group('ARTs — the grouping, and the boundary it crosses');
      third differs — this app has no PIs and the sibling has no stage times —
      and that is the point: the two windows share a SHAPE, one section per thing
      you manage, not a list of sections. */
-  is(heads, ['Teams', 'Agile Release Trains', 'Workflow Stages'],
-     'three sections, each headed by its name');
+  is(heads, ['Teams', 'Agile Release Trains', 'Statuses', 'Workflow Stages'],
+     'four sections, each headed by its name');
   /* The header button NAMES the third section, which is the sibling app's rule
      rather than this one's: its button has always read "Teams & PIs". This app
      read plain "Teams" until 2026-08-21, when the feature behind it turned out
@@ -7428,7 +7908,34 @@ group('ARTs — the grouping, and the boundary it crosses');
      is the half where the untrusted text sits on every row. */
   ok(!/Development|Code Review|Testing|Deployment|Compliance|Done/i
        .test(JSON.stringify(win.tdGet().teams)),
-     'and no status name from the demo\u2019s own export is anywhere in what it stored');
+     'and no status name from the demo\u2019s own export is on any ROW it stored');
+
+  /* THE OTHER HALF OF THAT CLAIM, and it has to be asserted beside it or the
+     line above reads as "no status name anywhere", which stopped being true on
+     2026-09-01. The words ARE stored — once each, in the vocabulary, where the
+     reader can see them and delete them. Leg 3 of the argument, stated as the
+     pair of assertions it actually is. */
+  const demoVocab = win.tdGet().statuses || [];
+  ok(demoVocab.length > 0, 'the demo DOES leave a status vocabulary — this is not a no-op');
+  ok(demoVocab.some(x => /code review/i.test(x.label)),
+     'and the words live there, once each, rather than on four hundred rows');
+  ok(demoVocab.every(x => TD.cleanStatusLabel(x.label) === x.label),
+     'every one of them survives its own guard, so the demo comes through the same door');
+  ok(!demoVocab.some(x => /^done$/i.test(x.label)),
+     'and none of them is Done — the in-flight rule holds through the demo too');
+
+  /* The unlisted status, which is what keeps the ungrouped face reachable from
+     Load sample data. It is IN the vocabulary (the app read it) and in NO stage
+     (nobody grouped it), which is the state the age chart's "No stage" column
+     and the paste report's unmatched note both exist for. */
+  const compliance = demoVocab.find(x => /compliance/i.test(x.label));
+  ok(!!compliance, 'Compliance Review is in the vocabulary — the app read it like any other');
+  ok(!win.tdGet().stages.some(st => (st.statuses || []).indexOf(compliance.id) >= 0),
+     'and in no stage, so the ungrouped face is reachable from Load sample data');
+  /* The auto-tick, which is the upgrade path a returning reader takes: the demo
+     sets its stages up with ALIASES only, and the paste fills in the grouping. */
+  ok(win.tdGet().stages.every(st => st.match.length === 0 || st.statuses.length > 0),
+     'every demo stage that lists an alias had its statuses ticked in by the paste itself');
 
   /* ── The current stage, which is what a plain Jira export can feed ──────── */
   const longTailRows = demoOf(demo, 'Team Long Tail').rows;

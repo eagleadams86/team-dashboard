@@ -1355,6 +1355,36 @@ table.manage td.empty-row { text-align: left; color: var(--text-secondary);
 /* The section headings inside the dialog, and the note under each one. */
 .manage-head { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .manage-note { color: var(--text-secondary); font-size: var(--fs-xs); margin: 4px 0 0; }
+/* The vocabulary and the per-stage tick lists. Both are lists of small labelled
+   controls that wrap, so they are the same flex row with the same gap — one
+   shape, two uses, rather than two things that look nearly alike. Colours and
+   sizes are the dialog's own tokens; nothing new is introduced here. */
+.statuslist, .stagepick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+/* The tick row belongs to the stage row above it, so it carries no rule of
+   its own and no cell padding on top — the two read as one entry. */
+.stagepickrow > td { border-top: 0; padding-top: 0; }
+.stagepickrow .stagepick { margin-top: 0; margin-bottom: 4px; }
+.statuslist:empty, .stagepick:empty { display: none; }
+.statuschip, .stagepick label {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface-alt);
+  font-size: var(--fs-xs); color: var(--text-primary);
+}
+/* The gap above is what keeps the tick away from its word — the family rule
+   that a control and its label are never flush. */
+.stagepick label { cursor: pointer; }
+.stagepick input { margin: 0; }
+.statuschip .count { color: var(--text-secondary); }
+/* A delete that is a glyph needs a hit area a finger can find; the family's
+   touch floor is 44px and this sits inside a chip, so it takes the chip's own
+   height and pads out to meet it. */
+.statuschip button {
+  border: 0; background: none; cursor: pointer; padding: 2px 4px; margin: -2px -2px -2px 0;
+  color: var(--text-secondary); font-size: var(--fs-sm); line-height: 1; border-radius: 4px;
+}
+.statuschip button:hover { color: var(--err); background: var(--bg-card-alt); }
+.statusnone { color: var(--text-secondary); font-size: var(--fs-xs); margin-top: 8px; }
 
 /* settings filter list, and the Teams dialog's table */
 table.filters { width: 100%; border-collapse: collapse; }
@@ -3020,6 +3050,18 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        deliberately isn't. Every word of the note below is load-bearing: the
        reason this app can hold stage times at all is that a stage is something
        you named here, and the only thing a paste contributes is numbers. -->
+  <!-- The vocabulary, above the stages that group it, because that is the order
+       the two happen in: the app reads statuses off an export, and grouping them
+       is something you may then choose to do. Nothing here is typed — this list
+       is the app showing its working, and the only control on it is delete. -->
+  <div class="row spread" style="margin-top:20px">
+    <strong class="manage-head">Statuses</strong>
+  </div>
+  <p class="manage-note">Every status this app has read out of your exports, and the only
+    words from a work system it keeps. Delete any you do not want; the items in it keep their
+    dates and simply stop being grouped. The list holds at most 40.</p>
+  <div id="statusList" class="statuslist"></div>
+
   <div class="row spread" style="margin-top:20px">
     <strong class="manage-head">Workflow Stages</strong>
     <button class="btn small" id="btnAddStage" type="button">+ Add a Stage</button>
@@ -3030,12 +3072,18 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     that status to. Several statuses can feed one stage: list them all and their days are
     added together. No export? Every stage you add here also gets a box on the work item
     form, so the days can simply be typed in.</p>
-  <p class="manage-note"><strong>You type the status names, and this app never stores them.</strong>
-    A status name is work-system text, so it is matched while your paste is being read and
-    then thrown away with the rest of it — what is saved is the stage name you chose and a
-    number of days. That is also why there is no button to pick the statuses up out of an
-    export: it would put those words into storage, which is the one thing this app will not do.
-    Match on the status name exactly as Jira spells it; capitals and punctuation don't matter.</p>
+  <p class="manage-note"><strong>The statuses come out of your export; the stages are yours.</strong>
+    Paste an export with a <strong>Status</strong> column and the statuses in it are added to
+    your list above, where you can see them and delete any you do not want. Grouping them into
+    stages is optional &mdash; the work item age chart draws by status on its own &mdash; and a
+    stage is worth adding when several statuses are really one part of your workflow, or when
+    you want them in your own order. <strong>Change a grouping and every item you have already
+    pasted moves with it</strong>; nothing needs re-pasting.</p>
+  <p class="manage-note">The <strong>status names</strong> box is still here and still matters
+    for one job: a <strong>Time in Status</strong> export names its statuses in its column
+    <em>headings</em>, and a heading is not a value in any column, so it can only be matched by
+    a name you have typed. Type them exactly as Jira spells them; capitals and punctuation
+    don't matter. Anything you tick above is matched already.</p>
   <div class="table-scroll">
     <table class="manage" id="stageTable" aria-label="Workflow stages"><tbody id="stageRows"></tbody></table>
   </div>
@@ -3407,8 +3455,16 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              placeholder="e.g. DAE-1500" list="itemParentList">
       <datalist id="itemParentList"></datalist>
     </div>
+    <!-- ONE control, two things it can be picking from, and never a text box.
+         With a vocabulary it offers the statuses this app has read, and the
+         stage follows from the grouping; with none it offers the stages
+         directly, which is what a board that has never pasted a Status column
+         has always had. A free-text status field is the one thing this must
+         never become: the words in that list got there by passing leg 2 at a
+         paste boundary, and a box somebody types into has no column to
+         measure. -->
     <div id="itemStageWrap" hidden>
-      <label for="itemStage">Sitting in <span class="hint">(optional)</span></label>
+      <label for="itemStage" id="itemStageLabel">Sitting in <span class="hint">(optional)</span></label>
       <select id="itemStage"></select>
     </div>
   </div>
@@ -4329,6 +4385,20 @@ function detectColumns(rows, header, order, stages) {
     }
   }
 
+  /* ── Leg 2 of the status argument, decided about the COLUMN ────────────────
+     Whether anything is read out of the status column at all, answered here
+     rather than per row, because "does this column repeat?" is a claim about
+     the whole column and a row cannot see it.
+
+     THE ROLE STAYS CLAIMED EVEN WHEN THE ANSWER IS NO, and that is deliberate:
+     `taken()` above has already used map.status to keep the headerless
+     work-type detector off this column, which is a guard that predates storing
+     anything and matters MORE for a column that has just been judged prose-like.
+     Clearing the role here would hand exactly the wrong column to the one
+     detector in this function that guesses. */
+  map.statusStats = map.status >= 0 ? (stats[map.status] || null) : null;
+  map.statusUsable = map.status >= 0 && statusColumnUsable(map.statusStats);
+
   return map;
 }
 
@@ -4423,38 +4493,44 @@ function projectIdOf(key) {
    and flow efficiency have always been waiting on, and the reason the work item
    age chart puts work TYPE on its x axis where the canonical chart puts stage.
 
-   READ THIS BEFORE ADDING ANYTHING NEAR IT. A Jira status is exactly the field
-   the rules at the top of CLAUDE.md were written to keep out, and it is kept
-   out here: NO STATUS NAME IS EVER STORED, and none is ever put on screen.
-   The guard everything else in this app leans on — "can a regex tell this from
-   a sentence?" — fails on a status and cannot be made to work. "Fix the login
-   bug on prod" is twenty-five characters of letters and spaces, which is every
-   shape a status label has. So a shape guard here would be theatre.
+   READ THIS BEFORE ADDING ANYTHING NEAR IT, AND READ THE STATUS VOCABULARY
+   BLOCK BELOW IT. Until 2026-09-01 this section carried a different argument:
+   NO STATUS NAME IS EVER STORED. That was reversed deliberately, at Charles's
+   explicit request, and the argument that replaced it is written out at
+   cleanStatusLabel rather than here. The short version, because the old one is
+   quoted in enough places to be worth contradicting on the spot:
 
-   What is stored instead is a stage YOU named, in a dialog, in this app:
+     • A status name IS stored now, once, in `state.statuses` — a capped,
+       visible, deletable list of {id, label}. A ROW stores an id and never a
+       word, exactly as it always has.
+     • Stages did not go away and did not become compulsory. They are now an
+       OPTIONAL GROUPING over that list: a stage collects status ids, and a
+       row's stage is worked out from its status when it is read.
+     • The old admission test — "can a regex tell this from a sentence?" —
+       still fails on a status and is still not what lets it in. What lets it
+       in is that a status column REPEATS and prose does not, which is a
+       property of the column rather than of the value, and is checked before
+       anything is stored. See statusColumnUsable.
 
-     • `state.stages` is a list of {id, name, match[]} — every character of it
-       typed by the person using the app, capped, and escaped where it renders.
-       It is the same class of data as a team name or an ART name, which this
-       app has always stored, and NOT the same class as a pasted cell.
-     • A row stores NUMBERS: `{stageId: days}` and nothing else. There is no
-       route by which a word out of the export reaches storage.
-     • The status name out of the export lives for the length of one parse. It
-       is matched against the aliases you typed, turned into a day count, and
-       discarded with the rest of the pasted text.
+   What is stored is still, in the end, a stage YOU named:
 
-   That is the whole safety argument, and it is why the matching is by ALIASES
-   YOU TYPE rather than by anything picked up from the paste. An "adopt this
-   heading as an alias" button would be one click that copies work-system text
-   into permanent storage, which is the thing this design exists to avoid. If it
-   is ever wanted, it is a decision to take deliberately and to write down here,
-   not a convenience to add in passing.
+     • `state.stages` is a list of {id, name, match[], statuses[]} — the name
+       and the aliases typed by the person using the app, capped, and escaped
+       where they render; `statuses` is a list of ids into `state.statuses`.
+     • A row stores NUMBERS: `{stageId: days}`, plus at most two ids.
+
+   The ALIASES stay, and they are not vestigial: they are the only thing that
+   can match a Time in Status export's column HEADINGS, which are not values in
+   any column and so never reach the vocabulary. They also carry every document
+   written before this build.
 
    The export to ask Jira for is a **Time in Status** one in its days-per-status
    shape: one row per issue, one column per status, every per-item cell a
    number. The other shape — one row per transition, with a status name in a
-   cell on every row — must NOT be supported: it puts untrusted text on every
-   item row, which is exactly the shape this design refuses. */
+   cell on every row — is STILL not supported, and the reason survives the
+   change: it is not one column of repeated labels to measure, it is a status in
+   a cell on every row of a file whose rows are transitions, so the repetition
+   test that admits an ordinary Status column has nothing to bite on. */
 
 /* A status heading and the alias you typed for it are "the same" when they say
    the same word — case, punctuation and spacing are noise that differs between
@@ -4480,6 +4556,133 @@ function cleanStageAlias(a) {
   const s = a.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (!s || s.length > STAGE_ALIAS_MAX_LEN) return '';
   return normalizeAlias(s) ? s : '';
+}
+
+/* ── The status vocabulary, and the argument that lets it exist ──────────────
+   THIS IS THE SAFETY ARGUMENT FOR THE WHOLE STATUS FEATURE. It replaced an
+   older one — "no status name is ever stored" — on 2026-09-01, and it is
+   written here rather than in CLAUDE.md alone because the next person to touch
+   this will be reading the code.
+
+   The old argument could not be repaired, only replaced. A status has no shape
+   a regex can check: "Fix the login bug on prod" is twenty-five characters of
+   letters and spaces, which is every shape a status label has, so the test that
+   let the issue key and the parent key in fails outright here. A length cap in
+   its place would be theatre — a fourteen-character summary ("Login redesign")
+   clears any cap a real status also clears.
+
+   What holds instead is FOUR LEGS, and the first two carry the weight:
+
+     1. THE APP NEVER GUESSES A STATUS COLUMN. HEADER_PATTERNS.status is
+        anchored and has no headerless fallback, so a column is a status column
+        only because the export literally headed it "Status" or "Current
+        status". PROSE_HEADING keeps a prose heading out of every role.
+     2. A STATUS COLUMN REPEATS AND PROSE DOES NOT. A whole workflow is about
+        ten statuses; a summary column has about one distinct value per row.
+        That is a property of the COLUMN rather than of the value, which is
+        exactly what the value could not give us, and statusColumnUsable tests
+        it at the paste boundary, all-or-nothing, BEFORE anything is stored.
+     3. A ROW STORES AN ID, NEVER A WORD. The words live once, in a capped list
+        the reader can see and delete in the stages dialog. The blast radius of
+        a mistake is one visible entry, not a column of four hundred cells.
+     4. Shape hygiene on each label — length, word count, character whitelist,
+        dropped whole. SECONDARY ON PURPOSE. Leg 4 is what stops a stray cell
+        being ugly; it is not what makes the feature safe, and it must never be
+        cited as though it were. That is leg 2's job.
+
+   The consequence worth stating for the next request: this is NOT precedent for
+   a summary field, and the reason is leg 2 rather than any cap. A summary
+   column fails the repetition test by construction — that is what makes it a
+   summary — so the same argument applied to it returns "no". */
+const STATUS_MAX = 40;          /* distinct statuses per document */
+const STATUS_LABEL_MAX = 40;    /* cleanWorkType's cap, and for the same reason */
+const STATUS_WORDS_MAX = 6;     /* "Pending Business Owner Sign Off" is five */
+/* Letters, digits, spaces and the handful of separators a real workflow uses:
+   "Blocked/Waiting", "UAT (Client)", "Won't Do", "Dev Complete". Note what is
+   refused as much as what is allowed — no comma, colon, semicolon, quote,
+   angle bracket, pipe or equals — so the value is inert wherever it lands, HTML
+   or CSV, and a sentence carrying any punctuation at all fails here before its
+   length is even considered. CONTROL CHARACTERS ARE REFUSED BY THIS TEST rather
+   than stripped before it, which is why there is no strip step above: every
+   other guard here has to strip because it ends in a length cap that would
+   otherwise pass them through, and this one ends in a whitelist that cannot.
+   The FIRST character must be alphanumeric, which also puts every CSV formula
+   lead (=, +, -, @) out of reach; the family's own formula guard still runs at
+   the export, belt and braces. */
+const STATUS_CHARS_RE = /^[A-Za-z0-9][A-Za-z0-9 '&()\/.+-]*$/;
+/* Above this many filled cells, the column must actually repeat. Below it the
+   absolute cap does the work on its own — five rows cannot hold forty distinct
+   values — and a ratio test would reject a perfectly ordinary small paste of
+   four rows in four different statuses. The same reasoning that made the
+   work-type detector prefer a distinct COUNT to a ratio. */
+const STATUS_RATIO_MAX = 0.5;
+const STATUS_RATIO_MIN_ROWS = 20;
+
+/* One label, on its way into the vocabulary. Leg 4. Dropped WHOLE on any
+   failure, never truncated — forty characters of a summary is still work-system
+   text, which is the rule cleanWorkType has always followed. Applied at both
+   doors, the paste and sanitizeStatuses, like every other guard here. */
+function cleanStatusLabel(v) {
+  if (typeof v !== 'string') return '';
+  const s = v.replace(/\s+/g, ' ').trim();
+  if (!s || s.length > STATUS_LABEL_MAX) return '';
+  if (s.split(' ').length > STATUS_WORDS_MAX) return '';
+  if (!STATUS_CHARS_RE.test(s)) return '';
+  return normalizeAlias(s) ? s : '';
+}
+
+/* Leg 2, and the one that matters. Takes the columnStats entry for the column a
+   Status heading claimed and answers whether this app will read ANYTHING out of
+   it. All-or-nothing on purpose: a column that is half statuses and half prose
+   is a mismapped column, and storing the half that happens to be short would be
+   the worst of both answers.
+
+   Measured over the WHOLE column rather than over the rows that will be kept.
+   More rows is better evidence of repetition, and the rows dropped for having
+   no dates — a backlog — carry statuses too. */
+function statusColumnUsable(stat) {
+  if (!stat || !stat.filled) return false;
+  if (stat.distinct > STATUS_MAX) return false;
+  if (stat.filled < STATUS_RATIO_MIN_ROWS) return true;
+  return stat.distinctRatio <= STATUS_RATIO_MAX;
+}
+
+/* The normalised-label index of a vocabulary, built once per caller rather than
+   rebuilt per row. */
+function statusNormIndex(statuses) {
+  const byNorm = new Map();
+  (Array.isArray(statuses) ? statuses : []).forEach(s => {
+    if (!s || typeof s.id !== 'string') return;
+    const norm = normalizeAlias(s.label);
+    if (norm && !byNorm.has(norm)) byNorm.set(norm, s.id);
+  });
+  return byNorm;
+}
+
+/* A status label to the id it already has, or a new one — the vocabulary's own
+   append. Mutates the list and the index it is handed and reads no state, so
+   the paste can plan a whole file before anything is written.
+
+   De-duplicated on normalizeAlias, the same latitude the aliases get and for
+   the same reason: "In-Progress" and "In Progress" are one status, and letting
+   them be two would split a column of the age chart in half for a reason nobody
+   could see. The first spelling seen is the one kept.
+
+   Returns null when the label is refused or the list is full. FULL IS NOT AN
+   ERROR AND NOT A SILENT DROP — the caller counts it and the paste report says
+   so, because forty statuses means the column is probably not what the reader
+   thinks it is, and a silent cap would hide that. */
+function statusIdFor(statuses, byNorm, label) {
+  const clean = cleanStatusLabel(label);
+  if (!clean) return null;
+  const norm = normalizeAlias(clean);
+  const known = byNorm.get(norm);
+  if (known) return known;
+  if (statuses.length >= STATUS_MAX) return null;
+  const id = newId();
+  statuses.push({ id, label: clean });
+  byNorm.set(norm, id);
+  return id;
 }
 
 /* A day count out of a Time in Status export. STRICT, like every other cell
@@ -4616,6 +4819,62 @@ function stageIdForStatus(value, stages) {
   return '';
 }
 
+/* The stage that has TICKED a given status, which is what grouping means now
+   that the statuses themselves are stored. First stage wins a status two of
+   them claim, exactly as the first stage wins a contested alias, and
+   sanitizeStages makes that impossible to store in the first place.
+
+   Note the deliberate asymmetry with stageIdForStatus above: that one matches
+   TEXT, and it still has a job — a Time in Status export's column headings are
+   not values in any column, so they never reach the vocabulary and can only be
+   matched by an alias somebody typed. This one matches an ID. */
+function stageForStatusId(statusId, stages) {
+  if (!statusId || !Array.isArray(stages)) return '';
+  for (const st of stages) {
+    if (!st || typeof st.id !== 'string') continue;
+    if ((Array.isArray(st.statuses) ? st.statuses : []).indexOf(statusId) >= 0) return st.id;
+  }
+  return '';
+}
+
+/* WHERE AN ITEM IS SITTING, AND THE ONLY PLACE THAT QUESTION IS ANSWERED. Every
+   reader of a row's stage goes through here; nothing reads `r.stage` directly
+   any more except this function and the boundary code.
+
+   Two paths, and which one applies is decided by the row rather than by a
+   setting:
+
+     • A row WITH a status resolves through the stage's ticked list, AT READ
+       TIME. That is the whole point of storing the status: re-ticking a status
+       into a different stage re-buckets every row already pasted, where the old
+       design froze the answer at paste time and could only ever affect the next
+       export. A status in no stage resolves to no stage, which is an ordinary
+       and visible state.
+     • A row WITHOUT one falls back to the stored `r.stage` — a document written
+       before this build, or an item typed in on a board with no vocabulary.
+       That field is never written for a row that has a status.
+
+   The fallback is not a migration step and must not become one. Rewriting old
+   rows would mean inventing a status label this app never saw, which is exactly
+   the thing it is not entitled to do. */
+function stageOf(row, stages) {
+  if (!row) return '';
+  if (row.status) return stageForStatusId(row.status, stages);
+  return row.stage || '';
+}
+
+/* A status id to the word for it, for the places that DRAW one. Reads `state`
+   rather than taking the list, unlike everything above it in this section —
+   which is why it lives at the app layer and not among the pure helpers: the
+   table and the tooltip have no list in hand, and threading one through every
+   render for a label lookup would be a worse trade than the impurity. Returns
+   '' for an id nothing answers to, so a caller never has to check first. */
+function statusLabelOf(id) {
+  if (!id) return '';
+  const found = state.statuses.find(x => x.id === id);
+  return found ? found.label : '';
+}
+
 function duplicateStageAliases(stages) {
   const seen = new Map(), dupes = new Map();
   (Array.isArray(stages) ? stages : []).forEach(st => {
@@ -4632,9 +4891,23 @@ function duplicateStageAliases(stages) {
    this has always been: with no feature types set up, `features` comes back
    empty and every row lands in `rows` as before. That is the default state of
    the setting too, so an existing browser sees no change until it asks for one. */
-function parsePastedRows(text, order, stages, featureTypes) {
+function parsePastedRows(text, order, stages, featureTypes, statuses) {
   const featureSet = new Set((Array.isArray(featureTypes) ? featureTypes : [])
     .map(t => String(t || '').trim().toLowerCase()).filter(Boolean));
+  /* The vocabulary this paste starts from, COPIED rather than mutated in place.
+     Same rule the rest of this function follows: it plans over what it is handed
+     and returns what it worked out, so the multi-team dialog can show a paste's
+     effect before a word of it is written, and a paste the reader cancels leaves
+     the stored vocabulary exactly as it was. */
+  const statusList = (Array.isArray(statuses) ? statuses : [])
+    .filter(s => s && typeof s.id === 'string').map(s => ({ id: s.id, label: s.label }));
+  const statusesBefore = statusList.length;
+  const statusByNorm = statusNormIndex(statusList);
+  /* Statuses this paste adopted that an EXISTING alias already answers to, so a
+     reader who set their stages up before this build has them grouped without
+     re-ticking anything. Returned as a plan rather than applied here — the
+     stages list is an argument, not this function's to edit. */
+  const statusTicks = [];
   /* Trim spaces but never tabs: in a tab-separated paste a leading tab is an
      empty first cell — a work-in-progress row in a completed-first export.
      l.trim() here once ate that tab and shifted every cell left, so the start
@@ -4736,11 +5009,22 @@ function parsePastedRows(text, order, stages, featureTypes) {
      report naming four hundred rows is a report nobody reads. The column is
      named by its position, like every other column in the parse report. */
   const badStageCells = new Map();
-  /* Rows whose status column held something no stage answers to. A COUNT, not a
-     list: the values are work-system text, and this report has never echoed a
-     pasted cell. The number is what says "your aliases are wrong" as against
-     "one odd row". */
+  /* Rows whose status is in no stage. Still a COUNT rather than a per-row list,
+     and the reason has changed: the values are no longer unnameable — they are
+     in the vocabulary, and the report names the ones it kept — but a list with
+     one entry per row would be four hundred lines saying the same four things.
+     The number is what says "your grouping is incomplete" as against "one odd
+     row". */
   let unmatchedStatus = 0;
+  /* Cells the status column offered that leg 4 refused: too long, too many
+     words, or a character no status has. A count, because a value that failed
+     the whitelist is precisely the value this report must not print. */
+  let statusesDropped = 0;
+  /* Cells refused because the vocabulary was already full. Counted apart from
+     the above because they mean something completely different to the reader:
+     the first says "one cell was odd", the second says "this column is not what
+     you think it is". */
+  let statusesOverflow = 0;
   /* Two different orderings, two different meanings — see the checks below. */
   const startAfterDone = [], raisedAfterStart = [];
   let unfinished = 0, undated = 0;
@@ -4881,7 +5165,11 @@ function parsePastedRows(text, order, stages, featureTypes) {
        all mean the same thing to the dashboard: this item has no stage. The
        count of the third is reported, since a whole export matching nothing is
        a set-up problem rather than a quiet one. */
-    const rawStatus = at(cells, cols.status);
+    /* Nothing is read from a column leg 2 refused — not a shortened version of
+       it, not the values in it that happen to be short, and not an alias match
+       against it. A column judged prose-like is a column this app has decided
+       it cannot read, and half-reading it would be the worst of both answers. */
+    const rawStatus = cols.statusUsable ? at(cells, cols.status) : '';
     /* ONLY for work still in flight, and that is not an optimisation. Every
        export says "Done" or "Closed" against everything it has finished, which
        is most of the file — reading those would file the whole history under a
@@ -4889,10 +5177,53 @@ function parsePastedRows(text, order, stages, featureTypes) {
        unmatched-status count read "800 items" on a perfectly healthy set-up.
        A finished item's current status says nothing about flow. The one figure
        this field feeds is the work item age chart, which looks at work in
-       progress and nothing else. */
+       progress and nothing else.
+
+       UNCHANGED BY THE MOVE TO STORING STATUSES, and worth saying because the
+       pull the other way is obvious: the vocabulary would be more complete with
+       "Done" in it. It would also be a word this app has no use for, on every
+       row it has ever seen, and completeness is not a reason to store anything.
+
+       `cols.statusUsable` is leg 2, decided about the whole column before this
+       loop ran. When it is false nothing here reads the column at all — not a
+       shortened version, not the values that happen to be short. */
     const readStatus = !completed && rawStatus;
-    const stageId = readStatus ? stageIdForStatus(rawStatus, stages) : '';
-    if (readStatus && !stageId) unmatchedStatus++;
+    let statusId = '';
+    /* Legacy, and written only when there is no status to resolve from. A row
+       that carries a status works its stage out through stageOf at READ time,
+       so writing one here would freeze an answer the reader can now change. */
+    let stageId = '';
+    if (readStatus) {
+      const before = statusList.length;
+      const id = statusIdFor(statusList, statusByNorm, rawStatus);
+      if (!id) {
+        /* Two refusals that arrive identically and read completely differently,
+           so they are told apart by whether the list had room for another. */
+        if (statusList.length >= STATUS_MAX && cleanStatusLabel(rawStatus)) statusesOverflow++;
+        else statusesDropped++;
+        /* Refused as a WORD, which does not mean the reader's own alias cannot
+           answer to it — and a stage id is not a word. This is the whole
+           pre-2026-09-01 path, kept for exactly this case: a board whose status
+           is "In Progress: Dev" fails leg 4's whitelist on the colon and is
+           still perfectly groupable by somebody who typed that alias. */
+        stageId = stageIdForStatus(rawStatus, stages);
+      } else {
+        statusId = id;
+        /* Newly adopted, so offer it to the aliases the reader typed before
+           this build existed. Once per STATUS rather than once per row: one
+           already in the list was offered its tick when it first arrived. */
+        if (statusList.length > before) {
+          const st = stageIdForStatus(rawStatus, stages);
+          if (st) statusTicks.push({ stageId: st, statusId: id });
+        }
+      }
+    }
+    /* No stage by either route. One tally for both, because from the reader's
+       side they are one situation — an item in flight that no column of the age
+       chart will name — and the fix is in the same dialog either way. */
+    if (readStatus && !(statusId
+        ? (stageForStatusId(statusId, stages) || statusTicks.some(t => t.statusId === statusId))
+        : stageId)) unmatchedStatus++;
 
     const stageDays = Object.create(null);
     let anyStage = false;
@@ -4921,6 +5252,11 @@ function parsePastedRows(text, order, stages, featureTypes) {
     if (anyStage) out.stages = stageDays;
     /* Same omit-when-empty rule as every optional field here. */
     if (stageId) out.stage = stageId;
+    /* And again for the status id. The two are mutually exclusive by
+       construction above — a row has a status or a legacy stage, never both —
+       which is what keeps stageOf a two-line function with no precedence rule
+       to get wrong. */
+    if (statusId) out.status = statusId;
     /* The split, and the whole reason features are extracted rather than
        flagged: from this line on a feature is not in `rows`, so no item-level
        figure can see it. Throughput, cycle time, the percentile, the defect
@@ -4940,6 +5276,20 @@ function parsePastedRows(text, order, stages, featureTypes) {
               which it used to report as the same thing. */
            lineCount: lines.length,
            unmatchedStatus,
+           /* The vocabulary this paste WOULD leave behind, and the ids it put on
+              rows point into it. The caller adopts the two together or neither —
+              see the note on statusList above. */
+           statuses: statusList,
+           statusesNew: statusList.slice(statusesBefore),
+           statusTicks,
+           statusesDropped, statusesOverflow,
+           /* Set only when a Status heading claimed a column and leg 2 turned it
+              down. Carries COUNTS and the column's position — never a cell, and
+              never the heading, which is itself a pasted cell. */
+           statusColumnRefused: (cols.status >= 0 && !cols.statusUsable && cols.statusStats)
+             ? { index: cols.status, filled: cols.statusStats.filled,
+                 distinct: cols.statusStats.distinct }
+             : null,
            badStageCells: [...badStageCells.entries()]
              .map(([index, count]) => ({ index, count })).sort((a, b) => a.index - b.index) };
 }
@@ -4990,7 +5340,7 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
    unstarted feature is the pipeline, where an unstarted item is untouched
    backlog). Every other check below — the date ordering, the future guard, the
    guards on the type and the key — applies unchanged to both. */
-function buildManualRow(f, stages, isFeature) {
+function buildManualRow(f, stages, isFeature, statuses) {
   const iso = (v) => {
     const t = String(v == null ? '' : v).trim();
     if (!t) return null;
@@ -5065,8 +5415,21 @@ function buildManualRow(f, stages, isFeature) {
      same rule the parser applies to a Status column, stated once more here
      because this is a second door onto the same field. An id nothing answers to
      is dropped rather than stored, as everywhere else. */
+  /* IN-FLIGHT ONLY, on both fields, and an id nothing answers to is dropped —
+     the parser's own two rules, at the other door. A finished item's status
+     says nothing about flow, which is why the paste skips it, and a form that
+     stored one would be the one route past a rule the rest of the app keeps.
+
+     The two are mutually exclusive here as they are in the parse: a status when
+     there is a vocabulary to pick from, the legacy stage when there is not.
+     Writing both would give stageOf a precedence rule to get wrong. */
+  const statusId = String(f.status || '');
   const stageId = String(f.stage || '');
-  if (!completed && stageId && (stages || []).some(st => st.id === stageId)) row.stage = stageId;
+  if (!completed && statusId && (statuses || []).some(x => x.id === statusId)) {
+    row.status = statusId;
+  } else if (!completed && stageId && (stages || []).some(st => st.id === stageId)) {
+    row.stage = stageId;
+  }
   /* ── Days in each stage, typed in ──────────────────────────────────
      Offered on the form since 2026-08-22. It used to say day counts came only
      out of a Time in Status export and that "there is no honest way to type
@@ -5509,6 +5872,13 @@ const AGE_OTHER = 'Other types';
    — and it is pushed to the right-hand end exactly as "No type" is. */
 const AGE_NO_STAGE = 'No stage';
 const AGE_OTHER_STAGES = 'Other stages';
+/* The same pair one rung down the axis ladder, for the board that has statuses
+   and has not grouped them. Named separately rather than reusing the stage
+   words because the reader is being told two different things — "this item is
+   in no stage you have set up" and "this item's export had no status in it" —
+   and only one of those has a fix in the stages dialog. */
+const AGE_NO_STATUS = 'No status';
+const AGE_OTHER_STATUSES = 'Other statuses';
 
 /* What a single dot is called, on both scatters, so the two can never drift
    apart. The issue key if the paste carried one — that is the whole reason the
@@ -7115,8 +7485,13 @@ function buildForecast(o) {
   return forecast;
 }
 
-function derive(rows, settings, view, stages) {
+function derive(rows, settings, view, stages, statuses) {
   const stageList = Array.isArray(stages) ? stages : [];
+  /* Optional, exactly as `stages` is and for the same reason: a caller passing
+     four arguments gets the behaviour it got before the vocabulary existed,
+     which is every test written before then and is why this landed without
+     test churn. */
+  const statusList = Array.isArray(statuses) ? statuses : [];
   const sameDay   = Number(settings.sameDayValue);
   const unplannedStr = String(settings.unplannedType || '').trim().toLowerCase();
   const filterVal = String(view.filterValue || '').trim().toLowerCase();
@@ -7792,7 +8167,11 @@ function derive(rows, settings, view, stages) {
       type: r.type || '',
       started: r.started,
       key: r.key || '',
-      stage: r.stage || ''
+      /* Worked out HERE, from the status, rather than read off the row — which
+         is what makes re-ticking a status re-bucket work already pasted. See
+         stageOf. */
+      stage: stageOf(r, stageList),
+      status: r.status || ''
     }));
 
   /* ── What the columns ARE ──────────────────────────────────────────────────
@@ -7809,9 +8188,26 @@ function derive(rows, settings, view, stages) {
      a control most people set once and never touch, and nothing is lost by not
      having one: the work-type reading is still a filter away — scope the strip
      to Bugs and this chart answers "where do defects get stuck", which is
-     strictly more than the old type-column chart ever said. */
+     strictly more than the old type-column chart ever said.
+
+     THREE READINGS SINCE 2026-09-01, still one switch and still no picker. The
+     ladder is stage, then status, then work type, and each rung is a strictly
+     better answer to "where is everything sitting" than the one below it:
+
+       • STAGE where the reader has grouped their statuses. Their own words,
+         their own order, the workflow as they think of it.
+       • STATUS where the app has a vocabulary and nothing has been grouped
+         yet. This rung is new and it is the one that matters most in practice:
+         a board that pastes an export now gets the canonical axis IMMEDIATELY,
+         with no set-up at all, where before it got work type until somebody
+         went and typed a list of aliases. Grouping is now an improvement you
+         make to a chart that already works, rather than the price of admission.
+       • WORK TYPE otherwise, unchanged and NOT legacy: it is what a board with
+         no status column still gets, and Team Bare Export still draws it. */
   const anyStage = inFlight.some(r => r.stage);
   const byStage = anyStage && stageList.length > 0;
+  const byStatus = !byStage && statusList.length > 0 && inFlight.some(r => r.status);
+  const statusNameOf = new Map(statusList.map(s => [s.id, s.label]));
 
   const ageBuckets = new Map();
   /* In stage mode the buckets are SEEDED in the reader's own stage order, so
@@ -7836,8 +8232,16 @@ function derive(rows, settings, view, stages) {
       if (!rows.length) ageBuckets.delete(label);
     });
   } else {
+    /* Statuses are NOT seeded in list order the way stages are, and that is the
+       one real difference between the two rungs. A stage list is a workflow the
+       reader arranged; a vocabulary is whatever order an export happened to
+       mention things in, which is not a direction and would be a worse axis than
+       ranking by size. So this falls through to the type axis's own ordering
+       below and gets it for free. */
     for (const r of inFlight) {
-      const key = r.type || AGE_UNTYPED;
+      const key = byStatus
+        ? ((r.status && statusNameOf.get(r.status)) || AGE_NO_STATUS)
+        : (r.type || AGE_UNTYPED);
       if (!ageBuckets.has(key)) ageBuckets.set(key, []);
       ageBuckets.get(key).push(r);
     }
@@ -7854,8 +8258,8 @@ function derive(rows, settings, view, stages) {
      sorting into the middle of the real ones on its count. That also keeps both
      synthetic columns on the right, which is what makes the right-hand edge the
      reliably quiet corner the reference-line labels are drawn in. */
-  const absentLabel = byStage ? AGE_NO_STAGE : AGE_UNTYPED;
-  const foldLabel = byStage ? AGE_OTHER_STAGES : AGE_OTHER;
+  const absentLabel = byStage ? AGE_NO_STAGE : byStatus ? AGE_NO_STATUS : AGE_UNTYPED;
+  const foldLabel = byStage ? AGE_OTHER_STAGES : byStatus ? AGE_OTHER_STATUSES : AGE_OTHER;
   const untyped = ranked.filter(([label]) => label === absentLabel);
   const typed = ranked.filter(([label]) => label !== absentLabel);
   /* A board with a dozen issue types — or a workflow mapped to a dozen stages —
@@ -7938,13 +8342,22 @@ function derive(rows, settings, view, stages) {
        many are sitting in each stage" is the other half of the question this
        axis was asked for, and putting it on the tick answers it without a
        second card. Not done on the type axis, where the columns are already
-       ordered by size and the number would restate the ordering. */
-    columns: ageColumns.map(c => byStage ? c.label + ' (' + c.rows.length + ')' : c.label),
+       ordered by size and the number would restate the ordering.
+
+       The STATUS axis carries it too, even though it is ranked by size like the
+       type axis. The reason the type axis leaves it off does not transfer: a
+       work type is a kind of thing and its column height is a by-product, where
+       a status is a PLACE and "four are sitting in Code Review" is the figure
+       somebody came to the chart for. Ranking by size makes the number easier
+       to read off the axis, not redundant with it. */
+    columns: ageColumns.map(c => (byStage || byStatus)
+      ? c.label + ' (' + c.rows.length + ')' : c.label),
     /* The bare labels too, so a caller that needs the stage rather than the
        tick text — a test, or anything drawn beside this — is not parsing a
        count back out of a string. */
     columnNames: ageColumns.map(c => c.label),
     byStage,
+    byStatus,
     foldedTypes: folded.length,
     count: inFlight.length,
     agedCount: agedDays == null ? null : inFlight.filter(r => r.age > agedDays).length,
@@ -8233,7 +8646,8 @@ function derive(rows, settings, view, stages) {
         ? Units + ' in Progress Too Long — No Threshold Set'
         : Units + ' in Progress Longer Than ' + agedDays + ' ' + DayNoun,
       itemAge: 'Age of Every ' + Unit + ' Still in Progress on ' + prettyDate(endDate)
-        + (ageing.byStage ? ', by Workflow Stage' : ', by Work Type'),
+        + (ageing.byStage ? ', by Workflow Stage'
+           : ageing.byStatus ? ', by Status' : ', by Work Type'),
       cycleScatter: cycleLabel + ' of Each ' + Unit + ', on the ' + Noun + ' It Finished',
       /* Both name the question's own input, so a card read on its own — in a
          screenshot, over someone's shoulder — still says what was asked. */
@@ -8261,7 +8675,8 @@ function derive(rows, settings, view, stages) {
       agedWork: agedDays == null ? Units + ' past the threshold'
         : Units + ' older than ' + agedDays + ' ' + dayNoun,
       itemAge: 'Age so far (' + dayNoun + ')',
-      itemAgeX: ageing.byStage ? 'Workflow stage' : 'Work type',
+      itemAgeX: ageing.byStage ? 'Workflow stage'
+        : ageing.byStatus ? 'Status' : 'Work type',
       cycleScatter: cycleLabel + ' (' + dayNoun + ')',
       /* Both forecast charts count RUNS up the y axis — the x axis is the
          outcome, which is the other way round from every chart above, where x
@@ -8302,7 +8717,7 @@ function derive(rows, settings, view, stages) {
      eight percentiles, and a "total" row built that way would be quietly wrong
      in its most-read column. Deriving over the concatenated rows gives the
      train the same treatment a team gets, from the same code. */
-function deriveTeams(teams, settings, view, stages) {
+function deriveTeams(teams, settings, view, stages, statuses) {
   const list = Array.isArray(teams) ? teams : [];
   /* Which of a team's two lists this run is about. PURE — it reads the view it
      was handed rather than the app's, so the same rule serves the dashboard, a
@@ -8316,7 +8731,7 @@ function deriveTeams(teams, settings, view, stages) {
      passes over one team's worth of pooled rows is cheap, and the alternative —
      working the coverage out before deriving anything — would mean a second
      implementation of "where does this team's data end". */
-  let train = derive(everything, settings, view, stages);
+  let train = derive(everything, settings, view, stages, statuses);
   /* Nothing anywhere has finished, so there is no window to compare within and
      no date to share. The rows would all be empty; say so once instead. */
   if (train.empty) return { train, rows: [], asOf: null, coverageEnd: null, staleTeams: [] };
@@ -8340,7 +8755,8 @@ function deriveTeams(teams, settings, view, stages) {
   const wantForecast = !(view && view.forecastMode === 'off');
   const preScan = wantForecast
     ? list.map(t => ({ t,
-        d: derive(listOf(t), settings, Object.assign({}, view, { forecastMode: 'off' }), stages) }))
+        d: derive(listOf(t), settings, Object.assign({}, view, { forecastMode: 'off' }), stages,
+          statuses) }))
     : [];
   const ends = preScan.map(x => x.d.dataEnd).filter(Boolean);
   const coverageEnd = ends.length ? new Date(Math.min(...ends.map(d => d.getTime()))) : null;
@@ -8353,7 +8769,7 @@ function deriveTeams(teams, settings, view, stages) {
      ordinary case and every single-team forecast. */
   if (wantForecast && coverageEnd && coverageEnd < train.endDate) {
     train = derive(everything, settings,
-      Object.assign({}, view, { forecastCoverageEnd: coverageEnd }), stages);
+      Object.assign({}, view, { forecastCoverageEnd: coverageEnd }), stages, statuses);
   }
 
   /* Which teams are behind, and by how many whole periods — named on the card,
@@ -8397,7 +8813,7 @@ function deriveTeams(teams, settings, view, stages) {
         sleDays: view && view.unit === 'features' ? null : t.sleDays,
         /* The All Teams table has no forecast column, so the per-row derives do
            not need the expensive half of one. The TRAIN keeps it. */
-        forecastMode: 'off' }), stages) }))
+        forecastMode: 'off' }), stages, statuses) }))
   };
 }
 
@@ -8514,6 +8930,13 @@ window.TD = {
   /* The current-stage half: the value matcher and the two synthetic column
      labels the stage axis uses. */
   stageIdForStatus, AGE_NO_STAGE, AGE_OTHER_STAGES,
+  /* The status vocabulary's pure half — the two guards the whole feature's
+     safety argument rests on, plus the vocabulary append and the two readers
+     of a grouping. Exported so the argument can be tested directly rather than
+     inferred from what a paste happened to produce. */
+  cleanStatusLabel, statusColumnUsable, statusIdFor, statusNormIndex,
+  stageForStatusId, stageOf, AGE_NO_STATUS, AGE_OTHER_STATUSES,
+  STATUS_MAX, STATUS_LABEL_MAX, STATUS_WORDS_MAX, STATUS_RATIO_MAX, STATUS_RATIO_MIN_ROWS,
   /* The two figures a team sets. Pure guards, so what a hand-edited copy can put
      on somebody's chart is pinned without a dialog on screen. */
   cleanWipLimit, cleanSleDays, TEAM_TARGET_MAX,
@@ -8869,7 +9292,8 @@ function haltForNewerData(found) {
 /* state.teams[] each hold their own rows; settings are shared by all of them.
    Everything in `state` is your data; everything in `view` is where you happen
    to be standing in it. Only `state` goes into a backup or a share link. */
-let state  = { teams: [], arts: [], stages: [], settings: Object.assign({}, DEFAULT_SETTINGS) };
+let state  = { teams: [], arts: [], stages: [], statuses: [],
+               settings: Object.assign({}, DEFAULT_SETTINGS) };
 let view   = Object.assign({}, DEFAULT_VIEW);
 let charts = {};
 /* The All Teams throughput chart is held HERE rather than in `charts` above.
@@ -8939,6 +9363,14 @@ function sanitizeArts(arts) {
    copy from outside can plant in somebody's dialog. */
 function sanitizeStages(stages) {
   const seen = new Set();
+  /* A status may be ticked into ONE stage. Two stages claiming it is the same
+     contradiction two stages claiming an alias is, and it gets the same answer:
+     the first in the list keeps it, rather than the app resolving a
+     contradiction silently or a row's stage depending on which reader looked.
+     Enforced HERE rather than only in the dialog, because a hand-edited backup
+     or a share link can say anything, and stageForStatusId would otherwise have
+     a precedence rule to get wrong. */
+  const claimed = new Set();
   return (Array.isArray(stages) ? stages : []).map(st => {
     let id = (st && typeof st.id === 'string' && ID_OK.test(st.id) && st.id !== PROTO_KEY
       && !seen.has(st.id)) ? st.id : newId();
@@ -8952,8 +9384,48 @@ function sanitizeStages(stages) {
       byNorm.add(norm);
       aliases.push(clean);
     });
-    return { id, name: String((st && st.name) || 'Untitled stage').slice(0, 120), match: aliases };
+    /* Ids only, capped at the size of the vocabulary they point into — a stage
+       cannot list more statuses than exist. Ids pointing at a status that is no
+       longer there are pruned in hydrateState, where the list is known, exactly
+       as a dangling artId and a dangling stage id are. */
+    const picked = [];
+    (st && Array.isArray(st.statuses) ? st.statuses : []).forEach(sid => {
+      if (picked.length >= STATUS_MAX) return;
+      if (typeof sid !== 'string' || !ID_OK.test(sid)) return;
+      if (claimed.has(sid) || picked.indexOf(sid) >= 0) return;
+      claimed.add(sid);
+      picked.push(sid);
+    });
+    return { id, name: String((st && st.name) || 'Untitled stage').slice(0, 120),
+             match: aliases, statuses: picked };
   });
+}
+
+/* The vocabulary's boundary, and the one place a status arriving from outside
+   this browser — a backup file, a share link, a hand-edited localStorage — is
+   allowed to become a word this app will put on screen.
+
+   Every label goes through cleanStatusLabel again here, which is the point:
+   leg 2 guards the PASTE, and a document does not arrive through the paste.
+   A copy from outside gets leg 4 and the cap, and nothing else it claims about
+   how repetitive its column was is believed, because it is not here to be
+   checked. A label that fails is dropped WHOLE, taking its entry with it, and
+   hydrateState then prunes every row and stage that pointed at it. */
+function sanitizeStatuses(statuses) {
+  const seen = new Set(), byNorm = new Set(), out = [];
+  (Array.isArray(statuses) ? statuses : []).forEach(s => {
+    if (out.length >= STATUS_MAX) return;
+    const label = cleanStatusLabel(s && s.label);
+    if (!label) return;
+    const norm = normalizeAlias(label);
+    if (byNorm.has(norm)) return;
+    let id = (s && typeof s.id === 'string' && ID_OK.test(s.id) && s.id !== PROTO_KEY
+      && !seen.has(s.id)) ? s.id : newId();
+    seen.add(id);
+    byNorm.add(norm);
+    out.push({ id, label });
+  });
+  return out;
 }
 
 function sanitizeTeams(teams) {
@@ -9067,7 +9539,15 @@ function hydrateRow(r) {
          points at a stage no longer in the list, exactly as it does for a
          dangling artId. Unlike the day counts beside it this is a VALUE rather
          than an object key, so PROTO_KEY is not a hazard here. */
-      stage: (r && typeof r.w === 'string' && ID_OK.test(r.w)) ? r.w : ''
+      stage: (r && typeof r.w === 'string' && ID_OK.test(r.w)) ? r.w : '',
+      /* `u` on the wire — which status this item is in, as an id into
+         state.statuses. A VALUE rather than an object key, like `w` beside it,
+         so PROTO_KEY is not a hazard; and like `w`, hydrateState drops one that
+         points at a status no longer in the list.
+
+         Note what is NOT here: no label, no fallback, no repair. The words live
+         in exactly one place and a row can only ever point at them. */
+      status: (r && typeof r.u === 'string' && ID_OK.test(r.u)) ? r.u : ''
     };
   }
 }
@@ -9124,6 +9604,11 @@ const serializeRows = rows => rows.map(r => {
     if (Object.keys(g).length) out.g = g;
   }
   if (r.stage) out.w = r.stage;
+  /* Omit-when-empty again, and it does more work here than anywhere else: a
+     board with no Status column — or one whose column leg 2 refused — writes no
+     `u` on any row, so it serialises byte-identically to what it wrote before
+     this build existed and its first save does not rewrite the whole document. */
+  if (r.status) out.u = r.status;
   /* And the same rule for the parent key: absent unless there is one, so a team
      whose export has no Parent key column saves exactly what it saved before
      this field existed. */
@@ -9236,7 +9721,10 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 13 added the feature ageing threshold — `featureAgedDays`, the one
+/* SCHEMA 14 added the status vocabulary — `state.statuses`, a `u` (status id) on
+   each row, and a `statuses` list of ticked ids on each stage. It REVERSED the
+   rule that no status name is ever stored; the argument that replaced it is at
+   cleanStatusLabel. 13 added the feature ageing threshold — `featureAgedDays`, the one
    setting whose default is "not set"; 12 added the feature layer — a `p` (parent key) on each row and a
    `features` list on each team, plus the `featureTypes` setting that decides
    which pasted rows become features; 11 added the two settings behind ignoring major outliers — a mode and
@@ -9259,7 +9747,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 13;
+const SCHEMA = 14;
 
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
@@ -9317,8 +9805,18 @@ function serializeState() {
     arts: state.arts.length ? state.arts.map(a => ({ id: a.id, name: a.name })) : undefined,
     /* And no `stages` key until a stage exists — so a browser that never sets
        one up writes exactly the document it wrote before the feature landed. */
+    /* Same rule again, one level down: a stage that has ticked nothing writes no
+       `statuses` key, so every document written before this build round-trips
+       through this build byte-identically. */
+    statuses: state.statuses.length
+      ? state.statuses.map(s => ({ id: s.id, label: s.label }))
+      : undefined,
     stages: state.stages.length
-      ? state.stages.map(st => ({ id: st.id, name: st.name, match: st.match.slice() }))
+      ? state.stages.map(st => {
+          const out = { id: st.id, name: st.name, match: st.match.slice() };
+          if (st.statuses && st.statuses.length) out.statuses = st.statuses.slice();
+          return out;
+        })
       : undefined,
     settings: state.settings
   };
@@ -9340,7 +9838,7 @@ const countKeys = teams =>
    together because they are lost together: a build that predates stages drops
    both, and the prompt exists to catch exactly that file. */
 const countStageDays = teams =>
-  teams.reduce((n, t) => n + t.rows.filter(r => r.stages || r.stage).length, 0);
+  teams.reduce((n, t) => n + t.rows.filter(r => r.stages || r.stage || r.status).length, 0);
 
 /* Both halves of the feature layer, counted together: a parent key on an item is
    no use without the feature it names, and a feature list is no use without the
@@ -9354,6 +9852,7 @@ const countFeatureLinks = teams =>
 function hydrateState(raw) {
   const arts = sanitizeArts(raw && raw.arts);
   const stages = sanitizeStages(raw && raw.stages);
+  const statuses = sanitizeStatuses(raw && raw.statuses);
   const teams = sanitizeTeams(raw && raw.teams);
   /* A team pointing at an ART that isn't in the list is on no train, not on a
      ghost one. It happens for real: an older build drops `arts` while keeping
@@ -9369,10 +9868,22 @@ function hydrateState(raw) {
      explain. A row left with no counts at all loses the object too, so it goes
      back to serialising byte-identically to a row that never had one. */
   const stageIds = new Set(stages.map(st => st.id));
+  /* And the same, once more, for the vocabulary. Three things point at a status
+     — a row, a feature and a stage's tick list — and every one of them is
+     rebuilt from the surviving list rather than trusted. A row pointing at a
+     status that is not there would be an item the age chart could neither name
+     nor group, and nothing on screen would ever explain it or clear it: exactly
+     the shape of the orphaned stage figure that survived a delete, a reload and
+     every serialise for weeks before it was found. */
+  const statusIds = new Set(statuses.map(s => s.id));
+  stages.forEach(st => {
+    st.statuses = st.statuses.filter(sid => statusIds.has(sid));
+  });
   const pruneStages = (r) => {
     /* Where the item is, on the same terms as the counts below: a pointer at a
        stage that does not exist is no stage, not a ghost one. */
     if (r.stage && !stageIds.has(r.stage)) r.stage = '';
+    if (r.status && !statusIds.has(r.status)) r.status = '';
     if (!r.stages) return;
     const kept = Object.create(null);
     let any = false;
@@ -9394,7 +9905,19 @@ function hydrateState(raw) {
      stage that exists" — has to be true of every record the dialog opens, and
      that dialog opens features too. */
   teams.forEach(t => { t.rows.forEach(pruneStages); (t.features || []).forEach(pruneStages); });
-  return { teams, arts, stages, settings: normalizeSettings(raw && raw.settings) };
+  /* A status nothing points at any more is dropped, so the dialog's list stays
+     the statuses this document actually has rather than growing for ever. A
+     status a STAGE has ticked survives even with no rows on it: the tick is a
+     grouping decision the reader made, and losing it the moment the last item in
+     that status was completed would silently un-group the next paste. */
+  const liveStatuses = new Set();
+  stages.forEach(st => st.statuses.forEach(sid => liveStatuses.add(sid)));
+  teams.forEach(t => {
+    t.rows.forEach(r => { if (r.status) liveStatuses.add(r.status); });
+    (t.features || []).forEach(f => { if (f.status) liveStatuses.add(f.status); });
+  });
+  return { teams, arts, stages, statuses: statuses.filter(s => liveStatuses.has(s.id)),
+           settings: normalizeSettings(raw && raw.settings) };
 }
 
 /* v1 stored a single team's rows under td-rows with the name in td-settings.
@@ -9655,7 +10178,8 @@ window.tdRaisesKeyboard = raisesKeyboard;
 /* Pure helpers tests.html pins. Grouped because they are one boundary:
    everything here decides what a copy arriving from outside this browser — a
    backup file, a share link — is allowed to turn into. */
-window.TDState = { sanitizeTeams, sanitizeArts, sanitizeStages, hydrateState, normalizeSettings,
+window.TDState = { sanitizeTeams, sanitizeArts, sanitizeStages, sanitizeStatuses,
+  hydrateState, normalizeSettings,
   isBackup, ID_OK, PROTO_KEY, serializeRows, hydrateRows, hydrateRow, hydrateFeatures,
   hydrateStageDays, mergeFeatures, countFeatureLinks, SCHEMA };
 /* Click-to-copy's pure part, and the entry point the suite drives. */
@@ -11740,6 +12264,80 @@ function renderTeamRows() {
    items across every team carry time in that stage — which is the only honest
    answer to "is this stage set up right?", and the number that goes to zero the
    moment an alias stops matching. */
+/* The vocabulary, as chips with a count and a delete. Built with createElement
+   rather than innerHTML for the LABEL — it is the one word in this dialog that
+   came out of a work system, and the one place a stored word is drawn at full
+   size, so it goes in as text rather than as markup. Everything around it is
+   this app's own.
+
+   Counted over both lists and over the stages, so the number answers the
+   question somebody is about to ask of the delete button beside it. */
+function renderStatusList() {
+  const box = $('statusList');
+  if (!box) return;
+  const counts = new Map();
+  const bump = (r) => { if (r.status) counts.set(r.status, (counts.get(r.status) || 0) + 1); };
+  state.teams.forEach(t => { t.rows.forEach(bump); (t.features || []).forEach(bump); });
+  const stageOfStatus = new Map();
+  state.stages.forEach(st => (st.statuses || []).forEach(sid => stageOfStatus.set(sid, st.name)));
+  box.innerHTML = '';
+  if (!state.statuses.length) {
+    const p = document.createElement('p');
+    p.className = 'statusnone';
+    p.textContent = 'No statuses yet. They appear here when you paste an export with a '
+      + 'Status column in it.';
+    box.appendChild(p);
+    return;
+  }
+  state.statuses.forEach(st => {
+    const n = counts.get(st.id) || 0;
+    const chip = document.createElement('span');
+    chip.className = 'statuschip';
+    const name = document.createElement('span');
+    name.textContent = st.label;
+    const count = document.createElement('span');
+    count.className = 'count';
+    /* A status a stage has ticked but nothing is sitting in is a real and
+       ordinary state — everything in it finished — and reads as "0 items"
+       rather than as a fault. Its stage is named instead, which is the fact
+       that explains why it is still in the list. */
+    count.textContent = stageOfStatus.has(st.id)
+      ? n + ' · ' + stageOfStatus.get(st.id)
+      : String(n);
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.dataset.delstatus = st.id;
+    del.textContent = '×';
+    del.setAttribute('aria-label', 'Delete status ' + st.label);
+    chip.appendChild(name);
+    chip.appendChild(count);
+    chip.appendChild(del);
+    box.appendChild(chip);
+  });
+}
+
+/* The tick list under a stage's alias box: every status the app has read, with
+   the ones this stage groups ticked. THIS IS THE "ADOPT THIS HEADING" BUTTON
+   THAT WAS REFUSED FOR A YEAR, and it is allowed now for one reason only —
+   the words are already stored. The old objection was that a click would copy
+   work-system text into permanent storage; there is no such click here, because
+   there is no such copy. Ticking moves an id between two lists the app already
+   holds.
+
+   EVERY status is offered, including one another stage has claimed, and ticking
+   it MOVES it. Hiding the claimed ones would mean the only way to move a status
+   is to remember which stage has it and go and untick it there — a rule the
+   reader would have to learn from a control that had gone missing. */
+function stagePickHtml(st, i) {
+  if (!state.statuses.length) return '';
+  const mine = new Set(st.statuses || []);
+  return '<div class="stagepick">' + state.statuses.map(x =>
+    '<label><input type="checkbox" data-stagepick="' + escapeHtml(st.id) + '" value="' +
+    escapeHtml(x.id) + '"' + (mine.has(x.id) ? ' checked' : '') +
+    ' aria-label="Group ' + escapeHtml(x.label) + ' under the stage in row ' + (i + 1) +
+    '">' + escapeHtml(x.label) + '</label>').join('') + '</div>';
+}
+
 function renderStageRows() {
   const tb = $('stageRows');
   if (!tb) return;
@@ -11759,7 +12357,13 @@ function renderStageRows() {
   const countRefs = (r) => {
     const seen = new Set();
     if (r.stages) Object.keys(r.stages).forEach(id => seen.add(id));
-    if (r.stage) seen.add(r.stage);
+    /* THREE ways a record reaches a stage now, not two, and this list is the one
+       that must never fall behind: a count column disagreeing with the confirm
+       under it is exactly what made the `w`-versus-`g` bug wrong rather than
+       merely incomplete. `stageOf` covers the current-stage half of it — the
+       status route and the legacy `w` — and the day counts above are the third. */
+    const cur = stageOf(r, state.stages);
+    if (cur) seen.add(cur);
     seen.forEach(bump);
   };
   state.teams.forEach(t => { t.rows.forEach(countRefs); (t.features || []).forEach(countRefs); });
@@ -11784,6 +12388,16 @@ function renderStageRows() {
       '<td class="count">' + n + (n === 1 ? ' item' : ' items') + '</td>' +
       '<td>' + rowActs('stage', st.id, st.name, i, state.stages.length, false) + '</td>';
     tb.appendChild(tr);
+    /* The ticks get a row of their OWN, spanning the table, rather than sitting
+       in the aliases cell. Seven statuses in a cell sized for a comma-separated
+       box wrap into a seven-deep stack and make one stage as tall as the dialog;
+       across the full width they read as the one wrapping list they are. */
+    if (state.statuses.length) {
+      const pick = document.createElement('tr');
+      pick.className = 'stagepickrow';
+      pick.innerHTML = '<td colspan="4">' + stagePickHtml(st, i) + '</td>';
+      tb.appendChild(pick);
+    }
   });
   if (!state.stages.length) {
     tb.innerHTML = '<tr><td colspan="4" class="empty-row">' +
@@ -11960,7 +12574,7 @@ function renderDashboard() {
       /* Only so the wording follows — see the unit block in derive(). The
          figures are decided entirely by which list was handed in. */
       unit: featureUnit() ? 'features' : 'items' },
-    state.stages);
+    state.stages, state.statuses);
   const plottable = !d.empty && d.weeks.length > 0;
 
   /* Three states, three surfaces: the charts when something plots; the paste
@@ -12250,7 +12864,7 @@ function renderDashboard() {
         forecastItems: view.forecastItems, forecastDate: view.forecastDate,
         countFrom: view.countFrom, scenario: view.scenario,
         unit: featureUnit() ? 'features' : 'items' },
-      state.stages);
+      state.stages, state.statuses);
     /* An empty pool has no forecast to draw; fall back to the team's own, which
        is what the reader was looking at before they widened the scope. */
     if (!pooled.train.empty) {
@@ -12289,7 +12903,8 @@ function renderDashboard() {
        a team three periods behind contributes three periods of zero to the item
        throughput too. */
     if (fcCoverage) itemView.forecastCoverageEnd = fcCoverage;
-    const itemDerive = derive(items, state.settings, itemView, state.stages);
+    const itemDerive = derive(items, state.settings, itemView, state.stages,
+      state.statuses);
     const bd = featureBreakdown(feats, items);
     /* ── A SIZE THE READER TYPED, over the one the board measured ─────────
        The second half of the decomposition is normally measured off finished
@@ -12855,7 +13470,7 @@ function renderStageTime(d) {
        are working — they are grouping the age chart — so a card saying it has
        none would be simply wrong, and would send somebody to check a set-up
        that is already right. Point them at what they DO have instead. */
-    const teamHasCurrent = !!(team && team.rows.some(r => r.stage));
+    const teamHasCurrent = !!(team && team.rows.some(r => stageOf(r, state.stages)));
     /* Every one of these names BOTH doors, and that is the point of them since
        2026-08-22: this card was the only one in the app a reader could not fill
        without a Jira report, and a message sending them back to an export they
@@ -13575,7 +14190,7 @@ function renderAllTeams() {
          be work nobody can see — and this is the view that runs the most
          derives, one per team plus the train. */
       forecastMode: 'off' },
-    state.stages);
+    state.stages, state.statuses);
   const train = all.train;
   /* How many items the per-team rows ignored between them. Summed from the rows
      rather than read off the train, because they are different questions: the
@@ -13933,6 +14548,10 @@ function renderDataTable() {
       '<td>' + (r.started ? isoOf(r.started) : '<span class="hint">—</span>') + '</td>' +
       '<td>' + (r.created ? isoOf(r.created) : '<span class="hint">—</span>') + '</td>' +
       '<td>' + (escapeHtml(r.type) || '<span class="hint">—</span>') + '</td>' +
+      (state.statuses.length
+        ? '<td>' + (escapeHtml(statusLabelOf(r.status)) || '<span class="hint">—</span>')
+          + '</td>'
+        : '') +
       '<td class="num">' + (ct == null ? '—' : num1(ct)) + '</td>' +
       '<td class="num">' +
         (r.completed ? bucketLabel(bucketStart(r.completed, bucket), bucket) : '—') + '</td>' +
@@ -13978,6 +14597,17 @@ function dataColumns(bucket, bucketHead) {
     { key: 'started', label: 'Started', desc: true, get: r => r.started && r.started.getTime() },
     { key: 'created', label: 'Created', desc: true, get: r => r.created && r.created.getTime() },
     { key: 'type', label: 'Type', desc: false, get: r => (r.type || '').toLowerCase() || null },
+    /* Only where there is a vocabulary. An empty column on every board that has
+       never pasted a Status export would be a column of dashes seven wide, and
+       this table is already the widest thing in the app — the same reasoning
+       that keeps the created-date column honest about being optional.
+
+       It sorts ASCENDING first, like Item and unlike every date beside it: a
+       status has no most-interesting end, it is a list you scan for the one you
+       have in mind. It carries the LABEL rather than the id, so it sorts and
+       exports as the word the reader sees. */
+    ...(state.statuses.length ? [{ key: 'status', label: 'Status', desc: false,
+      get: r => (statusLabelOf(r.status) || '').toLowerCase() || null }] : []),
     { key: 'cycle', num: true, desc: true,
       label: (state.settings.cycleTimeLabel || 'Cycle Time')
         + (state.settings.workingDays === true ? ' (working days)' : ' (days)'),
@@ -14214,6 +14844,9 @@ function renderAll() {
   renderTeamSelect();
   renderTeamRows();
   renderArtRows();
+  /* Before the stage rows, which draw a tick per status: the list is the
+     source and the ticks are a view of it. */
+  renderStatusList();
   renderStageRows();
   renderFilterSelect();
   renderDataTable();
@@ -14934,6 +15567,7 @@ function searchApp(st, query) {
   const teams  = Array.isArray(st.teams)  ? st.teams  : [];
   const arts   = Array.isArray(st.arts)   ? st.arts   : [];
   const stages = Array.isArray(st.stages) ? st.stages : [];
+  const statuses = Array.isArray(st.statuses) ? st.statuses : [];
   const artName = (id) => (arts.find(a => a.id === id) || {}).name || '';
 
   /* Teams and trains first: they are what the picker above would have found, so
@@ -14952,9 +15586,32 @@ function searchApp(st, query) {
      list — which is the answer to the question that brought you here. */
   for (const stg of stages) {
     const aliases = Array.isArray(stg.match) ? stg.match : [];
-    if (!has(stg.name) && !aliases.some(has)) continue;
+    const grouped = (Array.isArray(stg.statuses) ? stg.statuses : [])
+      .map(id => (statuses.find(x => x.id === id) || {}).label).filter(Boolean);
+    if (!has(stg.name) && !aliases.some(has) && !grouped.some(has)) continue;
+    /* The GROUPED statuses lead the snippet where there are any: they are what
+       the stage actually is now, and the aliases are the fallback for a board
+       still matching by typed text. Both are shown when both exist, because a
+       stage can be doing each job for a different export. */
+    const parts = [];
+    if (grouped.length) parts.push('groups ' + grouped.join(', '));
+    if (aliases.length) parts.push('matches ' + aliases.join(', '));
     push({ view: 'stage', stageId: stg.id, where: stg.name + ' — workflow stage',
-           snippet: aliases.length ? 'matches ' + aliases.join(', ') : 'no aliases yet' });
+           snippet: parts.length ? parts.join(' · ') : 'nothing grouped yet' });
+  }
+  /* The vocabulary. Reachable by Find for the same reason a stage name is: it
+     is a stored word, and Find's rule has always been that it reaches exactly
+     what the whitelists let in and nothing more. It could not be reached before
+     this build because there was nothing there. */
+  for (const x of statuses) {
+    if (!has(x.label)) continue;
+    const n = teams.reduce((c, t) => c
+      + (t.rows || []).filter(r => r.status === x.id).length
+      + (t.features || []).filter(f => f.status === x.id).length, 0);
+    const on = stages.find(stg => (stg.statuses || []).indexOf(x.id) >= 0);
+    push({ view: 'stage', statusId: x.id, where: x.label + ' — status',
+           snippet: n + ' item' + (n === 1 ? '' : 's')
+             + (on ? ' · grouped under ' + on.name : ' · in no stage') });
   }
   /* Items across every team, newest first — a key is unique, so the usual search
      returns one row, and a work type returns however many there are. The INDEX
@@ -15322,23 +15979,60 @@ function stagesReadHtml(res) {
   let html = '';
   /* The status column first: it is the one most exports actually have, so it is
      the line most readers will be looking for. */
-  if (res.columns && res.columns.status >= 0) {
-    const seen = res.rows.filter(r => r.stage).length;
+  if (res.statusColumnRefused) {
+    /* Leg 2 firing, and it gets the FIRST line in this report because it is the
+       one finding here that is about somebody's data being other than they
+       think it is. COUNTS AND A POSITION ONLY. Not one cell, and not the
+       heading either — a heading is a pasted cell, and this report has never
+       echoed one. The column that has just been judged to hold free text is the
+       last column in the file to start quoting. */
+    const bad = res.statusColumnRefused;
+    html += '<br><strong>Column ' + (bad.index + 1) + ' was headed as a status, but nothing in '
+      + 'it was stored.</strong> It holds ' + bad.distinct + ' different values across '
+      + bad.filled + ' filled cells, and a workflow does not have that many statuses — that '
+      + 'is the shape of a summary or a description column. If it really is your status column, '
+      + 'this app has read it as free text and left it alone on purpose.';
+  } else if (res.columns && res.columns.status >= 0) {
+    const seen = res.rows.filter(r => r.status || r.stage).length;
     html += '<br>Read <strong>column ' + (res.columns.status + 1) + '</strong> as the current '
-      + 'status. ' + (seen
-        ? seen + ' item' + (seen === 1 ? ' was' : 's were') + ' filed under the stage it '
-          + 'matches — the work item age chart now groups by stage rather than by work type. '
-          + 'Only the stage is saved; the status names themselves are not.'
-        : 'Nothing in it matches a status you have listed against a stage, so no item has a '
-          + 'stage yet.')
-      + (state.stages.length ? '' : ' Set your stages up under Teams & Stages in the header '
-          + 'first — a status is only read when a stage lists it.');
-    if (res.unmatchedStatus) {
+      + 'status, for the ' + seen + ' item' + (seen === 1 ? '' : 's') + ' still in flight. ';
+    if (res.statusesNew && res.statusesNew.length) {
+      /* NAMED, where this report names nothing else that came out of a paste.
+         These have been through leg 2 and leg 4 and are in the vocabulary now:
+         they are stored data, the same class of thing as a stage name, and the
+         reader is entitled to see what the app has just decided to keep. A cell
+         that was REFUSED is still never printed — that is the distinction, and
+         it is the whole of it. */
+      html += (res.statusesNew.length === 1 ? 'One new status was added to your list: '
+        : res.statusesNew.length + ' new statuses were added to your list: ')
+        + res.statusesNew.map(x => '<strong>' + escapeHtml(x.label) + '</strong>').join(', ')
+        + '. ';
+    }
+    html += state.stages.length
+      ? 'Group them under Teams &amp; Stages to change what the work item age chart’s columns '
+        + 'are.'
+      : 'The work item age chart groups by status now. You can group those statuses into stages '
+        + 'of your own under Teams &amp; Stages, but you do not have to.';
+    if (res.unmatchedStatus && state.stages.length) {
       html += '<br><strong>' + res.unmatchedStatus + ' item'
-        + (res.unmatchedStatus === 1 ? '' : 's') + ' had a status no stage answers to</strong>, '
-        + 'and ' + (res.unmatchedStatus === 1 ? 'it counts' : 'they count') + ' as having no '
-        + 'stage. Check the spellings in Teams & Stages against this export\u2019s own status '
-        + 'column — this report does not repeat what was in it.';
+        + (res.unmatchedStatus === 1 ? '' : 's') + ' had a status that is in no stage</strong>, '
+        + 'so ' + (res.unmatchedStatus === 1 ? 'it sits' : 'they sit') + ' in the chart’s '
+        + '“' + AGE_NO_STAGE + '” column. Tick the statuses you want under each stage '
+        + 'in Teams &amp; Stages.';
+    }
+    if (res.statusesOverflow) {
+      html += '<br><strong>Your status list is full at ' + STATUS_MAX + '.</strong> '
+        + res.statusesOverflow + ' cell' + (res.statusesOverflow === 1 ? ' was' : 's were')
+        + ' left without one. A workflow with more than ' + STATUS_MAX + ' statuses in it is '
+        + 'unusual — check that this really is your status column, and delete the statuses '
+        + 'you do not need under Teams &amp; Stages.';
+    }
+    if (res.statusesDropped) {
+      html += '<br>' + res.statusesDropped + ' cell'
+        + (res.statusesDropped === 1 ? ' in that column was' : 's in that column were')
+        + ' too long, or held punctuation no status has, so '
+        + (res.statusesDropped === 1 ? 'it was' : 'they were')
+        + ' left out rather than shortened.';
     }
   }
   if (cols.length) {
@@ -15453,11 +16147,38 @@ function showParseNote(res, mode, team, adopted) {
     '</div>';
 }
 
+/* The vocabulary a paste worked out, taken on together with the rows it put ids
+   on. THE TWO MOVE TOGETHER OR NEITHER DOES: an id on a row whose label never
+   reached `state.statuses` is an item the age chart can neither name nor group,
+   and hydrateState would silently drop it on the next load. So this is called
+   from the same place, at the same moment, as the row write — never earlier,
+   because a paste that turns out to load nothing should leave the reader's list
+   exactly as it found it.
+
+   The TICKS are the other half. A status a stage's typed alias already answers
+   to is ticked into that stage as it is adopted, so somebody who set their
+   stages up before this build gets their next paste grouped without re-typing
+   or re-ticking a thing. Refused where the status is already claimed — one
+   status belongs to one stage, the rule sanitizeStages enforces — so a tick can
+   never quietly move a status out of a stage the reader put it in by hand. */
+function adoptStatuses(res) {
+  if (!res || !Array.isArray(res.statuses)) return;
+  state.statuses = res.statuses;
+  (res.statusTicks || []).forEach(t => {
+    const st = state.stages.find(x => x.id === t.stageId);
+    if (!st) return;
+    if (!Array.isArray(st.statuses)) st.statuses = [];
+    if (state.stages.some(x => (x.statuses || []).indexOf(t.statusId) >= 0)) return;
+    if (st.statuses.length >= STATUS_MAX) return;
+    st.statuses.push(t.statusId);
+  });
+}
+
 function doLoad(mode) {
   const team = activeTeam();
   if (!team) return;
   const res = parsePastedRows($('pasteBox').value, view.dateOrder, state.stages,
-    state.settings.featureTypes);
+    state.settings.featureTypes, state.statuses);
   /* Fill in the team's project id from its own export, when the export answers
      the question unanimously and nobody has answered it already. Typing an id
      per team is the setup step that would otherwise stand between a first paste
@@ -15476,6 +16197,7 @@ function doLoad(mode) {
      export, or a board whose items came in last week — so "did this paste load
      anything" has to ask about both lists now, not just about rows. */
   if (!res.rows.length && !res.features.length) return;
+  adoptStatuses(res);
   if (res.rows.length) team.rows = mode === 'append' ? team.rows.concat(res.rows) : res.rows;
   /* Only when feature types are set up. With none, `res.features` is empty by
      construction — so replacing unconditionally would let an ordinary paste
@@ -15512,7 +16234,7 @@ function mergeFeatures(existing, incoming) {
 
 function multiParse() {
   const res = parsePastedRows($('multiPasteBox').value, view.dateOrder, state.stages,
-    state.settings.featureTypes);
+    state.settings.featureTypes, state.statuses);
   return { res, route: routeRowsToTeams(res.rows, state.teams),
            /* Features route by the SAME rule the items do — a feature's key
               carries its project at the front exactly as an item's does — so the
@@ -15673,6 +16395,12 @@ function runMulti(mode) {
           + (losing.length > CONFIRM_CAP ? '\n• … and ' + (losing.length - CONFIRM_CAP) + ' more' : '')
           + '\n\nTeams this paste does not name are untouched. This cannot be undone.')) return;
     }
+    /* Before the rows go in, for the reason adoptStatuses states: the ids on
+       these rows point into that list and the two are only ever taken together.
+       Inside the `mode !== 'check'` branch, so the CHECK button still writes
+       nothing at all — it is the one mode whose whole job is to change no
+       state, and a vocabulary quietly growing on a dry run would break that. */
+    adoptStatuses(res);
     route.assigned.forEach(a => {
       const team = state.teams.find(t => t.id === a.teamId);
       if (!team) return;
@@ -15975,7 +16703,8 @@ $('artRows').addEventListener('click', e => {
 
 /* ── Workflow stages ──────────────────────────────────────────────────────── */
 $('btnAddStage').addEventListener('click', () => {
-  const stage = { id: newId(), name: 'Stage ' + (state.stages.length + 1), match: [] };
+  const stage = { id: newId(), name: 'Stage ' + (state.stages.length + 1),
+                  match: [], statuses: [] };
   state.stages.push(stage);
   save();
   renderAll();
@@ -16021,6 +16750,67 @@ $('stageRows').addEventListener('input', e => {
   renderStageAliasWarning();
 });
 
+/* Ticking a status into a stage, and the one place grouping is decided by hand.
+   `change`, not `input`: a checkbox fires both, and this one re-renders the
+   whole dialog.
+
+   THE TICK MOVES IT. A status belongs to one stage — the rule sanitizeStages
+   enforces at the boundary — so claiming it here takes it off whichever stage
+   had it, rather than refusing the click and leaving the reader to work out
+   which of eight stages to go and untick. The re-render is what shows them
+   where it went. */
+$('stageRows').addEventListener('change', e => {
+  const stageId = e.target.dataset && e.target.dataset.stagepick;
+  if (!stageId) return;
+  const statusId = e.target.value;
+  const stage = state.stages.find(st => st.id === stageId);
+  if (!stage || !state.statuses.some(x => x.id === statusId)) return;
+  state.stages.forEach(st => {
+    st.statuses = (st.statuses || []).filter(sid => sid !== statusId);
+  });
+  if (e.target.checked) stage.statuses.push(statusId);
+  save();
+  /* Everything, not just this dialog: the age chart's axis, its columns and the
+     Time in stage card all read the grouping, and this is the change that was
+     impossible before — every item already pasted moves with it. */
+  renderAll();
+});
+
+/* Deleting a status. The vocabulary is the only list in this app whose entries
+   came out of a work system, so it is the only one with a delete that exists
+   for a reason other than tidiness: this is how a word gets out of storage.
+
+   Takes the id off every row and every feature, and off whichever stage had
+   ticked it. Done eagerly rather than left to hydrateState on the next load,
+   for the same reason the stage delete is: persist() writes immediately, so a
+   pointer left behind sits in localStorage until something reloads the page. */
+$('statusList').addEventListener('click', e => {
+  const id = e.target.dataset && e.target.dataset.delstatus;
+  if (!id) return;
+  const status = state.statuses.find(x => x.id === id);
+  if (!status) return;
+  let on = 0;
+  const eachRecord = (fn) =>
+    state.teams.forEach(t => { t.rows.forEach(fn); (t.features || []).forEach(fn); });
+  eachRecord(r => { if (r.status === id) on++; });
+  const stage = state.stages.find(st => (st.statuses || []).indexOf(id) >= 0);
+  if (!confirm('Delete the status ' + status.label + '?\n\n'
+      + (on ? 'The ' + on + ' item' + (on === 1 ? '' : 's') + ' in it keep'
+              + (on === 1 ? 's' : '') + ' every date and figure — '
+              + (on === 1 ? 'it' : 'they') + ' just stop being grouped'
+              + (stage ? ' under ' + stage.name : '') + '. '
+          : 'Nothing is in it, so no figure changes. ')
+      + 'Pasting an export with that status in it again brings it back.')) return;
+  state.statuses = state.statuses.filter(x => x.id !== id);
+  state.stages.forEach(st => {
+    st.statuses = (st.statuses || []).filter(sid => sid !== id);
+  });
+  eachRecord(r => { if (r.status === id) r.status = ''; });
+  save();
+  renderAll();
+  window.toast('Deleted ' + status.label);
+});
+
 $('stageRows').addEventListener('click', e => {
   const btn = e.target.closest ? e.target.closest('[data-movestage]') : null;
   if (btn) { moveInList(state.stages, 'stage', btn.dataset.movestage, Number(btn.dataset.dir)); return; }
@@ -16053,8 +16843,16 @@ $('stageRows').addEventListener('click', e => {
     state.teams.forEach(t => { t.rows.forEach(fn); (t.features || []).forEach(fn); });
   eachRecord(r => {
     if (r.stages && r.stages[id] != null) timed++;
-    if (r.stage === id) sitting++;
+    /* Through stageOf, so an item that reaches this stage by its STATUS is
+       counted the same as one carrying the legacy pointer. The count column
+       above uses the same call, and the two agreeing is the whole point. */
+    if (stageOf(r, state.stages) === id) sitting++;
   });
+  /* What the statuses this stage has ticked go back to being: still in the
+     vocabulary, still on their items, simply not grouped. Said out loud because
+     the honest reading of "deleting a stage" is otherwise that the statuses go
+     with it, and they do not — nothing here can lose a word off an export. */
+  const ticked = (stage.statuses || []).length;
   const goes = [];
   if (timed) goes.push('the time ' + timed + ' item' + (timed === 1 ? '' : 's') + ' spent in it');
   if (sitting) goes.push(sitting + ' item' + (sitting === 1 ? ' that is' : 's that are')
@@ -16063,6 +16861,8 @@ $('stageRows').addEventListener('click', e => {
       ? 'Delete ' + stage.name + '?\n\nThis removes ' + goes.join(' and ')
         + '. No work item is deleted, and re-pasting an export with that column brings the '
         + 'figures back.'
+        + (ticked ? '\n\nThe ' + ticked + ' status' + (ticked === 1 ? '' : 'es')
+            + ' grouped under it stay in your list — they are just no longer grouped.' : '')
       : 'Delete ' + stage.name + '?')) return;
   state.stages.splice(i, 1);
   eachRecord(r => {
@@ -16926,6 +17726,7 @@ $('clearBtn').addEventListener('click', () => {
   const also = [];
   if (state.arts.length) also.push(plural(state.arts.length, 'ART'));
   if (state.stages.length) also.push(plural(state.stages.length, 'workflow stage'));
+  if (state.statuses.length) also.push(plural(state.statuses.length, 'status'));
   /* Named only when there is one to lose. It is not a team or an item, so it
      rides in the same list ARTs and stages do rather than inflating the count
      above — and it has to be named at all because an unmentioned survivor is
@@ -17009,12 +17810,22 @@ function openItemDialog(index) {
      buildManualRow. The picker is drawn every open because a stage can be added
      or renamed in the dialog next door between one item and the next. */
   const wrap = $('itemStageWrap');
-  wrap.hidden = !state.stages.length;
-  if (state.stages.length) {
-    $('itemStage').innerHTML = '<option value="">Not set</option>' + state.stages
-      .map(st => '<option value="' + escapeHtml(st.id) + '">' + escapeHtml(st.name) + '</option>')
-      .join('');
-    $('itemStage').value = (r && r.stage) || '';
+  const pickStatus = state.statuses.length > 0;
+  wrap.hidden = !state.stages.length && !pickStatus;
+  if (!wrap.hidden) {
+    const label = $('itemStageLabel');
+    /* The word has to follow the list, or the form asks for one thing and
+       offers another — the same rule the unit switch made the charts follow. */
+    if (label) label.innerHTML = (pickStatus ? 'Status' : 'Sitting in')
+      + ' <span class="hint">(optional)</span>';
+    $('itemStage').innerHTML = '<option value="">Not set</option>'
+      + (pickStatus ? state.statuses : state.stages)
+        .map(x => '<option value="' + escapeHtml(x.id) + '">'
+          + escapeHtml(pickStatus ? x.label : x.name) + '</option>').join('');
+    /* A row edited on a board that has since grown a vocabulary still carries
+       its legacy stage; there is no status to select for it, so the picker
+       reads Not set rather than showing a stage in a list of statuses. */
+    $('itemStage').value = (r && (pickStatus ? r.status : r.stage)) || '';
   }
 
   /* One box per stage, in the reader's OWN stage order — the order the Time in
@@ -17075,7 +17886,11 @@ $('itemSave').addEventListener('click', () => {
     parentKey: $('itemParent').value,
     type: $('itemType').value,
     key: $('itemKey').value,
-    stage: state.stages.length ? $('itemStage').value : '',
+    /* One box, so one read, and which field it lands in is decided the same way
+       the dialog decided what to draw. Sent as both rather than resolved here:
+       buildManualRow owns the in-flight rule and the does-it-exist check. */
+    status: state.statuses.length ? $('itemStage').value : '',
+    stage: (!state.statuses.length && state.stages.length) ? $('itemStage').value : '',
     /* Read straight off the boxes as text, NOT as numbers: an empty box and a
        typed 0 are two different answers here, and `valueAsNumber` collapses
        them both to NaN-or-0. buildManualRow tells them apart off the string,
@@ -17087,7 +17902,7 @@ $('itemSave').addEventListener('click', () => {
        `capacityScale`. */
     keepStages: (editingItem !== null && saveList[editingItem])
       ? saveList[editingItem].stages : null
-  }, state.stages, savingFeature);
+  }, state.stages, savingFeature, state.statuses);
 
   if (built.error) { $('itemWarn').textContent = built.error; return; }
 
@@ -17153,9 +17968,15 @@ $('clearConfirm').addEventListener('click', () => {
      having said nothing about either. They are DATA — a stage carries the
      status names typed off an export, an ART is a grouping of teams — where
      `settings` is the labels and thresholds the dialog does promise to keep,
-     which is the line this delete draws. */
+     which is the line this delete draws.
+
+     The VOCABULARY goes on the same line and is the clearest case of it: it is
+     the only list here made entirely of words that came out of a work system,
+     so a delete-all that left it standing would leave behind exactly the thing
+     somebody pressing this button is most likely to be trying to remove. */
   state.arts = [];
   state.stages = [];
+  state.statuses = [];
   /* Both filters pointed into the lists just emptied. Cleared here rather than
      left for their own validators: an ART filter is corrected on read anyway,
      but leaving a stale id in the saved view means the next thing to read it
@@ -17356,13 +18177,40 @@ function buildSharePayload(teamIds, win) {
      stage id with no stage to name it, and the recipient's hydrateState would
      then prune the figure the sender could see. */
   const usedStages = new Set();
+  /* The vocabulary's own sibling, and it carries WORDS where everything beside
+     it carries ids and numbers — which makes this the one line in the payload
+     builder worth stopping at. The statuses travel because the recipient's age
+     chart is drawn from them: a link without them shows a different picture
+     from the sender's, which is the same argument that put issue keys in a
+     link, and a shared board silently falling back to the work-type axis would
+     be two people reading one link and seeing two charts.
+
+     Only the ones the WINDOWED rows actually use, exactly as only the stages
+     those rows spent time in travel. A link trimmed to three months does not
+     carry a status nothing in it is sitting in. */
+  const usedStatuses = new Set();
   const noteStages = (r) => {
     if (r.g) Object.keys(r.g).forEach(id => usedStages.add(id));
     if (r.w) usedStages.add(r.w);
+    if (r.u) usedStatuses.add(r.u);
   };
   teams.forEach(t => { t.rows.forEach(noteStages); (t.features || []).forEach(noteStages); });
-  const stages = state.stages.filter(st => usedStages.has(st.id))
-    .map(st => ({ id: st.id, name: st.name }));
+  const statuses = state.statuses.filter(x => usedStatuses.has(x.id))
+    .map(x => ({ id: x.id, label: x.label }));
+  /* A stage travels if its DAY COUNTS are in the link or if it groups a status
+     that is — the second half is new, and without it a stage that reaches its
+     items only through their statuses would be dropped, and the recipient's
+     hydrateState would then prune the tick as a dangling id. A sender's
+     grouping that arrives as no grouping. */
+  const stageTravels = (st) => usedStages.has(st.id)
+    || (st.statuses || []).some(sid => usedStatuses.has(sid));
+  const stages = state.stages.filter(stageTravels)
+    .map(st => {
+      const out = { id: st.id, name: st.name };
+      const picked = (st.statuses || []).filter(sid => usedStatuses.has(sid));
+      if (picked.length) out.statuses = picked;
+      return out;
+    });
 
   const payload = {
     v: SHARE_PAYLOAD_V,
@@ -17402,6 +18250,12 @@ function buildSharePayload(teamIds, win) {
   };
   if (arts.length) payload.arts = arts;
   if (stages.length) payload.stages = stages;
+  /* Same omit-when-empty rule: a link from a board with no vocabulary carries no
+     `statuses` key at all, so it is byte-identical to a link from before this
+     build and the payload key set only grows when there is something to put in
+     it. The ALIASES still do not travel — they are matching rules for a paste
+     box the recipient does not have. */
+  if (statuses.length) payload.statuses = statuses;
   if (cutoff) payload.from = isoOf(cutoff);
   return payload;
 }
@@ -18352,11 +19206,19 @@ function loadSample() {
      one, and the same stage reads it happily. Deployment is deliberately a
      stage almost nothing sits in — a table where every row is a big number
      teaches nobody where to look. */
+  /* THE ALIASES ARE STILL WHAT THE DEMO SETS UP, and that is the point of
+     leaving them: the aliases are what read a Time in Status export's HEADINGS,
+     which is the half of the feature the vocabulary cannot do, AND they are
+     what auto-ticks each status into its stage as the paste adopts it. So the
+     demo exercises the upgrade path a real returning reader takes — stages set
+     up before this build, a paste that fills in the grouping without being
+     asked — rather than a state only a fresh install reaches. The ticks
+     themselves are asserted in the demo test group. */
   const demoStages = [
-    { id: newId(), name: 'Build',  match: ['Development'] },
-    { id: newId(), name: 'Review', match: ['Ready for Code Review', 'Code Review'] },
-    { id: newId(), name: 'Test',   match: ['Testing'] },
-    { id: newId(), name: 'Deploy', match: ['Deployment'] }
+    { id: newId(), name: 'Build',  match: ['Development'], statuses: [] },
+    { id: newId(), name: 'Review', match: ['Ready for Code Review', 'Code Review'], statuses: [] },
+    { id: newId(), name: 'Test',   match: ['Testing'], statuses: [] },
+    { id: newId(), name: 'Deploy', match: ['Deployment'], statuses: [] }
   ];
   demoStages.forEach(st => state.stages.push(st));
 
@@ -18389,7 +19251,12 @@ function loadSample() {
   let landOn = null;
   DEMO_TEAMS.forEach(profile => {
     const parsed = parsePastedRows(demoPaste(profile), 'auto', state.stages,
-      state.settings.featureTypes);
+      state.settings.featureTypes, state.statuses);
+    /* Adopted per profile, inside the loop, because the vocabulary each parse
+       starts from has to be the one the parse before it left — otherwise the
+       second team's "In Progress" is a second entry with a second id, and the
+       age chart splits one status into two columns. */
+    adoptStatuses(parsed);
     /* The demo's teams carry the project ids their own keys are built from, so
        "Paste several teams" is reachable from Load sample data rather than only
        after somebody types three ids in. Team Bare Export has no keys and so no id —

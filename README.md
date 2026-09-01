@@ -647,10 +647,10 @@ an error — it's work you've begun, and it counts on the net flow chart as work
 Rows with *no* dates at all — untouched backlog — are ignored, and the count is reported so a
 paste of 260 rows that becomes 170 items explains itself.
 
-**Only dates, a short type label and two keys are ever saved.** The paste is read for
-those on the spot and everything else is discarded — summaries, statuses, assignees, comments
-and the rest of the export are never stored. Two guards do that work, and they are different
-on purpose:
+**Only dates, a short type label, two keys and a status are ever saved.** The paste is read
+for those on the spot and everything else is discarded — summaries, assignees, comments and the
+rest of the export are never stored. Three guards do that work, and they are different on
+purpose:
 
 - The **work type** is held to a short category label ("Story", "Bug", "Tech Debt"). A cell
   longer than a label — a summary that landed in the wrong column, say — is dropped whole
@@ -666,8 +666,17 @@ on purpose:
   same shape check as the issue key, at the same two doors. It is the same kind of value, so
   it gets the same guard rather than a new one.
 
-Both guards run again whenever a saved copy, cloud document, backup or share link is read
-back in. There are deliberately no free-text or comment fields anywhere in the app.
+- The **status** cannot be guarded that way at all, because a status has no shape, and it is
+  the one field here guarded by looking at the **column** instead of the value. It is read only
+  from a column headed exactly *Status*, and only if that column **repeats itself** the way a
+  workflow does — a column with a different value on nearly every row is a column of summaries,
+  and nothing at all is taken from it. What is then stored on a row is a *pointer* into a
+  capped list of statuses you can see and delete; the words themselves live in that one list.
+  See [Your Statuses, and Grouping Them Into Stages](#your-statuses-and-grouping-them-into-stages).
+
+Every guard runs again whenever a saved copy, backup or share link is read back in. There are
+deliberately no free-text or comment fields anywhere in the app — there is nowhere you can type
+a sentence and have it saved.
 
 **A column of prose may hold no role at all.** A heading naming itself a summary, description,
 comment, note, title, reason or justification is taken out of consideration *before* the export
@@ -822,8 +831,8 @@ Everything the charts depend on, shared by all your teams:
   Monday takes one day, not three. It is one switch for all three, because a screen mixing the
   two measures would be unreadable, and every chart and column that states a duration re-labels
   itself to say which days it means. **Public holidays are not known to the app** and still
-  count as working days — a holiday list would be per-country and per-year, and this app
-  deliberately stores no text of that kind. Throughput, net flow, work in progress and the
+  count as working days — a holiday list would be per-country and per-year, and nothing in this
+  app is a place to type a list of dated names into. Throughput, net flow, work in progress and the
   defect rate are counts rather than durations, so they don't move.
 - **Same-day cycle time** — what an item that starts and finishes on one day is worth
   (`0.5` days since 21 Aug 2026: a whole day made an item opened and closed inside one day
@@ -1075,15 +1084,20 @@ Rows gained an optional created date (`k` on the wire, backup `version: 3`, `sch
 saved state; the working-days setting later took both markers to `4`, ARTs to `5`,
 the issue key to `6`, the per-team project id to `7`, workflow stages to `8`, the per-row
 current stage to `9`, the per-team [limit and target](#your-own-limit-and-your-own-target)
-to `10`, [ignoring outliers](#ignoring-major-outliers) to `11` and the
-[feature layer](#features-the-unit-above-a-work-item) to `12`). A row without one is left exactly as it was
+to `10`, [ignoring outliers](#ignoring-major-outliers) to `11`, the
+[feature layer](#features-the-unit-above-a-work-item) to `12`, the feature ageing threshold to
+`13`, and the [status list](#your-statuses-and-grouping-them-into-stages) to `14`). A row without
+one is left exactly as it was
  — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before. **The issue key
 (`i` on the wire) follows exactly the same rule**: absent unless there is one, so a team whose
 export has no key column saves byte-identically to before that field existed, and the first save
 after upgrading doesn't rewrite the whole stored document. **The project id follows it too** — a team
 without one writes no `projectId` key at all, so a browser that never splits a paste stores
-exactly what it stored before the feature existed.
+exactly what it stored before the feature existed. **And the status (`u` on the wire) follows it as
+well**: a board with no Status column — or one whose column the repetition gate refused — writes
+no `u` on any row and no status list at all, so it saves byte-identically to before this field
+existed.
 
 **Stage times follow the same rule**: no `g` key on a row until there are day counts to put
 in it, and no `stages` list on the document until you set one up, so a browser that never uses
@@ -1316,22 +1330,43 @@ Most people have the first and not the second. That is fine — the first is the
 is not a consolation prize: the table reads typed figures and pasted ones identically, because they
 are the same figures once saved.
 
-### You Name the Stages. Your Export's Status Names Are Never Stored
+### Your Statuses, and Grouping Them Into Stages
 
-This is the part worth reading even if you skip the rest.
+This is the part worth reading even if you skip the rest, and it **changed on 1 September 2026**.
+Until then this app stored no status name at all: you typed the statuses yourself and the ones in
+your export were matched, converted and thrown away. It stores them now — safely, in one place,
+and visibly — and the reasoning is below.
 
-A **stage** is a part of your workflow you want to measure the wait in — *Build*, *Review*,
-*Test*. You create and name them under **Teams & Stages** in the header, and against each one you type
-the **Jira statuses that feed it**, separated by commas. Several statuses can feed one stage:
-a workflow with both *Ready for Code Review* and *Code Review* is one Review stage as far as
-the flow is concerned. Those same statuses are matched against a **Status column's values** and
-against a **Time in Status export's headings**, so one set-up serves both — and a board that
-later gains durations needs nothing re-typed.
+**Paste an export with a Status column and the statuses in it are added to a list you can see.**
+It lives under **Teams & Stages** in the header, every entry has a delete button beside it, and
+that list is the *only* place a status name is kept. A work item stores a **pointer** into it,
+never the word, so pasting four hundred items adds no words at all — only the handful your
+workflow actually has.
 
-Paste an export with a **Status** column and each in-flight item is filed under the stage its
-status matches. Paste a **Time in Status** export — one row per issue, one column per status,
-each cell a number of days — and the days land in the stage each status is matched to, several
-columns adding together where several statuses feed one stage.
+**The work item age chart then groups by status with no set-up from you.** That is the whole
+point of the change: "where is everything sitting, and how long has it been there" is the
+question people walk up to a board with, and it used to cost you a list of hand-typed aliases
+before the chart could answer it.
+
+**A stage is an optional grouping over that list.** Create one under Teams & Stages, name it —
+*Build*, *Review*, *Test* — and **tick** the statuses that belong to it. Worth doing when several
+statuses are really one part of your workflow, or when you want them in your own order rather
+than ranked by size. **Change a grouping and every item you have already pasted moves with it** —
+the stage is worked out when the chart is drawn, not frozen when the item was pasted, so nothing
+needs re-pasting.
+
+So the chart has three readings and picks the best one available, without a picker: **by stage**
+if you have grouped anything, **by status** if you have statuses and have not, and **by work
+type** if your export had no Status column. The last is not a legacy mode — it is what a board
+without that column still gets.
+
+**The typed status names box is still there, and still does one job nothing else can.** A
+**Time in Status** export names its statuses in its column **headings**, and a heading is not a
+value in any column, so it can only be matched against a name you have typed. Type them exactly
+as Jira spells them; capitals and punctuation do not matter. Those same typed names also tick a
+matching status into their stage the first time it is read, so a set-up made before this change
+keeps working with nothing re-typed. Several statuses can feed one stage and their days are
+added together; if two stages claim one status, the app says so rather than picking one quietly.
 
 **Or type the days in.** Once a stage exists it gets a box on the Add/Edit Work Item form, so a
 board kept by hand — or a couple of figures read off a Jira screen without exporting anything —
@@ -1341,21 +1376,45 @@ that is different from typing `0`, which says the item crossed it inside a day. 
 on its face — the working-days setting governs the three durations this app measures itself, and
 cannot honestly be applied to a single total someone else worked out.
 
-**The status names — in your headings and in your Status column's cells — are matched while the
-paste is being read, and then thrown away with the rest of it.** What is saved is the stage name *you* chose and a
-number. Every other field this app stores is guarded by asking whether a regex can tell it
-from a sentence — a key can, a project id can. **A status cannot**: "Fix the login bug on
-prod" is twenty-five characters of letters and spaces, which is every shape a status label
-has. So the safety here is not a guard on the value; it is that the value is never stored.
+#### Why a Status Can Be Stored When a Summary Cannot
 
-That is also why **there is no button that picks the status names up out of your export**, even
-though the app has just read them and it would save you the typing. One click that copies
-work-system text into permanent storage is the thing this design exists to avoid.
+Every other field this app keeps is guarded by asking whether a regex can tell it from a
+sentence — a key can, a project id can. **A status cannot.** "Fix the login bug on prod" is
+twenty-five characters of letters and spaces, which is every shape a status label has, so a
+length cap here would be theatre: a fourteen-character summary ("Login redesign") clears any cap
+a real status also clears.
+
+What guards it instead is the **column**, not the value, and there are four parts to it:
+
+1. **The app never guesses which column is the status.** Only a heading that is exactly *Status*
+   or *Current status* counts — not *Status Category*, not *Status changed date* — and there is
+   no fallback that finds one from the values. A column headed as a summary, description,
+   comment, note, title, reason or justification is out of reach of every field entirely.
+2. **A status column repeats itself and prose does not.** A whole workflow is about ten statuses
+   however many items you have; a summary column has a different value on nearly every row. The
+   app counts the distinct values in that column *before storing anything*, and a column that
+   looks like free text is refused **whole** — not the short values kept and the long ones
+   dropped, nothing at all — with the paste report saying so in counts, never quoting a cell.
+3. **A row stores an id, never a word.** The words live once, in a list capped at 40 that you can
+   read and empty. The blast radius of a mistake is one visible entry, not a column of cells.
+4. **Each label is held to a plain shape** — 40 characters, six words, letters, digits and a few
+   separators like `/`, `(` and `'`. A comma, a colon, a quote or an angle bracket is refused,
+   and a failing label is dropped whole rather than shortened.
+
+Points 1 and 2 are what make this safe; point 4 is hygiene and must not be mistaken for the
+guard. **This is not precedent for storing a summary**, and the reason is point 2 rather than any
+cap: a summary column fails the repetition test by construction — that is what makes it a
+summary — so the same argument applied to it answers no.
+
+**Only work still in progress is read.** Every export says *Done* against everything it has ever
+closed, which is most of the file; a finished item's current status says nothing about flow. So
+finished rows are skipped, and *Done* never reaches your list.
 
 Matching ignores capitals and punctuation — `In-Progress` and `In Progress` are the same
-status — but it is **exact, never a partial match**. An alias of `Testing` will not quietly
-swallow a *Waiting on Testing Env* column and add somebody's environment queue to your test
-time. If two stages list the same status, the app says so as you type rather than picking one.
+status, stored once — but a typed name is matched **exactly, never partially**. An alias of
+`Testing` will not quietly swallow a *Waiting on Testing Env* column and add somebody's
+environment queue to your test time.
+
 
 ### If Your Export Names Its Columns "Days in …"
 
@@ -1468,9 +1527,10 @@ that are all 12 or under, the app falls back to day first **and says that it gue
 picker to change. The difference is not cosmetic: `1/1/26` to `1/3/26` is two days read one way
 and fifty-nine the other.
 
-If items had a status **no stage answers to**, it says how many. It does not say what they were:
-that is work-system text, and the count is what tells you your aliases are wrong rather than one
-row being odd. It counts only rows that were actually **loaded** — an untouched backlog item has a
+If items had a status **that is in no stage**, it says how many, and it names the statuses it
+kept — those have passed the column test and are in your list, so showing them is showing you
+your own stored data. A cell it *refused* is still never printed: the column that has just been
+judged free text is the last one to start quoting from. It counts only rows that were actually **loaded** — an untouched backlog item has a
 status and no dates at all, so it is dropped before it gets here, and counting those made the note
 read "400 items had a status no stage answers to" on a set-up whose spellings were perfect. If nothing matched, it says so and points you at the Teams
 window. If a stage's alias named a column the dashboard already needs — aliasing `Created`, say
@@ -1585,10 +1645,11 @@ If your export has no key column, a dot falls back to its **work type and start 
 finds the item in the export you pasted in seconds. Both charts name dots the same way, from one
 piece of code, so the pair can never disagree about what an item is called.
 
-The key is the *only* thing out of your work system the app keeps — no summary, no status, no
-assignee — and it is checked against [the shape of a key](#getting-your-data-in) rather than
-trimmed to fit, so a mismapped column stores nothing at all rather than storing part of a
-sentence. The Your Data tab lists every item with its key, unfinished ones at the top.
+The key and the status are the *only* things out of your work system the app keeps — no summary,
+no assignee — and the key is checked against [the shape of a key](#getting-your-data-in) rather
+than trimmed to fit, so a mismapped column stores nothing at all rather than storing part of a
+sentence. The status is guarded a different way, by the column it comes from; see
+[Your Statuses, and Grouping Them Into Stages](#your-statuses-and-grouping-them-into-stages). The Your Data tab lists every item with its key, unfinished ones at the top.
 
 ### Reading It
 
@@ -1651,6 +1712,12 @@ so it reads as "your export is missing a column" rather than as ordinary bad dat
 here that is typed by hand**. It is never read, never stored and never shown. See
 [What Happens to Bad Data](#what-happens-to-bad-data) above for the guard that makes that a rule
 rather than an accident.
+
+**Statuses becoming storable did not change this**, and it is worth saying why, because the two
+look alike from a distance. A status column repeats — ten values across a whole export — and that
+repetition is what the app measures before it stores anything. A summary column has a different
+value on nearly every row, which is what makes it a summary, so the same test applied to it
+answers no. Nothing about it is a matter of length.
 
 ### Reading the Whole Dashboard in Features
 
@@ -2336,8 +2403,8 @@ Results are capped at 80, and the list says how many more matched so the cap is 
 silent. A shared read-only link searches only teams and trains, because the item editor and
 the stages window aren't there.
 
-**Find stores nothing and reads nothing new.** A team name, a stage name, an alias, a work
-type and a key-shaped issue key are the only words this app keeps at all — see
+**Find stores nothing and reads nothing new.** A team name, a stage name, an alias, a status,
+a work type and a key-shaped issue key are the only words this app keeps at all — see
 [What Isn't Here, and Why](#what-isnt-here-and-why) — and Find can only reach what those
 boundaries already let in.
 
@@ -2499,9 +2566,12 @@ the whole-board version of Clean up old data. It's behind a fold on purpose: the
 irreversible action in the app shouldn't sit a mis-click away from Download backup.
 
 Pressing it opens a confirmation of its own that **lists exactly what is going** — "This deletes
-2 teams and 3 items, along with 1 ART and 4 workflow stages" — and offers the same JSON download
-as a last chance to keep any of it. The ARTs and the stages go with the teams: a stage carries
-status names you typed off an export and an ART is a grouping of teams, so both are data. **Your
+2 teams and 3 items, along with 1 ART, 7 statuses and 4 workflow stages" — and offers the same
+JSON download as a last chance to keep any of it. The ARTs, the statuses and the stages go with
+the teams: the status list is made entirely of words read off an export, a stage groups them and
+an ART groups teams, so all three are data. The status list is the clearest case of it — leaving
+it standing would leave behind exactly what somebody pressing that button is most likely to be
+trying to remove. **Your
 settings are kept**, which is the line the delete draws — the labels, the thresholds, the work
 type filters and your theme are configuration, and the dialog says so. There is no "…and every device you own" line any more: since sync was removed there is
 exactly one copy, and it is the one in this browser.
@@ -2531,11 +2601,13 @@ data travels **inside the link itself**: everything after the `#` never leaves t
 so the figures reach the recipient without GitHub Pages or anyone else seeing them. The payload is a trimmed copy — the chosen teams plus the shared settings, because
 those drive every number on the charts.
 
-It carries the same fields the app stores, **issue keys included**. That is deliberate: the keys
-are what names the items on the charts, and a link that dropped them would show the recipient a
-different picture from the one you are looking at. Nothing else out of your work system goes —
-no summaries, no statuses, no names — and a key in a link has passed the same shape check as a
-key in storage, so a link cannot carry anything in that field the app would not have saved. The
+It carries the same fields the app stores, **issue keys and status names included**. That is
+deliberate: the keys name the items on the charts and the statuses name its columns, and a link
+that dropped either would show the recipient a different picture from the one you are looking at.
+Nothing else out of your work system goes — no summaries, no names — and both fields have passed
+the same guards in a link that they passed in storage, so a link cannot carry anything in them the
+app would not have saved. Only what the link's own items need travels: the statuses they are
+sitting in, not your whole list. The
 dialog says so above the link. A recipient still on an older cached build simply sees dots named
 by work type, as they were before keys existed.
 
@@ -2755,17 +2827,24 @@ same-day value being coerced rather than trusted), `hasData()`, the predicate th
 "empty never beats data" rule rests on, and `isBackup()`, the guard that stops the wrong JSON
 file being restored over real data.
 
-**Workflow stages get the longest guard group in the suite**, in both their halves — because they are the one field
-whose source is a Jira status and the safety does not come from a check on the value. Both
-halves are pinned: the *guards* (a day count is a plain number — `3d 4h`, `12:30`, a negative
-and a six-digit value all refused; an alias is capped and dropped whole past it; a hostile or
-dangling stage id never reaches a stored day count, and the day-count object has no prototype
-for a `__proto__` key to reach) and the *route* (matching is exact rather than substring, the
-stage *name* is not an alias, two columns feeding one stage are added, two stages claiming one
-status is reported rather than resolved, and a status nobody has listed is simply not read —
-so a paste can never add the rule that reads it). The claim underneath the whole design is
-asserted directly: the parsed rows are stringified and checked to contain **no status name at
-all**, on hand-written fixtures and again on the demo's own data.
+**Statuses and workflow stages get the longest guard group in the suite** — because they are the
+one field whose source is a Jira status, and the safety does not come from a check on the value.
+The *guards* are pinned (a day count is a plain number — `3d 4h`, `12:30`, a negative and a
+six-digit value all refused; an alias is capped and dropped whole past it; a hostile or dangling
+stage or status id never reaches storage, and the day-count object has no prototype for a
+`__proto__` key to reach) and so is the *route* (matching is exact rather than substring, the
+stage *name* is not an alias, two columns feeding one stage are added, and two stages claiming
+one status is reported or resolved to the first rather than left ambiguous).
+
+The **repetition gate** gets the most of it, because it is the leg that replaced "no status name
+is ever stored". It is tested from both sides on two 200-row pastes that differ in nothing but
+how much their status column repeats: the one with 187 distinct values stores nothing and reports
+counts with no cell in them, and the one with six stores all six. The label guard is pinned on
+each shape it refuses — and pinned, deliberately, on the fact that a short summary *clears* it,
+so nobody can mistake it for the boundary. And the claim underneath the design is asserted
+directly, in the form that survived the reversal: the parsed rows are stringified and checked to
+contain **no status name at all**, on hand-written fixtures and again on the demo's own data —
+because a row carries an id and the words live in one visible list.
 
 **Click-to-copy** is pinned on the part that can go quietly wrong: a dot with no key saying so
 rather than copying its work type, a reference line yielding nothing, and — the one no pure test
@@ -2866,11 +2945,13 @@ hardware, with a personally paid-for Claude subscription, in a personal GitHub a
 employer equipment, funding or code went into it, and since 2026-08-20 it has no server or
 database behind it either: your data stays in your own browser.
 
-It holds no employer information beyond issue keys, and that is a property of the design
-rather than a promise: there is no free-text field anywhere in the app, and the storage
-whitelist admits only numbers, dates, short fixed labels and the shape-checked key. Text you
-paste in is parsed in the browser and thrown away — summaries, statuses and comments are never
-stored, transmitted or committed, and nothing is ever committed to this repository. Adding a
+It holds no employer information beyond issue keys and the names of your workflow statuses, and
+that is a property of the design rather than a promise: there is no free-text field anywhere in
+the app, and the storage whitelist admits only numbers, dates, short fixed labels, the
+shape-checked key and a capped list of statuses read from a column measured to be a list of
+statuses rather than prose. Text you paste in is parsed in the browser and thrown away —
+summaries and comments are never stored, transmitted or committed, and nothing is ever committed
+to this repository. Adding a
 stored field means adding it to that whitelist, or it is deliberately stripped.
 
 Share it freely: it is [MIT licensed](LICENSE), so anyone — including a company you work
