@@ -3013,6 +3013,52 @@ its own Flow / Delivery / Health grouping, a date window and period picker, read
 links, four themes and a test suite. It had cross-device sync too, until that was removed on
 2026-08-20 — see [above](#cross-device-sync-was-removed-2026-08-20).
 
+## A Single File You Can Send Someone
+
+The hosted app is four files served from GitHub Pages — `index.html`, the palette
+(`theme.css`), the charting library (`chart.min.js`) and the offline worker (`sw.js`) —
+plus a manifest and icons. That is the right shape for a website and the wrong shape for
+*"can you send me that thing you showed me"*: download `index.html` on its own and you get
+an unstyled page with no charts.
+
+`build-single.py` folds it into **one HTML file** that runs by double-clicking it. No
+server, no internet, no install, nothing to put anywhere:
+
+```
+python3 build-single.py        # writes dist/flow-metrics.html
+```
+
+The output is not committed — it is generated from `index.html`, which stays the only file
+that is written and tested, and it is rebuilt whenever the app changes. It needs the
+`markdown` package once (`pip3 install markdown`), to turn this README into the
+*How it works* window; the file it produces still carries no third-party code.
+
+### What is different in that copy
+
+Everything that counts, draws or stores is the same app, byte for byte. What changes is
+the handful of things that only mean something on a website:
+
+| | |
+|---|---|
+| **Share links** | Gone. A link is built from the page's own address, and from a file on your disk that address is a path on *your* machine — a link that looks real and works for nobody. Both the button and the window are removed, and a `#share=` link opened in this copy is ignored. |
+| **Privacy policy, How it works, NOTICE, licence** | Now windows inside the page, opened from the same words in the footer. The files they used to link to are not in the download. |
+| **The link to the sibling app** | Gone. It points at the hosted site, so it is a dead end with no internet. |
+| **Install as an app, offline caching** | Gone. A downloaded file *is* the offline copy, so the worker and the manifest have nothing left to do. |
+| **The security policy** | Tightened. Nothing is fetched any more, so the page is allowed to fetch nothing at all — not even from its own folder. |
+| **Everything else** | Unchanged: the calculations, all four themes, the charts and their full-screen view, Find, Back Up & Restore, CSV and Copy, printing, the sample data. |
+
+Three sections of this README are left out of that copy's *How it works* window — sharing,
+installing and working offline — because they describe features it does not have, and a
+guide explaining a button the reader cannot see is worse than a shorter guide.
+
+### Where your data lives in that copy
+
+The same place: the browser you opened the file in, and nowhere else. One thing is worth
+knowing, though. Every file opened from your own disk shares a single browser identity, so
+what this copy saves sits alongside anything else you have ever opened that way — a weaker
+fence than the hosted site's. **Back Up** is the way to keep a copy you can trust, and it
+is worth pressing more often here than on the website.
+
 ## Ownership and Licence
 
 Flow Metrics is an independent personal project by Charles Adams — built on personally owned
