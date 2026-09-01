@@ -340,8 +340,13 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    grouped by TICKING statuses had no typed alias, so it still matched no heading.
    A tick claims its column now, and most of those thirteen pin what the tick did
    NOT become — a looser match, a way past a typed alias, or a route from a paste
-   to its own rule. */
-const EXPECTED = 3090;
+   to its own rule. And to 3102 the same day, for the door that was still shut:
+   a status only ever seen on rows the app drops — untouched backlog, no dates —
+   never reached the vocabulary, so it could not be ticked and its column could
+   not be read. Learned now, and the tallies it must NOT join are pinned beside
+   it: which statuses exist is a claim about the workflow, and the unmatched
+   count is a claim about the rows that loaded. */
+const EXPECTED = 3102;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -1148,6 +1153,67 @@ async function run(TD, win) {
   ].join('\n'), 'auto', []);
   is(unreadable.columns.completed, 1,
      'a completion column whose dates are unreadable is still found, not skipped past');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the vocabulary — a status on a row that did not load');
+
+  /* Reported by Charles on 2026-09-01, one paste after the tick fix: a
+     `Days in Ready for Work` column with no way to match it, because the status
+     was not in his list to tick. Every row sitting in Ready for Work is
+     untouched backlog with no dates on it, and those rows are dropped before the
+     status block runs — 559 of them in his export. Which statuses EXIST is a
+     claim about the workflow; the unmatched count is a claim about the rows that
+     loaded. They had been answered by one block. */
+  const vocabBacklogPaste = [
+    'Issue key\tCreated\tIn Progress\tResolved\tIssue Type\tStatus\tDays in Ready for Work',
+    'DAE-1\t\t\t\tStory\tReady for Work\t4.5',
+    'DAE-2\t\t\t\tStory\tReady for Work\t2',
+    'DAE-3\t2026-08-01\t2026-08-02\t2026-08-09\tStory\tDone\t1'
+  ].join('\n');
+  const bl = TD.parsePastedRows(vocabBacklogPaste, 'auto', [], [], []);
+
+  is(bl.undated, 2, 'the two backlog rows still do not load — nothing about that changed');
+  is(bl.rows.length, 1, 'and only the finished row is kept');
+  is(bl.statuses.map(x => x.label), ['Ready for Work'],
+     'THE BUG: the status is learned from a row that did not load, because it is a fact '
+     + 'about the workflow rather than about that row');
+  is(bl.statusesNew.map(x => x.label), ['Ready for Work'],
+     'and it is reported as newly added, so the reader can see what the paste taught the app');
+  ok(!bl.statuses.some(x => /done/i.test(x.label)),
+     'still in-flight only: Done does not arrive by this door either');
+
+  /* The reason the status block sits below the undated return, which this must
+     not undo: the tallies are claims about rows that LOADED. */
+  is(bl.unmatchedStatus, 0,
+     'a dropped row is not counted as an item whose status no stage answers to');
+  const blStage = TD.parsePastedRows(vocabBacklogPaste, 'auto',
+    [{ id: 'rw', name: 'Ready', match: ['Ready for Work'], statuses: [] }], [], []);
+  is(blStage.unmatchedStatus, 0, 'and that holds with a stage set up too');
+  is(blStage.statusTicks.map(t => t.stageId), ['rw'],
+     'a stage already aliased to it gets the tick offered, so nothing needs re-ticking by hand');
+
+  /* Learned, therefore tickable, therefore its column reads on the next paste —
+     the whole point of the change, end to end. */
+  const learned = TD.parsePastedRows(vocabBacklogPaste, 'auto',
+    [{ id: 'rw', name: 'Ready', match: [], statuses: [] }], [], []);
+  const rwId = (learned.statuses.find(x => x.label === 'Ready for Work') || {}).id;
+  ok(!!rwId, 'the learned status has an id to tick');
+  const nextPaste = TD.parsePastedRows(vocabBacklogPaste, 'auto',
+    [{ id: 'rw', name: 'Ready', match: [], statuses: [rwId] }], [], learned.statuses);
+  is(nextPaste.columns.stages.map(c => c.stageId), ['rw'],
+     'tick it, paste again, and the Days in Ready for Work column is read');
+
+  /* Nothing is stored off a row that was dropped except the word itself. */
+  ok(!/Ready for Work/i.test(JSON.stringify(bl.rows)),
+     'no id and no label reaches a row — there is no row, it was dropped');
+
+  /* Leg 2 still governs the column, here as everywhere: a column judged
+     prose-like is not half-read on the way past. */
+  const prosey = ['Issue key\tResolved\tStatus'].concat(
+    Array.from({ length: 40 }, (_, i) => 'DAE-' + i + '\t\tThing number ' + i + ' went wrong')
+  ).join('\n');
+  const pr = TD.parsePastedRows(prosey, 'auto', [], [], []);
+  is(pr.statuses, [], 'a column the repetition gate refused teaches the vocabulary nothing');
 
   /* ────────────────────────────────────────────────────────── */
   group('workflow stages — a TICKED status claims its column too');

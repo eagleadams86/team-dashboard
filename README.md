@@ -1433,6 +1433,13 @@ summary — so the same argument applied to it answers no.
 closed, which is most of the file; a finished item's current status says nothing about flow. So
 finished rows are skipped, and *Done* never reaches your list.
 
+**A row that does not load still tells the app its status exists.** An untouched backlog item —
+raised, never started, no dates on it — is not counted in anything and does not appear on a
+chart, but the status it is sitting in is a real part of your workflow, so it joins your list and
+can be ticked into a stage. That is what makes a `Days in Ready for Work` column readable when
+everything in Ready for Work is still waiting to be picked up. It is only the word that is
+learned: no such row is loaded, counted, or shown anywhere.
+
 Matching ignores capitals and punctuation — `In-Progress` and `In Progress` are the same
 status, stored once — but a typed name is matched **exactly, never partially**. An alias of
 `Testing` will not quietly swallow a *Waiting on Testing Env* column and add somebody's

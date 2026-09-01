@@ -11,6 +11,42 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## A Status on a Row That Did Not Load (2026-09-01) — no schema change
+
+The third report in the same chain, and the door still shut after the first two:
+Charles had a `Days in Ready for Work` column and no way to match it, because
+"Ready for Work" was not in his status list to tick. Everything sitting in that
+status is untouched backlog — raised, never started, no dates — and those rows are
+dropped by the `undated` return **before** the status block runs. 559 rows of his
+paste went that way.
+
+- **Two questions had been answered by one block.** WHICH STATUSES EXIST is a claim
+  about the reader's workflow; the unmatched-status count and the bad-cell tally are
+  claims about the rows that LOADED. The block sits below the `undated` return for the
+  second reason — counting dropped backlog rows once made the report read "400 items
+  had a status no stage answers to" against a perfect set-up — and that reasoning is
+  untouched and still load-bearing. What moved is only the learning.
+- **`learnStatus` takes the word and NOTHING else.** No id on the row (there is no
+  row), no unmatched tally, no refusal counted. The refusal counters stay claims about
+  loaded rows, which is what they say on screen.
+- **The guard is unchanged, and that is the safety argument.** The value comes from the
+  same column, which has already passed leg 2's repetition gate over every row in the
+  paste, and every word still goes through `cleanStatusLabel`. A dropped row is not a
+  weaker source — it is the same column, one row further down. Read through
+  `cols.statusUsable` like every other reader of that column, so a prose-like column is
+  not half-read on the way past either.
+- **Still in-flight only.** Every row reaching that return has an empty completion date,
+  so `Done` does not arrive by this door.
+- **The tick is offered on the same terms the main path offers it**, so a stage already
+  aliased `Ready for Work` does not have to be re-ticked because the only rows carrying
+  that status were ones the app could not measure.
+- **What this does NOT fix, deliberately: a status with nothing in it anywhere.** If no
+  row in the paste sits in that status, no cell carries the word and it is still only
+  reachable by typing it into the stage's status names box — which is what that box is
+  now documented for. Adopting it from the `Days in …` HEADING instead is the
+  "adopt this heading" button, and that is still a decision to take with Charles rather
+  than in passing. Put to him 2026-09-01; **[PENDING]** at the time of writing.
+
 ## A Ticked Status Claims Its Column (2026-09-01) — no schema change, DECIDED WITH CHARLES
 
 The second half of the section below, and it only showed up once the first half was

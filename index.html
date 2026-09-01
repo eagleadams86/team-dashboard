@@ -5312,6 +5312,51 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
   const startAfterDone = [], raisedAfterStart = [];
   let unfinished = 0, undated = 0;
 
+  /* ── A STATUS IS A FACT ABOUT THE WORKFLOW, NOT ABOUT THE ROWS THAT LOADED ──
+     Reported by Charles on 2026-09-01: a `Days in Ready for Work` column he
+     could not match to a stage, because "Ready for Work" was not in his status
+     list to be ticked — and it was not in the list because every row sitting in
+     it is untouched backlog with no dates on it, which the `undated` return
+     below drops before the status block ever runs. 559 rows of his paste went
+     that way. A status with nothing currently in it at all is the same problem
+     with a different cause.
+
+     The two questions had been merged. The status block sits below that return
+     ON PURPOSE — the unmatched-status COUNT and the bad-cell tally are claims
+     about rows that loaded, and counting a dropped backlog row made the report
+     read "400 items had a status no stage answers to" against a set-up that was
+     perfect. That reasoning is untouched and still load-bearing. But WHICH
+     STATUSES EXIST is a different question with a different answer: a backlog
+     item sitting in Ready for Work is proof that Ready for Work is a place work
+     sits, whether or not this app could measure that row.
+
+     So the word is learned here and NOTHING else is: no id is stored on the row
+     (there is no row — it was dropped), no unmatched tally, and no refusal
+     counted. The refusal counters stay claims about loaded rows, which is what
+     they say on screen. The GUARD is unchanged and is the whole safety
+     argument: the value comes from the same column, which has already passed
+     leg 2's repetition gate over every row in the paste, and every word still
+     goes through cleanStatusLabel. A dropped row is not a weaker source; it is
+     the same column, one row further down.
+
+     Still in-flight only — `completed` is empty on every row that reaches
+     here — so "Done" does not arrive by this door either. */
+  const learnStatus = (raw) => {
+    if (!raw) return;
+    const before = statusList.length;
+    const id = statusIdFor(statusList, statusByNorm, raw);
+    if (!id) return;
+    /* Newly adopted, so offer it to the aliases the reader typed before the
+       vocabulary existed — the same courtesy the main path does, and the reason
+       it is here rather than left to the reader: a stage aliased "Ready for
+       Work" should not have to be re-ticked because the only rows carrying that
+       status were ones the app could not measure. */
+    if (statusList.length > before) {
+      const st = stageIdForStatus(raw, stages);
+      if (st) statusTicks.push({ stageId: st, statusId: id });
+    }
+  };
+
   raw.forEach((cells, i) => {
     const lineNo = i + 1 + (skippedHeader ? 1 : 0);
     const rawCompleted = at(cells, cols.completed);
@@ -5419,7 +5464,14 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
        has to have a key and a date of some kind — this is a relaxed rule, not
        an absent one. */
     const featurePipeline = isFeature && usableCreated;
-    if (!completed && !started && !featurePipeline) { undated++; return; }
+    if (!completed && !started && !featurePipeline) {
+      undated++;
+      /* The word, and only the word — see learnStatus. Read through
+         `statusUsable` like every other reader of this column, so a column leg 2
+         judged prose-like is not half-read here either. */
+      learnStatus(cols.statusUsable ? at(cells, cols.status) : '');
+      return;
+    }
     /* Items only. This tally feeds the "N of your rows are work in progress"
        line under the paste, which is a claim about the work items that were
        loaded; a feature nobody has finished is not a work item in progress. */
