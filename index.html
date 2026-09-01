@@ -1399,6 +1399,15 @@ table.filters th { text-align: left; padding: 0 12px 6px 0;
   text-transform: uppercase; color: var(--text-secondary); }
 table.filters td:last-child, table.filters th:last-child { padding-right: 0; }
 table.filters td.act { width: 1%; }
+/* THE SAME FLOOR THE TEAMS TABLE HAS, and it arrived the same way. A row here
+   used to carry one delete button; it now carries two arrows and a delete, and
+   those 72 extra pixels came straight out of the two text columns — on a phone
+   the Display box read "Stories an" and the Value box "Story, Ta", which is
+   exactly the truncated control the no-orphaned-fields rule exists to stop.
+   With a floor the table outgrows the dialog instead and scrolls in its own box.
+   The Value column gets the wider one: it is the box that may now hold a list. */
+table.filters td:first-child { min-width: 150px; }
+table.filters td:nth-child(2) { min-width: 170px; }
 /* A floor under the name column, or the ART picker beside it squeezes the box on
    a phone until "Team Healthy Flow" reads as "Team He" — a truncated control,
    which is the thing the no-orphaned-fields rule exists to stop. With the floor
@@ -1411,6 +1420,32 @@ table.manage td.aliases { min-width: 220px; width: 45%; }
 /* A count belongs under its heading, not hard against the box to its left, and
    these columns are only as wide as their widest cell. */
 table.filters th.act, table.filters td.act { text-align: right; }
+/* ── The All row looks as un-editable as it is ───────────────────────────────
+   Its two boxes have always been `readonly` and nothing said so: two ordinary
+   fields that took the caret, took a click, and silently swallowed every
+   keystroke. Reported by Charles, who asked for them greyed out.
+
+   `readonly` and NOT `disabled`, which is why this is a rule of its own rather
+   than one more thing riding on `:disabled`. A disabled input is skipped by the
+   keyboard and, in several screen readers, is not announced at all — so the row
+   that explains what "no filter" means would simply cease to exist for a reader
+   who cannot see it sitting there. Read-only keeps it reachable and selectable
+   and merely says it cannot be changed.
+
+   The colours are two tokens the palette already has: the muted text every
+   secondary label in the app uses, on the alternate surface. Both are checked
+   pairs — the worst of the four themes is 4.73:1, over the 4.5:1 floor — so
+   this dims a field without inventing a value the theme pack has never seen.
+   Written against the ATTRIBUTE rather than against this one table, because the
+   share-link box is read-only for the same reason and had the same problem. */
+input[readonly] { background: var(--surface-alt); color: var(--text-muted); }
+/* The cursor is NOT on the rule above, and the share-link box is why: it is
+   read-only too, and clicking into it to select the link is the entire point of
+   it. `not-allowed` belongs only where there is nothing to do with the text
+   either. (It keeps its own `--text-secondary`, an id rule that outranks the
+   one above — 6.1:1 at worst against the alternate surface, so the new
+   background does not cost it anything.) */
+table.filters input[readonly] { cursor: not-allowed; }
 /* A square icon button. The base hover is NEUTRAL and `.danger` is what turns it
    red — the same split `.btn` / `.btn.danger` already uses, and the reason it
    changed: this class used to mean "delete", because deleting was the only thing
@@ -1427,6 +1462,16 @@ table.filters th.act, table.filters td.act { text-align: right; }
 /* The buttons at the end of a row: kept on one line and pushed to the right edge,
    so the arrows line up down the table however wide the columns end up. */
 .rowacts { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+/* A row with NO delete still has to line its arrows up with the rows that have
+   one. The work-type filter list is the only table where that case is mixed —
+   the teams table drops every delete at once, when there is a single team left,
+   so its rows stay square with each other. Here the All row has none and the
+   rest do, and right-aligning two buttons against three put the All row's ↑
+   directly under its neighbours' ↓: three columns of arrows that mean different
+   things down one line. An empty box the width of the missing button, rather
+   than a disabled one, because a button nobody may press is still a stop on the
+   way through the dialog with the keyboard. */
+.rowacts .spacer { width: 30px; flex: none; }
 
 /* footer notes — the sibling app's .privacy: lined up with the text inside the
    last card (18px of card padding + its 1px border), not with the card edge. */
@@ -3273,10 +3318,19 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   </div>
   <p class="manage-note">
     The choices in the Work Type filter on the dashboard. <strong>Display</strong> is what you pick;
-    <strong>Value</strong> is the text matched against your Type column. Leave the
-    <code>All</code> row alone — it means "no filter".
+    <strong>Value</strong> is the text matched against your Type column. Put
+    <strong>several types in one row</strong> by separating them with commas —
+    <code>Story, Task</code> is one choice covering both. Each is matched exactly, so
+    <code>Task</code> does not pull in <code>Sub-task</code>. The arrows set the order the
+    choices appear in the picker. Leave the <code>All</code> row alone — it means
+    "no filter", which is why it is greyed out.
   </p>
-  <div style="margin-top:var(--sp-5)">
+  <!-- The scroller the Teams table already sits in, and it earns its place here
+       for the same reason: the two text columns have a floor, so on a phone the
+       table outgrows the dialog and scrolls inside its own box rather than
+       squeezing "Stories and Tasks" down to "Stories an". It became necessary
+       when the row grew from one button to three. -->
+  <div class="table-scroll" style="margin-top:var(--sp-5)">
     <table class="filters">
       <!-- The third column holds each row's Remove button and shows no
            heading, but an EMPTY <th> is a column a screen reader announces
@@ -4428,6 +4482,81 @@ function cleanWorkType(t) {
    document. Each entry is separately held to cleanWorkType, the same guard the
    type on a pasted row gets. */
 const FEATURE_TYPES_MAX = 8;
+
+/* ── A filter row may name MORE THAN ONE work type ──────────────────────────
+   The Value box is a COMMA-SEPARATED LIST — "Story, Task" — so one choice in
+   the strip can group types a board splits and a reader reads together:
+   stories and tasks as delivery, spikes and chores as overhead. Nothing about
+   the stored shape changed to allow it. `value` is the string it always was,
+   so a saved copy, a backup and a share link all still hold exactly what they
+   held, and this needed no schema bump and no migration.
+
+   THE COMMA IS THE CONVENTION THIS APP ALREADY HAS. `featureTypes` and the
+   stage aliases are both comma-separated lists of work-type labels typed into
+   one box; a third spelling of the same idea would be one more thing to learn
+   for no gain. The cost is that a Jira type with a comma IN ITS NAME cannot be
+   matched — the same cost the other two lists already pay, and no board has
+   one.
+
+   MATCHING STAYS EXACT, PER ENTRY. "Task" does not match "Sub-task". A
+   contains-match would quietly pull in types nobody picked, and on a dashboard
+   an over-full view is worse than an empty one: empty is visibly wrong and
+   gets fixed, slightly-too-full is invisible and gets reported.
+
+   Each entry goes through `cleanWorkType`, so the box is held to the same
+   40-character label rule as a pasted type — a hand-edited backup cannot use
+   the extra room this took to carry a sentence out of a work system.
+
+   NULL means NO FILTER, and null rather than an empty array on purpose: a
+   caller must not be able to read "everything" as "nothing matches". An empty
+   box means no filter, and so does any entry reading "all" — a list that
+   already contains everything is everything, whatever else is beside it. */
+const FILTER_TYPES_MAX = 8;
+
+/* The write cap on a filter Value, and it is DERIVED rather than picked: eight
+   entries of the 40 characters `cleanWorkType` allows, plus a comma and a
+   space between each. Stated as the arithmetic so that raising the entry cap
+   above cannot leave this one behind, silently truncating the eighth type
+   somebody typed. Display keeps the plain 120 the other short labels get. */
+const FILTER_VALUE_MAX = FILTER_TYPES_MAX * 42;
+
+function filterTypes(value) {
+  const out = [];
+  const seen = new Set();
+  for (const part of String(value == null ? '' : value).split(',')) {
+    const norm = cleanWorkType(part).toLowerCase();
+    if (!norm) continue;
+    if (norm === 'all') return null;
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    out.push(norm);
+    if (out.length === FILTER_TYPES_MAX) break;
+  }
+  return out.length ? out : null;
+}
+
+/* The same list, rebuilt as the text a reader sees rather than as the lowercase
+   forms a match needs — the untrusted boundary's version of filterTypes.
+
+   IT KEEPS THE SPELLING IT WAS GIVEN. `cleanWorkType` only strips control
+   characters, trims, and drops anything longer than a label, so "Story" comes
+   back "Story": this tidies a value without ever quietly restyling one. What it
+   does drop is an entry no work type could be, and everything past the eighth.
+
+   Deliberately NOT run on every keystroke. The Value box stores what is typed
+   and this runs only where a document arrives from outside — a saved copy, a
+   backup file, a share link — because a half-typed "Stor" is a value the reader
+   is in the middle of and rewriting it under the cursor is the one thing a
+   tidy-up must not do. Matching already ignores whatever it cannot use. */
+function cleanFilterValue(v) {
+  if (typeof v !== 'string') return '';
+  return v.split(',')
+    .map(part => cleanWorkType(part))
+    .filter(Boolean)
+    .slice(0, FILTER_TYPES_MAX)
+    .join(', ')
+    .slice(0, FILTER_VALUE_MAX);
+}
 
 /* The one identifier this app stores, and the strictest boundary in it.
 
@@ -7494,7 +7623,12 @@ function derive(rows, settings, view, stages, statuses) {
   const statusList = Array.isArray(statuses) ? statuses : [];
   const sameDay   = Number(settings.sameDayValue);
   const unplannedStr = String(settings.unplannedType || '').trim().toLowerCase();
-  const filterVal = String(view.filterValue || '').trim().toLowerCase();
+  /* The work types this view keeps, or NULL for all of them. A LIST, because a
+     filter row's Value may name several — see filterTypes. The view field is
+     the same plain string it has always been, so every caller and every test
+     fixture written when a filter meant one type still means exactly that. */
+  const filterList = filterTypes(view.filterValue);
+  const filterSet = filterList ? new Set(filterList) : null;
   /* Defaulted here rather than relying on the caller, so an old saved view — or
      a test fixture written before buckets existed — still means "weekly". */
   const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
@@ -7570,9 +7704,11 @@ function derive(rows, settings, view, stages, statuses) {
   const DayNoun = workingDays ? 'Working Days' : 'Days';
 
   /* Rows whose type doesn't match the filter drop out entirely. Note the filter
-     is on work type only — the date window below never removes rows. */
-  const items = (filterVal
-      ? rows.filter(r => String(r.type || '').trim().toLowerCase() === filterVal)
+     is on work type only — the date window below never removes rows. Membership
+     of a SET, not equality with one string: a row matches if its type is any of
+     the types the chosen filter names. */
+  const items = (filterSet
+      ? rows.filter(r => filterSet.has(String(r.type || '').trim().toLowerCase()))
       : rows.slice())
     .filter(r => r.completed || r.started);
 
@@ -8870,6 +9006,9 @@ window.TD = {
      heading is prose may hold any role" — rather than one role at a time
      through a whole parse. */
   PROSE_HEADING, proseColumns, FEATURE_TYPES_MAX,
+  /* The work-type filter's list. Pure, so what one filter row keeps can be
+     pinned without a settings dialog on screen. */
+  filterTypes, cleanFilterValue, FILTER_TYPES_MAX, FILTER_VALUE_MAX,
   /* The project id and the routing it drives — pure, so the split can be pinned
      without a paste box or a team list on screen. */
   dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
@@ -9622,12 +9761,19 @@ function normalizeSettings(raw) {
      link can hold anything — so filter entries are coerced to the
      {display, value} string pair the renderers assume, with the same length cap
      names get. An entry that isn't an object at all is dropped; a list emptied
-     that way gets the defaults back, exactly as an empty list does. */
+     that way gets the defaults back, exactly as an empty list does.
+
+     The VALUE goes further than a cap now that it may hold a list, because a
+     cap alone got weaker the moment the box grew to hold eight labels: a flat
+     336-character limit would let one 336-character sentence through. So it is
+     rebuilt from its parts instead — every entry held to `cleanWorkType`, junk
+     dropped whole, the count capped — which makes this boundary STRICTER than
+     the single 120-character value it replaced, not looser. */
   s.filters = (Array.isArray(s.filters) ? s.filters : [])
     .filter(f => f && typeof f === 'object')
     .map(f => ({
       display: (typeof f.display === 'string' ? f.display : '').slice(0, 120),
-      value:   (typeof f.value   === 'string' ? f.value   : '').slice(0, 120)
+      value:   cleanFilterValue(f.value)
     }));
   if (!s.filters.length) s.filters = DEFAULT_SETTINGS.filters.map(f => Object.assign({}, f));
   delete s.teamName;                          /* v1 field — teams carry their own names now */
@@ -11669,8 +11815,14 @@ function outlierFoot(d) {
 function currentFilterValue() {
   const chosen
  = state.settings.filters.find(f => f.display === view.filterDisplay);
-  /* "All" or nothing means no filter at all. */
-  if (!chosen || !chosen.value || chosen.value.toLowerCase() === 'all') return '';
+  /* "All", an empty box, or a list with "All" somewhere in it all mean no
+     filter at all. Asked of `filterTypes` rather than tested here, so the ONE
+     rule about what counts as a filter lives in one place: this function
+     decides whether the empty-state wording claims a filter is on, `derive`
+     decides what a filter removes, and the two must never be able to disagree.
+     They did briefly while this was its own test — "All, Bug" removed nothing
+     and still said it had. */
+  if (!chosen || !filterTypes(chosen.value)) return '';
   return chosen.value;
 }
 
@@ -14649,10 +14801,24 @@ function escapeHtml(s) {
 
 function renderFilterRows() {
   const tb = $('filterRows');
+  const total = state.settings.filters.length;
   tb.innerHTML = '';
   state.settings.filters.forEach((f, i) => {
     const tr = document.createElement('tr');
     const locked = f.display === 'All';
+    /* A new row has no name yet, and "Move  up" is not a label. Its position is
+       the only thing that identifies it until it is typed in, so that is what a
+       screen reader gets — the same fallback the row's own inputs already use. */
+    const name = f.display || 'work type row ' + (i + 1);
+    /* Moved BY INDEX, where teams and ARTs are moved by id. A filter row has no
+       id and does not want one: it is a display name, a value and a position,
+       and nothing outside this list ever points at a particular row. See
+       moveFilter for what that costs — a focus restore that looks up the new
+       index rather than the same id. */
+    const arrow = (dir, glyph, word) =>
+      '<button class="icon-btn" data-movefilter="' + i + '" data-dir="' + dir + '"' +
+      ' title="Move ' + word + '"' + ((dir < 0 ? i === 0 : i === total - 1) ? ' disabled' : '') +
+      ' aria-label="Move ' + escapeHtml(name) + ' ' + word + '">' + glyph + '</button>';
     /* The table's column headings don't name the inputs for a screen reader, so
        each carries its own label. Positional, not the current value — a label
        built from the value would go stale with every keystroke. */
@@ -14660,18 +14826,53 @@ function renderFilterRows() {
       '<td><input type="text" data-i="' + i + '" data-k="display" maxlength="120" value="' + escapeHtml(f.display) + '"' +
         ' aria-label="Display name, work type row ' + (i + 1) + '"' +
         (locked ? ' readonly' : '') + '></td>' +
-      '<td><input type="text" data-i="' + i + '" data-k="value" maxlength="120" value="' + escapeHtml(f.value) + '"' +
+      '<td><input type="text" data-i="' + i + '" data-k="value" maxlength="' + FILTER_VALUE_MAX + '" value="' + escapeHtml(f.value) + '"' +
         ' aria-label="Type text to match, work type row ' + (i + 1) + '"' +
         (locked ? ' readonly' : '') + '></td>' +
-      '<td class="act">' + (locked ? '' :
+      '<td class="act"><span class="rowacts">' +
+        arrow(-1, '\u2191', 'up') + arrow(1, '\u2193', 'down') +
+        /* ORDER IS THE ONE THING THE All ROW CAN STILL CHANGE. Its two boxes are
+           read-only because their text is what makes the row mean "no filter",
+           but where it sits is only where it sits in the picker, and a reader
+           who wants Defects at the top of a five-row list is not touching
+           anything. So the arrows are live on every row and the delete is
+           still hidden on this one. */
+        (locked ? '<span class="spacer" aria-hidden="true"></span>' :
         /* `.danger`, like every other delete in the app — the base hover is
            neutral and that class is what turns it red. This was the one that
            did not, so the only destructive control in Settings was also the
            only one that gave no warning as the pointer reached it. */
         '<button class="icon-btn danger" data-del="' + i + '" title="Remove this type" aria-label="Remove ' +
-        escapeHtml(f.display) + '">&times;</button>') + '</td>';
+        escapeHtml(name) + '">&times;</button>') + '</span></td>';
     tb.appendChild(tr);
   });
+}
+
+/* Swap a filter one place along the list. The teams-and-ARTs mover next to
+   `rowActs` cannot be reused: it finds its row by id, and a filter has none.
+
+   The focus restore is the reason this is worth a function at all rather than
+   two lines in the click handler. Move a row with the keyboard and every button
+   in the table is rebuilt, so the one that was focused no longer exists and the
+   keyboard lands back at the top of the dialog — losing your place after every
+   single press. Focus goes to the same arrow on the row at its NEW index, or,
+   if that arrow has just been disabled because the row reached an end, to its
+   opposite number, which is the only one still worth pressing. */
+function moveFilter(i, dir) {
+  const list = state.settings.filters;
+  const j = i + dir;
+  if (!Number.isInteger(i) || i < 0 || i >= list.length || j < 0 || j >= list.length) return;
+  list.splice(j, 0, list.splice(i, 1)[0]);
+  save();
+  renderFilterRows();
+  renderFilterSelect();
+  renderDashboard();
+  const pick = (d) => $('settingsDialog')
+    .querySelector('[data-movefilter="' + j + '"][data-dir="' + d + '"]');
+  const want = pick(dir);
+  const other = pick(-dir);
+  if (want && !want.disabled) want.focus();
+  else if (other) other.focus();
 }
 
 function renderSettingsForm() {
@@ -17374,16 +17575,27 @@ $('filterRows').addEventListener('input', e => {
   const t = e.target;
   if (!t.dataset.k) return;
   /* Same write-boundary cap as the settings labels — pasted text skips
-     maxlength. */
-  state.settings.filters[+t.dataset.i][t.dataset.k] = t.value.slice(0, 120);
+     maxlength. Two caps, not one: Display is a short label like the rest of
+     them, Value may hold a whole list of work types and gets the room for
+     eight. */
+  const cap = t.dataset.k === 'value' ? FILTER_VALUE_MAX : 120;
+  state.settings.filters[+t.dataset.i][t.dataset.k] = t.value.slice(0, cap);
   save();
   renderFilterSelect();
   renderDashboard();
 });
 $('filterRows').addEventListener('click', e => {
-  const del = e.target.dataset && e.target.dataset.del;
-  if (del == null) return;
-  state.settings.filters.splice(+del, 1);
+  /* `closest`, not `e.target.dataset`, and the arrows are why. A press on an
+     icon button can land on whatever the button is drawing rather than on the
+     button itself, so reading the target's own dataset works right up until
+     something inside one of these gets its own element. */
+  const btn = e.target.closest ? e.target.closest('[data-movefilter],[data-del]') : null;
+  if (!btn) return;
+  if (btn.dataset.movefilter != null) {
+    moveFilter(+btn.dataset.movefilter, Number(btn.dataset.dir));
+    return;
+  }
+  state.settings.filters.splice(+btn.dataset.del, 1);
   save();
   renderFilterRows();
   renderFilterSelect();
@@ -17392,6 +17604,8 @@ $('filterRows').addEventListener('click', e => {
 $('btnAddFilter').addEventListener('click', () => {
   state.settings.filters.push({ display: '', value: '' });
   save();
+  /* The WHOLE table, not just the new row: the row that was last had its down
+     arrow disabled and no longer should. */
   renderFilterRows();
 });
 $('btnResetSettings').addEventListener('click', () => {
@@ -19242,6 +19456,22 @@ function loadSample() {
      feature layer on, and the Settings box shows the word that did it rather
      than leaving somebody hunting for why their rows split. */
   if (!state.settings.featureTypes.length) state.settings.featureTypes = ['Feature'];
+  /* ── The demo is the only place a GROUPED filter row can be shown ──────────
+     A filter row's Value may name several work types, and the shipped list
+     cannot demonstrate it: putting "Stories and Tasks" in the defaults would be
+     the same guess at somebody else's board that Spikes, Stories and Tasks were
+     before they were taken out, and on a team whose types read Feature, Chore
+     and Incident it would be a filter matching nothing. Here it is a fact —
+     all three demo teams export Story, Task, Bug and Spike — so the feature is
+     reachable from the demo the way every other one is.
+
+     Only when the list is still the one that shipped. A reader who has built
+     their own is never added to, which is the rule the two settings above
+     follow; compared as a whole rather than by length, so a list the same size
+     but tuned is left alone too. */
+  if (JSON.stringify(state.settings.filters) === JSON.stringify(DEFAULT_SETTINGS.filters)) {
+    state.settings.filters.push({ display: 'Stories and Tasks', value: 'Story, Task' });
+  }
   /* And a threshold to age those features against, for the same reason and by
      the same rule — only where the reader has not answered already.
 

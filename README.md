@@ -574,7 +574,10 @@ to Month on that same window drops below the eight-period floor, so the forecast
 history" card is reachable from the demo too.
 
 Every team carries all four work types, so the **work type filter** does something whichever
-team you're on. The dates cover the **whole week**, not just weekdays, which is what makes the
+team you're on — and loading the demo adds a **grouped** row, `Stories and Tasks → Story, Task`,
+which the shipped list deliberately cannot show you (two rows naming a stranger's work types would
+be two filters matching nothing). It is only added if you have not already changed the list
+yourself. The dates cover the **whole week**, not just weekdays, which is what makes the
 **working days** setting reachable from the demo: turning it on visibly shortens Team Long
 Tail's tail and drops two items out of its aged count. The span is long enough that **Clean up
 old data** has real answers — a 3-month cutoff would drop items from all three teams, a 12-month
@@ -851,6 +854,20 @@ Everything the charts depend on, shared by all your teams:
   Tasks as well; they were guesses at somebody else's board, and on a team whose types read
   Feature, Chore and Incident they were three filters matching nothing, which reads as broken data
   rather than as a setting nobody has set
+
+  **One row can name several types.** Separate them with commas — `Stories and Tasks → Story, Task`
+  is a single choice in the picker covering both — so a board that splits work finer than you read
+  it can be grouped back together without touching the export. The comma is the same separator the
+  feature types and the stage aliases already use. Each entry is still matched **exactly**, so
+  `Task` does not quietly pull in `Sub-task`; on a dashboard an over-full view is worse than an
+  empty one, because empty is visibly wrong and slightly-too-full is not. A type with a comma in
+  its own name cannot be matched, which is the price of the separator and the same price the other
+  two lists already pay.
+
+  **The arrows reorder the list**, exactly as they do for teams and trains — the order here is the
+  order the picker offers. The `All` row is **greyed out**: its two boxes have always been
+  read-only, because their text is what makes the row mean "no filter", and now they look it. It
+  can still be moved; only its wording is fixed
 
 Nothing else is here on purpose: a setting that changes nothing is worse than a missing one.
 
