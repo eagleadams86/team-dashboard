@@ -4180,17 +4180,32 @@ function matchHeader(header, field, skip, accept) {
 /* Per-column shape of the data: how often it parses as a date, and how repetitive
    it is. The second number is what separates a Type column (a handful of values,
    repeated) from an issue-key column (every value distinct). */
+/* A cell parseDate would read only as a spreadsheet day-count serial. */
+const SERIAL_ONLY = /^\d{4,6}(\.\d+)?$/;
+
 function columnStats(rows, order) {
   const width = rows.reduce((n, r) => Math.max(n, r.length), 0);
   const stats = [];
   for (let c = 0; c < width; c++) {
     const vals = rows.map(r => String(r[c] == null ? '' : r[c]).trim()).filter(Boolean);
-    const dates = vals.filter(v => parseDate(v, order)).length;
+    /* A BARE INTEGER IS NOT EVIDENCE OF A DATE COLUMN (2026-09-01). parseDate
+       reads a four-to-six digit number as a day-count serial, which is right
+       for a cell under a heading that says the column holds dates — but counted
+       HERE it made a column of five-digit Jira issue ids score as a column of
+       dates, and a default issue-navigator export with no Resolved column then
+       took `Issue id` as the completion date: every row finished in 2012, every
+       start date dropped as later than its finish, and a 2012 axis on screen.
+       So `dateRate` counts only cells that could only be a date, and the serials
+       are counted apart: a heading-matched role still accepts a column of them
+       through `datey`, and a column found by CONTENT alone never is one. */
+    const dates = vals.filter(v => parseDate(v, order) && !SERIAL_ONLY.test(v)).length;
+    const serials = vals.filter(v => SERIAL_ONLY.test(v) && parseDate(v, order)).length;
     const keys = vals.filter(v => ISSUE_KEY_RE.test(v)).length;
     stats.push({
       index: c,
       filled: vals.length,
       dateRate: vals.length ? dates / vals.length : 0,
+      serialRate: vals.length ? serials / vals.length : 0,
       /* The same regex the stored value must pass, so a column can only be read
          as the key column if what is in it is what would actually be saved.
          A date can never score here — every date format this app parses either
@@ -4253,7 +4268,10 @@ function detectColumns(rows, header, order, stages, statuses) {
      has an empty Resolved column, and that column is still the completion date.
      One parsed date in four hundred rows is enough — a mostly-unfinished export
      is the normal case here, not the odd one. */
-  const datey = (i) => !stats[i] || stats[i].filled === 0 || stats[i].dateRate > 0;
+  const datey = (i) => !stats[i] || stats[i].filled === 0 || stats[i].dateRate > 0
+    /* A column of serials under a heading that names it is still a date column
+       — the heading is the evidence content alone could not give. */
+    || stats[i].serialRate > 0;
   const DATE_ROLE = { completed: true, started: true, created: true };
   /* Two passes, and the second is the old matcher untouched: every heading is a
      candidate again, values and stage claims included. So the guard only ever

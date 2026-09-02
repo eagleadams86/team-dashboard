@@ -12392,6 +12392,33 @@ group('a card with no chart matches the one beside it');
   is(dOpen.ageing.oldest, 19, 'and C, open since 10 Feb, is measured to 1 March — 19 days');
 
   /* ────────────────────────────────────────────────────────── */
+  group('a column of issue ids is not a column of dates');
+
+  /* The default Jira issue-navigator export: no Resolved column, and an
+     `Issue id` column of five-digit integers that parseDate reads as
+     spreadsheet serials. Ranked by content it scored as a column of dates and
+     was taken as the completion date — every row finished in 2012. */
+  const idPaste = 'Issue Type,Issue key,Issue id,Summary,Status,Created,Updated\n'
+    + 'Story,DAE-1,10001,Fix the thing,In Progress,2026-01-05,2026-01-10\n'
+    + 'Bug,DAE-2,10002,Break the thing,In Progress,2026-01-06,2026-01-11\n'
+    + 'Story,DAE-3,10003,Ship the thing,In Progress,2026-01-07,2026-01-12';
+  const pId = TD.parsePastedRows(idPaste, 'auto');
+  ok(pId.columns.completed !== 2, 'the Issue id column is not the completion date');
+  ok(pId.columns.started !== 2, 'nor the start date');
+  ok(pId.rows.every(r => !r.completed || r.completed.getUTCFullYear() >= 2026),
+     'and no row finishes in 2012');
+  is(pId.rows.length, 3, 'every row still loads');
+  is(pId.rows.map(r => r.key), ['DAE-1', 'DAE-2', 'DAE-3'], 'with its key');
+  const stId = TD.columnStats(idPaste.split('\n').slice(1).map(l => l.split(',')), 'auto');
+  is(stId[2].dateRate, 0, 'a column of bare integers has a date rate of zero');
+  is(stId[2].serialRate, 1, 'and is counted as serials instead, so a heading can still claim it');
+  /* The serial path is intact where a heading names the column. */
+  const pSerial = TD.parsePastedRows('Resolved\tStarted\tType\n42043\t42036\tBug', 'auto');
+  is(iso(pSerial.rows[0].completed), '2015-02-08',
+     'a day-count serial under a heading that names the column is still read as a date');
+  is(iso(pSerial.rows[0].started), '2015-02-01', 'in both date columns');
+
+  /* ────────────────────────────────────────────────────────── */
   /* A completeness floor. This suite has no per-test isolation, so "everything
      that ran passed" is only half an answer — an early `return` added to run()
      would end it quietly with a green summary over a fraction of the checks.

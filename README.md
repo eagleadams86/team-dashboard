@@ -642,7 +642,10 @@ silently corrupt every number on the dashboard.
 - Tabs and commas both work, and a header row is skipped automatically. Quoted CSV fields are
   handled — `"Jan 21, 2015"` or `"Bug, urgent"` stays one cell, comma and all.
 - Dates can be ISO (`2015-01-21`), numeric (`21/01/2015`), month-name (`21 Jan 2015`) or a raw
-  day-count serial (`42043`). Where `03/04/2015` is genuinely ambiguous, the app auto-detects
+  day-count serial (`42043`) — a serial only under a heading that names the column as a date,
+  because a column of bare numbers found by content alone is more often a column of Jira issue
+  ids (until 2026-09-01 a default issue-navigator export with no *Resolved* column took
+  *Issue id* as the completion date, and every row finished in 2012). Where `03/04/2015` is genuinely ambiguous, the app auto-detects
   day-first vs month-first from the rest of your data — or you can force it.
 - A **time on the end is fine** — `9/23/2025 10:21`, `23/Sep/25 4:12 PM`, `2025-09-23T10:21:00Z`.
   Jira and Excel export timestamps rather than bare dates, and every metric here works in whole

@@ -3337,3 +3337,11 @@ suite did not cover. Each has a test now, proven to fail first by reverting the 
   age zero; `summary.agedNow` (read correctly, off `wip`) said one aged item and
   `ageing.agedCount` said none. In flight on a date is `started <= endDate && (!completed ||
   completed > endDate)`. `items` is not window-filtered, so the fix is the filter alone.
+
+- **A bare integer is not evidence of a date column (fix 3).** `columnStats` counted every cell `parseDate` accepted, and `parseDate` reads a 4–6 digit
+  integer as a spreadsheet serial, so a column of five-digit Jira ids had `dateRate` 1.0 and the
+  free-date ranking took `Issue id` as the completion date whenever the export had no Resolved
+  column. `dateRate` now excludes `SERIAL_ONLY` cells and `serialRate` counts them apart;
+  `datey` (the heading-matched roles' content check) accepts either, so a *Resolved* column of
+  serials still lands. A column found by content alone must hold something that could only be a
+  date.
