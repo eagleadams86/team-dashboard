@@ -16199,15 +16199,29 @@ function searchApp(st, query) {
   }
   /* Items across every team, newest first — a key is unique, so the usual search
      returns one row, and a work type returns however many there are. The INDEX
-     into its own team's rows travels with the hit, because that is what
+     into its own team's list travels with the hit, because that is what
      openItemDialog takes; it is read back against the same team it was found in,
-     so a render that renumbers another team's rows cannot move it. */
+     so a render that renumbers another team's rows cannot move it.
+
+     BOTH LISTS, AND THE HIT SAYS WHICH (2026-09-01). A feature is a row — same
+     record, same fields — held on `t.features`, and openItemDialog reads
+     whichever list the Count switch is on. Walking `rows` alone made this the
+     sixth rows-only walker: a feature could not be found at all, and an ITEM
+     found while the switch sat on Features opened the feature at the same
+     index — "Edit This Feature" over a search for DAE-3, with FEAT-3 in the key
+     box and Save ready to overwrite it. So a hit carries `unit`, and
+     goToSearchHit throws the switch to match before it opens anything. */
   const found = [];
-  for (const t of teams)
+  for (const t of teams) {
     (Array.isArray(t.rows) ? t.rows : []).forEach((r, i) => {
       if (!has(r.key) && !has(r.type)) return;
-      found.push({ team: t, row: r, index: i });
+      found.push({ team: t, row: r, index: i, unit: 'items' });
     });
+    (Array.isArray(t.features) ? t.features : []).forEach((r, i) => {
+      if (!has(r.key) && !has(r.type)) return;
+      found.push({ team: t, row: r, index: i, unit: 'features' });
+    });
+  }
   const when = (r) => r.completed || r.started || r.created || null;
   found.sort((a, b) => (when(b.row) || 0) - (when(a.row) || 0));
   for (const f of found) {
@@ -16215,9 +16229,13 @@ function searchApp(st, query) {
        date and nothing else. An in-progress row shown as its start date reads as
        a row that finished that day, which is the one thing this line must not
        say — so it says "in progress", the same words the data table uses. */
-    push({ view: 'data', teamId: f.team.id, index: f.index,
-           where: (f.row.key || f.row.type || 'Item') + ' — ' + f.team.name,
-           snippet: [f.row.key ? f.row.type : '',
+    push({ view: 'data', teamId: f.team.id, index: f.index, unit: f.unit,
+           where: (f.row.key || f.row.type || (f.unit === 'features' ? 'Feature' : 'Item'))
+             + ' — ' + f.team.name,
+           /* A feature says so, in front: the key alone does not tell the two
+              lists apart, and the editor it opens is a different form. */
+           snippet: [f.unit === 'features' ? 'feature' : '',
+                     f.row.key ? f.row.type : '',
                      f.row.completed ? isoOf(f.row.completed) : 'in progress']
              .filter(Boolean).join(' · ') });
   }
@@ -16263,6 +16281,15 @@ function goToSearchHit(h) {
     saveView();
   }
   if (h.artId) { view.artFilter = h.artId; saveView(); }
+  /* The Count switch follows the hit: openItemDialog edits whichever list the
+     switch is on, so a feature found while it sat on Work items — or an item
+     found while it sat on Features — would open the OTHER list's record at the
+     same index. Set before the render, so the table behind the dialog is the
+     list the hit came from too. */
+  if (h.view === 'data' && (h.unit === 'features' || h.unit === 'items')) {
+    view.unit = h.unit;
+    saveView();
+  }
   /* renderAll() BEFORE the tab switch, so the team picker, the tables and the
      charts are the ones this hit asked for by the time the panel is revealed. */
   renderAll();

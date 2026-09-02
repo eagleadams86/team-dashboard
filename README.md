@@ -2476,8 +2476,12 @@ across the family rather than three.
 
 What it reaches:
 
-- **A work item by its issue key.** `DAE-1023` finds it whichever team holds it, and the
-  result opens straight into that item's editor. Until now the only way back to one item was
+- **A work item — or a feature — by its issue key.** `DAE-1023` finds it whichever team holds
+  it, and the result opens straight into that record's editor, on whichever list it lives in: the
+  Count switch follows the result, so an item found while the switch sat on Features opens the
+  item, not the feature at the same position. (Until 2026-09-01 Find walked the items only, and
+  opened whichever list the switch happened to be on.) A feature says *feature* in its result
+  line, because the key alone does not tell the two lists apart. Until now the only way back to one item was
   to know its team, open that team's *Your Data* tab and read down the table.
 - **A work item by its type** — every `Bug`, newest first, across every team.
 - **A workflow stage, by its name or by any of its
