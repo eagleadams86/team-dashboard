@@ -2182,9 +2182,12 @@ async function run(TD, win) {
   is(vocRound.stages[0].statuses, ['u1'],
      'a stage tick list is pruned of ids the vocabulary no longer has');
 
-  /* A status nothing points at is dropped; one a STAGE has ticked survives with
-     no rows on it, because the tick is a decision the reader made and losing it
-     the moment the last item completed would silently un-group the next paste. */
+  /* Every status that passed the door stays — one a row uses, one a stage has
+     ticked, AND one nothing points at. This pinned the opposite until
+     2026-09-01 ("one nothing points at goes"): written when the only door into
+     the vocabulary was a row that loaded. A status learned off a dropped row or
+     an empty heading has no pointer by construction, and the prune erased it on
+     the next reload. See the group at the end of this suite. */
   const kept = StV.hydrateState({
     schema: StV.SCHEMA,
     statuses: [{ id: 'u1', label: 'Code Review' }, { id: 'u2', label: 'Testing' },
@@ -2192,8 +2195,8 @@ async function run(TD, win) {
     stages: [{ id: 'sr', name: 'Review', match: [], statuses: ['u2'] }],
     teams: [{ id: 't1', name: 'T', rows: [{ s: '2026-08-02', t: 'Story', u: 'u1' }] }]
   });
-  is(kept.statuses.map(x => x.id), ['u1', 'u2'],
-     'a status a row uses stays, one a stage groups stays, and one nothing points at goes');
+  is(kept.statuses.map(x => x.id), ['u1', 'u2', 'u3'],
+     'a status a row uses stays, one a stage groups stays, and so does one nothing points at yet');
 
   /* Two stages cannot claim one status: the same contradiction two stages
      claiming one alias is, given the same answer — first in the list keeps it,
@@ -12328,6 +12331,42 @@ group('a card with no chart matches the one beside it');
   ok(win.tdMaxi.current() === null,
      'and a render with nothing left to plot brings it down rather than leaving a dead canvas up');
   ok(!mDoc.querySelector('.shell').inert, 'with the page handed back');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a status nothing points at survives the reload');
+
+  /* Two doors admit a status that, by construction, nothing points at: a row
+     the parser dropped as undated (no row is stored, so nothing can point at
+     it) and an empty `Days in …` heading (a status nobody is in). Until
+     2026-09-01 hydrateState pruned every status without a pointer, loadState
+     wrote the pruned copy straight back, and the words the parse report had
+     just named were gone by the next morning. */
+  const StU = win.TDState;
+  const unreferenced = StU.hydrateState({
+    schema: StU.SCHEMA,
+    statuses: [{ id: 'u1', label: 'Ready for Work' }, { id: 'u2', label: 'CERT' },
+               { id: 'u3', label: 'Development' }],
+    stages: [{ id: 'sb', name: 'Build', match: [], statuses: [] }],
+    teams: [{ id: 't1', name: 'T', rows: [{ s: '2026-08-02', t: 'Story', u: 'u3' }] }]
+  });
+  is(unreferenced.statuses.map(s => s.label), ['Ready for Work', 'CERT', 'Development'],
+     'a status no row, feature or stage points at is kept — it was learned off a dropped '
+     + 'row or an empty heading, and the report that named it must still be true tomorrow');
+  const noRows = StU.hydrateState({
+    schema: StU.SCHEMA,
+    statuses: [{ id: 'u1', label: 'Ready for Work' }],
+    stages: [], teams: []
+  });
+  is(noRows.statuses.map(s => s.label), ['Ready for Work'],
+     'even with no team at all — the vocabulary is data in its own right');
+  is(StU.hydrateState({
+    schema: StU.SCHEMA,
+    statuses: [{ id: 'u1', label: 'Ready for Work' }],
+    stages: [{ id: 'sb', name: 'Build', match: [], statuses: ['u1', 'ghost'] }],
+    teams: [{ id: 't1', name: 'T', rows: [{ s: '2026-08-02', t: 'Story', u: 'ghost' }] }]
+  }).teams[0].rows[0].status, '',
+     'while a POINTER at a status that is not there is still dropped — that prune is a '
+     + 'different thing and stays');
 
   /* ────────────────────────────────────────────────────────── */
   /* A completeness floor. This suite has no per-test isolation, so "everything

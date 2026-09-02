@@ -1458,6 +1458,12 @@ statuses are left out, as they are everywhere else here. The parse report names 
 this way, separately from what your rows taught it, because a status off a heading does nothing
 until you tick it into a stage.
 
+**A status stays in your list once learned, whether or not anything points at it yet.** That
+matters for exactly these two doors — a status off an empty heading, or off a row that did not
+load, is by construction a word no stored row uses. Until 2026-09-01 the next reload quietly
+dropped every status nothing pointed at, so the words the report had just named were gone by the
+morning unless you had already ticked them into a stage.
+
 Matching ignores capitals and punctuation — `In-Progress` and `In Progress` are the same
 status, stored once — but a typed name is matched **exactly, never partially**. An alias of
 `Testing` will not quietly swallow a *Waiting on Testing Env* column and add somebody's

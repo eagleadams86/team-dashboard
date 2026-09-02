@@ -1437,8 +1437,9 @@ apply to the next request is *"does this column repeat the way a closed vocabula
 `PROTO_KEY`); `sanitizeStages` gains `statuses` with **first stage wins a contested status**, the
 same answer a contested alias gets; `hydrateRow` gains `status`; `serializeRows` emits `u`
 omit-when-empty; `hydrateState` prunes dangling status ids **on rows AND features** and prunes a
-stage's tick list, then drops a status nothing points at — **except one a stage has ticked**,
-because losing that the moment its last item completed would silently un-group the next paste.
+stage's tick list. It USED to drop a status nothing points at, except one a stage had ticked —
+**REVERSED 2026-09-01, see Six Fixes From the 2026-09-01 Audit**: two doors now admit a status
+nothing points at by construction, and the prune erased them on the next reload.
 `countStageDays` counts `r.status` too, so `tdAdopt`'s losing-a-field prompt covers it (a per-item
 status column is not re-typeable — the same test that sent stage times in and kept ARTs out).
 Delete-all takes `state.statuses`. **A THIRD REFERENCE FROM A RECORD TO A STAGE NOW EXISTS**
@@ -3314,3 +3315,18 @@ page out of five is not a convention.
   would have been blown away — it carried an `aria-label` re-stated in every branch of
   `updateUI()` instead. Both went with sync's removal (2026-08-20); the pattern is recorded
   here for the next state-changing button.
+
+## Six Fixes From the 2026-09-01 Audit
+
+A bug audit of the three work apps on 2026-09-01 (three auditors, each finding
+reproduced headless before it was reported) found six in Flow Metrics that the
+suite did not cover. Each has a test now, proven to fail first by reverting the fix.
+
+- **hydrateState keeps every status that passed the door (fix 1).** The `liveStatuses` prune dropped any status no row, feature or stage pointed at, and
+  `loadState` wrote the pruned copy straight back. Written when the only door into the vocabulary
+  was a row that loaded, so an unreferenced status could only be a leftover. `164b437` (a status
+  off a row dropped as undated — no row is stored, so nothing CAN point at it) and `62cfb93` (a
+  status off an empty `Days in …` heading — a status nobody is in) both produce exactly that, and
+  the report named words that were gone by the next reload. The list is bounded by `STATUS_MAX`
+  at the door and delete-all takes it; a dangling POINTER is still pruned, which is a different
+  thing. The test that pinned the old rule was rewritten, not deleted.

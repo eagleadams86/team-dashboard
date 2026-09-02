@@ -10375,18 +10375,26 @@ function hydrateState(raw) {
      stage that exists" — has to be true of every record the dialog opens, and
      that dialog opens features too. */
   teams.forEach(t => { t.rows.forEach(pruneStages); (t.features || []).forEach(pruneStages); });
-  /* A status nothing points at any more is dropped, so the dialog's list stays
-     the statuses this document actually has rather than growing for ever. A
-     status a STAGE has ticked survives even with no rows on it: the tick is a
-     grouping decision the reader made, and losing it the moment the last item in
-     that status was completed would silently un-group the next paste. */
-  const liveStatuses = new Set();
-  stages.forEach(st => st.statuses.forEach(sid => liveStatuses.add(sid)));
-  teams.forEach(t => {
-    t.rows.forEach(r => { if (r.status) liveStatuses.add(r.status); });
-    (t.features || []).forEach(f => { if (f.status) liveStatuses.add(f.status); });
-  });
-  return { teams, arts, stages, statuses: statuses.filter(s => liveStatuses.has(s.id)),
+  /* EVERY STATUS THAT PASSED sanitizeStatuses IS KEPT (2026-09-01). Until this
+     build a status nothing pointed at — no row, no feature, no stage's tick —
+     was dropped here, so the dialog's list stayed "the statuses this document
+     actually has". That rule was written when the only door into the vocabulary
+     was a row that loaded, so a word nothing pointed at could only be a
+     leftover. Two doors opened the same day, and both admit a status that
+     nothing points at BY CONSTRUCTION: one learned off a row the parser dropped
+     as undated (learnStatus — no row is stored, so nothing can point at it),
+     and one learned off an empty `Days in …` heading (a status nobody is
+     sitting in, which is the whole reason the heading had to teach it). The
+     parse report named every one of them; the next reload erased every one the
+     reader had not already ticked into a stage, because loadState writes the
+     hydrated copy straight back. A report made in the evening came back short
+     in the morning.
+
+     The list cannot grow for ever either way: STATUS_MAX bounds it at the door
+     and delete-all takes it. A dangling POINTER is still pruned above — that is
+     a different thing: a pointer at a word that is not there, not a word that
+     nothing points at. */
+  return { teams, arts, stages, statuses,
            settings: normalizeSettings(raw && raw.settings) };
 }
 
