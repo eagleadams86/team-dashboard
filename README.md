@@ -828,6 +828,12 @@ buttons.
 Because it opens over the dashboard rather than replacing it, a change lands on the charts behind
 it — rename the defect word and the chart titles follow while the window is still open.
 
+**Six sections, each ruled off from the one above it** — *Labels & Work Types*, *Aged Work*,
+*Features*, *Working Days*, *Unusually Long Items* and *Work Type Filter List*. Until
+2 Sep 2026 the window had two headings covering six unrelated things, so everything from the
+ageing thresholds down read as one long column of prose with no way to see where a setting
+ended; the Teams & Stages window beside it is ruled off the same way.
+
 Everything the charts depend on, shared by all your teams:
 
 - **Defect work type** — the exact text in your Type column that means "defect"

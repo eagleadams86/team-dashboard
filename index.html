@@ -1355,6 +1355,27 @@ table.manage td.empty-row { text-align: left; color: var(--text-secondary);
 /* The section headings inside the dialog, and the note under each one. */
 .manage-head { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .manage-note { color: var(--text-secondary); font-size: var(--fs-xs); margin: 4px 0 0; }
+/* ── One section of a settings window, and the rule that ends it ────────────
+   Both long windows in this app — Settings, and Teams, ARTs & Stages — are a
+   stack of unrelated things you set, each one a bold 15px line in a column of
+   13px prose with nothing to say where it stopped. Charles reported Settings
+   as "big and a bit hard to read" on 2026-09-02, which is the same complaint
+   the sibling window would earn on any day it grew a fifth section.
+
+   A 1px rule in `--border-strong` and nothing else: no new colour, no fill, no
+   shadow (pack rule 14), and no change to `.manage-head`, which is shared
+   furniture with Sprint Predictability and Golf Handicap. `--border-strong`
+   rather than `--border`, which is the token a table's own hairlines use here:
+   a divider nobody can see is the thing this change was asked for. The spacing lives
+   HERE rather than on each heading row, where it was four different inline
+   `margin-top` values by 2026-09-02 — a section is now one element to move,
+   and the gap above a heading cannot drift per dialog again. */
+.manage-sec { margin-top: var(--sp-7); padding-top: var(--sp-7); border-top: 1px solid var(--border-strong); }
+/* The first section takes the spacing and not the rule. What sits above it is
+   the window's own heading, or the sentence describing the whole window — a
+   line under either of those would read as the end of a section rather than
+   the start of one. */
+.manage-sec:first-of-type { margin-top: var(--sp-6); padding-top: 0; border-top: 0; }
 /* The vocabulary and the per-stage tick lists. Both are lists of small labelled
    controls that wrap, so they are the same flex row with the same gap — one
    shape, two uses, rather than two things that look nearly alike. Colours and
@@ -3046,48 +3067,52 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 <dialog id="manageDialog" aria-labelledby="manageDialogTitle">
   <h2 id="manageDialogTitle">Teams, ARTs &amp; Stages</h2>
 
-  <div class="row spread">
-    <strong class="manage-head">Teams</strong>
-    <button class="btn small" id="btnAddTeam" type="button">+ Add a Team</button>
-  </div>
-  <p class="manage-note">Each team keeps its own work items. The picker in the header chooses
-    which one the dashboard is showing; Settings are shared by all of them.</p>
-  <p class="manage-note"><strong>Project id</strong> is the letters at the front of the team's
-    issue keys — <em>DAE</em> for DAE-1552. It is what lets one export covering several teams be
-    pasted in one go and split between them; it changes no figure. Leave it blank and the team
-    simply takes nothing from a split.</p>
-  <p class="manage-note"><strong>WIP &le;</strong> is how much work this team means to have open
-    at once, and <strong>85% &le;</strong> how long it means an item to take &mdash; the promise
-    the 85th percentile is read against. Both are drawn as a line on the charts and neither
-    changes a figure: they are what the figures are compared to. Leave either blank and the app
-    states the number without judging it, which is what it does today.</p>
-  <!-- The two numbers look alike on screen and are read against different work,
-       which was reported as "are these duplicate settings?". Said where the
-       target is typed, and again beside the threshold in Settings. -->
-  <p class="manage-note"><strong>85% &le; is about work that has FINISHED</strong> &mdash; it is
-    checked against the items this team delivered. The separate
-    <strong>ageing threshold</strong> in Settings is about work that has <em>not</em>: how long
-    something can sit open before it is flagged. They are different questions, so they are
-    usually different numbers &mdash; and the threshold is normally the <strong>lower</strong>
-    of the two, because an item that has already passed your target is too late to rescue. A
-    promise of 10 days is often watched with a threshold around 6.</p>
-  <div class="table-scroll">
-    <table class="manage" id="teamTable" aria-label="Teams"><tbody id="teamRows"></tbody></table>
-  </div>
-  <!-- Two teams answering to one project id makes a split unanswerable, so it is
-       said here as it happens rather than left for the paste to discover. -->
-  <p class="note err" id="teamIdWarn" hidden style="margin-top:10px"></p>
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Teams</strong>
+      <button class="btn small" id="btnAddTeam" type="button">+ Add a Team</button>
+    </div>
+    <p class="manage-note">Each team keeps its own work items. The picker in the header chooses
+      which one the dashboard is showing; Settings are shared by all of them.</p>
+    <p class="manage-note"><strong>Project id</strong> is the letters at the front of the team's
+      issue keys — <em>DAE</em> for DAE-1552. It is what lets one export covering several teams be
+      pasted in one go and split between them; it changes no figure. Leave it blank and the team
+      simply takes nothing from a split.</p>
+    <p class="manage-note"><strong>WIP &le;</strong> is how much work this team means to have open
+      at once, and <strong>85% &le;</strong> how long it means an item to take &mdash; the promise
+      the 85th percentile is read against. Both are drawn as a line on the charts and neither
+      changes a figure: they are what the figures are compared to. Leave either blank and the app
+      states the number without judging it, which is what it does today.</p>
+    <!-- The two numbers look alike on screen and are read against different work,
+         which was reported as "are these duplicate settings?". Said where the
+         target is typed, and again beside the threshold in Settings. -->
+    <p class="manage-note"><strong>85% &le; is about work that has FINISHED</strong> &mdash; it is
+      checked against the items this team delivered. The separate
+      <strong>ageing threshold</strong> in Settings is about work that has <em>not</em>: how long
+      something can sit open before it is flagged. They are different questions, so they are
+      usually different numbers &mdash; and the threshold is normally the <strong>lower</strong>
+      of the two, because an item that has already passed your target is too late to rescue. A
+      promise of 10 days is often watched with a threshold around 6.</p>
+    <div class="table-scroll">
+      <table class="manage" id="teamTable" aria-label="Teams"><tbody id="teamRows"></tbody></table>
+    </div>
+    <!-- Two teams answering to one project id makes a split unanswerable, so it is
+         said here as it happens rather than left for the paste to discover. -->
+    <p class="note err" id="teamIdWarn" hidden style="margin-top:10px"></p>
+  </section>
 
-  <div class="row spread" style="margin-top:20px">
-    <strong class="manage-head">Agile Release Trains</strong>
-    <button class="btn small" id="btnAddArt" type="button">+ Add an ART</button>
-  </div>
-  <p class="manage-note">An Agile Release Train groups teams together. It is a
-    <strong>label only</strong> — every figure is still worked out per team — and
-    <strong>All Teams</strong> gains a picker for it. Teams need not be on one.</p>
-  <div class="table-scroll">
-    <table class="manage" id="artTable" aria-label="Agile Release Trains"><tbody id="artRows"></tbody></table>
-  </div>
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Agile Release Trains</strong>
+      <button class="btn small" id="btnAddArt" type="button">+ Add an ART</button>
+    </div>
+    <p class="manage-note">An Agile Release Train groups teams together. It is a
+      <strong>label only</strong> — every figure is still worked out per team — and
+      <strong>All Teams</strong> gains a picker for it. Teams need not be on one.</p>
+    <div class="table-scroll">
+      <table class="manage" id="artTable" aria-label="Agile Release Trains"><tbody id="artRows"></tbody></table>
+    </div>
+  </section>
 
   <!-- ── Workflow stages ──────────────────────────────────────────────────
        The third section, and the one that needs the most saying, because what
@@ -3099,60 +3124,64 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        the two happen in: the app reads statuses off an export, and grouping them
        is something you may then choose to do. Nothing here is typed — this list
        is the app showing its working, and the only control on it is delete. -->
-  <div class="row spread" style="margin-top:20px">
-    <strong class="manage-head">Statuses</strong>
-  </div>
-  <p class="manage-note">Every status this app has read out of your exports, and the only
-    words from a work system it keeps. Delete any you do not want; the items in it keep their
-    dates and simply stop being grouped. The list holds at most 40.</p>
-  <div id="statusList" class="statuslist"></div>
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Statuses</strong>
+    </div>
+    <p class="manage-note">Every status this app has read out of your exports, and the only
+      words from a work system it keeps. Delete any you do not want; the items in it keep their
+      dates and simply stop being grouped. The list holds at most 40.</p>
+    <div id="statusList" class="statuslist"></div>
+  </section>
 
-  <div class="row spread" style="margin-top:20px">
-    <strong class="manage-head">Workflow Stages</strong>
-    <button class="btn small" id="btnAddStage" type="button">+ Add a Stage</button>
-  </div>
-  <p class="manage-note">A stage is a part of your workflow you want to measure the wait in —
-    <em>Build</em>, <em>Review</em>, <em>Test</em>. Paste a <strong>Time in Status</strong>
-    export with a column per status and each item's days land in the stage you have matched
-    that status to. Several statuses can feed one stage: list them all and their days are
-    added together. No export? Every stage you add here also gets a box on the work item
-    form, so the days can simply be typed in.</p>
-  <p class="manage-note"><strong>The statuses come out of your export; the stages are yours.</strong>
-    Paste an export with a <strong>Status</strong> column and the statuses in it are added to
-    your list above, where you can see them and delete any you do not want. Grouping them into
-    stages is optional &mdash; the work item age chart draws by status on its own &mdash; and a
-    stage is worth adding when several statuses are really one part of your workflow, or when
-    you want them in your own order. <strong>Change a grouping and every item you have already
-    pasted moves with it</strong>; nothing needs re-pasting.</p>
-  <p class="manage-note"><strong>Ticking a status is enough.</strong> A status you have ticked
-    into a stage also claims that status's column in a <strong>Time in Status</strong> export —
-    so one tick does both jobs, and a set-up made by ticking needs nothing typed. A status
-    nobody is currently sitting in still reaches your list, from the
-    <em>Days in&nbsp;…</em> heading of its own column, so there is normally something to tick.
-    The <strong>status names</strong> box is for what neither can reach: an old spelling your
-    board has since renamed, or a status whose column heading was too long or oddly punctuated
-    to be read as a name. Type those exactly as Jira spells them; capitals and punctuation
-    don't matter, and a typed name wins where it disagrees with a tick.</p>
-  <!-- Said here because this is the box that gets it wrong: the export heads its
-       columns "Days in Code Review", and the obvious thing to do is type that.
-       Both work, but only one of them also matches the status as a VALUE in a
-       plain export's Status column, and a reader who types the long form gets
-       their durations and no grouping and no way to see why. -->
-  <p class="manage-note"><strong>Type the status, not the whole heading.</strong> A real export
-    heads these columns <em>Days in Code Review</em> or <em>Time in Code Review</em>; the words
-    in front are read off and the status inside is what has to match, so
-    <em>Code Review</em> is the alias to type. It is also the spelling that matches a plain
-    export's <strong>Status</strong> column, which the long one cannot.
-    <strong>Leave <em>Days in Done</em> and <em>Days Blocked</em> out.</strong> The first keeps
-    growing after the work has finished, and the second runs at the same time as whatever
-    status the item is really in &mdash; neither is time spent in a stage.</p>
-  <div class="table-scroll">
-    <table class="manage" id="stageTable" aria-label="Workflow stages"><tbody id="stageRows"></tbody></table>
-  </div>
-  <!-- Two stages listing one status makes a column's destination unanswerable,
-       so it is said here as it happens rather than left for a paste to
-       discover — exactly as two teams sharing a project id already are. -->
-  <p class="note err" id="stageAliasWarn" hidden style="margin-top:10px"></p>
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Workflow Stages</strong>
+      <button class="btn small" id="btnAddStage" type="button">+ Add a Stage</button>
+    </div>
+    <p class="manage-note">A stage is a part of your workflow you want to measure the wait in —
+      <em>Build</em>, <em>Review</em>, <em>Test</em>. Paste a <strong>Time in Status</strong>
+      export with a column per status and each item's days land in the stage you have matched
+      that status to. Several statuses can feed one stage: list them all and their days are
+      added together. No export? Every stage you add here also gets a box on the work item
+      form, so the days can simply be typed in.</p>
+    <p class="manage-note"><strong>The statuses come out of your export; the stages are yours.</strong>
+      Paste an export with a <strong>Status</strong> column and the statuses in it are added to
+      your list above, where you can see them and delete any you do not want. Grouping them into
+      stages is optional &mdash; the work item age chart draws by status on its own &mdash; and a
+      stage is worth adding when several statuses are really one part of your workflow, or when
+      you want them in your own order. <strong>Change a grouping and every item you have already
+      pasted moves with it</strong>; nothing needs re-pasting.</p>
+    <p class="manage-note"><strong>Ticking a status is enough.</strong> A status you have ticked
+      into a stage also claims that status's column in a <strong>Time in Status</strong> export —
+      so one tick does both jobs, and a set-up made by ticking needs nothing typed. A status
+      nobody is currently sitting in still reaches your list, from the
+      <em>Days in&nbsp;…</em> heading of its own column, so there is normally something to tick.
+      The <strong>status names</strong> box is for what neither can reach: an old spelling your
+      board has since renamed, or a status whose column heading was too long or oddly punctuated
+      to be read as a name. Type those exactly as Jira spells them; capitals and punctuation
+      don't matter, and a typed name wins where it disagrees with a tick.</p>
+    <!-- Said here because this is the box that gets it wrong: the export heads its
+         columns "Days in Code Review", and the obvious thing to do is type that.
+         Both work, but only one of them also matches the status as a VALUE in a
+         plain export's Status column, and a reader who types the long form gets
+         their durations and no grouping and no way to see why. -->
+    <p class="manage-note"><strong>Type the status, not the whole heading.</strong> A real export
+      heads these columns <em>Days in Code Review</em> or <em>Time in Code Review</em>; the words
+      in front are read off and the status inside is what has to match, so
+      <em>Code Review</em> is the alias to type. It is also the spelling that matches a plain
+      export's <strong>Status</strong> column, which the long one cannot.
+      <strong>Leave <em>Days in Done</em> and <em>Days Blocked</em> out.</strong> The first keeps
+      growing after the work has finished, and the second runs at the same time as whatever
+      status the item is really in &mdash; neither is time spent in a stage.</p>
+    <div class="table-scroll">
+      <table class="manage" id="stageTable" aria-label="Workflow stages"><tbody id="stageRows"></tbody></table>
+    </div>
+    <!-- Two stages listing one status makes a column's destination unanswerable,
+         so it is said here as it happens rather than left for a paste to
+         discover — exactly as two teams sharing a project id already are. -->
+    <p class="note err" id="stageAliasWarn" hidden style="margin-top:10px"></p>
+  </section>
 
   <div class="row" style="justify-content:flex-end;margin-top:18px">
     <button class="btn primary" id="manageCloseBtn" type="button">Done</button>
@@ -3173,36 +3202,60 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     that changes nothing is worse than a missing one. Every one of them is shared by every team;
     the two figures a team sets for ITSELF are on its own row under Teams &amp; Stages.</p>
 
-  <div class="row spread" style="margin-top:16px">
-    <strong class="manage-head">Labels &amp; Work Types</strong>
-  </div>
-  <p class="manage-note">The words on the charts, and what counts as a defect.</p>
-  <div class="grid two pairs" style="margin-top:var(--sp-5)">
-    <div>
-      <label for="setCycleLabel">Word to use for cycle time on charts</label>
-      <select id="setCycleLabel">
-        <option>Cycle Time</option>
-        <option>Time in Process</option>
-        <option>TiP</option>
-        <option>In Process Time</option>
-      </select>
+  <!-- ── SIX SECTIONS, EACH INSIDE ITS OWN <section class="manage-sec"> ───────
+       Reported by Charles on 2026-09-02: the window is "big and a bit hard to
+       read". It held six unrelated settings under TWO headings, so everything
+       between "Labels & Work Types" and "Work Type Filter List" — the two
+       ageing thresholds, features, working days and outliers — read as one
+       undifferentiated column of prose, and a hint three paragraphs down had
+       nothing saying which field it belonged to.
+
+       Nothing here is new furniture: `.manage-head` and `.manage-note` are the
+       shared settings-window pair, and `.manage-sec` only adds the rule between
+       one section and the next plus the spacing that used to be an inline
+       `margin-top` on every heading row. The heading rows keep no inline margin
+       now — a section is one element, and the space above a heading cannot
+       drift per dialog again. -->
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Labels &amp; Work Types</strong>
     </div>
-    <div>
-      <label for="setUnplannedType">Defect work type — the exact text in your Type column</label>
-      <input type="text" id="setUnplannedType" maxlength="120" placeholder="Bug">
+    <p class="manage-note">The words on the charts, and what counts as a defect.</p>
+    <div class="grid two pairs" style="margin-top:var(--sp-5)">
+      <div>
+        <label for="setCycleLabel">Word to use for cycle time on charts</label>
+        <select id="setCycleLabel">
+          <option>Cycle Time</option>
+          <option>Time in Process</option>
+          <option>TiP</option>
+          <option>In Process Time</option>
+        </select>
+      </div>
+      <div>
+        <label for="setUnplannedType">Defect work type — the exact text in your Type column</label>
+        <input type="text" id="setUnplannedType" maxlength="120" placeholder="Bug">
+      </div>
+      <div>
+        <label for="setSameDay">Cycle time to use when an item starts and finishes the same day (days)</label>
+        <input type="number" id="setSameDay" style="--digits:4" step="0.1" min="0">
+      </div>
+      <div>
+        <label for="setUnplannedLabel">Word to use for defects on charts</label>
+        <input type="text" id="setUnplannedLabel" maxlength="120" placeholder="Defect">
+      </div>
     </div>
-    <div>
-      <label for="setSameDay">Cycle time to use when an item starts and finishes the same day (days)</label>
-      <input type="number" id="setSameDay" style="--digits:4" step="0.1" min="0">
+    <!-- Moved up here on 2026-09-02, from the foot of the outlier section where
+         it had drifted: it says "the defect text above", and above it were two
+         ageing thresholds, a feature list and the whole outlier block. A note
+         that points at a field belongs in that field's section. -->
+    <div class="note info" style="margin-top:var(--sp-5)">
+      Anything whose Type is blank, or doesn't match the defect text above, counts as
+      ordinary planned work.
     </div>
-    <div>
-      <label for="setUnplannedLabel">Word to use for defects on charts</label>
-      <input type="text" id="setUnplannedLabel" maxlength="120" placeholder="Defect">
-    </div>
-  </div>
+  </section>
 
   <!-- ── THE TWO MEASURES, EACH WITH A CAVEAT ─────────────────────────────────
-       Both sit UNDER the grid rather than in it, which is the rule the
+       Both hints sit UNDER the grid rather than in it, which is the rule the
        working-days checkbox has always followed here and is now the general one:
        a multi-line explanation inside a bottom-aligned grid cell inflates its
        whole row and strands whatever short field sits beside it. That is the
@@ -3213,7 +3266,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
        THE TWO THRESHOLDS SIT SIDE BY SIDE, one to a column, and the hint that
        used to fill the space beside the item box now runs full width beneath
-       them. That is the outlier pair's layout three blocks down, and it is the
+       them. That is the outlier pair's layout two sections down, and it is the
        right one the moment a second field exists: the dead space the old
        comment complained about is a box's worth of it, so the fix is to put the
        second box there rather than to keep spending it on prose. A paragraph at
@@ -3222,26 +3275,32 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        Both boxes stay `--digits:3` so the pair reads as one question asked
        twice, and `align-items: end` on the grid keeps them on one baseline even
        though the two labels wrap to different heights on a narrow window. -->
-  <div class="grid two pairs" style="margin-top:var(--sp-6)">
-    <div>
-      <label for="setAgedDays" id="setAgedDaysLabel">Count an in-progress item as aged after (days)</label>
-      <input type="number" id="setAgedDays" style="--digits:3" step="1" min="1" placeholder="14">
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Aged Work</strong>
     </div>
-    <div>
-      <label for="setFeatureAgedDays" id="setFeatureAgedDaysLabel">Count an in-progress feature as aged after (days)</label>
-      <input type="number" id="setFeatureAgedDays" style="--digits:3" step="1" min="1">
+    <p class="manage-note">How long something can sit unfinished before the app flags it.</p>
+    <div class="grid two pairs" style="margin-top:var(--sp-5)">
+      <div>
+        <label for="setAgedDays" id="setAgedDaysLabel">Count an in-progress item as aged after (days)</label>
+        <input type="number" id="setAgedDays" style="--digits:3" step="1" min="1" placeholder="14">
+      </div>
+      <div>
+        <label for="setFeatureAgedDays" id="setFeatureAgedDaysLabel">Count an in-progress feature as aged after (days)</label>
+        <input type="number" id="setFeatureAgedDays" style="--digits:3" step="1" min="1">
+      </div>
     </div>
-  </div>
-  <p class="hint" style="margin-top:var(--sp-3)">Unfinished work only &mdash; nothing that
-    has completed is ever counted here. Not the same as a team&rsquo;s
-    <strong>85% &le;</strong> target, which is checked against work that has finished; set
-    each <strong>lower</strong> than that target so something is flagged while there is
-    still time to act on it.</p>
-  <p class="hint" style="margin-top:var(--sp-3)">The feature box is
-    <strong>empty by default, and empty is off</strong> &mdash; a fortnight is a rule about
-    work items, and nothing here assumes it holds for features. Until you set a number, the
-    Aged Work card in the feature view says so and shows what that team&rsquo;s finished
-    features actually took, so the number you pick is measured against your own board.</p>
+    <p class="hint" style="margin-top:var(--sp-3)">Unfinished work only &mdash; nothing that
+      has completed is ever counted here. Not the same as a team&rsquo;s
+      <strong>85% &le;</strong> target, which is checked against work that has finished; set
+      each <strong>lower</strong> than that target so something is flagged while there is
+      still time to act on it.</p>
+    <p class="hint" style="margin-top:var(--sp-3)">The feature box is
+      <strong>empty by default, and empty is off</strong> &mdash; a fortnight is a rule about
+      work items, and nothing here assumes it holds for features. Until you set a number, the
+      Aged Work card in the feature view says so and shows what that team&rsquo;s finished
+      features actually took, so the number you pick is measured against your own board.</p>
+  </section>
 
   <!-- The feature layer's one switch. On its own line with room for a hint,
        under the rule stated at the top of this dialog: a setting that needs more
@@ -3251,115 +3310,132 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        Comma-separated in one box, which is the shape a workflow stage's aliases
        already use in the Teams & Stages window — the same question ("which words
        in your export mean this?") asked the same way. -->
-  <div class="grid two pairs" style="margin-top:var(--sp-6)">
-    <div>
-      <label for="setFeatureTypes">Work types that mean a feature</label>
-      <input type="text" id="setFeatureTypes" placeholder="Feature, Epic">
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Features</strong>
     </div>
-    <p class="hint" style="margin:0">Separate them with commas, exactly as they
-      appear in your Type column. Rows matching are kept <strong>apart from your
-      work items</strong>, so no item-level figure moves. <strong>Empty is
-      off</strong> &mdash; nothing ships here by default, because a guess at
-      somebody else&rsquo;s board is a setting that matches nothing. Pair it with
-      a <em>Parent key</em> column to join items to the features they belong to.</p>
-  </div>
+    <p class="manage-note">Which rows are features rather than work items.</p>
+    <div class="grid two pairs" style="margin-top:var(--sp-5)">
+      <div>
+        <label for="setFeatureTypes">Work types that mean a feature</label>
+        <input type="text" id="setFeatureTypes" placeholder="Feature, Epic">
+      </div>
+      <p class="hint" style="margin:0">Separate them with commas, exactly as they
+        appear in your Type column. Rows matching are kept <strong>apart from your
+        work items</strong>, so no item-level figure moves. <strong>Empty is
+        off</strong> &mdash; nothing ships here by default, because a guess at
+        somebody else&rsquo;s board is a setting that matches nothing. Pair it with
+        a <em>Parent key</em> column to join items to the features they belong to.</p>
+    </div>
+  </section>
 
-  <div style="margin-top:var(--sp-6)">
-    <label class="checkline" for="setWorkingDays">
-      <input type="checkbox" id="setWorkingDays"><span>Count working days only (Monday to Friday)</span>
-    </label>
-    <p class="hint" style="margin-top:var(--sp-3)">
-      Cycle time, lead time and the ageing threshold skip weekends — an item started on a
-      Friday and finished on the Monday takes one day, not three. <strong>Public holidays are
-      not known to this app</strong> and still count as working days, wherever you are.
-    </p>
-  </div>
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Working Days</strong>
+    </div>
+    <p class="manage-note">Whether weekends count towards every figure measured in days.</p>
+    <div style="margin-top:var(--sp-5)">
+      <label class="checkline" for="setWorkingDays">
+        <input type="checkbox" id="setWorkingDays"><span>Count working days only (Monday to Friday)</span>
+      </label>
+      <p class="hint" style="margin-top:var(--sp-3)">
+        Cycle time, lead time and the ageing threshold skip weekends — an item started on a
+        Friday and finished on the Monday takes one day, not three. <strong>Public holidays are
+        not known to this app</strong> and still count as working days, wherever you are.
+      </p>
+    </div>
+  </section>
+
   <!-- Ignoring outliers. On its own line with room for a hint, under the rule
        stated at the top of this dialog: a setting that needs more than a label
        does not belong in the grid. The number box sits beside the select rather
        than under it because it is the select's third option spelled out, and
        putting a two-digit box on a line of its own would be the dead space the
        aged-days pair above already avoids. -->
-  <div class="grid two pairs" style="margin-top:var(--sp-6)">
-    <div>
-      <!-- The one ⓘ inside a dialog. The delegated [data-help] listener picks it
-           up wherever it sits, and the help dialog opens on top of this one —
-           both are modal, so the top layer stacks them and closing the help
-           returns you here with the select still where you left it. The hints
-           below say what the setting does; this says what to make of it, which
-           is the same division of labour every tile on the dashboard follows. -->
-      <label for="setOutlierMode">Ignore items that took unusually long<button type="button"
-        class="tile-help" data-help="outliers"
-        aria-label="What does ignoring outliers mean?">i</button></label>
-
-      <select id="setOutlierMode">
-        <option value="off">Off &mdash; count every item</option>
-        <option value="auto">Automatically, from this team&rsquo;s own spread</option>
-        <option value="days">Anything over a number I set</option>
-      </select>
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Unusually Long Items</strong>
     </div>
-    <div>
-      <label for="setOutlierDays" id="setOutlierDaysLabel">Ignore items over (days)</label>
-      <input type="number" id="setOutlierDays" style="--digits:3" step="1" min="1" placeholder="90">
+    <p class="manage-note">Whether one very long item is allowed to move your cycle time.</p>
+    <div class="grid two pairs" style="margin-top:var(--sp-5)">
+      <div>
+        <!-- The one ⓘ inside a dialog. The delegated [data-help] listener picks it
+             up wherever it sits, and the help dialog opens on top of this one —
+             both are modal, so the top layer stacks them and closing the help
+             returns you here with the select still where you left it. The hints
+             below say what the setting does; this says what to make of it, which
+             is the same division of labour every tile on the dashboard follows. -->
+        <label for="setOutlierMode">Ignore items that took unusually long<button type="button"
+          class="tile-help" data-help="outliers"
+          aria-label="What does ignoring outliers mean?">i</button></label>
+
+        <select id="setOutlierMode">
+          <option value="off">Off &mdash; count every item</option>
+          <option value="auto">Automatically, from this team&rsquo;s own spread</option>
+          <option value="days">Anything over a number I set</option>
+        </select>
+      </div>
+      <div>
+        <label for="setOutlierDays" id="setOutlierDaysLabel">Ignore items over (days)</label>
+        <input type="number" id="setOutlierDays" style="--digits:3" step="1" min="1" placeholder="90">
+      </div>
     </div>
-  </div>
-  <p class="hint" style="margin-top:var(--sp-3)">
-    An ignored item <strong>still counts as delivered</strong> &mdash; throughput, net flow,
-    the cumulative flow diagram, work in progress and the defect rate do not move. Only its
-    cycle time, lead time and time in stage stop counting. Work that is still
-    <strong>in progress is never ignored</strong>, however long it has been open, so the aged
-    work figures are untouched.
-  </p>
-  <p class="hint" style="margin-top:var(--sp-3)">
-    <strong>Automatically</strong> ignores anything more than three interquartile ranges above
-    the upper quartile of what finished in the window on screen &mdash; the standard test for
-    an extreme outlier &mdash; and needs at least 12 finished items before it will offer an
-    opinion. Narrowing the date picker changes what counts, because an outlier is only
-    unusual next to the work beside it.
-  </p>
-  <div class="note info" style="margin-top:var(--sp-5)">
-    Most boards should leave this off. The <strong>median</strong> and <strong>85%</strong>
-    figures this dashboard leads with already shrug off a long tail &mdash; if one enormous
-    item is spoiling the picture, the average is the only figure it is spoiling, and the
-    median beside it is the better number to read.
-  </div>
-  <div class="note info" style="margin-top:var(--sp-6)">
-    Anything whose Type is blank, or doesn't match the defect text above, counts as
-    ordinary planned work.
-  </div>
+    <p class="hint" style="margin-top:var(--sp-3)">
+      An ignored item <strong>still counts as delivered</strong> &mdash; throughput, net flow,
+      the cumulative flow diagram, work in progress and the defect rate do not move. Only its
+      cycle time, lead time and time in stage stop counting. Work that is still
+      <strong>in progress is never ignored</strong>, however long it has been open, so the aged
+      work figures are untouched.
+    </p>
+    <p class="hint" style="margin-top:var(--sp-3)">
+      <strong>Automatically</strong> ignores anything more than three interquartile ranges above
+      the upper quartile of what finished in the window on screen &mdash; the standard test for
+      an extreme outlier &mdash; and needs at least 12 finished items before it will offer an
+      opinion. Narrowing the date picker changes what counts, because an outlier is only
+      unusual next to the work beside it.
+    </p>
+    <div class="note info" style="margin-top:var(--sp-5)">
+      Most boards should leave this off. The <strong>median</strong> and <strong>85%</strong>
+      figures this dashboard leads with already shrug off a long tail &mdash; if one enormous
+      item is spoiling the picture, the average is the only figure it is spoiling, and the
+      median beside it is the better number to read.
+    </div>
+  </section>
 
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Work Type Filter List</strong>
+      <button class="btn small" id="btnAddFilter" type="button">+ Add a Type</button>
+    </div>
+    <p class="manage-note">
+      The choices in the Work Type filter on the dashboard. <strong>Display</strong> is what you pick;
+      <strong>Value</strong> is the text matched against your Type column. Put
+      <strong>several types in one row</strong> by separating them with commas —
+      <code>Story, Task</code> is one choice covering both. Each is matched exactly, so
+      <code>Task</code> does not pull in <code>Sub-task</code>. The arrows set the order the
+      choices appear in the picker. Leave the <code>All</code> row alone — it means
+      "no filter", which is why it is greyed out.
+    </p>
+    <!-- The scroller the Teams table already sits in, and it earns its place here
+         for the same reason: the two text columns have a floor, so on a phone the
+         table outgrows the dialog and scrolls inside its own box rather than
+         squeezing "Stories and Tasks" down to "Stories an". It became necessary
+         when the row grew from one button to three. -->
+    <div class="table-scroll" style="margin-top:var(--sp-5)">
+      <table class="filters">
+        <!-- The third column holds each row's Remove button and shows no
+             heading, but an EMPTY <th> is a column a screen reader announces
+             as nothing at all — axe-core's empty-table-header found it here.
+             An sr-only word names the column for a reader without putting
+             anything on screen; scope="col" on all three because a header
+             that names a column should say so. -->
+        <thead><tr><th scope="col">Display</th><th scope="col">Value</th>
+          <th scope="col" class="act"><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody id="filterRows"></tbody>
+      </table>
+    </div>
+  </section>
 
-  <div class="row spread" style="margin-top:20px">
-    <strong class="manage-head">Work Type Filter List</strong>
-    <button class="btn small" id="btnAddFilter" type="button">+ Add a Type</button>
-  </div>
-  <p class="manage-note">
-    The choices in the Work Type filter on the dashboard. <strong>Display</strong> is what you pick;
-    <strong>Value</strong> is the text matched against your Type column. Put
-    <strong>several types in one row</strong> by separating them with commas —
-    <code>Story, Task</code> is one choice covering both. Each is matched exactly, so
-    <code>Task</code> does not pull in <code>Sub-task</code>. The arrows set the order the
-    choices appear in the picker. Leave the <code>All</code> row alone — it means
-    "no filter", which is why it is greyed out.
-  </p>
-  <!-- The scroller the Teams table already sits in, and it earns its place here
-       for the same reason: the two text columns have a floor, so on a phone the
-       table outgrows the dialog and scrolls inside its own box rather than
-       squeezing "Stories and Tasks" down to "Stories an". It became necessary
-       when the row grew from one button to three. -->
-  <div class="table-scroll" style="margin-top:var(--sp-5)">
-    <table class="filters">
-      <!-- The third column holds each row's Remove button and shows no
-           heading, but an EMPTY <th> is a column a screen reader announces
-           as nothing at all — axe-core's empty-table-header found it here.
-           An sr-only word names the column for a reader without putting
-           anything on screen; scope="col" on all three because a header
-           that names a column should say so. -->
-      <thead><tr><th scope="col">Display</th><th scope="col">Value</th>
-        <th scope="col" class="act"><span class="sr-only">Actions</span></th></tr></thead>
-      <tbody id="filterRows"></tbody>
-    </table>
-  </div>
   <!-- Reset and Done share the closing row, the destructive one on the left and
    the way out on the right — the same arrangement the Back up dialog uses,
    and the reason Reset is not up beside "+ Add a type" where a mis-click

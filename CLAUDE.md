@@ -11,6 +11,36 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## A Settings Window Is a Stack, Not a Column (2026-09-02) — no schema change
+
+Charles, of the Settings window: *"this window is big and a bit hard to read. can you add
+section separators or something?"* It held **six unrelated settings under two headings** —
+everything from the ageing thresholds to the outlier block sat under *Labels & Work Types*,
+which named none of it — so the window read as one undifferentiated column of 13px prose.
+
+- **Six sections now, each in its own `<section class="manage-sec">`:** Labels & Work Types,
+  Aged Work, Features, Working Days, Unusually Long Items, Work Type Filter List. The list is
+  pinned in the suite as a whole, so a setting added here has to say which section it belongs
+  to or add one.
+- **`.manage-sec` is one rule and some spacing** — `border-top: 1px solid var(--border-strong)`
+  and nothing else. No new colour, no fill, no shadow (pack rule 14), and `.manage-head` is
+  untouched. `--border-strong` rather than `--border` because at `--border` the line is barely
+  visible on midnight, which is the whole thing that was asked for.
+- **The spacing moved off the heading rows.** Each was an inline `margin-top` — 16px, 18px,
+  20px, four different values across two dialogs by 2026-09-02. A section is now one element
+  to move and the gap above a heading cannot drift per dialog again.
+- **The first section takes the spacing and not the rule** (`:first-of-type`), because above it
+  is the window's own heading or the sentence describing the whole window, and a line under
+  either reads as the end of a section rather than the start of one.
+- **The note about a blank Type moved into the section holding the box it points at.** It says
+  "the defect text above" and had drifted to the foot of the outlier block, four sections below
+  that box. Pinned, because the end of the window is where an appended note lands.
+- **Teams, ARTs & Stages took the same treatment in the same change**, and so did Sprint
+  Predictability's *Targets* and Golf Handicap's *League Handicap*. Neither sibling window
+  would have earned the complaint on its own — they are short — but the four are the same
+  screen wearing four names, and a divider in two of them is drift rather than design. See the
+  shared settings-window furniture note in Sprint Predictability's CLAUDE.md.
+
 ## A Heading May Teach the Vocabulary (2026-09-01) — no schema change, DECIDED WITH CHARLES
 
 **This reverses "there is no adopt-this-heading button", and it is the reversal the

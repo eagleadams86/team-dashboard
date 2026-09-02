@@ -7778,12 +7778,40 @@ group('ARTs — the grouping, and the boundary it crosses');
      && sDlg.contains(sDoc.getElementById('btnResetSettings')),
      'with every control that was on the tab inside it — the fields, the filter list and reset');
   /* Laid out as the Teams window's twin: one section per thing you set, headed
-     by its name, the Add button in that heading row. */
+     by its name, the Add button in that heading row.
+
+     SIX HEADINGS, not two. Until 2026-09-02 everything between the two below
+     — the ageing thresholds, features, working days and the whole outlier
+     block — sat under "Labels & Work Types", which named none of it; Charles
+     read the window as one undifferentiated column of prose. Pinned as the
+     whole list because that is the invariant: a setting added here has to say
+     which section it belongs to, or add one. */
   is([...sDlg.querySelectorAll('.manage-head')].map(e => e.textContent),
-     ['Labels & Work Types', 'Work Type Filter List'],
-     'two sections, each headed by its name, like the window beside it');
+     ['Labels & Work Types', 'Aged Work', 'Features', 'Working Days',
+      'Unusually Long Items', 'Work Type Filter List'],
+     'six sections, each headed by its name, like the window beside it');
   ok(sDoc.getElementById('btnAddFilter').closest('.row.spread'),
      'and the Add button in its section\u2019s heading row rather than under the table');
+  /* Every heading is inside a section, and every section is separated from the
+     one above it by a rule — the thing that was missing when the window was
+     reported as hard to read. A heading with no `.manage-sec` around it is a
+     section that would run into its neighbour. */
+  ok([...sDlg.querySelectorAll('.manage-head')].every(h => h.closest('section.manage-sec')),
+     'each one inside its own section, so the window is a stack rather than a column of prose');
+  const secRule = win.getComputedStyle(sDlg.querySelectorAll('.manage-sec')[1]);
+  ok(parseFloat(secRule.borderTopWidth) >= 1 && secRule.borderTopStyle === 'solid',
+     'with a rule between one section and the next');
+  is(win.getComputedStyle(sDlg.querySelector('.manage-sec')).borderTopWidth, '0px',
+     'and none above the first, where it would underline the window\u2019s own note instead');
+  /* The note about a blank Type sat at the foot of the outlier block, four
+     sections below the field it says is "above". It moved into the section
+     that owns that field on 2026-09-02, and this is what stops it drifting
+     back the next time a note is appended to the end of the window. */
+  const blankTypeNote = [...sDlg.querySelectorAll('.note.info')]
+    .find(n => /counts as\s+ordinary planned work/.test(n.textContent));
+  ok(blankTypeNote && blankTypeNote.closest('section.manage-sec')
+       .querySelector('.manage-head').textContent === 'Labels & Work Types',
+     'and the note about a blank Type sits in the section holding the defect box it points at');
   is(win.getComputedStyle(sDlg).maxWidth, '1100px',
      'at the family\u2019s working-window width — at 560 all five fields stack into one column');
 
@@ -7834,6 +7862,12 @@ group('ARTs — the grouping, and the boundary it crosses');
      you manage, not a list of sections. */
   is(heads, ['Teams', 'Agile Release Trains', 'Statuses', 'Workflow Stages'],
      'four sections, each headed by its name');
+  /* And each in a `.manage-sec` with a rule above it, exactly as Settings is
+     since 2026-09-02 — the two windows are read side by side, so a rule in one
+     and not the other is the drift, not the design. */
+  ok([...win.document.querySelectorAll('#manageDialog .manage-head')]
+       .every(h => h.closest('section.manage-sec')),
+     'each one in its own section, ruled off from the one above it like Settings');
   /* The header button NAMES the third section, which is the sibling app's rule
      rather than this one's: its button has always read "Teams & PIs". This app
      read plain "Teams" until 2026-08-21, when the feature behind it turned out
