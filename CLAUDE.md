@@ -3353,3 +3353,14 @@ suite did not cover. Each has a test now, proven to fail first by reverting the 
   ('items'|'features'), goToSearchHit sets `view.unit` from it before `renderAll()`, and a
   feature's snippet leads with "feature". The question to keep asking near a team: would this be
   wrong if half the data were in `features`?
+
+- **The paste is cut into records, not lines (fix 5).** `parsePastedRows` split on `\r?\n` before any quote handling, so a quoted cell holding a
+  newline — Excel writes a multi-line Description exactly so, in both CSV and tab form — cut the
+  row in two: the tail became a row of its own and every column after the break moved one cell
+  left, so the key was lost and the start date was read as the completion date, silently.
+  `splitRecords(text)` scans with splitCsvLine's own rule (a quote opens a cell only at the start
+  of one; `""` is a literal; a newline inside an open cell continues the record) and returns each
+  record with the PHYSICAL line it starts on, which `lineNo` now reads from `lineOf` — the report
+  points at the export, and a record above may span lines. **A quote that never closes is not a
+  quote**: if the scan ends inside a cell the paste is cut on plain newlines, exactly as before,
+  so one stray `"` in a hand-typed paste cannot swallow everything after it.

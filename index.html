@@ -4086,6 +4086,54 @@ function splitCsvLine(line) {
   return cells;
 }
 
+/* The paste, cut into RECORDS rather than lines (2026-09-01), each with the
+   physical line it starts on. A quoted cell may hold a line break — Excel
+   writes a multi-line Description that way, and so does a real CSV — and
+   splitting on every newline first cut such a row in two: the half before
+   the break kept the key and the columns up to the Description, the half
+   after it was read as a row of its own, and every column past the break
+   landed one cell to the left. DAE-1 came back with no key and its start
+   date read as its completion date, with nothing in the report to say so.
+
+   The rule is splitCsvLine's own: a quote OPENS a cell only at the start of
+   one (the start of a record, or straight after a tab or a comma), a doubled
+   quote inside is a literal, and the next lone quote closes it. A newline
+   inside an open cell continues the record.
+
+   A QUOTE THAT NEVER CLOSES IS NOT A QUOTE. A hand-typed paste with one stray
+   `"` at the start of a cell would otherwise swallow every line after it into
+   one record; when the scan reaches the end still inside a cell, the paste is
+   cut on plain newlines instead — exactly what it was before this existed. */
+function splitRecords(text) {
+  const s = String(text || '');
+  const out = [];
+  let cur = '', line = 1, start = 1, inQuotes = false, atCellStart = true;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (s[i + 1] === '"') { cur += '""'; i++; continue; }
+        inQuotes = false;
+      } else if (ch === '\n') line++;
+      cur += ch;
+      continue;
+    }
+    if (ch === '\n') {
+      out.push({ text: cur, line: start });
+      cur = ''; line++; start = line; atCellStart = true;
+      continue;
+    }
+    if (ch === '"' && atCellStart) inQuotes = true;
+    atCellStart = ch === '\t' || ch === ',';
+    cur += ch;
+  }
+  if (inQuotes) {
+    return s.split('\n').map((t, i) => ({ text: t, line: i + 1 }));
+  }
+  out.push({ text: cur, line: start });
+  return out;
+}
+
 function looksLikeHeader(cells) {
   const joined = cells.join(' ').toLowerCase();
   return /complet|start|type|date|key|resolv|status|creat/.test(joined) && !/\d{4}/.test(joined);
@@ -5278,9 +5326,13 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
      empty first cell — a work-in-progress row in a completed-first export.
      l.trim() here once ate that tab and shifted every cell left, so the start
      date was silently read as a completion date. */
-  const lines = String(text || '').split(/\r?\n/)
-    .map(l => l.replace(/^[ \r]+|[ \r]+$/g, ''))
-    .filter(l => l.trim());
+  /* Records, not lines: a quoted cell may hold a line break, and the line a
+     record STARTS on is what the report points at — see splitRecords. */
+  const records = splitRecords(text)
+    .map(r => ({ text: r.text.replace(/^[ \r]+|[ \r]+$/g, ''), line: r.line }))
+    .filter(r => r.text.trim());
+  const lines = records.map(r => r.text);
+  const lineOf = records.map(r => r.line);
   /* One attempt at reading the paste: split it, take a header off the top if
      there is one, work out the date order and map the columns. Pulled out
      because the whole thing is run twice — see the fallback below. */
@@ -5447,7 +5499,9 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
   };
 
   raw.forEach((cells, i) => {
-    const lineNo = i + 1 + (skippedHeader ? 1 : 0);
+    /* The physical line this record starts on, which is where the reader will
+       find it in the export — a record above it may span more than one line. */
+    const lineNo = lineOf[i + (skippedHeader ? 1 : 0)];
     const rawCompleted = at(cells, cols.completed);
     const rawStarted   = at(cells, cols.started);
     const rawCreated   = at(cells, cols.created);

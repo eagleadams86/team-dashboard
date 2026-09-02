@@ -12478,6 +12478,53 @@ group('a card with no chart matches the one beside it');
   aDoc.getElementById('itemDialog').close();
 
   /* ────────────────────────────────────────────────────────── */
+  group('a quoted cell may hold a line break');
+
+  /* Excel copies a multi-line Description exactly this way, and a real CSV
+     quotes it. Split on every newline, the row broke in two: the half after
+     the break was read as a row of its own and every column past the break
+     moved one cell left, so DAE-1 lost its key and its start date was read as
+     its completion date — with nothing in the report to say so. */
+  const brokenCsv = 'Key,Type,Description,Resolved,Started\n'
+    + 'DAE-1,Story,"Line one\nline two",2026-08-10,2026-08-01\n'
+    + 'DAE-2,Bug,"Just one line",2026-08-12,2026-08-03';
+  const pBr = TD.parsePastedRows(brokenCsv, 'auto');
+  is(pBr.rows.length, 2, 'two records, not three');
+  is(pBr.rows.map(r => r.key), ['DAE-1', 'DAE-2'], 'each keeps its key');
+  is(pBr.rows.map(r => iso(r.completed)), ['2026-08-10', '2026-08-12'], 'and its completion date');
+  is(pBr.rows.map(r => iso(r.started)), ['2026-08-01', '2026-08-03'], 'and its start date');
+  is(pBr.badCompleted.length + pBr.badStarted.length, 0, 'with nothing reported');
+
+  const brokenTab = 'Key\tType\tDescription\tResolved\tStarted\n'
+    + 'DAE-1\tStory\t"Line one\nline two"\t2026-08-10\t2026-08-01\n'
+    + 'DAE-2\tBug\tJust one line\t2026-08-12\t2026-08-03';
+  const pBt = TD.parsePastedRows(brokenTab, 'auto');
+  is(pBt.rows.map(r => r.key), ['DAE-1', 'DAE-2'], 'the same paste out of Excel, tab-separated');
+  is(pBt.rows.map(r => iso(r.completed)), ['2026-08-10', '2026-08-12']);
+
+  /* The line number the report points at is the PHYSICAL line, so a record
+     below a multi-line one is still found in the export. */
+  const afterBreak = 'Key,Type,Description,Resolved,Started\n'
+    + 'DAE-1,Story,"Line one\nline two\nline three",2026-08-10,2026-08-01\n'
+    + 'DAE-2,Bug,"One line",not a date,2026-08-03';
+  const pAf = TD.parsePastedRows(afterBreak, 'auto');
+  is(pAf.badCompleted.length, 1, 'the bad completion date is reported');
+  is(pAf.badCompleted[0].line, 5,
+     'at line 5 of the paste, where it is — the record above it spans three lines');
+
+  /* A quote that never closes is not a quote: the paste is cut on plain
+     newlines, exactly as before, rather than swallowed into one record. */
+  const stray = '"DAE-1,Story,2026-08-10,2026-08-01\nDAE-2,Bug,2026-08-12,2026-08-03';
+  is(TD.parsePastedRows(stray, 'auto').rows.map(r => iso(r.completed)), ['2026-08-12'],
+     'a stray opening quote does not swallow the rest of the paste — its own line was already '
+     + 'unreadable, as it was before, and the line after it still loads');
+  const doubled = TD.parsePastedRows('Key,Type,Description,Resolved\n'
+    + 'DAE-1,Story,"He said ""go""\nthen left",2026-08-10', 'auto');
+  is(doubled.rows.map(r => r.key), ['DAE-1'],
+     'a doubled quote inside a quoted cell is a literal, not a close-and-reopen');
+  is(iso(doubled.rows[0].completed), '2026-08-10', 'and the record still ends where it ends');
+
+  /* ────────────────────────────────────────────────────────── */
   /* A completeness floor. This suite has no per-test isolation, so "everything
      that ran passed" is only half an answer — an early `return` added to run()
      would end it quietly with a green summary over a fraction of the checks.
