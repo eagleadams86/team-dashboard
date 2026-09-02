@@ -3364,3 +3364,11 @@ suite did not cover. Each has a test now, proven to fail first by reverting the 
   points at the export, and a record above may span lines. **A quote that never closes is not a
   quote**: if the scan ends inside a cell the paste is cut on plain newlines, exactly as before,
   so one stray `"` in a hand-typed paste cannot swallow everything after it.
+
+- **The week holding 1 January is week 1 of the NEW year (fix 6).** `weekNumber` counted from the Sunday on or before Jan 1 of the year of the day it was handed,
+  and `weekKey` read the year off that day too — and every caller hands the week's Sunday, so the
+  straddling week was `2025-53` and the next `2026-02`: week 01 never appeared, and the same week
+  had two keys depending on which day asked (`weekKey(1 Jan)` already said `2026-01`). Both now
+  read the year off the week's SATURDAY, so a key is a pure function of the week. The pinned
+  `'2024-53'` in two tests became `'2025-01'`; the fortnight key beside it (`'2024-52'`, a week
+  that does not straddle) did not move. Keys are computed, never stored, so nothing migrates.

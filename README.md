@@ -1158,7 +1158,10 @@ one is older.
 worth knowing:
 
 - **Weeks start on Sunday.** Week keys are `YEAR-WW`, where the week containing 1 January is
-  week 1. Written out by hand, because JavaScript has no week-number function.
+  week 1 **of the new year** — the week straddling New Year is `2026-01`, never the old year's
+  `53`, so the numbering never runs 52, 53, 02 (which it did until 2026-09-01: keyed off its Sunday,
+  the straddling week took the old year and week 01 never appeared). A year with 53 Sundays still
+  gets a 53. Written out by hand, because JavaScript has no week-number function.
 - **Fortnights are anchored to a fixed date** — the first Sunday of 1970 — not to whatever
   window is on screen. Which fortnight a date falls in is therefore a property of the calendar,
   and switching from 3 months to 12 doesn't slide every bar one week sideways. Months are

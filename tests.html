@@ -493,10 +493,18 @@ async function run(TD, win) {
   }
   is(weekDrift, 0, "the 'week' bucket is priorSunday/weekKey exactly, over 400 consecutive days");
 
-  /* New Year: the week containing 2 Jan 2025 belongs to 2024, and a fortnight
-     keyed off its start Sunday inherits that rule rather than re-deriving it. */
-  is(TD.bucketKey(TD.bucketStart(D(2025, 1, 2), 'week'), 'week'), '2024-53',
-     'the week straddling New Year keeps the old year');
+  /* New Year: the week containing 2 Jan 2025 is week 1 of 2025 — the README's
+     rule, and what weekKey(1 Jan) already said. Keyed off its Sunday it used to
+     read 2024-53, and the week after it 2025-02: the same week had two keys
+     depending on which day asked, and week 01 never appeared on the axis. */
+  is(TD.bucketKey(TD.bucketStart(D(2025, 1, 2), 'week'), 'week'), '2025-01',
+     'the week straddling New Year is week 1 of the new year');
+  is(TD.weekKey(D(2024, 12, 29)), TD.weekKey(D(2025, 1, 4)),
+     'and every day of that week, Sunday to Saturday, gives the same key');
+  is(TD.weekKey(D(2025, 1, 5)), '2025-02', 'the next week is 02 — the numbering has no gap');
+  is(TD.weekKey(D(2022, 12, 25)), '2022-53',
+     'a year with 53 Sundays still gets a 53 — 2022 began on a Saturday');
+  is(TD.weekKey(D(2023, 1, 1)), '2023-01', 'and a year that begins on a Sunday starts at 01 on the day');
   is(TD.bucketKey(TD.bucketStart(D(2025, 1, 2), 'fortnight'), 'fortnight'), '2024-52',
      'a fortnight straddling New Year keeps the old year too');
   is(TD.bucketKey(TD.bucketStart(D(2025, 1, 2), 'month'), 'month'), '2025-01',
@@ -3633,7 +3641,7 @@ async function run(TD, win) {
     { completed: D(2024, 12, 31), started: D(2024, 12, 21), type: '' },
     { completed: D(2025, 1, 2),   started: D(2024, 12, 29), type: '' }
   ], SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
-  is(dNY.weeks, ['2024-53'], 'both items land in the one straddling week');
+  is(dNY.weeks, ['2025-01'], 'both items land in the one straddling week');
   is(dNY.throughput, [2], 'throughput counts both');
   near(dNY.avgCycleTime[0], 7, 'the weekly average holds BOTH cycle times — (10 + 4) / 2');
   near(dNY.summary.avgCycleTime, 7, 'and so does the pooled tile average');

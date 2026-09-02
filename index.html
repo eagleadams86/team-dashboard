@@ -3840,19 +3840,32 @@ function priorSunday(d) { return addDays(d, -(weekdayNum(d) - 1)); }
 
 /* Week number where the week containing Jan 1 is week 1 and weeks start on
    Sunday. JS has no equivalent, so count Sundays from the Sunday on or before
-   Jan 1. */
+   Jan 1.
+
+   THE WEEK HOLDING 1 JANUARY BELONGS TO THE NEW YEAR (2026-09-01), so a week
+   is numbered — and, in weekKey, yeared — against the year its SATURDAY is
+   in. Both used to read the year off whatever day they were handed, and every
+   caller hands the week's Sunday: the week straddling New Year was therefore
+   numbered as the old year's 53rd, and the first full week of the new year as
+   its 2nd. Week 01 never appeared; the axis ran 52, 53, 02. Read off the
+   Saturday, the same week is 2026-01 and the next 2026-02, and a year with
+   53 Sundays still gets a 53. */
 function weekNumber(d) {
-  const jan1Sunday = priorSunday(utcDate(d.getUTCFullYear(), 1, 1));
-  return Math.floor(diffDays(priorSunday(d), jan1Sunday) / 7) + 1;
+  const sunday = priorSunday(d);
+  const year = addDays(sunday, 6).getUTCFullYear();
+  const jan1Sunday = priorSunday(utcDate(year, 1, 1));
+  return Math.floor(diffDays(sunday, jan1Sunday) / 7) + 1;
 }
 
-/* "YYYY-WW" — the label a week is plotted under. Every caller passes the
-   week-start Sunday. Keying off any other day of the week gives a different
-   year for the week straddling New Year, and a bucket keyed that way is never
-   read back — cycle times used to vanish for items completed in the first days
-   of January for exactly that reason. */
+/* "YYYY-WW" — the label a week is plotted under. A pure function of the WEEK:
+   every day of it, Sunday to Saturday, gives the same key. It used to read the
+   year off the day it was handed, so the week straddling New Year had two
+   keys depending on which day asked — and a bucket keyed off a completion
+   date was never read back under the Sunday's key, which is how cycle times
+   once vanished for items completed in the first days of January. */
 function weekKey(d) {
-  return d.getUTCFullYear() + '-' + String(weekNumber(d)).padStart(2, '0');
+  const year = addDays(priorSunday(d), 6).getUTCFullYear();
+  return year + '-' + String(weekNumber(d)).padStart(2, '0');
 }
 
 /* Same day-of-month n months away, clamped to the month's end. */
