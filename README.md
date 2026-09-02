@@ -5,6 +5,10 @@ completed and started dates. Single page, no build step, nothing to install.
 
 **Live:** https://eagleadams86.github.io/team-dashboard/
 
+**Download:** [the app as one file](https://github.com/eagleadams86/team-dashboard/releases/latest) — double-click it and it
+runs, with no server, no install and no internet.
+[What differs from the website](#a-single-file-you-can-send-someone).
+
 The app is called **Flow Metrics** on screen. The repo, the Pages path and the
 `app: 'team-dashboard'` marker inside a backup file all still say *team-dashboard* — renaming
 any of those would break existing links and backups, so the rename is deliberately a
@@ -3044,6 +3048,12 @@ The hosted app is four files served from GitHub Pages — `index.html`, the pale
 plus a manifest and icons. That is the right shape for a website and the wrong shape for
 *"can you send me that thing you showed me"*: download `index.html` on its own and you get
 an unstyled page with no charts.
+
+**[⬇ Download the current build](https://github.com/eagleadams86/team-dashboard/releases/latest)** — it is attached to the
+latest release as `flow-metrics.html`. Put it somewhere permanent rather than leaving it in
+Downloads, then double-click it. Your work items are kept by the browser it opens in, not by
+the file, so **Back Up** is how you move them to another machine. The file does not update
+itself — come back to that page when you want a newer one.
 
 `build-single.py` folds it into **one HTML file** that runs by double-clicking it. No
 server, no internet, no install, nothing to put anywhere:
