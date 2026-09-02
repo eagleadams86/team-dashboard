@@ -32,6 +32,17 @@ which named none of it — so the window read as one undifferentiated column of 
 - **The first section takes the spacing and not the rule** (`:first-of-type`), because above it
   is the window's own heading or the sentence describing the whole window, and a line under
   either reads as the end of a section rather than the start of one.
+- **The Features hint came out of the grid the same day** (reported an hour later): five
+  lines of prose in the second cell beside a one-line field, which is the one thing this
+  dialog's own rule says not to do — the reading order went across the window instead of down
+  it, and the box sat stranded in the middle of its section. It now runs full width beneath
+  the field, like every other section's explanation, and the field takes the whole row because
+  it is the only cell in its grid. **The suite pins the rule for the whole window**: no `.hint`
+  inside a `.grid`.
+- **Its `.manage-note` was taken out in that change and put straight back by Charles.** The
+  sentence repeats the label under it, but every other section opens with one, and being the
+  only heading with nothing under it was the more visible oddity — consistency of the shape
+  beats economy of the sentence. Pinned too: no section is left as a bare heading.
 - **The note about a blank Type moved into the section holding the box it points at.** It says
   "the defect text above" and had drifted to the foot of the outlier block, four sections below
   that box. Pinned, because the end of the window is where an appended note lands.

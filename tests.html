@@ -7807,6 +7807,22 @@ group('ARTs — the grouping, and the boundary it crosses');
      sections below the field it says is "above". It moved into the section
      that owns that field on 2026-09-02, and this is what stops it drifting
      back the next time a note is appended to the end of the window. */
+  /* The rule this window states in its own markup — a setting that needs more
+     than a label belongs on its own line, not in a grid cell — pinned as a
+     claim about the WHOLE window rather than about the one paragraph that
+     broke it. The Features hint spent a day in the grid's second cell beside a
+     one-line field, which put the reading order across the window instead of
+     down it and left the box stranded mid-section. */
+  ok([...sDlg.querySelectorAll('.hint')].every((h) => !h.closest('.grid')),
+     'no explanation sits inside a field grid — each runs full width under the fields it explains');
+  /* Every section opens the same way: a heading, then one sentence saying what
+     the section is. Charles put the Features sentence back the day it was taken
+     out — it repeats the label under it, and being the only heading with
+     nothing under it was the more visible oddity. */
+  ok([...sDlg.querySelectorAll('.manage-head')]
+       .every((h) => h.closest('.row').nextElementSibling
+                     && h.closest('.row').nextElementSibling.matches('p.manage-note')),
+     'and every section opens with its own sentence, none left as a bare heading');
   const blankTypeNote = [...sDlg.querySelectorAll('.note.info')]
     .find(n => /counts as\s+ordinary planned work/.test(n.textContent));
   ok(blankTypeNote && blankTypeNote.closest('section.manage-sec')
