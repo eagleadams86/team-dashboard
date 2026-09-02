@@ -219,7 +219,10 @@ A few details worth knowing, each of which is there for a reason:
   as of the last date your export actually reaches. Everything in this app is read as of the
   newest date in the data rather than as of today, deliberately — work in progress and aged work
   are both read at the window's end, so an end date past the export would age every open item for
-  free against data that stopped weeks ago.
+  free against data that stopped weeks ago. **Work item age is read at that same end**: an item
+  finished after the window was still in flight on its last day and is drawn at the age it had
+  reached then, and one started after it is not there yet. (Until 2026-09-01 that chart listed
+  whatever was open *today*, so the tile beside it and the chart described different items.)
 - **Both dates are needed, and *From* must come before *To*.** Half a pair is the state you pass
   through on the way to typing the second date, so it means "no custom window" rather than an
   error — the note under the strip says so while it waits, instead of leaving two boxes that hold

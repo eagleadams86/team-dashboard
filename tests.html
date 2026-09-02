@@ -12369,6 +12369,29 @@ group('a card with no chart matches the one beside it');
      + 'different thing and stays');
 
   /* ────────────────────────────────────────────────────────── */
+  group('the age chart is read as of the window\u2019s end');
+
+  /* Under a typed window ending 31 Jan: A finished inside it, B was in flight
+     on the 31st and finished in March, C had not started yet. The tile beside
+     the chart already counted B; the chart drew C at age zero and left B out. */
+  const winRows = [
+    { key: 'A', started: D(2026, 1, 5),  completed: D(2026, 1, 20), type: 'Story' },
+    { key: 'B', started: D(2026, 1, 10), completed: D(2026, 3, 1),  type: 'Story' },
+    { key: 'C', started: D(2026, 2, 10), completed: null,           type: 'Story' }
+  ];
+  const winView = { filterValue: '', months: 'custom', bucket: 'week',
+                    customFrom: '2026-01-01', customTo: '2026-01-31' };
+  const dWin = TD.derive(winRows, { ...SAMPLE_SETTINGS, agedDays: 14 }, winView);
+  is(dWin.ageing.count, 1, 'one item was in flight on the window\u2019s last day');
+  is(dWin.ageing.agedCount, 1,
+     'and it is the aged one the tile counts — the chart and the tile describe ONE population');
+  is(dWin.ageing.oldest, 21, 'B, at the age it had reached on the 31st — not today');
+  const dOpen = TD.derive(winRows, { ...SAMPLE_SETTINGS, agedDays: 14 },
+                          { filterValue: '', months: 'all', bucket: 'week' });
+  is(dOpen.ageing.count, 1, 'with no window the newest date in the data is the as-of date');
+  is(dOpen.ageing.oldest, 19, 'and C, open since 10 Feb, is measured to 1 March — 19 days');
+
+  /* ────────────────────────────────────────────────────────── */
   /* A completeness floor. This suite has no per-test isolation, so "everything
      that ran passed" is only half an answer — an early `return` added to run()
      would end it quietly with a green summary over a fraction of the checks.

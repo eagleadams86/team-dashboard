@@ -8610,12 +8610,22 @@ function derive(rows, settings, view, stages, statuses) {
      beside it, and measured with spanDays so the working-days setting reaches
      it exactly as it reaches the ageing threshold it is drawn against.
 
+     AS OF `endDate`, WHICH A TYPED WINDOW CLAMPS (2026-09-01) — the same date
+     the chart's title names and the same date the aged-work tile is read at.
+     Until this build the list was "open today" (started and never completed),
+     while the title said "still in progress on <the window's end>": under a
+     custom window ending in January, an item finished in March was missing
+     from the chart on a day it was plainly in flight, and an item started in
+     February was drawn at age zero on a day it did not yet exist. The tile
+     beside the chart counted one aged item; the chart drew none. In flight on
+     a date means started on or before it and not finished until after it.
+
      A dot carries its issue key where the paste had a Key column — the one
      shape-checked field this app stores — and its work type and start date
      where it did not, either of which finds the item in the export it came
      from. That is what the tooltip and the ⓘ both say. */
   const inFlight = items
-    .filter(r => r.started && !r.completed)
+    .filter(r => r.started && r.started <= endDate && (!r.completed || r.completed > endDate))
     .map(r => ({
       age: Math.max(0, spanDays(endDate, r.started, workingDays)),
       type: r.type || '',

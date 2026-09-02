@@ -3330,3 +3330,10 @@ suite did not cover. Each has a test now, proven to fail first by reverting the 
   the report named words that were gone by the next reload. The list is bounded by `STATUS_MAX`
   at the door and delete-all takes it; a dangling POINTER is still pruned, which is a different
   thing. The test that pinned the old rule was rewritten, not deleted.
+
+- **The work item age chart is read as of `endDate` (fix 2).** `inFlight` in derive() filtered `r.started && !r.completed` — open TODAY — while `endDate` had
+  already been clamped to a typed window's `to` and the chart's title named that date. Under a
+  January window an item finished in March was missing and one started in February was drawn at
+  age zero; `summary.agedNow` (read correctly, off `wip`) said one aged item and
+  `ageing.agedCount` said none. In flight on a date is `started <= endDate && (!completed ||
+  completed > endDate)`. `items` is not window-filtered, so the fix is the filter alone.
