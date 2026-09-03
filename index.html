@@ -1209,9 +1209,21 @@ select { cursor: pointer; }
    the fixed 300px, and min-height:0 is what lets a flex child actually shrink
    inside it rather than pushing the card past the bottom of the window. The id
    out-specifies .chart-card.solo, which would otherwise hold the lead time and
-   train charts to half a window's width up here as well. */
+   train charts to half a window's width up here as well.
+
+   `min-width: 0` is the same word for the other axis, and it is hardening
+   rather than a fix here. The overlay is a flex ROW, so without it the card's
+   automatic minimum size is its MIN-CONTENT width — and a Chart.js canvas
+   carries a width in its own style attribute, so a card that arrives
+   remembering a wider box would keep it and hang over the padding, taking the
+   ⤢ with it. Money Map and Sprint Predictability both did exactly that on
+   2026-09-03, because maximising takes a card out of the page and the card left
+   behind goes FULL WIDTH — wider than this window, since the page reflows with
+   no scrollbar. This grid keeps its columns when one card leaves, so no card
+   here has ever come back wider than the window; the word is what stops the
+   next grid change from making it a bug again. */
 #chartMaxi > .chart-card { flex: 1 1 auto; display: flex; flex-direction: column;
-  min-height: 0; width: auto; margin: 0; }
+  min-height: 0; min-width: 0; width: auto; margin: 0; }
 #chartMaxi > .chart-card > .chart-wrap { flex: 1 1 auto; height: auto; min-height: 0; }
 
 /* ── Walking the charts on this screen without coming back down ──────────
