@@ -839,9 +839,11 @@ Everything the charts depend on, shared by all your teams:
 
 - **Defect work type** — the exact text in your Type column that means "defect"
   (`Bug` by default). Anything blank, or not matching, counts as ordinary planned work.
-- **Work types that mean a feature** — comma separated, empty by default. Empty switches the
-  [feature layer](#features-the-unit-above-a-work-item) off entirely. Matched the same way the
-  defect type is: trimmed, case-folded and exact, never a partial match.
+- **Work types that mean a feature** — comma separated, **`Feature` by default**, because that is
+  what Jira's own hierarchy calls the level above a Story. Change it to whatever your board says,
+  and **clearing the box switches the [feature layer](#features-the-unit-above-a-work-item) off
+  entirely**. Matched the same way the defect type is: trimmed, case-folded and exact, never a
+  partial match.
 - **Count an in-progress item as aged after (days)** — how long an item can sit in progress
   before the Aged work chart counts it (`14` by default; worth keeping under a month).
 - **Count an in-progress feature as aged after (days)** — the same question asked of features,
@@ -1780,13 +1782,18 @@ Jira exports carry a **Parent key** column — the feature, epic or capability a
 to. Set up which work types mean "a feature" and the app reads it, so it can answer questions
 about the thing people actually plan in rather than only about individual items.
 
-**Nothing here is on by default.** *Work types that mean a feature* in **Settings** is empty out
-of the box, and empty means the whole layer is off: no row is diverted, nothing new is stored,
-and every figure is the figure it was. There is no shipped guess at `Feature` or `Epic`, for the
-same reason the work-type filter no longer ships Spikes and Stories — a guess at somebody else's
-board is a setting that matches nothing, which reads as broken data rather than as a setting
-nobody has set. The parse report names the work types it found in your paste, so the word to put
-there is already on screen after the first paste.
+**`Feature` ships in the box, and clearing it turns the layer off.** *Work types that mean a
+feature* in **Settings** starts as `Feature`, because that is what Jira's out-of-the-box hierarchy
+calls the level above a Story — the default of the tool these pastes come out of rather than a
+guess at your board. It is one word to change if yours says `Epic` or `Capability`, and the parse
+report names the work types it actually found in your paste, so the right word is on screen after
+the first paste.
+
+Empty is still off, and empty means the whole layer is off: no row is diverted, nothing new is
+stored, and every figure is the figure it was. A feature type that matches nothing costs nothing
+either — it diverts no rows, moves no figure, and the feature view says it has no features rather
+than showing you a wrong one. Changing this default reaches only a new browser and **Reset
+settings to defaults**; a dashboard that already has the box empty keeps it empty.
 
 ### A Feature Is Kept Apart, Not Flagged
 

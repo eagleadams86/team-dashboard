@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3177;
+const EXPECTED = 3178;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -4156,7 +4156,10 @@ async function run(TD, win) {
   group('featureTypes — the one new setting');
   {
     const S5 = win.TDState;
-    is(S5.normalizeSettings({}).featureTypes, [], 'empty by default — the layer ships off');
+    is(S5.normalizeSettings({}).featureTypes, ['Feature'],
+       'ships as Feature — what Jira calls the level above a Story');
+    is(S5.normalizeSettings({ featureTypes: [] }).featureTypes, [],
+       'and an empty list is kept empty — clearing the box is still off');
     is(S5.normalizeSettings({ featureTypes: ['Feature', 'Epic'] }).featureTypes,
        ['Feature', 'Epic'], 'a supplied list is kept');
     is(S5.normalizeSettings({ featureTypes: 'Feature' }).featureTypes, [],
