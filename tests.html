@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3184;
+const EXPECTED = 3207;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -12308,6 +12308,125 @@ group('a card with no chart matches the one beside it');
     ok(/applyChartTextDefaults\(\);\s*\n\s*trainChart = new Chart/.test(APP_SRC),
        'the train chart asks for the defaults itself, since it does not go through '
        + 'renderChart');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('pinning the tabs and the view controls');
+
+  /* Charles, 2026-09-03: "let a user pin this whole section to the top, similar
+     to how we did it with money map". The section is the tab row AND the
+     controls strip, held as one band.
+
+     THE FRAME IS RESIZED HERE, and it has to be: the suite's frame is 1px wide,
+     so the phone rule below 720 is the only one that ever matches in it, and
+     every assertion about the desktop band would be measuring the phone. Set to
+     a real width, measured, set to a phone, measured, and put back — the same
+     trick the sub-paragraph test uses on the sibling apps, and the only way a
+     media query can be tested by firing rather than by grepping. */
+  {
+    /* `win.document`, not the maxi group's `mDoc`: that is a `const` declared
+       further DOWN this function, and reading one before its declaration is the
+       temporal-dead-zone error that has taken this app down twice. */
+    const pinDoc = win.document;
+    const appFrame = document.getElementById('app');
+    const wasCss = appFrame.style.cssText;
+    const wide = async (w) => {
+      appFrame.style.cssText =
+        'position:absolute;width:' + w + 'px;height:900px;opacity:0;border:0;left:-9999px';
+      await new Promise((r) => setTimeout(r, 250));
+    };
+    const cs = (el) => win.getComputedStyle(el);
+    const rect = (el) => el.getBoundingClientRect();
+    const prop = (n) => cs(pinDoc.documentElement).getPropertyValue(n).trim();
+
+    const bar = pinDoc.getElementById('pinBar');
+    const row = pinDoc.querySelector('.tabrow');
+    const pinBtn = pinDoc.getElementById('pinBtn');
+
+    ok(!!bar && !!row && !!pinBtn, 'the page carries the band, the row and the button');
+    /* The band holds exactly the two rows Charles pointed at, in that order —
+       the welcome card used to sit BETWEEN them in the markup and was moved out
+       so the two could be one sticky box. */
+    is([...bar.children].map((c) => c.id || c.className),
+       ['tabrow', 'viewControls'],
+       'and the band holds the tab row and the view controls, and nothing else');
+    ok(row.contains(pinDoc.querySelector('[role="tablist"]')) && row.contains(pinBtn),
+       'the button is a SIBLING of the tablist inside the row — a non-tab child of a '
+       + 'tablist is a lie about what the thing is');
+
+    await wide(1265);
+    /* BACK TO THE TOP FIRST. Groups above this one scroll the frame, and the
+       real press below is a hit test — a button 500px above the viewport is not
+       under any pointer, and elementFromPoint answers null for it. */
+    win.scrollTo(0, 0);
+    win.tdPin.apply(false);
+    await new Promise((r) => setTimeout(r, 150));
+    is(cs(bar).position, 'static', 'unpinned, the band is in the flow like any other block');
+    ok(/^Pin the tabs/.test(pinBtn.getAttribute('aria-label')),
+       'and the button says what pressing it will DO', pinBtn.getAttribute('aria-label'));
+    /* No reflow either way. That is the whole reason the band is a flex column:
+       a plain block would let the controls' bottom margin collapse out through
+       it, so pinning would open an 18px window for the page to scroll through
+       and the panel below would move. */
+    const panel = pinDoc.getElementById('panel-dashboard');
+    const offTop = Math.round(rect(panel).top + win.scrollY);
+    const offDoc = pinDoc.documentElement.scrollHeight;
+
+    /* A REAL press, not `applyPin`: the button rewrites its own icon, which
+       detaches whatever the pointer landed on — the class of bug that folded a
+       card in Money Map, and the reason `.pinbtn svg` is `pointer-events: none`. */
+    const target = () => {
+      const r = rect(pinBtn);
+      return pinDoc.elementFromPoint(Math.round(r.left + r.width / 2),
+                                   Math.round(r.top + r.height / 2));
+    };
+    ok(target() === pinBtn,
+       'what a pointer hits in the middle of the button IS the button',
+       target() && target().tagName + '.' + target().className);
+    target().dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 200));
+
+    ok(!!pinDoc.documentElement.dataset.pin, 'pressing it pins');
+    is(win.localStorage.getItem('td-pin'), '1', 'and remembers it for the next visit');
+    is(cs(bar).position, 'sticky', 'the band is stuck');
+    is(prop('--pin-top'), Math.round(rect(pinDoc.querySelector('header')).height) + 'px',
+       'exactly where the header ends — MEASURED, because that row wraps to two or '
+       + 'three lines on a phone');
+    ok(Number(cs(bar).zIndex) > 4 && Number(cs(bar).zIndex) < 15,
+       'painted under the header and under a full-screen chart, which covers the page',
+       cs(bar).zIndex);
+    ok(/^Unpin the tabs/.test(pinBtn.getAttribute('aria-label')),
+       'and the button now says how to get out', pinBtn.getAttribute('aria-label'));
+    is(Math.round(rect(panel).top + win.scrollY), offTop,
+       'and NOTHING MOVED: the panel is where it was');
+    is(pinDoc.documentElement.scrollHeight, offDoc, 'and the page is the same height');
+    ok(parseFloat(prop('--pin-clear')) >= Math.round(rect(bar).height),
+       'a control tabbed into clears the whole band, not just the header',
+       prop('--pin-clear'));
+
+    /* ── A phone pins the tab row and nothing else ─────────────────────────
+       The band is 537px at 375 and the header another 173 — 709 of an 812px
+       screen. `display: contents` is what lets the row stick for the whole page
+       rather than only while the band it sits in is still on screen. */
+    await wide(375);
+    is(cs(bar).display, 'contents', 'at phone width the band generates no box at all');
+    is(cs(row).position, 'sticky', 'and the tab row is the thing that sticks');
+    is(cs(row).marginBottom, '0px',
+       'with its margin swapped for padding, so the gap is inside the box that paints it');
+    is(cs(row).paddingBottom, '20px', 'the same 20px, so nothing moves');
+    ok(parseFloat(prop('--pin-clear')) >= Math.round(rect(row).height),
+       'and the clearance is measured off the ROW, not off a band with no box',
+       prop('--pin-clear'));
+    is(cs(pinDoc.getElementById('viewControls')).position, 'static',
+       'the controls scroll away with the page, which is what buys the room back');
+
+    await wide(1265);
+    win.tdPin.apply(false);
+    await new Promise((r) => setTimeout(r, 150));
+    is(win.localStorage.getItem('td-pin'), '0', 'unpinning is remembered too');
+    is(cs(bar).position, 'static', 'and the band is back in the flow');
+    appFrame.style.cssText = wasCss;
+    await new Promise((r) => setTimeout(r, 250));
   }
 
   /* ────────────────────────────────────────────────────────── */

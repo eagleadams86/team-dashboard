@@ -11,6 +11,61 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## Pinning the Tabs and the View Controls (2026-09-03) — no schema change
+
+Charles: *"let a user pin this whole section to the top, similar to how we did it
+with money map."* The section is the tab row AND the control strip, so they are
+held in one band, `.pinbar`, and stuck as one. Money Map pins its two toolbars
+separately because its year strip belongs to one tab and unpins on its own on a
+phone; here the two rows are shown and hidden together, so one band with one
+measured offset is the whole of it. Everything else is its shape: `data-pin` on
+`<html>` set by the head script before first paint, `--pin-top` measured from the
+header's real rectangle, `td-pin` in localStorage, off by default.
+
+**Four things this app had to work out that Money Map did not.**
+
+- **The band is a FLEX COLUMN, and that is load-bearing.** The rows' own bottom
+  margins are what space this section, and a plain block would let the last one
+  collapse straight out through the bottom of the band — so pinned, the page
+  would scroll through an 18px window under the controls. In a flex container
+  margins never collapse, so the same 18px stays inside the box that paints it.
+  **Nothing moves when you pin**, which the suite asserts by measuring the
+  panel's top and the document height both ways.
+- **THE WELCOME CARD WAS IN THE MIDDLE.** It sat between the tab strip and the
+  control strip in the markup, so the two could not be wrapped without wrapping
+  it too — and a sticky band would then have pinned the welcome card to the top.
+  It moved below the controls. Nothing reads its position: it takes the whole
+  page when it is up (`data-welcome`), and everything around it is hidden.
+- **A phone pins the tab row and nothing else**, and `display: contents` is what
+  makes that work. A sticky box can only stick INSIDE its parent's box: left as a
+  band, `.tabrow` scrolled away the moment the band's bottom passed the top of
+  the window — 536px down a phone screen. With `contents` the band generates no
+  box and the row's containing block is `<main>` again. Applied at that width
+  whether or not the pin is on, so the box tree is the same either way and the
+  toggle stays free of reflow. The numbers are measured, not guessed: the band is
+  170px at 1265 and **537 at 375, against a header of 173** — 709 of an 812px
+  screen.
+- **`display: contents` also breaks the measurement, and that is the bug to
+  remember.** Such an element is still `position: sticky` to the cascade and its
+  rectangle is 0×0, so `stuckPin()` happily picked the band and wrote a
+  `--pin-clear` that cleared nothing. It asks for both now.
+
+`measurePinTop()` runs from `selectTab()` and `renderEmptyState()` as well as
+from the ResizeObserver: the band's height changes when the control strip goes on
+Your Data and when the welcome card takes the page, and **an observer is
+delivered with the next rendering step, which a background window does not
+have.**
+
+23 checks in `pinning the tabs and the view controls`. **The suite's frame is 1px
+wide, so the phone rule is the only one that ever matches in it** — the test
+resizes `#app` to 1265, measures, resizes to 375, measures, and puts it back.
+That is the only way a media query is tested by firing rather than by grepping.
+It also scrolls the frame to the top first: groups above it leave the frame
+scrolled, and the real press is a hit test, which answers null for a button
+above the viewport.
+
+**Sprint Predictability does NOT have this**, and it shares this app's chrome.
+
 ## WIP vs Month Got Its Own ⓘ (2026-09-03) — no schema change
 
 Charles asked what the column meant. That is the finding, not the request: the

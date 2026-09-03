@@ -62,6 +62,21 @@ Weekly is the default and the finest grain; monthly smooths out the lumpiness th
 single week hard to read. The grouping also drives the last column of the Your Data table, so
 the table and the charts always name the same period.
 
+**Pin the tabs and controls to the top.** The 📌 at the end of the tab row holds that whole
+band — the tabs and the control strip under them — against the top of the window while the
+page scrolls underneath, so you can change the window or the grouping from halfway down a long
+dashboard without scrolling back up. **It is off until you ask for it**, because pinned chrome
+is bought with vertical space and only you can make that trade; press it again to let the band
+scroll away, and it is remembered for next time. Nothing else moves when you pin — the page is
+exactly the height it was.
+
+**On a phone it pins the tab row only.** The band there is the tab row plus a control strip
+whose four pickers stack, which comes to 537px against a header of 173 — seven hundred pixels
+of an 812px screen before a figure appears. The tab row alone is 42, and buys the thing a
+phone reader actually wants, which is changing tab without scrolling back up. You still scroll
+to the top to change the window or the grouping there. Money Map makes the same trade for the
+same reason.
+
 Charts draw their data in the shared theme pack's **categorical colours** — `--series-1`, a blue,
 for the measure, and `--series-5`, a rust, for the second series where a chart has one. They used
 to draw in the app's accent, which is fine on Midnight and Light and wrong on the other two: on

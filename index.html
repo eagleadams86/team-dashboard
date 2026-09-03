@@ -127,6 +127,14 @@
     if (!localStorage.getItem('td-state'))
       document.documentElement.setAttribute('data-first-run', '');
 
+    /* And the pin, for the same reason as the theme: the tab row and the view
+       controls either are stuck to the top or they are not, and settling that a
+       frame late is a page that visibly jumps as it opens. Only the attribute
+       goes on here — the offset it reads is measured once there is a layout to
+       measure. */
+    if (localStorage.getItem('td-pin') === '1')
+      document.documentElement.dataset.pin = 'on';
+
     /* ── Hold the page still until it has something to show ─────────────────
        This file is 560KB of markup that the browser paints AS IT PARSES, and
        the script that fills it runs at the foot of it. So for about a tenth of
@@ -303,7 +311,14 @@ html[data-first-run] #teamSel { display: none; }
 .row.spread { justify-content: space-between; }
 
 /* tabs — buttons, filled when selected, exactly as the sibling app draws them */
-.tabs { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+/* The row carries the tablist AND the pin button. The 20px that was the
+   tablist's own bottom margin belongs to the row now: pinned, that margin is
+   part of the band the page scrolls through, and only the element carrying it
+   can paint it. */
+.tabrow { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+/* `flex: 1 1 auto` with `min-width: 0`, or a flex item will not shrink below
+   its content — and it is also what puts the pin button at the far end. */
+.tabs { display: flex; gap: 12px; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; }
 .tab { background: var(--surface-alt); border: 1px solid var(--border-control);
   border-radius: var(--radius-sm); padding: 8px 14px; cursor: pointer;
   color: var(--text-primary); font-weight: 500; }
@@ -311,6 +326,103 @@ html[data-first-run] #teamSel { display: none; }
 .tab[aria-selected="true"] { background: var(--unit-active-bg);
   border-color: var(--unit-active-bg); color: var(--unit-active-txt); font-weight: 600; }
 .tab[aria-selected="true"]:hover { border-color: var(--unit-active-bg); }
+
+/* ── Pinning the tab row and the view controls ──────────────────────────────
+   Asked for by Charles on 2026-09-03: "let a user pin this whole section to the
+   top, similar to how we did it with money map". OFF by default and toggled by
+   the button at the end of the tab row — pinned chrome is bought with vertical
+   space, and that is a trade only the reader can make.
+
+   ONE BAND, WHERE MONEY MAP HAS TWO. Its tab row and year strip belong to
+   different tabs and its phone rule unpins the strip on its own, so each needed
+   its own offset. Here the two rows are shown and hidden together, so `.pinbar`
+   holds both and there is one measured `top` for the pair.
+
+   THE OFFSET IS MEASURED, NEVER WRITTEN DOWN. The app header above this wraps
+   to two or three rows on a phone, so `top` reads a custom property that
+   measurePinTop() writes from a real rectangle — the same way `--maxi-top` is
+   written for the full-screen chart. A literal here is wrong on the first phone
+   that opens the page.
+
+   `--bg` AND NOT `--surface`. The header is a band deliberately lifted OFF the
+   page and wears the surface colour to say so. This one sits ON the page and
+   shows `--bg` through today, so `--bg` is the one value that makes pinning
+   change nothing except "content no longer shows through". The surface colour
+   would recolour the band the moment it was pinned, which is a second thing
+   happening that nobody asked for. No colour is invented here.
+
+   Z-INDEX 12 IS PENNED IN ON BOTH SIDES: under the header's 20, which has to
+   stay over it, and under `#chartMaxi`'s 15, because a maximised chart covers
+   the page and `.shell` is inert underneath it — chrome showing through would
+   look live and answer nothing. */
+.pinbtn {
+  flex: 0 0 auto; align-self: center;
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-control); background: transparent;
+  color: var(--text-secondary); cursor: pointer;
+}
+.pinbtn:hover { color: var(--text-primary); background: var(--surface-alt);
+  border-color: var(--text-secondary); }
+/* Pinned, the button wears the accent — but the ICON changes with it, so the
+   state is never resting on a hue. */
+html[data-pin] .pinbtn { color: var(--accent); border-color: var(--accent); }
+/* The icon must never be the thing that was clicked. This button rewrites its
+   own contents on press, which DETACHES the <path> a real pointer landed on,
+   and a detached node has no ancestors for anything upstream to ask about — the
+   class of bug written up against `.chart-max svg` below, where it cost a
+   folded card in Money Map. A synthetic `.click()` cannot reproduce it. */
+.pinbtn svg { pointer-events: none; }
+@media (pointer: coarse) { .pinbtn { width: 40px; height: 40px; } }
+
+/* A FLEX COLUMN so the rows' own bottom margins cannot collapse out through the
+   bottom of the band — see the note on the markup. Unpinned this changes
+   nothing: a block and a single-column flex lay these two rows out identically,
+   which is what makes the toggle free of reflow. */
+.pinbar { display: flex; flex-direction: column; }
+html[data-pin] .pinbar {
+  position: sticky; top: var(--pin-top, 0px); z-index: 12;
+  background: var(--bg);
+}
+/* Nothing in the app scrolls the page to an element — every focus() it makes
+   passes `preventScroll`. The BROWSER's own Tab-key scrolling does, though, and
+   it knows nothing about a pinned bar, so a control tabbed into lands behind it.
+   `--pin-clear` is the height of everything actually stuck. */
+html[data-pin] .panel :is(button, a[href], input, select, textarea, [tabindex]) {
+  scroll-margin-top: var(--pin-clear, 0px);
+}
+/* ── A PHONE PINS THE TAB ROW AND NOTHING ELSE ──────────────────────────────
+   Measured on this page rather than guessed. The band is the tab row plus the
+   controls card, and the card stacks its four pickers as the window narrows:
+   170px at 1265, 249 by 640, and 537 at 375 — where the header is another 173,
+   so the two together come to 709px of an 812px screen. Pinning the lot there
+   does not leave room for a figure.
+
+   The tab row alone is 42px (96 when the tabs wrap to two lines) and buys the
+   thing a phone reader actually wants, which is changing tab without scrolling
+   back up. The cost is real and worth saying plainly: on a phone you still
+   scroll to the top to change the window or the grouping.
+
+   The band goes back to `static` and gives up its paint; the row takes both,
+   including the margin→padding swap that keeps the 20px gap inside the box that
+   paints it, so nothing moves when you pin. */
+@media (max-width: 720px) {
+  /* `display: contents` and not `position: static`, and the difference is the
+     whole thing working. A sticky box can only stick INSIDE its parent's box:
+     left as a band, `.tabrow` scrolled away the moment the band's bottom passed
+     the top of the window — 536px down a phone screen, which is to say almost
+     at once. With `contents` the band generates no box at all and the row's
+     containing block is <main> again, so it sticks for the whole page. It is
+     applied at this width whether or not the pin is on, so the box tree is the
+     same either way and margins collapse the same either way — which is what
+     keeps the toggle free of reflow here as well. It also restores exactly the
+     tree this page had before the band existed. */
+  .pinbar { display: contents; }
+  html[data-pin] .tabrow {
+    position: sticky; top: var(--pin-top, 0px); z-index: 12;
+    background: var(--bg); margin-bottom: 0; padding-bottom: 20px;
+  }
+}
 
 /* Chart-group sub-tabs. Deliberately NOT the filled pill above: an underlined
    row reads as subordinate by construction, so two tablists on one screen can't
@@ -1335,6 +1447,7 @@ table.data tr.no-data td.figure { color: var(--text-muted); }
    boot AFTER renderEmptyState — the JS version was overwritten a tick later and
    the Your Data panel came back under the card. An attribute nothing else
    touches cannot lose that race. */
+html[data-welcome] .pinbar,
 html[data-welcome] .tabs,
 html[data-welcome] #viewControls,
 html[data-welcome] .panel { display: none !important; }
@@ -1958,9 +2071,15 @@ main:focus { outline: none; }
      picker's value is the answer, whereas here `.print-only` below already says
      which team and which window these figures are, so the picker itself is
      furniture. */
-  .skip, .subtabs, .applink, .tile-help, .chart-max, .table-scroll .btn,
+  .skip, .subtabs, .applink, .tile-help, .chart-max, .pinbtn, .table-scroll .btn,
   header select, header label, #toast, #chartMaxi, #shareBar,
   [data-export], dialog, #viewControls .field, #unitFieldData { display: none !important; }
+  /* A pinned band would otherwise print ONCE, over the top of whatever the first
+     page happens to start with. The pack un-sticks `header` for every app in the
+     family and hides `[role="tablist"]`, which takes the tabs — but `.pinbar`
+     outlives the tablist the pack hides, and the window note inside it genuinely
+     prints, so it is named here. */
+  .pinbar { position: static !important; }
   /* The window note stays, and it is the one thing here that must: a figure on
      paper is worthless without the dates it covers. Its container is a flex row
      for the pickers that have just gone. */
@@ -2083,6 +2202,26 @@ main:focus { outline: none; }
        (aria-controls), and a single stop in the tab order rather than one per
        tab. tabindex is roved in selectTab() alongside aria-selected; the arrow
        keys are wired at the foot of the page. Same pattern as the sibling app. -->
+  <!-- ══════════════════ THE PINNED BAND ══════════════════
+       The tab row and the view controls, held together so they can be stuck to
+       the top of the window as ONE thing — which is what Charles asked for
+       (2026-09-03): "pin this whole section". Money Map pins its two toolbars
+       separately because its year strip belongs to one tab and unpins on its
+       own on a phone; here the two rows are always shown and hidden together,
+       so one band with one measured offset is the whole of it.
+
+       A FLEX COLUMN, and that is load-bearing rather than tidy: the rows' own
+       bottom margins are what space this section today, and a plain block would
+       let the last one collapse straight out through the bottom of the band —
+       so pinned, the page would scroll through an 18px window under the
+       controls. In a flex container margins never collapse, so the same 18px
+       stays inside the box that paints it and nothing moves when you pin. -->
+  <div class="pinbar" id="pinBar">
+  <!-- The row carries the tablist AND the pin button beside it. The button
+       cannot go INSIDE the tablist — a non-tab child there is a lie about what
+       the thing is — and the 20px that was the tablist's own bottom margin
+       belongs to the row now, for the reason the band above records. -->
+  <div class="tabrow">
   <div class="tabs" role="tablist" aria-label="Views">
     <button class="tab" role="tab" id="tab-dashboard" aria-controls="panel-dashboard" aria-selected="true"  tabindex="0">Dashboard</button>
     <!-- Next to Dashboard because it is the other way of reading the same
@@ -2098,51 +2237,13 @@ main:focus { outline: none; }
          the tabs answer two different questions at once. -->
     <button class="tab" role="tab" id="tab-data"      aria-controls="panel-data"      aria-selected="false" tabindex="-1">Your Data</button>
   </div>
+    <!-- Dressed by dressPinBtn() — icon, accessible name and title all change
+         together, and there is no aria-pressed on top of them: the state would
+         then be announced twice and the two would have to be kept in agreement.
+         The same rule the full-screen button follows. -->
+    <button type="button" class="pinbtn" id="pinBtn"></button>
+  </div>
 
-  <!-- ══════════════════ THE FIRST SCREEN ══════════════════
-       The family's welcome card, to the shape Money Map settled on and Sprint
-       Predictability took next: what the app IS, then where the figures go,
-       then the three ways in, then a line for each of them in the button's own
-       words. A reader deciding whether this is the thing they want is deciding
-       off the first paragraph, so it says what gets worked out rather than
-       promising "insight"; the second is the privacy claim the footer three
-       inches below already makes, and the two must never disagree.
-
-       It REPLACES the whole app while it is up — renderEmptyState() takes the
-       tab strip, the view controls and all three panels away with it. Before
-       this, a first run opened on the Your Data tab with a paste box explaining
-       a Jira export, which answers "how do I fill this in" to somebody who has
-       not yet been told what it is.
-
-       Start Fresh dismisses it for this sitting rather than writing anything:
-       there is nothing to create here — the data comes from a paste or from
-       typed items — so the honest thing is to open the tab that takes both. A
-       reload with still nothing entered brings the card back, which is the
-       truth about where you are. -->
-  <div class="card welcome" id="welcomeCard" hidden><div class="empty">
-    <h2>Welcome to Flow Metrics</h2>
-    <p>A flow clinic for your delivery teams: give it your work items — a completed date, a
-      start date and a type — and it works out throughput, cycle and lead time, work in
-      progress, and the age of everything still open, grouped into Flow, Delivery and
-      Health, for one team or across all of them.</p>
-    <p>Everything you enter stays in this browser. Nothing is uploaded — there is no account
-      and no server.</p>
-    <p style="margin-top:16px">
-      <button class="btn primary" id="welcomeFreshBtn" type="button">Start Fresh</button>
-      <button class="btn" id="welcomeSampleBtn" type="button">Load Sample Data</button>
-      <button class="btn" id="welcomeRestoreBtn" type="button">Restore a Backup</button>
-      <button class="btn" id="welcomePlanBtn" type="button">Forecast Ahead</button></p>
-    <p><strong>Start Fresh</strong> opens Your Data, where you paste a report out of Jira or
-      add work items one at a time — a board kept by hand works just as well.</p>
-    <p><strong>Load Sample Data</strong> fills every chart with three invented teams and nine
-      months of work items, each team named for the one thing it shows, so you can see what
-      the app does before typing anything of your own. The figures are made up.</p>
-    <p><strong>Restore a Backup</strong> reads a Flow Metrics export.</p>
-    <p><strong>Forecast Ahead</strong> is for a team that has not started. You type how fast you
-      think it will go and it answers the same two questions it would answer from real data —
-      when a scope finishes, and how much finishes by a date. It is your estimate with the
-      arithmetic done, not a measurement.</p>
-  </div></div>
 
   <!-- The three tab panels. The main landmark that wraps them opens ABOVE the
        tab strip now (see the note there), so there is no second <main> here —
@@ -2231,6 +2332,52 @@ main:focus { outline: none; }
     </div>
     <div class="window" id="windowNote"></div>
   </div>
+  </div>
+
+  <!-- ══════════════════ THE FIRST SCREEN ══════════════════
+       The family's welcome card, to the shape Money Map settled on and Sprint
+       Predictability took next: what the app IS, then where the figures go,
+       then the three ways in, then a line for each of them in the button's own
+       words. A reader deciding whether this is the thing they want is deciding
+       off the first paragraph, so it says what gets worked out rather than
+       promising "insight"; the second is the privacy claim the footer three
+       inches below already makes, and the two must never disagree.
+
+       It REPLACES the whole app while it is up — renderEmptyState() takes the
+       tab strip, the view controls and all three panels away with it. Before
+       this, a first run opened on the Your Data tab with a paste box explaining
+       a Jira export, which answers "how do I fill this in" to somebody who has
+       not yet been told what it is.
+
+       Start Fresh dismisses it for this sitting rather than writing anything:
+       there is nothing to create here — the data comes from a paste or from
+       typed items — so the honest thing is to open the tab that takes both. A
+       reload with still nothing entered brings the card back, which is the
+       truth about where you are. -->
+  <div class="card welcome" id="welcomeCard" hidden><div class="empty">
+    <h2>Welcome to Flow Metrics</h2>
+    <p>A flow clinic for your delivery teams: give it your work items — a completed date, a
+      start date and a type — and it works out throughput, cycle and lead time, work in
+      progress, and the age of everything still open, grouped into Flow, Delivery and
+      Health, for one team or across all of them.</p>
+    <p>Everything you enter stays in this browser. Nothing is uploaded — there is no account
+      and no server.</p>
+    <p style="margin-top:16px">
+      <button class="btn primary" id="welcomeFreshBtn" type="button">Start Fresh</button>
+      <button class="btn" id="welcomeSampleBtn" type="button">Load Sample Data</button>
+      <button class="btn" id="welcomeRestoreBtn" type="button">Restore a Backup</button>
+      <button class="btn" id="welcomePlanBtn" type="button">Forecast Ahead</button></p>
+    <p><strong>Start Fresh</strong> opens Your Data, where you paste a report out of Jira or
+      add work items one at a time — a board kept by hand works just as well.</p>
+    <p><strong>Load Sample Data</strong> fills every chart with three invented teams and nine
+      months of work items, each team named for the one thing it shows, so you can see what
+      the app does before typing anything of your own. The figures are made up.</p>
+    <p><strong>Restore a Backup</strong> reads a Flow Metrics export.</p>
+    <p><strong>Forecast Ahead</strong> is for a team that has not started. You type how fast you
+      think it will go and it answers the same two questions it would answer from real data —
+      when a scope finishes, and how much finishes by a date. It is your estimate with the
+      arithmetic done, not a measurement.</p>
+  </div></div>
 
   <!-- ══════════════════ ALL TEAMS ══════════════════
        Every team on one page, against one shared window and one shared date.
@@ -15661,6 +15808,10 @@ function renderEmptyState() {
   const firstRun = !anyData && !viewOnly && !welcomeStarted && !planningOn();
   $('welcomeCard').hidden = !firstRun;
   document.documentElement.toggleAttribute('data-welcome', firstRun);
+  /* The band goes away with the rest of the app while the card is up, and comes
+     back with it — so what is stuck, and how far a tabbed-to control has to
+     clear it, both change here. */
+  measurePinTop();
 }
 
 /* The unit switch: whether it is offered at all, and which way it is set.
@@ -15745,6 +15896,12 @@ function selectTab(name) {
   });
   /* The strip belongs to the two views it means anything to. */
   $('viewControls').hidden = !NUMBER_TABS.includes(name);
+  /* The pinned band just got shorter or taller by the height of that strip, and
+     `--pin-clear` is written from its box. The ResizeObserver in applyPin sees
+     this too; the call is here as well because an observer is delivered with the
+     next rendering step, and a tab pressed in a background window has no next
+     rendering step until the reader comes back to it. */
+  measurePinTop();
   /* All Teams is built only while it is on screen — see renderAllTeams — so
      arriving is when it gets built, and leaving is when the dashboard takes the
      shared window note back. Just the two views, not renderAll: switching tabs
@@ -16198,6 +16355,127 @@ const maxiHeaderWatch = ('ResizeObserver' in window) ? new ResizeObserver(() => 
   const chart = chartIn(maxiCard);
   if (chart) chart.resize();
 }) : null;
+
+/* ── Pinning the tab row and the view controls ───────────────────────────────
+   The CSS is up in "Pinning the tab row and the view controls"; this is the one
+   measurement it reads and the button that turns it on.
+
+   ONE ATTRIBUTE, ONE MEASURED OFFSET. `data-pin` on <html> is the whole state —
+   the head script sets it before first paint so the page doesn't jump — and
+   `--pin-top` / `--pin-clear` are where the band is told to stop and how far a
+   tabbed-to control has to clear it. Measured, because there is no number to
+   write down: the app header wraps to two or three rows on a phone. */
+
+/* Inline SVG for the reason MAXI_ICON gives — a glyph is a different size in
+   every platform's font, and an <img> is a fetch on a page that ships its own
+   CSP. Named by what PRESSING does, because that is what the button's
+   accessible name says too. */
+const PIN_ICON = {
+  pin:   '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"'
+       + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'
+       + ' focusable="false"><path d="M7 4h10"/><path d="M9 4v6l-3 3v2h12v-2l-3-3V4"/>'
+       + '<path d="M12 17v5"/></svg>',
+  unpin: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"'
+       + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'
+       + ' focusable="false"><path d="M7 4h10"/><path d="M9 4v6l-3 3v2h12v-2l-3-3V4"/>'
+       + '<path d="M12 17v5"/><path d="M3 3l18 18"/></svg>'
+};
+
+/* WHAT IS ACTUALLY STUCK, asked of the CASCADE rather than of a breakpoint
+   copied into JS. Three answers fall out of one question: the whole band on a
+   desktop, the tab row alone under the phone rule, and nothing at all when the
+   pin is off or the welcome card has taken the page. A hard-coded 720 here would
+   be a second copy of the media query to keep in step. */
+const stuckPin = () => {
+  const sticky = (el) => {
+    if (!el) return null;
+    const cs = getComputedStyle(el);
+    /* `display: contents` is the phone rule's answer, and an element with that
+       display generates NO BOX — it is still `position: sticky` as far as the
+       cascade is concerned, and its rectangle is 0×0. Reading the height off it
+       wrote a `--pin-clear` that cleared nothing. */
+    return (cs.position === 'sticky' && cs.display !== 'contents') ? el : null;
+  };
+  return sticky($('pinBar')) || sticky(document.querySelector('.tabrow')) || null;
+};
+const pinStuck = () => !!stuckPin();
+
+function measurePinTop() {
+  const root = document.documentElement;
+  const head = document.querySelector('header');
+  const stuck = stuckPin();
+  const h = head ? head.getBoundingClientRect().height : 0;
+  /* Zero when nothing is stuck, which is what makes the unpinned page and the
+     welcome takeover fall out with no branch of their own. */
+  const b = stuck ? stuck.getBoundingClientRect().height : 0;
+  root.style.setProperty('--pin-top', Math.round(h) + 'px');
+  /* Plus a little, so a control tabbed into isn't flush against the band. */
+  root.style.setProperty('--pin-clear', Math.round(h + b + 8) + 'px');
+}
+
+function savedPin() {
+  try { return localStorage.getItem('td-pin') === '1'; }
+  catch (e) { return false; }   /* private mode: the app draws, just unpinned */
+}
+
+/* The visible icon and the accessible name say the same thing — what pressing
+   this will DO next — and there is no aria-pressed on top of them: the state
+   would then be announced twice and the two would have to be kept in agreement.
+   The same rule the full-screen button follows. */
+function dressPinBtn() {
+  const btn = $('pinBtn');
+  if (!btn) return;
+  const on = !!document.documentElement.dataset.pin;
+  btn.innerHTML = on ? PIN_ICON.unpin : PIN_ICON.pin;
+  btn.setAttribute('aria-label', on
+    ? 'Unpin the tabs and controls — let them scroll with the page'
+    : 'Pin the tabs and controls to the top of the page');
+  btn.title = on ? 'Unpin the tabs and controls' : 'Pin the tabs and controls to the top';
+}
+
+function applyPin(on) {
+  try { localStorage.setItem('td-pin', on ? '1' : '0'); } catch (e) {}
+  if (on) document.documentElement.dataset.pin = 'on';
+  else delete document.documentElement.dataset.pin;
+  measurePinTop();
+  dressPinBtn();
+  if (pinWatch) {
+    pinWatch.disconnect();
+    if (on) {
+      pinWatch.observe(document.querySelector('header'));
+      pinWatch.observe($('pinBar'));
+      /* The row as well as the band: under the phone rule the row is the thing
+         that is stuck, and its height is what `--pin-clear` is written from. */
+      pinWatch.observe(document.querySelector('.tabrow'));
+    }
+  }
+  /* NO renderAll(). Nothing about the markup changes — this is paint and
+     position and nothing else — so the toggle keeps the reader's scroll place
+     and their focus, and no chart is rebuilt. */
+}
+
+/* Both boxes change height for reasons that are not a window resize: a longer
+   team name wrapping the header, the Count switch appearing when a team gains
+   features, the controls strip going away on Your Data. An observer catches
+   every one without a list of call sites to keep in step. Connected only while
+   something is pinned. */
+const pinWatch = ('ResizeObserver' in window)
+  ? new ResizeObserver(() => measurePinTop()) : null;
+
+if ($('pinBtn')) $('pinBtn').onclick = () => applyPin(!document.documentElement.dataset.pin);
+/* The header and the band re-wrap on a resize whether or not the observer is
+   connected, and the offset is read on every paint. */
+addEventListener('resize', measurePinTop);
+/* A web font arriving after first paint changes both of these heights. */
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(measurePinTop);
+/* The attribute is already on <html> from the head script; this hangs the
+   observer and the icon off it, and measures once there is a layout. */
+applyPin(savedPin());
+
+/* For tests.html: the state and the door, so the suite can drive the real thing
+   rather than a copy of its reasoning. */
+window.tdPin = { apply: applyPin, on: () => !!document.documentElement.dataset.pin,
+                 stuck: pinStuck, measure: measurePinTop };
 
 /* For tests.html: which card is up, and the two doors, so the suite can drive
    the real thing rather than a copy of its reasoning. */
