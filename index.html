@@ -1206,6 +1206,19 @@ table.data th.sortable .th-head { display: flex; align-items: center; }
    border. Measured with elementFromPoint at the edges — nothing else can see a
    pseudo-element's hit area. */
 table.data th.sortable .th-head button:not(.tile-help) { padding-right: 2px; }
+/* ── The headings of THIS table wrap; every other table's do not ─────────────
+   `table.data td` is `nowrap`, and so is every heading over it — a figure broken
+   across two lines is worse than a wide column. The All teams table is the one
+   place that cannot afford it: ten columns of a comparison table came to exactly
+   the width of an ordinary window with nothing to spare, so the third ⓘ (WIP vs
+   month, 2026-09-03) pushed it 38px over and into a sideways scroll it had
+   always fitted inside.
+
+   Letting the HEADINGS wrap buys that back and more — the header row goes from
+   36px to 56px, one extra line, and the table fits again. Only the headings:
+   the figures under them stay on one line, which is the rule that mattered.
+   Scoped to this table by id, so the Loaded Data table's headings are untouched. */
+#allTeamsTable thead th.sortable button:not(.tile-help) { white-space: normal; }
 table.data th.sortable .th-head .tile-help { margin-left: 10px; margin-right: 12px; }
 /* A heading and its column have to agree. `th.num` has always been right-aligned
    and `td.num` never was, so every numeric column in Loaded Data — the cycle
@@ -12760,6 +12773,21 @@ const METRIC_HELP = {
       + 'in the table below can, which is what it is there for: read the tile for a promise, '
       + 'read the column to find who needs help.'],
   ] },
+  teamWipRatio: { title: 'WIP vs Month', body: [
+    ['How much work this team has open, measured against ', b('a month of its own finished '
+      + 'work'), '. In progress, the column beside it, is the top of that division; the '
+      + 'bottom is what the team completed in the last month.'],
+    ['The common coaching rule is to keep work in progress ', b('under half a month’s '
+      + 'throughput'), ' — 0.5× — and nearer a quarter for most teams. Lower is better: less '
+      + 'open at once means shorter cycle times, for the same reason a shorter queue moves '
+      + 'faster. It is a rule of thumb and not a target this app holds you to, which is why '
+      + 'nothing here turns a colour when a team crosses it.'],
+    [b('The month is a month whatever window is on screen'), ', counted back from the newest '
+      + 'date in that team’s own data — so widening the window to a year does not change '
+      + 'this figure, where it changes almost every other column here. A team that finished '
+      + 'nothing in that month reads — rather than a number: there is no ratio to state, and '
+      + '“∞×” is not a figure anyone can act on.'],
+  ] },
   teamDataEnd: { title: 'Data To', body: [
     ['The last date this team’s own export runs to. Every other column is read over the '
       + 'same window and as of the same date — the newest date any team has — so the figures '
@@ -14703,7 +14731,7 @@ function teamColumns(train) {
   const dash = '—';
   const or = (v, f) => (v == null ? dash : f(v));
   /* ── Which columns carry an ⓘ, and why it is not all of them ───────────────
-     ONLY the two whose note cannot be read anywhere else. Seven of the columns
+     ONLY the ones whose note cannot be read from this table. Most of the columns
      below are the dashboard's own tiles laid side by side, and each of those
      tiles already carries the ⓘ that opens the same note; the throughput trend
      and Data to exist only in this table, so until this was wired up their notes
@@ -14713,7 +14741,18 @@ function teamColumns(train) {
      which is how that happened. Putting one on all nine put the table over the
      width of a 1265px window and into a sideways scroll it had always fitted
      inside: nine circles at 28px apiece is 250px of a comparison table, spent
-     mostly on notes a reader can already open one tab to the left. */
+     mostly on notes a reader can already open one tab to the left.
+
+     WIP VS MONTH IS THE THIRD, added 2026-09-03 because Charles asked what the
+     column meant. The rule above says its note opens from the dashboard tile —
+     but that tile is labelled "WIP vs throughput", so a reader in this table has
+     no way to know the two are the same figure, and the cross-reference this
+     column was resting on was one nobody could follow. Its own note, named for
+     THIS heading, also states the thing the tile's cannot: the denominator is a
+     month and not the window on screen, which is what makes this the one column
+     here that does not move when the window does. Three circles is 84px and the
+     table still fits — the count is the thing to watch, and the test beside it
+     is what watches. */
   return [
     { key: 'name', label: 'Team', text: true, desc: false,
       get: (r) => r.name.toLowerCase() },
@@ -14737,7 +14776,7 @@ function teamColumns(train) {
       get: (d) => d.summary.p85CycleTime, fmt: (v) => or(v, num1) },
     { key: 'wip', label: 'In progress', desc: true,
       get: (d) => d.summary.currentWip, fmt: (v) => or(v, String) },
-    { key: 'ratio', label: 'WIP vs month', desc: true,
+    { key: 'ratio', label: 'WIP vs month', desc: true, help: 'teamWipRatio',
       get: (d) => d.summary.wipRatio, fmt: (v) => or(v, (x) => num1(x) + '×') },
     { key: 'aged', label: 'Aged', desc: true,
       get: (d) => d.summary.agedNow, fmt: (v) => or(v, String) },

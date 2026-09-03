@@ -307,10 +307,20 @@ people actually scan for:
 | **Defect rate** | Who has a quality problem? — empty in the feature view, and the note under the table says why |
 | **Data to** | …and whose figures are worth trusting at all |
 
-**Throughput trend** and **Data to** carry an ⓘ of their own, because they are the two columns
-that exist only here — every other column is a dashboard tile laid on its side, and the tile
-carries the note. Nine circles across one header row costs 250px of a table already tight for
-width, which is the whole reason it is two and not nine.
+**Throughput trend**, **WIP vs month** and **Data to** carry an ⓘ of their own. The first and
+last are the two columns that exist only here — every other column is a dashboard tile laid on
+its side, and the tile carries the note. Nine circles across one header row costs 360px of a
+table already tight for width, which is the whole reason it is three and not nine.
+
+**WIP vs month** is the third because the cross-reference did not work: its note opens from a
+dashboard tile labelled *WIP vs throughput*, and nothing told a reader of this table that the
+two are the same figure. Its own note says what the ratio divides — the open work beside it
+against **what that team finished in the last month**, not over the window on screen, which
+makes it the one column here that does not move when you change the window — and what to make
+of the answer: **under half a month's throughput is the common coaching rule**, nearer a
+quarter for most teams, lower being better. It is a rule of thumb and not a target, which is
+why nothing turns a colour when a team crosses it. Making room for the third circle is why the
+headings of this table wrap onto a second line where every other table's stay on one.
 
 **Throughput trend** deserves its own paragraph, because it answers something none of the other
 columns can.

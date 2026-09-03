@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3178;
+const EXPECTED = 3184;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8978,23 +8978,60 @@ group('ARTs — the grouping, and the boundary it crosses');
 
   /* ── The ⓘ on a column heading ────────────────────────────────────────────
      Every column here carried a `help` key from the day the view was built and
-     the header render never read one, so the two notes describing columns that
-     exist ONLY in this table — the throughput trend, and Data to — could not be
-     opened at all. Those two are wired up now and the other seven deliberately
-     are not: their notes open from the dashboard tiles one tab to the left, and
-     nine circles at 28px apiece put this table over the width of an ordinary
-     window and into a sideways scroll it had always fitted inside. */
+     the header render never read one, so the notes describing columns that exist
+     ONLY in this table — the throughput trend, and Data to — could not be opened
+     at all. Those are wired up now and most of the others deliberately are not:
+     their notes open from the dashboard tiles one tab to the left, and nine
+     circles at 40px apiece put this table over the width of an ordinary window
+     and into a sideways scroll it had always fitted inside.
+
+     WIP VS MONTH IS THE THIRD, added 2026-09-03 because Charles asked what the
+     column meant. The rule said its note opens from the dashboard tile — but
+     that tile is labelled "WIP vs throughput", so a reader here had no way to
+     know the two are the same figure and the cross-reference was one nobody
+     could follow.
+
+     IT COST THE TABLE ITS FIT, and the fix is asserted below with the count. A
+     dot is 40px — 2px of button padding, a 10px margin, the 16px circle and a
+     12px margin — and this table had NOTHING to spare: three dots took it 38px
+     over an ordinary window. Letting the headings alone wrap buys that back with
+     room over, at the cost of one extra line in the header row. Both halves are
+     pinned here, because either one alone puts it back in a sideways scroll. */
   const helpOn = (key) => win.document.querySelectorAll('#allTeamsTable thead th')[colIndexEarly(key)]
     .querySelector('[data-help]');
   const colIndexEarly = (key) => [...win.document.querySelectorAll('#allTeamsTable thead th')]
     .findIndex(th => th.querySelector('[data-sort="' + key + '"]'));
   ok(helpOn('trend'), 'the throughput trend column carries its ⓘ');
   ok(helpOn('dataEnd'), 'and so does Data to — the other column unique to this view');
+  ok(helpOn('ratio'),
+     'and so does WIP vs month — the dashboard tile its note used to open from is '
+     + 'labelled "WIP vs throughput", which nobody reading this table could follow');
   is(helpOn('name'), null, 'the team name is not a metric, so it has none');
   is(helpOn('wip'), null,
      'and neither does In progress — its note opens from the tile of the same name');
-  is(win.document.querySelectorAll('#allTeamsTable thead [data-help]').length, 2,
-     'exactly two, so the table keeps the width it has always fitted inside');
+  is(win.document.querySelectorAll('#allTeamsTable thead [data-help]').length, 3,
+     'three, and no more: at 40px each they are what put this table over the width '
+     + 'of an ordinary window');
+  /* The other half of the same sum. `table.data td` is nowrap and so is every
+     other heading in the app — a figure broken over two lines is worse than a
+     wide column — and this table's headings are the one exception, which is what
+     pays for the third circle. Read off the COMPUTED style, and read against a
+     heading in the other table, because a rule that lost its scope would take
+     the Loaded Data table's headings with it and nothing else would notice. */
+  is(win.getComputedStyle(win.document
+       .querySelector('#allTeamsTable thead th.sortable button:not(.tile-help)')).whiteSpace,
+     'normal',
+     'the headings of THIS table wrap, which is what buys back the width the ⓘs cost');
+  /* Scoped BY ID, read off the stripped source. The Loaded Data table shares
+     `.sortable` — that sharing is stated in the CSS as the reason the selector
+     is written `:not(.tile-help)` rather than with a class of its own — so a
+     rule that lost its id would wrap that table's headings too and nothing on
+     screen here would say so. Stripped, because the comment above the rule
+     talks about the very thing the rule does. */
+  ok(/#allTeamsTable thead th\.sortable button:not\(\.tile-help\) \{ white-space: normal; \}/
+     .test(stripComments(APP_SRC)),
+     'and the rule names this table by id rather than sitting loose in table.data, '
+     + 'where it would take the Loaded Data table\u2019s headings with it');
 
   const helpDlg = win.document.getElementById('helpDialog');
   const sortBefore = win.document.querySelectorAll('#allTeamsTable thead th')[colIndexEarly('trend')]
@@ -9007,6 +9044,24 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(win.document.querySelectorAll('#allTeamsTable thead th')[colIndexEarly('trend')]
        .getAttribute('aria-sort'), sortBefore,
      'and does NOT re-sort the table underneath the dialog');
+  helpDlg.close();
+
+  /* The new one, named for ITS heading rather than for the tile it used to lean
+     on: a window titled "Work in Progress" over a column called WIP vs month
+     tells the reader who came about the ratio that this window is not for them,
+     which is the naming half of the app\u2019s own one-dot-one-explanation rule. */
+  const ratioSortBefore = win.document.querySelectorAll('#allTeamsTable thead th')[colIndexEarly('ratio')]
+    .getAttribute('aria-sort');
+  helpOn('ratio').click();
+  is(win.document.getElementById('helpTitle').textContent, 'WIP vs Month',
+     'the WIP vs month ⓘ opens a window named for that heading');
+  ok(/month/i.test(win.document.getElementById('helpBody').textContent)
+     && /0\.5|half/i.test(win.document.getElementById('helpBody').textContent),
+     'saying what the figure divides and what a reader should make of it',
+     win.document.getElementById('helpBody').textContent.slice(0, 80));
+  is(win.document.querySelectorAll('#allTeamsTable thead th')[colIndexEarly('ratio')]
+       .getAttribute('aria-sort'), ratioSortBefore,
+     'and does not re-sort the column it sits in either');
   helpDlg.close();
 
   /* Furniture, not a value: the export reads the rendered page, and a column of

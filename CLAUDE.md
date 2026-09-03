@@ -11,6 +11,43 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## WIP vs Month Got Its Own ⓘ (2026-09-03) — no schema change
+
+Charles asked what the column meant. That is the finding, not the request: the
+note existed, and the arrangement meant to lead him to it could not be followed.
+
+- **The cross-reference was unfollowable.** `teamColumns` gave dots only to the
+  two columns unique to this table, on the rule that every other column is a
+  dashboard tile laid on its side and the tile carries the note. True — except
+  that tile is labelled **"WIP vs throughput"** and the column is **"WIP vs
+  month"**. Same figure, two names, and nothing on screen says so. **A
+  cross-reference that depends on a reader guessing two labels are the same
+  thing is not a route.** The obvious alternative — renaming one of them so they
+  match — was left alone: Charles reads both, and it is his call.
+- **The window is named for THIS heading**, `teamWipRatio` → *WIP vs Month*,
+  following `teamTrend` and `teamDataEnd`. Opening the tile's *Work in Progress*
+  window from here would have told a reader who came about the ratio that the
+  window is not for them — the naming half of one-dot-one-explanation.
+- **It earns its place with a fact the tile's note cannot state**: the
+  denominator is a month counted back from the newest date in that team's own
+  data, **not the window on screen**, which makes this the one column here that
+  does not move when the window does.
+
+**IT COST THE TABLE ITS FIT, and that is the part to remember.** A dot is 40px —
+2px of button padding, a 10px margin, a 16px circle, a 12px margin — and this
+table had NOTHING spare: ten columns came to exactly the width of an ordinary
+1265px window, so the third circle took it 38px over and into the sideways
+scroll the original two-dot decision was written to avoid.
+
+**Letting the headings alone wrap buys it back.** `table.data td` is `nowrap` and
+so is every other heading in the app — a figure broken over two lines is worse
+than a wide column — and `#allTeamsTable thead` is now the one exception, scoped
+by id so the Loaded Data table's headings are untouched. The header row goes from
+36px to 56px and the table fits again with room over. **Both halves are pinned in
+the suite**, because either alone puts it back in a scroll: the dot count, and
+the computed `white-space` plus a stripped-source check that the rule still names
+the table by id.
+
 ## Stepping Between Charts in Full Screen (2026-09-03) — no schema change
 
 Charles: *"when a chart is in full screen mode, add left and right arrows near the
