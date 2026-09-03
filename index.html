@@ -406,6 +406,26 @@ html[data-pin] .panel :is(button, a[href], input, select, textarea, [tabindex]) 
    The band goes back to `static` and gives up its paint; the row takes both,
    including the margin→padding swap that keeps the 20px gap inside the box that
    paints it, so nothing moves when you pin. */
+/* ── ONE ROW THAT SCROLLS SIDEWAYS, NOT TWO THAT WRAP ───────────────────────
+   Asked for by Charles on 2026-09-03, straight after the pin and for the pin's
+   sake. Three tabs and the pin button come to about 370px, which is just past a
+   375px phone once the page's own padding is off — so the row wrapped to two
+   lines and the pinned band carried 116px where 42 would do. Sprint
+   Predictability had the same problem with seven tabs and three lines; Money Map
+   has drawn its tabs this way since it grew them. This is that rule.
+
+   THE PIN BUTTON IS NOT IN THE SCROLLER. It sits in `.tabrow` beside the
+   tablist, which is the whole reason that wrapper exists — inside `.tabs` it
+   would scroll away with them.
+
+   Harmless when they fit: a nowrap flex row with `overflow-x: auto` only scrolls
+   when there is something to scroll. Same 720px as the pin rule below, so the
+   phone has one breakpoint rather than two a pixel apart. */
+@media (max-width: 720px) {
+  .tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px;
+    scrollbar-width: thin; }
+  .tab { flex: 0 0 auto; white-space: nowrap; }
+}
 @media (max-width: 720px) {
   /* `display: contents` and not `position: static`, and the difference is the
      whole thing working. A sticky box can only stick INSIDE its parent's box:
@@ -15894,6 +15914,23 @@ function selectTab(name) {
     tab.tabIndex = sel ? 0 : -1;
     $('panel-' + t).hidden = !sel;
   });
+  /* On a phone the row scrolls sideways instead of wrapping, so the chosen tab
+     can sit off an end. Nudged only when it actually is — a row that re-centres
+     on a tab you can already see would shuffle on every press — and by RECTANGLE
+     rather than offsetLeft, whose offsetParent is the page, so those numbers and
+     `scrollLeft` are in different frames. Never `scrollIntoView`: that is free to
+     scroll the PAGE as well to satisfy the vertical axis, and jumping the reader
+     down the page on a tab press is not what was asked for. On a desktop the row
+     never overflows and this is a no-op. */
+  const bar = document.querySelector('.tabs');
+  const chosen = $('tab-' + name);
+  if (bar && chosen && bar.scrollWidth > bar.clientWidth) {
+    const b = bar.getBoundingClientRect(), t = chosen.getBoundingClientRect();
+    if (b.width > 0) {
+      if (t.left < b.left) bar.scrollLeft += t.left - b.left;
+      else if (t.right > b.right) bar.scrollLeft += t.right - b.right;
+    }
+  }
   /* The strip belongs to the two views it means anything to. */
   $('viewControls').hidden = !NUMBER_TABS.includes(name);
   /* The pinned band just got shorter or taller by the height of that strip, and

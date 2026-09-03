@@ -64,7 +64,26 @@ It also scrolls the frame to the top first: groups above it leave the frame
 scrolled, and the real press is a hit test, which answers null for a button
 above the viewport.
 
-**Sprint Predictability does NOT have this**, and it shares this app's chrome.
+**The tabs became one scrolling row on a phone the same day** (asked for after
+Sprint Predictability's, and for the pin's sake). Three tabs and the button come
+to about 370px, which is just past a 375 screen once `.shell`'s padding is off,
+so the row wrapped and the pinned band carried 116px where 42 would do. `nowrap`
+plus `overflow-x: auto` at the SAME 720px as the pin rule, so the phone has one
+breakpoint rather than two a pixel apart. It is harmless where they fit — a
+nowrap row only scrolls when there is something to scroll.
+- **The pin button is NOT in the scroller.** That is the second reason `.tabrow`
+  exists as a wrapper; inside `.tabs` it would scroll away with them.
+- **selectTab() nudges the chosen tab into view**, only when it is actually off
+  an end, by RECTANGLE and not `offsetLeft` (whose offsetParent is the page), and
+  **never `scrollIntoView`** — that is free to scroll the PAGE to satisfy the
+  vertical axis. Money Map's arithmetic, and Sprint Predictability's.
+- **The suite asserts ONE LINE, not "it overflows".** Whether the row overflows
+  depends on how many tabs are on offer, and All Teams is away below two teams —
+  which is the state that frame is in by the time it gets there. It measures the
+  row against a TAB rather than against a literal, since the row also carries the
+  pin's 20px band and a scrollbar.
+
+**Sprint Predictability has both of these now**, and it shares this app's chrome.
 
 ## WIP vs Month Got Its Own ⓘ (2026-09-03) — no schema change
 

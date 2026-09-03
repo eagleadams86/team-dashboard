@@ -77,6 +77,12 @@ phone reader actually wants, which is changing tab without scrolling back up. Yo
 to the top to change the window or the grouping there. Money Map makes the same trade for the
 same reason.
 
+**And on a phone the tab row is one line that scrolls sideways**, rather than two that wrap:
+three tabs and the 📌 come to about 370px, which is just past a 375px screen once the page's
+own padding is off. The tab you choose is nudged into view if it would sit off an end, and
+the 📌 stays put beside them rather than scrolling away. Sprint Predictability and Money Map
+draw their tabs the same way.
+
 Charts draw their data in the shared theme pack's **categorical colours** — `--series-1`, a blue,
 for the measure, and `--series-5`, a rust, for the second series where a chart has one. They used
 to draw in the app's accent, which is fine on Midnight and Light and wrong on the other two: on

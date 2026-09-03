@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3207;
+const EXPECTED = 3213;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -12419,6 +12419,41 @@ group('a card with no chart matches the one beside it');
        prop('--pin-clear'));
     is(cs(pinDoc.getElementById('viewControls')).position, 'static',
        'the controls scroll away with the page, which is what buys the room back');
+
+    /* ── And the tabs are ONE row that scrolls, not two that wrap ──────────
+       The other half of the same sum, added the same day: three tabs and the pin
+       button come to about 370px, which is just past a 375 phone once the page's
+       own padding is off, so the row wrapped and the pinned band carried 116px
+       where 42 would do. */
+    const tabBar = pinDoc.querySelector('.tabs');
+    is(cs(tabBar).flexWrap, 'nowrap', 'at phone width the tab row does not wrap');
+    is(cs(tabBar).overflowX, 'auto', 'it scrolls sideways instead');
+    /* ONE LINE, and not "it overflows": whether it does depends on how many tabs
+       are on offer, and All Teams is away below two teams — which is exactly the
+       state this frame is in by the time it gets here. The height is the claim
+       that matters and the one that holds either way. */
+    /* Measured against a TAB rather than against a number: the row also carries
+       the pin's 20px band and a scrollbar here, so a literal would be pinning
+       those as much as the thing it is about. */
+    const oneTab = rect(tabBar.querySelector('.tab')).height;
+    ok(rect(tabBar).height < oneTab * 2,
+       'so the tabs are one line rather than two',
+       Math.round(rect(tabBar).height) + 'px against a ' + Math.round(oneTab) + 'px tab');
+    is(pinBtn.parentElement, row,
+       'and the pin button is OUTSIDE the scroller, or it would scroll away with '
+       + 'the tabs and have to be gone looking for');
+    /* The nudge: choose the last tab and it comes into view, and the PAGE does
+       not move — `scrollIntoView` would have satisfied the vertical axis too. */
+    const tabsOn = [...tabBar.querySelectorAll('.tab')].filter((t) => !t.hidden);
+    const last = tabsOn[tabsOn.length - 1];
+    win.scrollTo(0, 0);
+    last.click();
+    await new Promise((r) => setTimeout(r, 300));
+    const bBox = tabBar.getBoundingClientRect(), tBox = last.getBoundingClientRect();
+    ok(tBox.left >= bBox.left - 1 && tBox.right <= bBox.right + 1,
+       'the chosen tab is nudged into view when it would sit off an end',
+       Math.round(tBox.left - bBox.left) + '..' + Math.round(tBox.right - bBox.right));
+    is(win.scrollY, 0, 'and the page itself did not move to do it');
 
     await wide(1265);
     win.tdPin.apply(false);
