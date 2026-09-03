@@ -47,6 +47,15 @@ screen, while remaining in fullscreen."* Two things decide how this is built.
 - **The heading's clearance is on `#chartMaxi.has-nav`**, so a screen with nothing to walk
   carries no reserved space beside its chart's name.
 
+- **The arrow-key handler skips ARIA ROLES, not just form controls.** Money Map
+  found it on 2026-09-03: its Net Worth card carries an "as of" radio pair INSIDE
+  the card, so it is still reachable while that card fills the window, and Right
+  both moved the month and stepped the chart. A `<button role="radio">` is not an
+  `<input>`. The guard names radiogroup, tablist, listbox, menu, menubar, slider,
+  spinbutton, grid and tree, and the same list is in all four apps — nothing here
+  puts such a control inside a chart card TODAY, which is exactly why it would be
+  missed the day something does.
+
 27 checks in `walking the charts on that screen without coming back down`.
 
 **Ported the same day**, so a change belongs in all four: **Lottery Portfolio** (no tabs —
@@ -1108,11 +1117,16 @@ move. Phase 1 of five; the forecasting itself is not built yet.
   cannot be told apart. Guessing would reparent every item in the file, silently, and **a wrong
   parent is worse than no parent**: it invents a feature breakdown nobody's board has. No
   heading, no parent.
-- **`featureTypes` is a LIST, and empty is off.** Nothing ships in it. This app shipped Spikes,
-  Stories and Tasks in its filter list once as a guess at somebody else's board, and they were
-  three filters matching nothing. Each entry goes through `cleanWorkType` (dropped whole, never
-  truncated), the list is capped at `FEATURE_TYPES_MAX` and de-duplicated on the matched form.
-  It has its own listener rather than a row in `SETTING_INPUTS`, because that map is for scalars.
+- **`featureTypes` is a LIST, it ships as `['Feature']`, and empty is still off.** The word was
+  added 2026-09-03 at Charles's request, reversing the empty default. It is not the Spikes-and-
+  Stories mistake repeated: `Feature` is what Jira's own hierarchy calls the level above a Story,
+  and unlike a filter row a feature type matching nothing diverts no rows, moves no figure and
+  shows nothing. **Do not make an empty list mean "give me the defaults back"** the way
+  `s.filters` does — clearing the box is the documented way to switch the whole layer off, and
+  every guard in the feature code is written against it. Each entry goes through `cleanWorkType`
+  (dropped whole, never truncated), the list is capped at `FEATURE_TYPES_MAX` and de-duplicated on
+  the matched form. It has its own listener rather than a row in `SETTING_INPUTS`, because that
+  map is for scalars.
 - **`mergeFeatures` de-duplicates on APPEND where rows deliberately do not.** Two pasted rows
   describing the same work item are two rows — the app has never had a way to know otherwise.
   A feature IS its key, so the same key twice would count one feature as two everywhere it is
