@@ -48,10 +48,15 @@ screen, while remaining in fullscreen."* Two things decide how this is built.
   carries no reserved space beside its chart's name.
 
 27 checks in `walking the charts on that screen without coming back down`.
-**Not yet ported to the other five apps that carry the full-screen button** — Money Map,
-Sprint Predictability, Lottery Portfolio, Golf Handicap (one chart, so nothing to walk)
-and the starter. Money Map and Sprint Predictability rewrite their views wholesale on every
-render, so a port there has to go through their `maxiSuspend`/`maxiResume` by canvas id.
+
+**Ported the same day**, so a change belongs in all four: **Lottery Portfolio** (no tabs —
+it walks the whole page, minus folded sections), **Sprint Predictability** and **Money
+Map** (both walk `#views`, which their renders rewrite wholesale, so the walk is always the
+tab the reader is on). **Money Map's arrows sit in the heading BAND**, not floating over
+the card's corner, because that corner is its fold control — the same divergence its ⤢
+already had, and the reason it is the only one of the four that has to hand the focus back
+by itself after a step. **Golf Handicap and the starter draw one chart each**, so there is
+nothing to walk; both record that, and where to take the walk from if a second arrives.
 
 ## A Settings Window Is a Stack, Not a Column (2026-09-02) — no schema change
 
