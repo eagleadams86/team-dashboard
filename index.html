@@ -1018,13 +1018,18 @@ select { cursor: pointer; }
    heading lines carry a matching right padding so a long chart name never runs
    under it. Square rather than the ⓘ's circle: this is an action, not an
    explanation, and the two should not be mistaken for each other at a glance. */
-.chart-max { position: absolute; top: 13px; right: 13px; z-index: 1;
+.chart-max { position: absolute; top: 13px; right: 13px; z-index: 1; }
+/* The step arrows further down share this box exactly, and share it from HERE
+   rather than by having it typed twice: the three buttons sit in one cluster in
+   the same corner, and a border or a size that drifted on one of them would be
+   visible at a glance. */
+.chart-max, .maxi-step {
   display: flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; padding: 0; border-radius: var(--radius-sm);
   border: 1px solid var(--border-control); background: transparent;
   color: var(--text-secondary); cursor: pointer; }
-.chart-max:hover { color: var(--text-primary); background: var(--surface-alt);
-  border-color: var(--text-secondary); }
+.chart-max:hover, .maxi-step:hover { color: var(--text-primary);
+  background: var(--surface-alt); border-color: var(--text-secondary); }
 /* The icon is never the thing that was clicked. Pressing this button rewrites
    its own innerHTML to the arrows-in icon, which DETACHES whatever the pointer
    actually landed on — and a detached node answers null to every `closest()` a
@@ -1032,7 +1037,7 @@ select { cursor: pointer; }
    today; Money Map's card heading did, and pressing the button there folded the
    card instead of filling the window (2026-08-30, reported within the hour).
    One line closes the class, in all four apps that carry this feature. */
-.chart-max svg { pointer-events: none; }
+.chart-max svg, .maxi-step svg { pointer-events: none; }
 /* ── A hidden button must actually GO ───────────────────────────────────────
    `.chart-max` declares `display: flex`, and an AUTHOR rule beats the browser's
    own `[hidden] { display: none }` whatever their specificities — so
@@ -1076,6 +1081,40 @@ select { cursor: pointer; }
 #chartMaxi > .chart-card { flex: 1 1 auto; display: flex; flex-direction: column;
   min-height: 0; width: auto; margin: 0; }
 #chartMaxi > .chart-card > .chart-wrap { flex: 1 1 auto; height: auto; min-height: 0; }
+
+/* ── Walking the charts on this screen without coming back down ──────────
+   Asked for by Charles (2026-09-03): left and right arrows beside the leave-
+   full-screen button, stepping through the charts of the screen you came from
+   while staying up here.
+
+   THEY LIVE IN THE OVERLAY AND NOT IN THE CARD, which is the load-bearing part.
+   A step swaps one card out of the overlay for another; a button inside the card
+   would be detached mid-press, and a detached button takes the keyboard's focus
+   to <body> with it — you could press Next once and then have nothing to press
+   again. In the overlay they never move, so the arrow you are on stays the arrow
+   you are on for the whole walk.
+
+   Their place is the card's own top-right corner, alongside the ⤢ they belong
+   with. The sum is the overlay's padding, plus the card's 1px BORDER, plus the
+   13px .chart-max is inset by, plus that button's 26px and a 6px gap: 20+1+13
+   = 34 down, and 20+1+13+26+6 = 66 in. The border is in there because an
+   absolutely positioned box is offset from its containing block's PADDING box,
+   so .chart-max sits a border-width further in than its own 13px reads — leave
+   it out and the three buttons are a pixel out of line, which is exactly what
+   the first draft of this did. The phone's smaller padding repeats below rather
+   than being left to drift. */
+.maxi-nav { position: absolute; top: 34px; right: 66px; z-index: 2;
+  display: flex; gap: 6px; }
+/* `.maxi-nav` declares `display: flex`, and an author rule beats the browser's
+   own `[hidden] { display: none }` at any specificity — the same trap that left
+   a dead .chart-max on screen on 2026-08-30. One screen, one chart: no arrows. */
+.maxi-nav[hidden] { display: none; }
+@media (max-width: 640px) { .maxi-nav { top: 24px; right: 56px; } }
+/* The heading lines clear the whole cluster, and only while there IS a cluster:
+   a screen with a single chart would otherwise carry 112px of reserved nothing
+   beside a name that could have used it. */
+#chartMaxi.has-nav > .chart-card .chart-name,
+#chartMaxi.has-nav > .chart-card .chart-title { padding-right: 112px; }
 /* Keeps the page still behind the overlay: scrolling what you cannot see reads
    as the window having lost its place when the chart comes back down. */
 body.maxi-open { overflow: hidden; }
@@ -3840,7 +3879,22 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
      underneath; anything in here would have gone inert with it. `role="dialog"`
      WITHOUT aria-modal: the header really is still live, and aria-modal="true"
      would tell a screen reader the opposite. -->
-<div id="chartMaxi" role="dialog"></div>
+<div id="chartMaxi" role="dialog">
+  <!-- The step arrows are the one thing that lives in here permanently. They
+       belong to the OVERLAY and not to the card, because stepping moves the card
+       out and another one in: a button inside it would be detached under the
+       pointer and would take the keyboard's focus with it. Hidden whenever the
+       screen behind has fewer than two charts to walk. Before the card in the
+       DOM so the reading order matches the left-to-right order on screen. -->
+  <div class="maxi-nav" id="maxiNav" hidden>
+    <button type="button" class="maxi-step" id="maxiPrev"></button>
+    <button type="button" class="maxi-step" id="maxiNext"></button>
+  </div>
+  <!-- Focus stays on the arrow through a step, so nothing about the swap is
+       announced on its own: this says which chart is now up, and only on a step.
+       Same shape as the search box's count, which is the app's precedent. -->
+  <span id="maxiSaid" class="sr-only" role="status"></span>
+</div>
 
 <div id="toast" popover="manual" role="status" aria-live="polite"></div>
 
@@ -15744,6 +15798,19 @@ const MAXI_ICON = {
      + '<path d="M10 14l-7 7"/></svg>'
 };
 
+/* The step arrows, drawn the same way and for the same reason. A chevron rather
+   than a triangle or a « : this pair steps through a list, it does not play or
+   rewind anything, and the chevron is the shape the rest of the web uses to say
+   exactly that. */
+const STEP_ICON = {
+  prev: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"'
+      + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'
+      + ' focusable="false"><path d="M15 18l-6-6 6-6"/></svg>',
+  next: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"'
+      + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'
+      + ' focusable="false"><path d="M9 18l6-6-6-6"/></svg>'
+};
+
 let maxiCard = null;    /* the card currently filling the window, or null */
 let maxiSlot = null;    /* the hidden placeholder holding its seat in the grid */
 let maxiScrollY = 0;    /* where the page was, to put it back on the way out */
@@ -15806,6 +15873,9 @@ function syncMaxiButtons() {
     dressMaxiBtn(card);
   });
   if (maxiCard) $('chartMaxi').setAttribute('aria-label', maxiName(maxiCard) + ', full screen');
+  /* A render can take a chart away from the screen behind, or give it one back,
+     so the arrows are re-read with the buttons rather than only on the way up. */
+  dressStepBtns();
 }
 
 /* The header wraps to two or three rows on a phone, and its height is the one
@@ -15852,6 +15922,7 @@ function openMaxi(card) {
      header is NOT inside .shell, so it stays reachable — which is the point. */
   document.querySelector('.shell').inert = true;
   dressMaxiBtn(card);
+  dressStepBtns();
   if (maxiHeaderWatch) maxiHeaderWatch.observe(document.querySelector('header'));
   const chart = chartIn(card);
   if (chart) chart.resize();
@@ -15876,6 +15947,9 @@ function closeMaxi() {
   document.querySelector('.shell').inert = false;
   if (maxiHeaderWatch) maxiHeaderWatch.disconnect();
   dressMaxiBtn(card);
+  dressStepBtns();
+  const said = $('maxiSaid');
+  if (said) said.textContent = '';
   const chart = chartIn(card);
   if (chart) chart.resize();
   /* Back to the button that opened it, which is now back in its card — a
@@ -15883,6 +15957,122 @@ function closeMaxi() {
   const btn = card.querySelector('.chart-max');
   if (btn && !btn.hidden) btn.focus();
 }
+
+/* ── Stepping to the next chart without coming back down ─────────────────────
+   Asked for by Charles (2026-09-03). Full screen is where you go to look hard at
+   one chart; comparing it with the one beside it meant leaving, finding the next
+   card and going back up, which is three actions for a thing that is one.
+
+   WHAT "THE CHARTS ON THAT SCREEN" MEANS is the only judgement here. It is the
+   tabpanel the card came out of — so on the Dashboard it is the SUB-TAB (Flow,
+   Delivery, Health, Forecast), not the whole tab. Stepping right must land on a
+   chart the reader would have seen by scrolling; stepping into Health from Flow
+   would be stepping somewhere they never went. The train chart lives on its own
+   panel and is a list of one, which is why the arrows are hidden rather than
+   looping a single card back onto itself.
+
+   The list is read off the DOM every time rather than being captured on the way
+   up, because the header stays live: change team and a chart can appear or go
+   (lead time with no created dates is the case that is always reachable), and
+   the list has to have gone with it. */
+function maxiGroup() {
+  if (!maxiCard || !maxiSlot) return [];
+  const panel = maxiSlot.closest('[role="tabpanel"]');
+  if (!panel) return [maxiCard];
+  const out = [];
+  /* The maximised card is in the overlay, so its PLACEHOLDER stands in for it —
+     the seat is what holds its place in the order, which is the whole reason the
+     placeholder exists. */
+  panel.querySelectorAll('.chart-card, .chart-slot').forEach(node => {
+    const card = (node === maxiSlot) ? maxiCard : node;
+    if (!card.classList.contains('chart-card')) return;
+    if (card.querySelector('.chart-wrap') && maxiReady(card)) out.push(card);
+  });
+  return out;
+}
+
+/* Hidden below two charts, and the heading's clearance goes with them. The
+   labels name the chart each arrow LANDS on rather than saying "previous" twice,
+   because at this point the reader is looking at a chart and not at a list. */
+function dressStepBtns() {
+  const nav = $('maxiNav');
+  if (!nav) return;
+  const list = maxiCard ? maxiGroup() : [];
+  const many = list.length > 1;
+  nav.hidden = !many;
+  $('chartMaxi').classList.toggle('has-nav', many);
+  if (!many) return;
+  const i = list.indexOf(maxiCard);
+  const at = (n) => list[(i + n + list.length) % list.length];
+  const where = ' (' + (i + 1) + ' of ' + list.length + ')';
+  const prev = $('maxiPrev'), next = $('maxiNext');
+  prev.setAttribute('aria-label', 'Previous chart \u2014 ' + maxiName(at(-1)));
+  next.setAttribute('aria-label', 'Next chart \u2014 ' + maxiName(at(1)));
+  prev.title = 'Previous chart' + where;
+  next.title = 'Next chart' + where;
+}
+
+/* One step, wrapping at both ends. The card that is up goes back to its own seat
+   BEFORE the next one leaves its own, so the grid never holds two placeholders
+   and the seat the next group is read from is the real one. Everything the
+   overlay itself owns — the scroll position, the inert shell, the measured top —
+   is untouched, because none of it changed: this is still the same window, with
+   a different chart in it. */
+function maxiStep(dir) {
+  if (!maxiCard || !maxiSlot) return;
+  const list = maxiGroup();
+  if (list.length < 2) return;
+  const i = list.indexOf(maxiCard);
+  if (i < 0) return;
+  const card = list[(i + dir + list.length) % list.length];
+  if (card === maxiCard) return;
+
+  const ov = $('chartMaxi');
+  const leaving = maxiCard;
+  maxiSlot.parentNode.insertBefore(leaving, maxiSlot);
+  maxiSlot.remove();
+  maxiSlot = document.createElement('div');
+  maxiSlot.className = 'chart-slot';
+  maxiSlot.hidden = true;
+  card.parentNode.insertBefore(maxiSlot, card);
+  ov.appendChild(card);
+  maxiCard = card;
+  ov.setAttribute('aria-label', maxiName(card) + ', full screen');
+  dressMaxiBtn(leaving);
+  dressMaxiBtn(card);
+  dressStepBtns();
+  /* Both of them: the one arriving has just been given the whole window, and the
+     one going back has just been given a 300px box again. */
+  const gone = chartIn(leaving), up = chartIn(card);
+  if (gone) gone.resize();
+  if (up) up.resize();
+  const said = $('maxiSaid');
+  if (said) said.textContent = maxiName(card) + ', full screen';
+}
+
+(() => {
+  const prev = $('maxiPrev'), next = $('maxiNext');
+  if (!prev || !next) return;
+  prev.innerHTML = STEP_ICON.prev;
+  next.innerHTML = STEP_ICON.next;
+  prev.addEventListener('click', () => maxiStep(-1));
+  next.addEventListener('click', () => maxiStep(1));
+})();
+
+/* The arrow keys do the same thing, which is what a reader who has just used the
+   buttons once will try next. Not while the caret is in a control: the team
+   picker and the theme picker are in the header and stay live up here on
+   purpose, and Left in an open <select> belongs to the select. */
+document.addEventListener('keydown', (e) => {
+  if (!maxiCard) return;
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (document.querySelector('dialog[open]')) return;
+  const t = e.target;
+  if (t && t.closest && t.closest('input, select, textarea, [contenteditable="true"]')) return;
+  e.preventDefault();
+  maxiStep(e.key === 'ArrowRight' ? 1 : -1);
+});
 
 /* One button per chart card, built once and then only re-dressed. Appended to
    the card rather than to either heading line for the reason the CSS records:
@@ -15943,7 +16133,8 @@ const maxiHeaderWatch = ('ResizeObserver' in window) ? new ResizeObserver(() => 
 
 /* For tests.html: which card is up, and the two doors, so the suite can drive
    the real thing rather than a copy of its reasoning. */
-window.tdMaxi = { open: openMaxi, close: closeMaxi, current: () => maxiCard, ready: maxiReady };
+window.tdMaxi = { open: openMaxi, close: closeMaxi, current: () => maxiCard, ready: maxiReady,
+                  step: maxiStep, group: maxiGroup };
 
 /* ── What pressing a column heading does ─────────────────────────────────────
    THREE states, not two: the column its own way, then reversed, then off.

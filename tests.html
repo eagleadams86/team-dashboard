@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3150;
+const EXPECTED = 3177;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -12389,6 +12389,139 @@ group('a card with no chart matches the one beside it');
   ok(win.tdMaxi.current() === null,
      'and a render with nothing left to plot brings it down rather than leaving a dead canvas up');
   ok(!mDoc.querySelector('.shell').inert, 'with the page handed back');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('walking the charts on that screen without coming back down');
+
+  /* Charles, 2026-09-03: arrows beside the leave-full-screen button that step
+     through the charts on the screen you came from, without dropping out of full
+     screen to do it. Two decisions carry the feature and both are pinned here.
+
+     THE ARROWS BELONG TO THE OVERLAY, NOT TO THE CARD. A step moves one card out
+     and another in; a button inside the card would be detached under the pointer
+     mid-press, and a detached button takes the keyboard's focus to <body> with
+     it \u2014 you could press Next once and have nothing left to press.
+
+     "THAT SCREEN" IS THE SUB-TAB. Stepping right must land on a chart the reader
+     could have reached by scrolling; walking from Flow into Health would be
+     walking somewhere they never were. */
+  plant({ stages: [], arts: [], settings: {},
+          teams: [{ id: 'mx1', name: 'Dated', rows: [
+                     { c: '2026-08-09', s: '2026-08-02', k: '2026-07-28', t: 'Story', i: 'DAE-1' },
+                     { c: '2026-08-12', s: '2026-08-04', k: '2026-07-30', t: 'Bug', i: 'DAE-2' },
+                     { c: '2026-08-14', s: '2026-08-05', k: '2026-07-31', t: 'Story', i: 'DAE-3' } ] },
+                   { id: 'mx2', name: 'Undated', rows: [
+                     { c: '2026-08-09', s: '2026-08-02', t: 'Story' } ] }] });
+  win.renderAll();
+  mDoc.getElementById('stab-flow').click();
+
+  const nav = mDoc.getElementById('maxiNav');
+  const prevArrow = mDoc.getElementById('maxiPrev');
+  const nextArrow = mDoc.getElementById('maxiNext');
+  const seen = (el) => win.getComputedStyle(el).display !== 'none';
+  const idOf = (card) => card.id || card.querySelector('canvas').id;
+  const names = (l) => l.map(c => c.querySelector('.chart-name span').textContent.trim()).join(', ');
+
+  ok(nav.parentElement === overlay,
+     'the arrows are the overlay\u2019s own and not a card\u2019s \u2014 a button inside the '
+     + 'card is detached mid-step and takes the focus with it');
+  ok(!seen(nav), 'and they are not on the page while nothing is filling the window');
+
+  /* The walk, worked out a second way: the cards on this sub-tab whose own
+     full-screen button is showing. If the two ever disagree, one of them is
+     offering a chart the other says is not there. */
+  const flowWalk = [...mDoc.querySelectorAll('#spanel-flow .chart-card')]
+    .filter(c => c.querySelector('.chart-max') && seen(c.querySelector('.chart-max')));
+  ok(flowWalk.length > 1, 'this screen has more than one chart to walk', flowWalk.length);
+
+  /* Read BEFORE anything is lifted out: while a card is up its seat is held by a
+     placeholder and the card itself is in the overlay, so an order read then is
+     an order with a hole in it. */
+  const walkOrder = [...mDoc.querySelectorAll('#spanel-flow .chart-card')].map(idOf).join(',');
+
+  const firstCard = flowWalk[0];
+  firstCard.querySelector('.chart-max').click();
+  ok(seen(nav), 'they appear when a chart fills the window');
+  ok(overlay.classList.contains('has-nav'),
+     'and the heading is told to leave room for them');
+  is(names(win.tdMaxi.group()), names(flowWalk),
+     'the walk is this sub-tab\u2019s drawable charts, in the order they are laid out in');
+  ok(win.tdMaxi.group().every(c => flowWalk.indexOf(c) >= 0),
+     'and nothing from a sub-tab the reader is not looking at');
+  ok(/Next chart \u2014 /.test(nextArrow.getAttribute('aria-label')),
+     'the arrow names the chart it lands on, not just a direction',
+     nextArrow.getAttribute('aria-label'));
+
+  const svgWas = nextArrow.firstElementChild;
+  const secondCard = flowWalk[1];
+  const secondLive = win.tdCharts()[secondCard.querySelector('canvas').id];
+  nextArrow.focus();
+  nextArrow.click();
+  ok(win.tdMaxi.current() === secondCard, 'Next steps to the chart beside it');
+  ok(secondCard.parentElement === overlay, 'which is the card itself, moved up here');
+  ok(firstCard.parentElement !== overlay
+     && mDoc.getElementById('spanel-flow').contains(firstCard),
+     'and the one that was up is back in its own seat');
+  is(mDoc.querySelectorAll('.chart-slot').length, 1,
+     'with exactly one placeholder held \u2014 the seat of whatever is up now');
+  ok(mDoc.activeElement === nextArrow,
+     'the arrow still has the keyboard, so it can be pressed again');
+  ok(nextArrow.firstElementChild === svgWas,
+     'and the arrow itself was never rebuilt under the pointer');
+  ok(overlay.classList.contains('open') && mDoc.querySelector('.shell').inert,
+     'the window did not come down and go back up \u2014 it is the same window with a '
+     + 'different chart in it');
+  ok(win.tdCharts()[overlay.querySelector('canvas').id] === secondLive,
+     'and the live Chart.js instance came with the card, rather than the step '
+     + 'leaving a copy on the page for every re-render to paint into');
+
+  /* Both ends wrap, because a walk with a dead end makes the reader work out
+     where they are in a list they were never shown. */
+  for (let i = 1; i < flowWalk.length; i++) nextArrow.click();
+  ok(win.tdMaxi.current() === firstCard, 'the last chart steps forward to the first');
+  prevArrow.click();
+  ok(win.tdMaxi.current() === flowWalk[flowWalk.length - 1],
+     'and the first steps back to the last');
+
+  /* The arrow keys do the same, which is what a reader tries next. */
+  win.tdMaxi.close();
+  firstCard.querySelector('.chart-max').click();
+  mDoc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  ok(win.tdMaxi.current() === secondCard, 'Right steps to the next chart');
+  mDoc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+  ok(win.tdMaxi.current() === firstCard, 'and Left steps back');
+
+  /* \u2026but not out of a control. The team and theme pickers are in the header
+     and stay live up here on purpose, and Left in a <select> belongs to the
+     select. */
+  const walkPicker = mDoc.getElementById('teamSel');
+  walkPicker.focus();
+  walkPicker.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  ok(win.tdMaxi.current() === firstCard,
+     'an arrow pressed in the team picker is the picker\u2019s, not the walk\u2019s');
+
+  /* The header really is still live, so the walk is re-read rather than captured
+     on the way up: change team and a chart can go. */
+  const walkWas = win.tdMaxi.group().length;
+  walkPicker.value = 'mx2';
+  walkPicker.dispatchEvent(new win.Event('change', { bubbles: true }));
+  ok(win.tdMaxi.group().length < walkWas,
+     'a team with no lead time chart is a shorter walk, read again rather than '
+     + 'remembered from the way up', win.tdMaxi.group().length + ' of ' + walkWas);
+  ok(/Next chart \u2014 /.test(nextArrow.getAttribute('aria-label')),
+     'and the arrow says where it goes now, not where it went before');
+
+  walkPicker.value = 'mx1';
+  walkPicker.dispatchEvent(new win.Event('change', { bubbles: true }));
+  nextArrow.click();
+  nextArrow.click();
+  win.tdMaxi.close();
+  is([...mDoc.querySelectorAll('#spanel-flow .chart-card')].map(idOf).join(','), walkOrder,
+     'a whole walk and then out leaves every card in the seat it started in');
+  is(mDoc.querySelectorAll('.chart-slot').length, 0, 'with no placeholder left behind');
+  ok(!seen(nav), 'and the arrows gone with the window');
+  ok(!overlay.classList.contains('has-nav'),
+     'so a screen with nothing to walk carries no reserved space beside its name');
 
   /* ────────────────────────────────────────────────────────── */
   group('a status nothing points at survives the reload');

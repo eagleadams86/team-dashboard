@@ -11,6 +11,48 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## Stepping Between Charts in Full Screen (2026-09-03) — no schema change
+
+Charles: *"when a chart is in full screen mode, add left and right arrows near the
+'leave fullscreen' button that allows the user to rotate through the charts on that
+screen, while remaining in fullscreen."* Two things decide how this is built.
+
+- **The arrows live in the OVERLAY, not in the card.** A step moves one card out of
+  `#chartMaxi` and another in; a button inside the card is detached under the pointer
+  mid-press, and a detached button takes the keyboard's focus to `<body>` with it — press
+  Next once and there is nothing left to press. In the overlay they never move, so the
+  arrow you are on stays the arrow you are on for a whole walk. This is the same class of
+  trap as the `.chart-max` icon rewrite (`[[real-press-not-btn-click]]` in memory), reached from the
+  other side.
+- **"That screen" is the SUB-TAB**, `card.closest('[role="tabpanel"]')` — so from Cycle
+  Time the walk reaches the other Flow charts and never the Health ones. Stepping right
+  must land somewhere the reader could have got to by scrolling. The All Teams panel is a
+  list of one, so it gets no arrows at all rather than a loop back onto itself.
+- **The walk is re-read on every press and on every render, never captured on the way
+  up.** The header stays live up here on purpose; change team and lead time can go. That
+  is why `dressStepBtns()` hangs off `syncMaxiButtons()` as well as off open and close.
+- **The card returns to its own seat before the next one leaves its own**, so the grid
+  never holds two `.chart-slot`s and the order the next walk is read from is the real one.
+  Nothing else the overlay owns is touched by a step — not the scroll position, not the
+  inert shell, not the measured `--maxi-top`: it is the same window with a different chart
+  in it.
+- **The arrow keys do the same**, except inside a control — the team and theme pickers are
+  in the header and stay usable while a chart is up, and Left in a `<select>` is the
+  select's.
+- **`.maxi-nav` is positioned from a sum that includes the card's 1px BORDER**
+  (20 + 1 + 13 down; + 26 + 6 across), because an absolutely positioned box is offset from
+  its containing block's *padding* box — `.chart-max`'s own `top: 13px` therefore lands a
+  border-width further in. Left out, the three buttons are a pixel out of line, which is
+  what the first draft did. Same lesson as `[[inset-grows-from-padding-box]]` in memory.
+- **The heading's clearance is on `#chartMaxi.has-nav`**, so a screen with nothing to walk
+  carries no reserved space beside its chart's name.
+
+27 checks in `walking the charts on that screen without coming back down`.
+**Not yet ported to the other five apps that carry the full-screen button** — Money Map,
+Sprint Predictability, Lottery Portfolio, Golf Handicap (one chart, so nothing to walk)
+and the starter. Money Map and Sprint Predictability rewrite their views wholesale on every
+render, so a port there has to go through their `maxiSuspend`/`maxiResume` by canvas id.
+
 ## A Settings Window Is a Stack, Not a Column (2026-09-02) — no schema change
 
 Charles, of the Settings window: *"this window is big and a bit hard to read. can you add

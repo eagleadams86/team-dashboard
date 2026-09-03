@@ -41,7 +41,8 @@ which it isn't, and its bars stop being comparable with theirs at a glance. On a
 every chart is full width, so there is nothing to centre.
 
 Any one of them can be **[filled to the window](#one-chart-filling-the-window)** with the ⤢ in
-its corner, with the header still there above it.
+its corner, with the header still there above it, and the **‹ ›** beside it step through the
+rest of the charts on that screen without coming back down.
 
 **Choose how much history to show** — 1 month, **12 weeks (a PI)**, 3, 6, 9 or 12 months, All, or
 **[Custom dates](#a-window-between-two-dates-you-type)**.
@@ -2459,6 +2460,13 @@ Press it again, press **Esc**, or click the margin around the card to come back.
 else on the page stays exactly where you left it, including which tab and which section of the
 dashboard you were on.
 
+**Step between the charts without coming back down.** Beside the ⤢ are a **‹** and a **›**.
+They walk the charts on the screen you came from — the sub-tab you were on, so from **Cycle
+time** the arrows reach the other Flow charts and not the Health ones — and they wrap round at
+both ends. The **left and right arrow keys** do the same thing, unless the caret is in the team
+or theme picker, where an arrow belongs to the picker. The arrows aren't there when the screen
+behind has only one chart to walk.
+
 **The menu stays put.** The header — the team picker, the theme, Teams & Stages, Back up and
 Share — is still there above the chart and still works, so you can flick a chart between two
 teams without leaving it. That is why this isn't the browser's own full-screen mode: that one
@@ -2474,6 +2482,8 @@ A few details:
 - Charts still do everything they do at ordinary size. The ⓘ still opens, tooltips still follow
   the pointer, and on the two scatters [pressing a dot still copies its
   key](#click-a-dot-to-copy-its-key).
+- **The walk is re-read, not remembered.** Change team while a chart is up and the arrows go
+  with it: a team with no created dates has no lead time chart, so it is one stop shorter.
 - The **Time in stage** card has no button, because it is a table rather than a chart — the
   **Copy** button beside it is the thing worth having there.
 - It works in a [shared link](#sharing-a-read-only-link) too. Like everything else on a chart it
