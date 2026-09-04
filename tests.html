@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3226;
+const EXPECTED = 3236;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -12968,6 +12968,69 @@ group('a card with no chart matches the one beside it');
   is(aDoc.getElementById('itemKey').value, 'FEAT-2', 'on the feature that was found');
   is(aDoc.getElementById('unitSel').value, 'features', 'with the switch thrown to match');
   aDoc.getElementById('itemDialog').close();
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a Find hit while a chart fills the window');
+
+  /* 2026-09-04 audit. ⌘K opens over a maximised chart on purpose — Find is a
+     window like the help window, and a chart is not a dialog. But a hit that
+     leads somewhere else (an item on Your Data, an ART on All Teams) changed
+     the tab UNDER the overlay and left the chart up: the item editor opened
+     over the full-screen chart, and two Escapes later the chart came down
+     onto Your Data with its ⤢ — the thing closeMaxi hands the keyboard to —
+     in a hidden panel, so the focus fell to <body>. The same rule as printing:
+     the chart comes down BEFORE the view changes, the way beforePrint() does.
+     A hit on the view the chart is on — a team, a stage — leaves it up: it is
+     the same window with the team the hit named, or a dialog over it. */
+  plant({ stages: [{ id: 'sg1', name: 'Build', statuses: [] }], arts: [], settings: {},
+          teams: [{ id: 'mx1', name: 'Dated', rows: [
+                     { c: '2026-08-09', s: '2026-08-02', k: '2026-07-28', t: 'Story', i: 'DAE-1' },
+                     { c: '2026-08-12', s: '2026-08-04', k: '2026-07-30', t: 'Bug', i: 'DAE-2' },
+                     { c: '2026-08-14', s: '2026-08-05', k: '2026-07-31', t: 'Story', i: 'DAE-3' } ] },
+                   { id: 'mx2', name: 'Undated', rows: [
+                     { c: '2026-08-09', s: '2026-08-02', t: 'Story' } ] }] });
+  win.renderAll();
+  win.selectTab('dashboard');
+  mDoc.getElementById('stab-flow').click();
+  const hitCard = maxiOf('chartCycleTime');
+  hitCard.querySelector('.chart-max').click();
+  ok(win.tdMaxi.current() === hitCard, 'a chart is up');
+  win.goToSearchHit({ view: 'data', teamId: 'mx1', index: 0, unit: 'items' });
+  ok(win.tdMaxi.current() === null,
+     'a hit that leads to Your Data brings the chart down before the view changes under it');
+  ok(!mDoc.querySelector('.shell').inert, 'with the page handed back');
+  ok(hitCard.parentElement !== overlay && mDoc.getElementById('spanel-flow').contains(hitCard)
+     && mDoc.querySelectorAll('.chart-slot').length === 0,
+     'and the card back in its own seat with no placeholder left');
+  is(mDoc.querySelector('[role="tab"][aria-selected="true"]').id, 'tab-data',
+     'the hit’s tab is the one on screen');
+  ok(mDoc.getElementById('itemDialog').open
+     && mDoc.getElementById('itemKey').value === 'DAE-1',
+     'and the editor opened on the item that was found');
+  mDoc.getElementById('itemDialog').close();
+  ok(mDoc.activeElement === mDoc.getElementById('tab-data'),
+     'closing the editor puts the keyboard on the Your Data tab — not on <body>, and not '
+     + 'on a ⤢ in a panel that is no longer shown',
+     mDoc.activeElement ? mDoc.activeElement.id || mDoc.activeElement.tagName : 'nothing');
+
+  /* The same view: a TEAM hit is the header's team picker by another route,
+     and the picker stays live over a chart on purpose. A STAGE hit is a dialog
+     over the chart, like the help window. Neither takes the chart down.
+     Closed first, so this half does not depend on the half above: with the
+     chart still up, the press below would take it DOWN instead. */
+  win.tdMaxi.close();
+  win.selectTab('dashboard');
+  hitCard.querySelector('.chart-max').click();
+  win.goToSearchHit({ view: 'dashboard', teamId: 'mx1' });
+  ok(win.tdMaxi.current() === hitCard,
+     'a team hit on the view the chart is on leaves the chart up — the same window, with '
+     + 'the team the hit named');
+  win.goToSearchHit({ view: 'stage', stageId: 'sg1' });
+  ok(win.tdMaxi.current() === hitCard && mDoc.getElementById('manageDialog').open,
+     'a stage hit opens Teams & Stages over the chart, and the chart stays up under it');
+  mDoc.getElementById('manageDialog').close();
+  win.tdMaxi.close();
+  ok(win.tdMaxi.current() === null, 'and out');
 
   /* ────────────────────────────────────────────────────────── */
   group('a quoted cell may hold a line break');

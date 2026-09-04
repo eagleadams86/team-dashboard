@@ -2569,6 +2569,15 @@ What it reaches:
   Review?"* — so the result lists them.
 - **A team, or an ART**, when the picker has more of them than you can scan.
 
+**With a chart filling the window**, ⌘K still opens — Find is a window like the help window.
+A result that leads somewhere else (a work item on *Your Data*, an ART on *All Teams*) brings
+the chart down first, the way printing does, so the editor opens on the page it belongs to and
+the keyboard lands on that tab when the editor closes. A team result, or a stage result, is on
+the screen you are already on and leaves the chart up — the team picker stays live over a chart
+on purpose, and *Teams & Stages* is a window over it. (Until 2026-09-04 the editor opened over
+the full-screen chart, and two Escapes later the chart came down onto Your Data with the
+keyboard on nothing.)
+
 Results are capped at 80, and the list says how many more matched so the cap is never
 silent. A shared read-only link searches only teams and trains, because the item editor and
 the stages window aren't there.

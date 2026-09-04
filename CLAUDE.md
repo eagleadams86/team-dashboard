@@ -3633,3 +3633,15 @@ red against the unfixed page before the fix went in; the commit quotes the red r
   window to widen, the card names the typed pace alone (it used to offer to widen a window over
   no data at all). The fold is never opened FOR the reader. The README paragraph that said the
   tick "arrives checked so the boxes are open" now says enabled, not shown.
+
+- **A Find hit that leaves the view brings a maximised chart down first (fix 4).** ⌘K opens over a
+  maximised chart on purpose — Find is a window like the help window, and a chart is not a
+  `dialog[open]` — but `goToSearchHit` did `renderAll()` + `selectTab()` under the overlay and
+  never `closeMaxi()`: the item editor opened over the full-screen chart, and two Escapes later
+  the chart came down onto Your Data with its ⤢ — the button `closeMaxi` hands the keyboard to —
+  in a hidden panel, so the focus fell to `<body>`. Now a hit whose view is not `activeTab`
+  closes the chart BEFORE the render, the way `beforePrint()` does; a team hit on the same view
+  leaves it up (the header's picker by another route, and the picker stays live up here on
+  purpose), and a stage hit is a dialog over it like the help window. After `selectTab`, a focus
+  that is on nothing the reader can see — `<body>`, or an element with no client rects — goes
+  onto the hit's own tab, so the editor has something real to return to when it closes.

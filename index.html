@@ -17082,6 +17082,19 @@ function renderSearchResults() {
 function goToSearchHit(h) {
   $('searchDialog').close();
   if (h.view === 'stage') { openModal($('manageDialog')); return; }
+  /* A CHART FILLING THE WINDOW COMES DOWN FIRST when the hit leads somewhere
+     else (2026-09-04 audit). ⌘K opens over a maximised chart on purpose — Find
+     is a window like the help window, and a chart is not a dialog — but a hit
+     on Your Data or All Teams changed the tab UNDER the overlay and left the
+     chart up: the item editor opened over the full-screen chart, and two
+     Escapes later the chart came down onto Your Data with its ⤢ — the button
+     closeMaxi hands the keyboard to — in a panel no longer shown, so the focus
+     fell to <body>. Same rule as beforePrint(): down BEFORE the view changes,
+     while the card's seat is still on screen. A hit on the view the chart is
+     on leaves it up — a team hit is the header's picker by another route, and
+     the picker stays live up here on purpose; a stage hit returned above and
+     is a dialog over the chart, like the help window. */
+  if (maxiCard && h.view !== activeTab) closeMaxi();
   if (h.teamId && state.teams.some(t => t.id === h.teamId)) {
     view.activeTeamId = h.teamId;
     saveView();
@@ -17100,6 +17113,19 @@ function goToSearchHit(h) {
      charts are the ones this hit asked for by the time the panel is revealed. */
   renderAll();
   selectTab(h.view);
+  /* WHERE THE KEYBOARD LANDS (2026-09-04 audit). The search window closing
+     handed the focus back to whatever had it before — the ⤢ of a chart that
+     has just come down, in a panel that has just been hidden; or <body>, after
+     a ⌘K pressed from nowhere in particular. A focus on nothing the reader can
+     see goes onto the hit's own tab (`activeTab`, not `h.view`: selectTab may
+     have fallen back), so the editor about to open has something real to
+     return to when it closes, and a reader without a mouse is where the hit
+     took them. A focus that is somewhere visible — the Find button, after a
+     click on it — is left alone. */
+  const had = document.activeElement;
+  const landing = $('tab-' + activeTab);
+  if (landing && (!had || had === document.body || !had.getClientRects().length))
+    landing.focus({ preventScroll: true });
   /* An item hit opens straight into its editor — the row found is the row on
      screen. The index is into the team just switched to, which is why the team
      is set first. */
