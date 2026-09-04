@@ -6253,6 +6253,18 @@ function buildManualRow(f, stages, isFeature, statuses) {
       + 'It is what the items belonging to it point at, so a feature without one can '
       + 'never have anything joined to it.' };
   }
+  /* AN ITEM'S KEY IS OPTIONAL, BUT NOT A FREE-FOR-ALL (2026-09-04, round two
+     of the 2026-09-03 audit). A typed key that was not a key shape went through
+     cleanIssueKey below, came back as '', and the row saved without it — not a
+     word to the person looking at the box, while the same box on a feature
+     was refused out loud. The paste keeps its drop-it rule (hundreds of rows
+     arriving unwatched, and the report points at the line); the form is one
+     row with somebody looking straight at it, so it says so. A BLANK key is
+     still fine: the field is optional, and the sentence offers that way out. */
+  if (!isFeature && typeof f.key === 'string' && f.key.trim() && !cleanIssueKey(f.key)) {
+    return { error: 'That isn\u2019t the shape of a Jira key \u2014 DAE-1552. Leave it blank or '
+      + 'fix it.' };
+  }
   if (started && completed && started > completed) {
     return { error: 'That item finished before it started. Check the two dates — work cannot '
       + 'take less than no time.' };

@@ -167,9 +167,13 @@ Two things worth knowing:
   next year would empty every chart on it.
 - **A typed row and a pasted row are the same thing once saved.** Both cross the same guards — the
   work type capped and dropped whole if it is really a sentence, the item name kept only if it is
-  the shape of an issue key. The one difference is that the form **refuses** a bad ordering rather
-  than dropping the offending date: a paste is hundreds of rows from a system nobody here
-  controls, and a form is one row with you looking straight at it.
+  the shape of an issue key. The difference is that the form **refuses** rather than quietly
+  dropping: a bad ordering of dates, and — since 2026-09-04 — an item name that is not the shape
+  of a Jira key (*"That isn't the shape of a Jira key — DAE-1552. Leave it blank or fix it."*).
+  Leaving the box blank is fine; the field is optional. Until then a typed `bad key here` saved
+  the row with no key and no word about it, while the same box on a feature was refused out
+  loud. A paste is hundreds of rows from a system nobody here controls, so it drops the bad cell
+  and reports the line; a form is one row with you looking straight at it.
 
 ### How Many Items the Window Covers
 

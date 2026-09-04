@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3248;
+const EXPECTED = 3257;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -10778,8 +10778,21 @@ group('ARTs — the grouping, and the boundary it crosses');
     /* The same guards a paste crosses, at a second door. */
     is(B({ started: '2026-01-19', type: 'x'.repeat(41) }).row.type, '',
        'an over-long type is dropped WHOLE, exactly as a pasted one is');
-    is(B({ started: '2026-01-19', key: 'not a key at all' }).row.key, '',
-       'and a key that is not a key shape is dropped whole too');
+    /* REFUSED, NOT DROPPED (2026-09-04, round two of the 2026-09-03 audit).
+       This check used to pin the opposite: a typed key that was not a key
+       shape came back as '' and the row saved without it, silently — while a
+       FEATURE with the same key was refused out loud. The paste keeps that
+       drop-it rule, and reports the line; a form is one row with the person
+       who typed it looking straight at it, and the one honest thing to do is
+       say so. A blank key is still allowed: the field is optional. */
+    ok(/shape of a Jira key/.test(B({ started: '2026-01-19', key: 'not a key at all' }).error || ''),
+       'a key that is not a key shape is REFUSED, in the voice the feature form already used');
+    ok(/Leave it blank or fix it/.test(B({ started: '2026-01-19', key: 'not a key at all' }).error || ''),
+       'and told what the two ways out are');
+    is(B({ started: '2026-01-19', key: '   ' }).row.key, '',
+       'a blank key is still allowed — the field is optional');
+    is(B({ started: '2026-01-19', key: 'hrn-12' }).row.key, 'HRN-12',
+       'and a lower-case key is upper-cased on the way in, as a pasted one is');
 
     /* An item still in flight is the ordinary case for a hand-kept board — you
        add it when it starts, and fill in the completion when it finishes. */
@@ -13182,6 +13195,44 @@ group('a card with no chart matches the one beside it');
        'counting features, where only the one-day gap remains, the line is gone too');
     sFire(sUnit, 'items');
     sFire(sScope, '');
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a typed item key that is not a key is refused, not dropped');
+
+  /* Through the real dialog. Until 2026-09-04 "bad key here" in the Item box
+     saved a row with no key and no word about it; the same box on a feature
+     said "A feature needs a key, in the shape of a Jira key". */
+  {
+    plant({ teams: [{ id: 'bk1', name: 'By Hand', rows: [] }], settings: {} });
+    win.renderAll();
+    const kDoc = win.document;
+    const rows = () => win.tdGet().teams[0].rows;
+    kDoc.getElementById('btnAddItem').click();
+    kDoc.getElementById('itemStarted').value = '2026-01-19';
+    kDoc.getElementById('itemCompleted').value = '2026-01-21';
+    kDoc.getElementById('itemType').value = 'Story';
+    kDoc.getElementById('itemKey').value = 'bad key here';
+    kDoc.getElementById('itemSave').click();
+    ok(/shape of a Jira key/.test(kDoc.getElementById('itemWarn').textContent),
+       'a key that is not a Jira key shape is refused out loud',
+       kDoc.getElementById('itemWarn').textContent);
+    is(rows().length, 0, 'and nothing is written');
+    ok(kDoc.getElementById('itemDialog').open, 'with the dialog still open on what was typed');
+    kDoc.getElementById('itemKey').value = '';
+    kDoc.getElementById('itemSave').click();
+    is(rows().length, 1, 'blanked, the same row saves — the key is optional');
+    ok(!rows()[0].i, 'with no key on it');
+    kDoc.getElementById('btnAddItem2').click();
+    kDoc.getElementById('itemStarted').value = '2026-01-19';
+    kDoc.getElementById('itemCompleted').value = '2026-01-21';
+    kDoc.getElementById('itemType').value = 'Story';
+    kDoc.getElementById('itemKey').value = 'hrn-12';
+    kDoc.getElementById('itemSave').click();
+    is(rows().map(r => r.i || ''), ['', 'HRN-12'],
+       'a lower-case key saves upper-cased, the way a pasted one lands');
+    if (kDoc.getElementById('itemDialog').open) kDoc.getElementById('itemCancel').click();
     plant({ teams: [], settings: {} });
   }
 

@@ -3671,3 +3671,14 @@ first, red against the unfixed page, and the commit quotes the row.
   whenever there is one, so nothing that was ever trimmed trims differently now. The All Teams
   "Data to" column is untouched: it reports the date, which is still true. Four checks in the
   pure stale group and five on the sample data, through the scope picker's own change event.
+
+- **A typed item key that is not a key is refused, not dropped (fix 7).** `buildManualRow` put
+  the Item box through `cleanIssueKey`, which returns `''` for anything not the shape of a Jira
+  key — so `bad key here` saved a row with no key and no word about it, while the same box on a
+  FEATURE was refused out loud. The form now refuses a non-empty key that fails `ISSUE_KEY_RE`,
+  in the feature sentence's voice (*"That isn't the shape of a Jira key — DAE-1552. Leave it
+  blank or fix it."*); a blank key is still allowed, the field is optional, and `hrn-12` still
+  lands as `HRN-12`. The paste path is untouched — it drops the cell and reports the line, which
+  is the right rule for hundreds of rows arriving unwatched. The one pure check that pinned the
+  old drop was rewritten, not deleted. The parent-key box still drops silently; it was not in the
+  finding and is left for a decision of its own.
