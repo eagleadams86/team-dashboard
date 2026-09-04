@@ -2745,8 +2745,10 @@ the whole-board version of Clean up old data. It's behind a fold on purpose: the
 irreversible action in the app shouldn't sit a mis-click away from Download backup.
 
 Pressing it opens a confirmation of its own that **lists exactly what is going** — "This deletes
-2 teams and 3 items, along with 1 ART, 7 statuses and 4 workflow stages" — and offers the same
-JSON download as a last chance to keep any of it. The ARTs, the statuses and the stages go with
+2 teams and 3 items, along with 1 ART, 4 workflow stages and 7 statuses" — and offers the same
+JSON download as a last chance to keep any of it. (Until 2026-09-04 the dialog actually said
+"1 ART and 4 workflow stages and 7 statuss" — this paragraph had promised a sentence the dialog
+did not say.) The ARTs, the statuses and the stages go with
 the teams: the status list is made entirely of words read off an export, a stage groups them and
 an ART groups teams, so all three are data. The status list is the clearest case of it — leaving
 it standing would leave behind exactly what somebody pressing that button is most likely to be

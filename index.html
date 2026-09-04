@@ -19248,7 +19248,10 @@ $('clearBtn').addEventListener('click', () => {
      started from as though nothing had been asked. */
   $('dataDialog').close();
   const c = window.tdCounts(serializeState());
-  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  /* A third argument for a plural that is not the word plus an s: this said
+     "7 statuss" (2026-09-04 audit). Local, like the file's other four one-line
+     plurals — none of them has a word that needs it. */
+  const plural = (n, w, ws) => `${n} ${n === 1 ? w : (ws || w + 's')}`;
   /* Everything this is about to destroy, named. ARTs and stages used to survive
      a "delete all data" without being mentioned either way — reported by
      Charles on 2026-08-21 — and a list of what goes is the only way this
@@ -19256,15 +19259,23 @@ $('clearBtn').addEventListener('click', () => {
   const also = [];
   if (state.arts.length) also.push(plural(state.arts.length, 'ART'));
   if (state.stages.length) also.push(plural(state.stages.length, 'workflow stage'));
-  if (state.statuses.length) also.push(plural(state.statuses.length, 'status'));
+  if (state.statuses.length) also.push(plural(state.statuses.length, 'status', 'statuses'));
   /* Named only when there is one to lose. It is not a team or an item, so it
      rides in the same list ARTs and stages do rather than inflating the count
      above — and it has to be named at all because an unmentioned survivor is
      what made this sentence untrue the last time. */
   if (!scenarioIsDefault(scenarioFrom(view.scenario))) also.push('your forecast adjustments');
+  /* ONE LIST, IN ENGLISH (2026-09-04 audit). Joined with " and " between every
+     pair this read "1 ART and 4 workflow stages and 7 statuss" — and the README
+     had promised the sentence with commas all along. Commas between, "and"
+     before the last; there is no list helper in the file to share, every
+     other join here is a plain comma list. */
+  const listed = also.length > 1
+    ? also.slice(0, -1).join(', ') + ' and ' + also[also.length - 1]
+    : also.join('');
   $('clearBody').textContent =
     `This deletes ${plural(c.teams, 'team')} and ${plural(c.items, 'item')}`
-    + (also.length ? `, along with ${also.join(' and ')}` : '')
+    + (also.length ? `, along with ${listed}` : '')
     + `. Your settings and your theme are kept. There is no undo — a downloaded backup is `
     + `the only way to get any of it back.`;
   /* No "…and every device you own" line any more: since sync was removed there

@@ -3645,3 +3645,12 @@ red against the unfixed page before the fix went in; the commit quotes the red r
   purpose), and a stage hit is a dialog over it like the help window. After `selectTab`, a focus
   that is on nothing the reader can see — `<body>`, or an element with no client rects — goes
   onto the hit's own tab, so the editor has something real to return to when it closes.
+
+- **The delete-all sentence is one list, in English (fix 5).** `plural(n, 'status')` said *7
+  statuss*, and the extras were joined with `' and '` between every pair — *along with 1 ART and
+  4 workflow stages and 7 statuss*. The README had been promising *1 ART, 4 workflow stages and 7
+  statuses* all along. That dialog's local `plural` now takes an optional spelt-out plural (none
+  of the other four `plural`s in the file does; each is one line and local, and this stays local
+  for the same reason), and the list is commas between with *and* before the last. No list helper
+  exists in the file to share — every other `join(', ')` is a plain comma list. Three checks in
+  "the delete-all sentence lists what goes, in English".

@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3236;
+const EXPECTED = 3239;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -11044,6 +11044,42 @@ group('a delete looks like a delete, everywhere');
     /* A filter pointing into a list that no longer exists is cleared with it. */
     is(JSON.parse(localStorage.getItem('td-view') || '{}').artFilter, '',
        'and the ART filter that pointed at one is cleared too');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the delete-all sentence lists what goes, in English');
+
+  /* 2026-09-04 audit. `plural(n, 'status')` said "7 statuss", and the list
+     was joined with " and " between every pair — "along with 1 ART and 4
+     workflow stages and 7 statuss". The README had promised the sentence the
+     dialog did not say. One list: commas between, "and" before the last, and
+     a plural that can be spelt out where adding an s is wrong. */
+  {
+    const lDoc = win.document;
+    plant({
+      teams: [{ id: 'ls1', name: 'Alpha', artId: 'lsa',
+                rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] }],
+      arts: [{ id: 'lsa', name: 'Estuary' }],
+      stages: [1, 2, 3, 4].map(n => ({ id: 'lss' + n, name: 'Stage ' + n, match: [] })),
+      statuses: [1, 2, 3, 4, 5, 6, 7].map(n => ({ id: 'lsu' + n, label: 'Status ' + n })),
+      settings: {}
+    });
+    /* No forecast adjustment left over from a group above, or the list would
+       carry a fourth item and the sentence would end differently. */
+    lDoc.getElementById('scReset').click();
+    const said = () => lDoc.getElementById('clearBody').textContent;
+    lDoc.getElementById('clearBtn').click();
+    ok(/along with 1 ART, 4 workflow stages and 7 statuses\./.test(said()),
+       'ARTs, stages and statuses are one list — commas between, “and” before the last, '
+       + 'and “statuses” spelt', said().slice(0, 150));
+    ok(!/statuss/.test(said()), 'never “statuss”');
+    lDoc.getElementById('clearDialog').close();
+    plant({ teams: [{ id: 'ls2', name: 'Beta', rows: [] }], arts: [], stages: [],
+            statuses: [{ id: 'lsu1', label: 'Only' }], settings: {} });
+    lDoc.getElementById('clearBtn').click();
+    ok(/along with 1 status\./.test(said()),
+       'one thing alone is named alone, in the singular', said().slice(0, 150));
+    lDoc.getElementById('clearDialog').close();
   }
 
   /* ────────────────────────────────────────────────────────── */
