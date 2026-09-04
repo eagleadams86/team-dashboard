@@ -843,9 +843,10 @@ Three buttons, and the first of them writes nothing:
 
 - **Check this paste** shows the plan — which teams the export splits into, how many items each
   would take, and how many each holds now. Nothing is loaded.
-- **Split into teams** replaces the items in each team the paste names. A team the paste does
-  *not* name is left exactly as it is. Where that would overwrite existing items it asks first,
-  naming each team and what it stands to lose.
+- **Split into teams** replaces what each team the paste names holds — **items and features
+  both**, so a team this paste names with no feature rows in it is left holding none, exactly as
+  a single-team paste does. A team the paste does *not* name is left exactly as it is. Where
+  that would overwrite anything it asks first, naming each team and what it stands to lose.
 - **Append to each team** adds to what is already there instead.
 
 **Anything the app cannot place is named, never guessed at** — a row in the wrong team's

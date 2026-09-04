@@ -16703,6 +16703,15 @@ $('panel-allteams').addEventListener('click', (e) => {
     view.activeTeamId = team.id;
     view.chartTab = 'flow';
     saveView();
+    /* renderAll() BEFORE the tab switch, exactly as goToSearchHit does it and
+       for the same reason. selectTab deliberately renders only the two number
+       views — "switching tabs has no bearing on the team picker" is true of a
+       tab press and false of THIS press, which changes the team as well — so
+       without it the header still named the team the reader came from, and so
+       did the Your Data heading, the paste card and the empty state. Reported
+       by Charles: pressing Sure-Lock Homes landed on Sure-Lock Homes' Flow tab
+       under a picker still reading Checking Crew. */
+    renderAll();
     selectTab('dashboard');
     selectChartTab('flow');
     return;
@@ -17831,7 +17840,7 @@ const teamItemCount = (id) => {
   return t ? t.rows.length : 0;
 };
 
-function showMultiNote(res, route, mode) {
+function showMultiNote(res, route, mode, featureRoute) {
   const el = $('multiNote');
   /* Redrawn here rather than only when the dialog opens: creating a team from
      the report below changes who claims what, and a header still listing the
@@ -17844,7 +17853,10 @@ function showMultiNote(res, route, mode) {
     return;
   }
   const probs = parseProblemsHtml(res);
-  if (!res.rows.length && !probs.problems) {
+  /* Features count as something read, or an export of nothing but features is
+     reported as holding nothing on the same press that loads it into three
+     teams — the runMulti guard's own case, one report along. */
+  if (!res.rows.length && !res.features.length && !probs.problems) {
     el.innerHTML = nothingLoadedHtml(res);
     return;
   }
@@ -17866,27 +17878,68 @@ function showMultiNote(res, route, mode) {
   }
 
   const item = (n) => n + ' item' + (n === 1 ? '' : 's');
-  const teamLine = (a) => '<li><strong>' + escapeHtml(a.name) + '</strong> (' +
-    escapeHtml(a.projectId) + ') — ' + item(a.rows.length) +
-    (mode === 'check'
-      ? (teamItemCount(a.teamId)
-          ? '; it holds ' + item(teamItemCount(a.teamId)) + ' now'
-          : '; it is empty now')
-      : '') + '</li>';
+  const feature = (n) => n + ' feature' + (n === 1 ? '' : 's');
+  const featuresOn = (state.settings.featureTypes || []).length > 0;
 
-  if (route.assigned.length) {
-    const total = route.assigned.reduce((n, a) => n + a.rows.length, 0);
-    const teams = route.assigned.length;
+  /* The plan is drawn over the teams this paste NAMES, by items or by features
+     — the same union a replace writes to. Drawn from the item routing alone, a
+     paste of nothing but features was reported as belonging to no team while it
+     was quietly loaded into three of them. */
+  const incomingFeats = new Map((featureRoute ? featureRoute.assigned : [])
+    .map(a => [a.teamId, a.rows.length]));
+  const named = state.teams
+    .filter(t => route.assigned.some(a => a.teamId === t.id) || incomingFeats.has(t.id))
+    .map(t => {
+      const a = route.assigned.find(x => x.teamId === t.id);
+      return { teamId: t.id, name: t.name, projectId: cleanProjectId(t.projectId),
+               items: a ? a.rows.length : 0,
+               feats: featuresOn ? (incomingFeats.get(t.id) || 0) : 0 };
+    });
+
+  /* What a team holds now counts BOTH its lists, because a replace rewrites
+     both: "it holds 40 items now" beside a feature list about to be replaced
+     is a true sentence that leaves out the half worth stopping for. */
+  const holdsNow = (teamId) => {
+    const t = state.teams.find(x => x.id === teamId);
+    if (!t) return '';
+    const parts = [];
+    if (t.rows.length) parts.push(item(t.rows.length));
+    if (featuresOn && (t.features || []).length) parts.push(feature(t.features.length));
+    return parts.join(' and ');
+  };
+  const teamLine = (a) => {
+    const takes = [];
+    if (a.items) takes.push(item(a.items));
+    if (a.feats) takes.push(feature(a.feats));
+    const now = holdsNow(a.teamId);
+    return '<li><strong>' + escapeHtml(a.name) + '</strong> (' + escapeHtml(a.projectId) + ') — '
+      + (takes.length ? takes.join(' and ') : item(0))
+      + (mode === 'check' ? (now ? '; it holds ' + now + ' now' : '; it is empty now') : '')
+      + '</li>';
+  };
+
+  if (named.length) {
+    const total = named.reduce((n, a) => n + a.items, 0);
+    const featTotal = named.reduce((n, a) => n + a.feats, 0);
+    const took = [];
+    if (total) took.push(item(total));
+    if (featTotal) took.push(feature(featTotal));
+    const teams = named.length;
     html += '<div class="note ' + (mode === 'check' ? 'info' : 'ok') + '" style="margin-top:var(--sp-4)">'
       + (mode === 'check'
           ? '<strong>This paste splits into ' + teams + ' team' + (teams === 1 ? '' : 's') + '.</strong>'
-          : '<strong>' + (mode === 'append' ? 'Added ' : 'Loaded ') + item(total) + ' into '
+          : '<strong>' + (mode === 'append' ? 'Added ' : 'Loaded ') + took.join(' and ') + ' into '
             + teams + ' team' + (teams === 1 ? '' : 's') + '.</strong>')
-      + '<ul class="plain">' + route.assigned.map(teamLine).join('') + '</ul>'
+      + '<ul class="plain">' + named.map(teamLine).join('') + '</ul>'
       + (mode === 'check'
           ? 'Nothing has been loaded yet. <strong>Split into teams</strong> replaces what each of '
-            + 'these teams holds; <strong>Append to each team</strong> adds to it. Either way, a '
-            + 'team this paste does not name is left exactly as it is.'
+            + 'these teams holds'
+            + (featuresOn
+                ? ' — items and features both, so a team this paste names with no features in '
+                  + 'it is left holding none'
+                : '')
+            + '; <strong>Append to each team</strong> adds to it instead. Either way, a team this '
+            + 'paste does not name is left exactly as it is.'
           : 'Teams this paste did not name were left exactly as they were.')
       + '</div>';
   } else {
@@ -17958,19 +18011,47 @@ function runMulti(mode) {
   /* Either routing having landed somewhere is enough to act on: an export of
      nothing but features names teams through featureRoute alone, and testing
      only the item routing would report it as loaded and write nothing. */
+  /* Whether feature types are set up at all decides both what the confirm below
+     may claim and what the write may touch — read once, so the sentence and the
+     write can never disagree about it. */
+  const featuresOn = (state.settings.featureTypes || []).length > 0;
+  const item = (n) => n + ' item' + (n === 1 ? '' : 's');
+
   if (mode !== 'check' && (route.assigned.length || featureRoute.assigned.length)) {
     /* The one confirm in this flow, and only where it is earned: replacing
        several teams at once is the single most destructive thing this dialog
        can do, and unlike the team-at-a-time box above it can do it to boards
        nobody is looking at. It names each one and what it stands to lose. */
     if (mode === 'replace') {
-      const losing = route.assigned.filter(a => teamItemCount(a.teamId));
+      /* Counted over BOTH routings and both lists, because a replace writes
+         both: a team named by this paste's items alone still has its features
+         replaced, and naming only the items it stands to lose would hide the
+         half of the loss the reader cannot get back by pasting again. */
+      const takingItems = new Map(route.assigned.map(a => [a.teamId, a.rows.length]));
+      const takingFeats = new Map(featureRoute.assigned.map(a => [a.teamId, a.rows.length]));
+      const feature = (n) => n + ' feature' + (n === 1 ? '' : 's');
+      const held = (t) => {
+        const parts = [];
+        /* Items are replaced only where this paste HAS items for the team —
+           the same rule the write below follows — so a team named by features
+           alone loses no items and must not be told that it does. */
+        if (takingItems.has(t.id) && t.rows.length) parts.push(item(t.rows.length));
+        if (featuresOn && (t.features || []).length) parts.push(feature(t.features.length));
+        return parts;
+      };
+      const taken = (t) => {
+        const parts = [];
+        if (takingItems.get(t.id)) parts.push(item(takingItems.get(t.id)));
+        if (featuresOn && takingFeats.get(t.id)) parts.push(feature(takingFeats.get(t.id)));
+        return parts.length ? parts.join(' and ') : 'nothing';
+      };
+      const losing = state.teams.filter(t =>
+        (takingItems.has(t.id) || takingFeats.has(t.id)) && held(t).length);
       const CONFIRM_CAP = 8;
       if (losing.length && !confirm(
-          'Replace the work items in ' + losing.length + ' team'
-          + (losing.length === 1 ? '' : 's') + '?\n\n'
-          + losing.slice(0, CONFIRM_CAP).map(a => '• ' + a.name + ' — loses ' + teamItemCount(a.teamId)
-              + ', takes ' + a.rows.length).join('\n')
+          'Replace what ' + losing.length + ' team' + (losing.length === 1 ? ' holds' : 's hold') + '?\n\n'
+          + losing.slice(0, CONFIRM_CAP).map(t => '• ' + t.name + ' — loses ' + held(t).join(' and ')
+              + ', takes ' + taken(t)).join('\n')
           + (losing.length > CONFIRM_CAP ? '\n• … and ' + (losing.length - CONFIRM_CAP) + ' more' : '')
           + '\n\nTeams this paste does not name are untouched. This cannot be undone.')) return;
     }
@@ -17992,14 +18073,30 @@ function runMulti(mode) {
        them. Same guard as the single-team box — with no feature types set up
        there is nothing to write, and writing an empty list would delete a
        feature list the reader built with the setting on. */
-    if ((state.settings.featureTypes || []).length) {
-      featureRoute.assigned.forEach(a => {
-        const team = state.teams.find(t => t.id === a.teamId);
-        if (!team) return;
-        team.features = mode === 'append'
-          ? mergeFeatures(team.features, a.rows)
-          : a.rows.slice();
-      });
+    if (featuresOn) {
+      if (mode === 'append') {
+        featureRoute.assigned.forEach(a => {
+          const team = state.teams.find(t => t.id === a.teamId);
+          if (!team) return;
+          team.features = mergeFeatures(team.features, a.rows);
+        });
+      } else {
+        /* A replace writes a feature list for every team the paste NAMES —
+           through its items as much as through its features — and a team this
+           export names with no features in it takes an empty one. Written over
+           the union rather than over featureRoute alone, which was the bug:
+           delete the feature rows from the export, split again, and last
+           export's features stayed standing beside this export's items, in a
+           mode whose whole promise is that a named team holds what the paste
+           says it holds. Same rule the single-team box has always followed. */
+        const incoming = new Map(featureRoute.assigned.map(a => [a.teamId, a.rows]));
+        new Set(route.assigned.map(a => a.teamId)
+          .concat(featureRoute.assigned.map(a => a.teamId))).forEach(teamId => {
+          const team = state.teams.find(t => t.id === teamId);
+          if (!team) return;
+          team.features = (incoming.get(teamId) || []).slice();
+        });
+      }
     }
     save();
     renderAll();
@@ -18016,7 +18113,7 @@ function runMulti(mode) {
       + ' into ' + teamsTouched + ' team' + (teamsTouched === 1 ? '' : 's'), 5000);
   }
 
-  showMultiNote(res, route, mode);
+  showMultiNote(res, route, mode, featureRoute);
 
   /* The box is cleared only when there is nothing left to do with it. With an
      unclaimed id still listed, the next step is to create a team and split
@@ -18074,8 +18171,8 @@ $('multiNote').addEventListener('click', e => {
 function openMultiDialog() {
   $('multiDateOrder').value = view.dateOrder;
   renderMultiTeamIds();
-  const { res, route } = multiParse();
-  showMultiNote(res, route, 'check');
+  const { res, route, featureRoute } = multiParse();
+  showMultiNote(res, route, 'check', featureRoute);
   openModal($('multiDialog'));
 }
 

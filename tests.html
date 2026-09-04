@@ -6739,10 +6739,70 @@ group('ARTs — the grouping, and the boundary it crosses');
   appDoc.getElementById('multiPasteBox').value = wholeTrain;
   appDoc.getElementById('btnMultiLoad').click();
   win.confirm = realConfirm;
-  ok(/Replace the work items in 3 teams/.test(asked), 'a replace over existing data asks first', asked);
-  ok(/Kingfisher — loses 2, takes 2/.test(asked), 'naming each team and what it stands to lose', asked);
+  ok(/Replace what 3 teams hold\?/.test(asked), 'a replace over existing data asks first', asked);
+  ok(/Kingfisher — loses 2 items, takes 2 items/.test(asked),
+     'naming each team and what it stands to lose', asked);
   is(win.tdGet().teams.map(t => t.rows.length), [2, 1, 0, 1],
      'and answering no writes nothing whatsoever');
+
+  /* ── A replace replaces BOTH of a team's lists (2026-09-04) ──────────
+     Reported by Charles: he took the feature rows out of his export, split
+     again, and the work items were replaced while the OLD features stood.
+     Features were written over featureRoute alone, so a team this paste named
+     through its items and not through its features was never reached — in the
+     one mode whose promise is that a named team holds what the paste says it
+     holds. The single-team box has always replaced a team's features whether
+     or not the paste has any; this is that rule, over every team named. */
+  plant({ teams: [
+      { id: 'kf', name: 'Kingfisher', projectId: 'KFR', rows: [],
+        features: [{ c: '2015-01-20', s: '2015-01-02', t: 'Feature', i: 'KFR-100' }] },
+      { id: 'hr', name: 'Heron', projectId: 'HRN', rows: [],
+        features: [{ c: '2015-01-20', s: '2015-01-02', t: 'Feature', i: 'HRN-100' }] },
+      { id: 'wg', name: 'Wagtail', projectId: 'WAG', rows: [],
+        features: [{ c: '2015-01-20', s: '2015-01-02', t: 'Feature', i: 'WAG-100' }] }],
+    settings: { featureTypes: ['Feature'] } });
+  appDoc.getElementById('multiPasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+    'KFR-1\t2015-01-14\t2015-01-21\tStory',
+    'HRN-1\t2015-01-16\t2015-01-23\tFeature'].join('\n');
+  win.confirm = (m) => { asked = m; return true; };
+  appDoc.getElementById('btnMultiLoad').click();
+  win.confirm = realConfirm;
+  /* `features` is omitted from a serialised team when the list is empty — the
+     same omit-when-empty rule `artId` and the two targets follow — so an
+     emptied list reads as no key at all rather than as []. */
+  is(win.tdGet().teams.map(t => (t.features || []).length), [0, 1, 1],
+     'a team named by items alone takes this export\'s features — none, so it holds none');
+  is(win.tdGet().teams[1].features.map(f => f.i), ['HRN-1'],
+     'a team named by features takes the ones in the paste, not the ones it had');
+  is(win.tdGet().teams[2].features.map(f => f.i), ['WAG-100'],
+     'and a team this paste does not name keeps everything, features included');
+  ok(/loses 1 feature, takes 1 item/.test(asked),
+     'the confirm names the features it is about to replace, not only the items', asked);
+
+  /* With no feature types set up there is nothing to write, and writing an
+     empty list would delete a list the reader built with the setting on. */
+  plant({ teams: [{ id: 'kf', name: 'Kingfisher', projectId: 'KFR', rows: [],
+        features: [{ c: '2015-01-20', s: '2015-01-02', t: 'Feature', i: 'KFR-100' }] }],
+    settings: { featureTypes: [] } });
+  appDoc.getElementById('multiPasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+    'KFR-1\t2015-01-14\t2015-01-21\tStory'].join('\n');
+  win.confirm = () => true;
+  appDoc.getElementById('btnMultiLoad').click();
+  win.confirm = realConfirm;
+  is(win.tdGet().teams[0].features.map(f => f.i), ['KFR-100'],
+     'with the feature layer off, a split leaves a stored feature list alone');
+
+  /* Back to the four teams the rest of this group is written against. */
+  plant({ teams: [
+      { id: 'kf', name: 'Kingfisher', projectId: 'KFR',
+        rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Story' },
+               { c: '2015-01-22', s: '2015-01-15', t: 'Bug' }] },
+      { id: 'hr', name: 'Heron', projectId: 'HRN',
+        rows: [{ c: '2015-01-23', s: '2015-01-16', t: 'Story' }] },
+      { id: 'wg', name: 'Wagtail', projectId: 'WAG', rows: [] },
+      { id: 'zz', name: 'Team ZZZ', projectId: 'ZZZ',
+        rows: [{ c: '2015-01-24', s: '2015-01-17', t: 'Task' }] }],
+    settings: {} });
 
   /* Append is the other half of the pair the single-team box already offers. */
   appDoc.getElementById('multiPasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
@@ -9226,6 +9286,28 @@ group('ARTs — the grouping, and the boundary it crosses');
   sel.value = 'q2'; sel.dispatchEvent(new win.Event('change'));
   ok(trainChartOf(), 'and survives the selected team having nothing to plot');
   is(trainSeries().reduce((a, b) => a + b, 0), 1, 'still showing the train, not the empty team');
+
+  /* PRESSING A TEAM'S NAME CHANGES THE TEAM, not just the tab (2026-09-04).
+     Reported by Charles: Sure-Lock Homes' Flow tab, under a picker still
+     reading Checking Crew. selectTab renders the two number views and says in
+     as many words that switching tabs has no bearing on the team picker —
+     true of a tab press, false of this one, which changes the team as well. So
+     the handler renders first, the way the team picker's own change handler
+     and goToSearchHit both do. */
+  plant({ arts: [], teams: [
+    { id: 'p1', name: 'Checking Crew', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] },
+    { id: 'p2', name: 'Sure-Lock Homes', rows: [{ c: '2015-05-02', s: '2015-04-29', t: 'Bug' }] }],
+    settings: {} });
+  win.selectTab('allteams');
+  const openBtn = win.document.querySelector('#panel-allteams [data-open="p2"]');
+  ok(openBtn, 'a team name on All Teams is a control that opens its dashboard');
+  openBtn.click();
+  is(JSON.parse(win.localStorage.getItem('td-view') || '{}').activeTeamId, 'p2',
+     'pressing it changes the team — `view` is a module binding, so read where saveView put it');
+  is(win.document.getElementById('teamSel').value, 'p2',
+     'and the header picker says so — the reported bug');
+  is(win.document.getElementById('tab-dashboard').getAttribute('aria-selected'), 'true',
+     'on the dashboard, where it has always landed');
 
   /* ────────────────────────────────────────────────────────── */
   group('the Loaded Data table sorts like the others');
