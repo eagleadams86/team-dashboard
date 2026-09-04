@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3266;
+const EXPECTED = 3269;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -5665,6 +5665,22 @@ async function run(TD, win) {
   const prevSameDay = typeInto(sameDayInput, '-3');
   is(win.tdGet().settings.sameDayValue, 0, 'a typed negative number is clamped to 0');
   typeInto(sameDayInput, prevSameDay);
+
+  /* THE FLOOR THE README DESCRIBES (2026-09-04). The ageing threshold is the one
+     typed number that floors at 1 rather than 0: a 0-day threshold would count
+     every open item as aged the moment it started, and derive() treats 0 as
+     "use the default", so a 0 in the box would have the charts reading 14
+     behind it. These were green before the README was corrected — the code
+     was always right, and the paragraph that said "clamped at zero" was not;
+     they are here so the paragraph cannot drift from the code again. */
+  const agedInput = doc.getElementById('setAgedDays');
+  const prevAged = typeInto(agedInput, '0');
+  is(win.tdGet().settings.agedDays, 1, 'a typed 0 for the ageing threshold floors at 1, not 0');
+  typeInto(agedInput, '-5');
+  is(win.tdGet().settings.agedDays, 1, 'and so does a typed negative');
+  is(win.TDState.normalizeSettings({ agedDays: 0 }).agedDays, 14,
+     'while a saved 0 reads back as the 14-day default — a 0 was never a threshold anywhere');
+  typeInto(agedInput, prevAged);
 
   /* The one settings control that is neither text nor a number. It writes the
      boolean the metrics read, not the string an input would give. */

@@ -746,8 +746,12 @@ summaries and not a short one. So `Parent summary` is refused by name rather tha
 on the next load — team names, the defect and cycle-time words, and both columns of the work
 type filter. `maxlength` stops ordinary typing past the cap but not a paste, and the object
 you type into is the one that goes to `localStorage` and the cloud, so the cap is applied at
-the keystroke as well as in `normalizeSettings()`. Typed numbers (the ageing threshold, the
-same-day value) are clamped at zero the same way.
+the keystroke as well as in `normalizeSettings()`. Typed numbers are bounded the same way, at
+the keystroke and on the way back in: the same-day value is clamped at zero, and **the ageing
+threshold floors at 1 day** — a threshold of 0 would count every open item as aged the moment
+it started, and the metrics treat 0 as "use the default", so without the floor the box could
+say 0 while the charts still read 14. (Until 2026-09-04 this paragraph said the threshold was
+clamped at zero too; the code never did that.)
 
 ### What Happens to Bad Data
 

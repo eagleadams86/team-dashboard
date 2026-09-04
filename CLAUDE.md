@@ -3683,6 +3683,18 @@ first, red against the unfixed page, and the commit quotes the row.
   old drop was rewritten, not deleted. The parent-key box still drops silently; it was not in the
   finding and is left for a decision of its own.
 
+- **The README says the ageing threshold floors at 1, because it does (fix 9, README only).** The
+  paragraph on typed settings said the ageing threshold and the same-day value were "clamped at
+  zero the same way". The same-day value is; the threshold never was — both the Settings
+  listener (`Math.max(1, …)` for `agedDays`) and `normalizeSettings()` (`a > 0`, else the
+  default) floor it at 1, on purpose: a 0-day threshold would flag every open item as aged the
+  moment it started, and `derive()` treats 0 as "use the default", so a 0 in the box would have
+  the charts reading 14 behind it. No code changed. The suite pinned the same-day clamp but
+  NOT the threshold floor, so three checks went in beside it — a typed 0 and a typed negative
+  both land as 1, and a saved 0 reads back as 14 — green before the README changed, and there
+  so the paragraph cannot drift from the code again. The README paragraph now says which is
+  which and why.
+
 - **A restore that worked closes the window behind it (fix 8).** *Restore a Backup* on the welcome
   card opens the Back Up & Restore window, and the `importFile` change handler restored, saved
   and toasted — and left the window standing over the app it had just filled. Every early
