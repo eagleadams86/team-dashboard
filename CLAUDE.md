@@ -3608,3 +3608,14 @@ red against the unfixed page before the fix went in; the commit quotes the red r
   overlay must not be dragged about. The same shape went into Sprint Predictability and Money Map
   the same day. The Money Map sentence in "Stepping Between Charts in Full Screen" above was about
   its buttons, and now says so.
+
+- **The phone tab scroller leaves the focus ring room on every side (fix 2, family-wide).** `overflow-x: auto`
+  makes `.tabs` a scrollport on BOTH axes, and a scrollport clips at its padding edge — so the
+  ring (2px, offset 2px: 4px outside the tab) lost its top and the outer edges of the first and
+  last tabs; only the bottom had its 4px of padding. Now `padding: 4px` with `margin: -4px -4px 0`
+  — the room is given and then given straight back to the layout, so the tabs, the row's height
+  (which `measurePinTop()` reads for `--pin-clear`) and the page's height are all what they were.
+  Proved by measuring at 375 and 1280, pinned and unpinned, before and after: only the `.tabs`
+  box itself changed. The bottom margin stays 0 because that 4px was already in the row. Money
+  Map's `.yearrail` had this pattern first. Four checks in the pin group measure it rather than
+  grepping for it.

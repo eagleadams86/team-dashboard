@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3216;
+const EXPECTED = 3220;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -12428,6 +12428,32 @@ group('a card with no chart matches the one beside it');
     const tabBar = pinDoc.querySelector('.tabs');
     is(cs(tabBar).flexWrap, 'nowrap', 'at phone width the tab row does not wrap');
     is(cs(tabBar).overflowX, 'auto', 'it scrolls sideways instead');
+    /* THE RING'S ROOM (2026-09-04 audit). `overflow-x: auto` makes the row a
+       scrollport on BOTH axes, and a scrollport clips at its padding edge — so
+       the focus ring (2px, offset 2px: 4px outside the tab) was sliced off on
+       the top, and on the outer edges of the first and last tabs. The bottom
+       already had 4px of padding for exactly this. Measured, not grepped: the
+       first tab has to sit 4px inside the scroller's top and left edges, the
+       last 4px inside its right edge once scrolled to the end, and the
+       scrollport has to be a tab plus 8 tall. Nothing else moves; the
+       assertions above and below about the row's height and position hold. */
+    const barBox = () => rect(tabBar);
+    const tabsShown = [...tabBar.querySelectorAll('.tab')].filter((t) => !t.hidden);
+    const firstTab = tabsShown[0], lastTab = tabsShown[tabsShown.length - 1];
+    tabBar.scrollLeft = 0;
+    ok(rect(firstTab).top - barBox().top >= 4,
+       'the first tab sits 4px inside the scroller’s top edge, so the ring is not clipped there',
+       Math.round(rect(firstTab).top - barBox().top) + 'px');
+    ok(rect(firstTab).left - barBox().left >= 4,
+       'and 4px inside its left edge', Math.round(rect(firstTab).left - barBox().left) + 'px');
+    tabBar.scrollLeft = tabBar.scrollWidth;
+    ok(barBox().right - rect(lastTab).right >= 4,
+       'the last tab sits 4px inside the right edge once scrolled to the end',
+       Math.round(barBox().right - rect(lastTab).right) + 'px');
+    tabBar.scrollLeft = 0;
+    ok(tabBar.clientHeight >= Math.round(rect(firstTab).height) + 8,
+       'and the scrollport is a tab plus 8px tall — 4px of ring room above and below',
+       tabBar.clientHeight + 'px against a ' + Math.round(rect(firstTab).height) + 'px tab');
     /* ONE LINE, and not "it overflows": whether it does depends on how many tabs
        are on offer, and All Teams is away below two teams — which is exactly the
        state this frame is in by the time it gets here. The height is the claim

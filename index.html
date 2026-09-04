@@ -422,7 +422,19 @@ html[data-pin] .panel :is(button, a[href], input, select, textarea, [tabindex]) 
    when there is something to scroll. Same 720px as the pin rule below, so the
    phone has one breakpoint rather than two a pixel apart. */
 @media (max-width: 720px) {
-  .tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px;
+  /* ROOM FOR THE RING ON EVERY SIDE (2026-09-04 audit). `overflow-x: auto`
+     makes this a scrollport on BOTH axes, and a scrollport clips at its
+     padding edge — so a focus ring (2px, offset 2px: 4px outside the tab) was
+     sliced off along the top, and off the outer edges of the first and last
+     tabs. The bottom already had its 4px of padding for exactly this reason.
+     Padding on the other three sides gives the ring its room, and the matching
+     NEGATIVE margin gives that room straight back to the layout, so nothing
+     on the page moves: the tabs, the row's height (which the pin measures for
+     `--pin-clear`) and the page's height are all what they were — the ring
+     simply has 4px of scrollport to paint into now. The bottom margin stays 0
+     because the bottom's 4px was already in the row's height. Same pattern as
+     Money Map's `.yearrail`, which found this first. */
+  .tabs { flex-wrap: nowrap; overflow-x: auto; padding: 4px; margin: -4px -4px 0;
     scrollbar-width: thin; }
   .tab { flex: 0 0 auto; white-space: nowrap; }
 }

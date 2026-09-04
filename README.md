@@ -81,7 +81,9 @@ same reason.
 three tabs and the 📌 come to about 370px, which is just past a 375px screen once the page's
 own padding is off. The tab you choose is nudged into view if it would sit off an end, and
 the 📌 stays put beside them rather than scrolling away. Sprint Predictability and Money Map
-draw their tabs the same way.
+draw their tabs the same way. The scroller keeps 4px of room on every side for the keyboard
+focus ring, so a tab you Tab onto shows its whole outline — until 2026-09-04 the top and the
+outer edges were sliced off by the scrolling box, which clips at its own edge.
 
 Charts draw their data in the shared theme pack's **categorical colours** — `--series-1`, a blue,
 for the measure, and `--series-5`, a rust, for the second series where a chart has one. They used
