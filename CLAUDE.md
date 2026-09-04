@@ -174,8 +174,12 @@ it walks the whole page, minus folded sections), **Sprint Predictability** and *
 Map** (both walk `#views`, which their renders rewrite wholesale, so the walk is always the
 tab the reader is on). **Money Map's arrows sit in the heading BAND**, not floating over
 the card's corner, because that corner is its fold control — the same divergence its ⤢
-already had, and the reason it is the only one of the four that has to hand the focus back
-by itself after a step. **Golf Handicap and the starter draw one chart each**, so there is
+already had, and the reason it is the only one of the four whose step BUTTONS have to hand the
+focus back by themselves after a step. The KEYS are a different case and every app has it:
+opening puts the focus on the card's own ⤢, and a key step carries that button back into the
+inert page — so `maxiStep()` moves a focus that is gone, or outside the overlay, onto the new
+card's ⤢ (2026-09-04; see "Fixes From the 2026-09-03 Audit" at the end of this file).
+**Golf Handicap and the starter draw one chart each**, so there is
 nothing to walk; both record that, and where to take the walk from if a second arrives.
 
 ## A Settings Window Is a Stack, Not a Column (2026-09-02) — no schema change
@@ -3585,3 +3589,22 @@ suite did not cover. Each has a test now, proven to fail first by reverting the 
   read the year off the week's SATURDAY, so a key is a pure function of the week. The pinned
   `'2024-53'` in two tests became `'2025-01'`; the fortnight key beside it (`'2024-52'`, a week
   that does not straddle) did not move. Keys are computed, never stored, so nothing migrates.
+
+## Fixes From the 2026-09-03 Audit
+
+A second bug audit of the three work apps on 2026-09-03 (again three auditors, each finding
+reproduced headless before it was reported) — this time aimed at the day-old full-screen
+stepping, the pin and the phone tab row, and then a general pass. Each fix has a test, proven
+red against the unfixed page before the fix went in; the commit quotes the red row.
+
+- **A key step in full screen lands the focus on the new card's ⤢ (fix 1, family-wide).** `openMaxi()` puts the
+  keyboard on the card's own ⤢, and `maxiStep()` carried that card — button and all — back
+  into the inert page under the overlay, so the browser dropped the focus on `<body>`: the next
+  arrow still worked (the handler listens on the document) but Tab started again from the top of
+  the page. The rule, in one sentence: *a step lands focus on the arrow that pressed it, or on the
+  new card's ⤢, never on the page underneath.* The overlay's own arrows never move, so a step
+  BUTTON that has the keyboard keeps it (the suite already asserted that); only a focus that is
+  gone, or outside `#chartMaxi`, is moved — with `preventScroll`, because the page under the
+  overlay must not be dragged about. The same shape went into Sprint Predictability and Money Map
+  the same day. The Money Map sentence in "Stepping Between Charts in Full Screen" above was about
+  its buttons, and now says so.

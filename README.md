@@ -2503,7 +2503,10 @@ They walk the charts on the screen you came from — the sub-tab you were on, so
 time** the arrows reach the other Flow charts and not the Health ones — and they wrap round at
 both ends. The **left and right arrow keys** do the same thing, unless the caret is in the team
 or theme picker, where an arrow belongs to the picker. The arrows aren't there when the screen
-behind has only one chart to walk.
+behind has only one chart to walk. A step by key leaves the keyboard on the new chart's ⤢ —
+so Tab and Esc carry on from the chart you are looking at, not from the top of the page. (Until
+2026-09-04 a key step dropped the focus onto the page underneath, because the button that had
+it went back down with the old card.)
 
 **The menu stays put.** The header — the team picker, the theme, Teams & Stages, Back up and
 Share — is still there above the chart and still works, so you can flick a chart between two

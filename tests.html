@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3213;
+const EXPECTED = 3216;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -12698,10 +12698,30 @@ group('a card with no chart matches the one beside it');
   /* The arrow keys do the same, which is what a reader tries next. */
   win.tdMaxi.close();
   firstCard.querySelector('.chart-max').click();
+  /* WHERE THE KEYBOARD IS after a key step (2026-09-04 audit). Opening puts the
+     focus on the card's own full-screen button, and a step carries that card —
+     button and all — back into the inert page under the overlay, so the
+     browser dropped the focus on <body>: the next arrow still worked (the
+     handler listens on the document) but Tab started again from the top of the
+     page and nothing on screen said where the keyboard had gone. The rule: a
+     step lands focus on the arrow that pressed it, or on the new card's
+     full-screen button, never on the page underneath. The overlay's own arrows
+     never move, so a step BUTTON that has the keyboard keeps it (asserted
+     above); this is the case the keys expose. */
+  const whereIs = () => mDoc.activeElement
+    ? (mDoc.activeElement.tagName + '.' + mDoc.activeElement.className) : 'nothing';
+  ok(mDoc.activeElement === firstCard.querySelector('.chart-max'),
+     'opened from its button, the keyboard is on that button', whereIs());
   mDoc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
   ok(win.tdMaxi.current() === secondCard, 'Right steps to the next chart');
+  ok(mDoc.activeElement === secondCard.querySelector('.chart-max')
+     && overlay.contains(mDoc.activeElement),
+     'and a step by KEY lands the keyboard on the new card’s full-screen button, '
+     + 'not on the page underneath with the old one', whereIs());
   mDoc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
   ok(win.tdMaxi.current() === firstCard, 'and Left steps back');
+  ok(mDoc.activeElement === firstCard.querySelector('.chart-max'),
+     'with the keyboard on that card’s button in turn', whereIs());
 
   /* \u2026but not out of a control. The team and theme pickers are in the header
      and stay live up here on purpose, and Left in a <select> belongs to the

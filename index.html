@@ -16307,6 +16307,22 @@ function maxiStep(dir) {
   const gone = chartIn(leaving), up = chartIn(card);
   if (gone) gone.resize();
   if (up) up.resize();
+  /* WHERE THE KEYBOARD LANDS (2026-09-04 audit). A step by the arrow KEYS was
+     pressed with the focus on the card's own ⤢ — openMaxi() puts it there —
+     and the card has just been carried back into the inert page under the
+     overlay, button and all, so the browser dropped the focus on <body>: the
+     next arrow still worked, because the handler listens on the document, but
+     Tab started again from the top of the page. The rule, in one sentence: a
+     step lands focus on the arrow that pressed it, or on the new card's ⤢,
+     never on the page underneath. The overlay's own arrows never move, so a
+     step BUTTON that has the keyboard keeps it; only a focus that is gone, or
+     stranded outside the overlay, is moved. preventScroll, because the overlay
+     is the window and the page under it must not be dragged about. */
+  const active = document.activeElement;
+  if (!active || !active.isConnected || !ov.contains(active)) {
+    const btn = card.querySelector('.chart-max');
+    if (btn) btn.focus({ preventScroll: true });
+  }
   const said = $('maxiSaid');
   if (said) said.textContent = maxiName(card) + ', full screen';
 }
