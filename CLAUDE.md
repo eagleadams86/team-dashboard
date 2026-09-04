@@ -3708,6 +3708,19 @@ first, red against the unfixed page, and the commit quotes the row.
   (db7e256) off its row's `hidden` attribute; here the hiding is CSS. Nine checks at the end of
   the suite, at 1265 and 375, on the card and then off it with the same pin.
 
+- **Enter in the Find box opens the first result (fix 11, family-wide).** `#searchBox` had an
+  `input` listener and nothing else, so typing a key and pressing Enter — the way every search
+  box works — did nothing: the window stayed, the results sat under it, and the only road to
+  one was a click or a Tab onto it. A `keydown` listener now makes the same call the click
+  handler makes (`goToSearchHit(searchHits[0])`) for a plain Enter with at least one hit, and
+  nothing else: the list is already newest-first, so the first result is the one a reader typing
+  a key means; with no hits there is nothing to open and the window stays for the next
+  character. A modified Enter (⌘, Ctrl, Alt, Shift) is left alone, the way Sprint
+  Predictability's listener leaves it (its 8637323 is the same fix). The second half of the
+  family finding — where the keyboard lands after a hit — was already fixed here the day before
+  (6183b71, fix 4 above) and is not touched. Eleven checks in "Enter in the Find box opens the
+  first result": one hit, the first of three, and none.
+
 - **A restore that worked closes the window behind it (fix 8).** *Restore a Backup* on the welcome
   card opens the Back Up & Restore window, and the `importFile` change handler restored, saved
   and toasted — and left the window standing over the app it had just filled. Every early

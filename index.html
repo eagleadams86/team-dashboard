@@ -17187,6 +17187,23 @@ $('findBtn').addEventListener('click', () => {
   $('searchBox').focus();
 });
 $('searchBox').addEventListener('input', renderSearchResults);
+/* ENTER OPENS THE FIRST RESULT (2026-09-04, from the 2026-09-03 audit). The box
+   had the `input` listener above and nothing else, so a reader who typed a key
+   and pressed Enter — the way every search box works — got nothing: the window
+   stayed, the results sat under it, and the only road to one was a click or a
+   Tab onto it. Enter is the same call a click on the first result makes, and
+   no more than that: the list is already newest-first, so the first result is
+   the one a reader typing a key means. With no results there is nothing to
+   open and the window stays for the next character. A MODIFIED Enter (⌘,
+   Ctrl, Alt, Shift) is left alone, the way Sprint Predictability's listener
+   leaves it — the family rule, and its 8637323 is the same fix. preventDefault
+   so the dialog does not also treat the key as a form submit. */
+$('searchBox').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if (!searchHits.length) return;
+  e.preventDefault();
+  goToSearchHit(searchHits[0]);
+});
 $('searchResults').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-hit]');
   if (btn && searchHits[+btn.dataset.hit]) goToSearchHit(searchHits[+btn.dataset.hit]);

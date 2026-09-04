@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3278;
+const EXPECTED = 3290;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -13116,6 +13116,67 @@ group('a card with no chart matches the one beside it');
   mDoc.getElementById('manageDialog').close();
   win.tdMaxi.close();
   ok(win.tdMaxi.current() === null, 'and out');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('Enter in the Find box opens the first result');
+
+  /* 2026-09-04 audit. The box had an `input` listener and nothing else, so a
+     reader who typed a key and pressed Enter — the way every search box works
+     — got nothing: the window stayed, the results sat under it, and the only
+     road to one was a click or a Tab onto it. Enter now makes the same call a
+     click on the first result makes; with no results it does nothing and the
+     window stays for the next character. Same data as the group above: three
+     keyed items on Dated, so `DAE` is three results newest first and DAE-3 is
+     the one at the top. */
+  {
+    const fDoc = win.document;
+    const fBox = fDoc.getElementById('searchBox');
+    const fDlg = fDoc.getElementById('searchDialog');
+    const fHits = () => fDoc.querySelectorAll('#searchResults [data-hit]');
+    const typeQuery = (q) => {
+      fBox.value = q;
+      fBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+    };
+    const enter = () => fBox.dispatchEvent(
+      new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+
+    fDoc.getElementById('findBtn').click();
+    ok(fDlg.open, 'Find is open');
+    typeQuery('DAE-2');
+    is(fHits().length, 1, 'with one result for DAE-2');
+    fBox.dispatchEvent(new win.KeyboardEvent('keydown',
+      { key: 'Enter', metaKey: true, bubbles: true, cancelable: true }));
+    ok(fDlg.open, 'a modified Enter (⌘-Enter) is left alone — the family rule, as Sprint '
+       + 'Predictability has it');
+    enter();
+    ok(!fDlg.open, 'Enter closes the window');
+    is(fDoc.querySelector('[role="tab"][aria-selected="true"]').id, 'tab-data',
+       'and lands on the result’s tab');
+    ok(fDoc.getElementById('itemDialog').open && fDoc.getElementById('itemKey').value === 'DAE-2',
+       'with the editor open on the item — the same call a click on the result makes',
+       fDoc.getElementById('itemKey').value);
+    fDoc.getElementById('itemDialog').close();
+
+    /* Several results: the FIRST, in the order shown. */
+    fDoc.getElementById('findBtn').click();
+    typeQuery('DAE');
+    ok(fHits().length > 1, 'more than one result for DAE', fHits().length);
+    ok(fHits()[0].querySelector('.hitwhere').textContent.startsWith('DAE-3 '),
+       'the newest, DAE-3, is the one shown first',
+       fHits()[0].querySelector('.hitwhere').textContent);
+    enter();
+    ok(!fDlg.open && fDoc.getElementById('itemDialog').open, 'Enter opens one of them');
+    is(fDoc.getElementById('itemKey').value, 'DAE-3', 'the first one shown');
+    fDoc.getElementById('itemDialog').close();
+
+    /* No results: nothing happens, and the window stays for the next character. */
+    fDoc.getElementById('findBtn').click();
+    typeQuery('zzz-nothing');
+    is(fHits().length, 0, 'nothing matches zzz-nothing');
+    enter();
+    ok(fDlg.open, 'and Enter leaves the window open — there is nothing to open');
+    fDlg.close();
+  }
 
   /* ────────────────────────────────────────────────────────── */
   group('a quoted cell may hold a line break');

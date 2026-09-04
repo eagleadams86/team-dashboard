@@ -2569,7 +2569,11 @@ A few details:
 ## Find (⌘K)
 
 **⌕ Find** in the header — or **⌘K** / **Ctrl-K** from anywhere — opens a search box over
-everything the app holds. Type two characters, and clicking a result takes you to it.
+everything the app holds. Type two characters, and clicking a result takes you to it — or
+press **Enter** to take the first result, which for a key is the one you meant and for a word
+is the newest match. With nothing matched, Enter does nothing and the box waits for the next
+character. (Until 2026-09-04 Enter did nothing at all; the only road to a result was a click
+or a Tab onto it. The same rule holds across the family.)
 
 It's the same window, in the same place, with the same shortcut as
 [Money Map's](https://github.com/eagleadams86/financial-plan) and
