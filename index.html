@@ -15530,6 +15530,29 @@ function teamColumns(train) {
       fmt: (v) => or(v, num1) },
     { key: 'p85', label: train.cyclePercentile + 'th ' + cycle.toLowerCase(), desc: true,
       get: (d) => d.summary.p85CycleTime, fmt: (v) => or(v, num1) },
+    /* IMMEDIATELY BESIDE THE CYCLE TIME PERCENTILE, and the adjacency is the
+       whole reason this column exists rather than a placement preference. The
+       column to its left measures from the moment work STARTED, so it cannot see
+       a request that sat for three weeks before anybody picked it up; this one
+       measures from the moment it was raised. THE GAP BETWEEN THE TWO CELLS IS
+       THAT TEAM'S QUEUE, readable along the row without arithmetic — which is
+       the one finding this table could not previously produce at all, and
+       usually the cheapest thing on it to act on, because closing a queue needs
+       scheduling rather than anyone working faster.
+
+       It reads as a dash on a team whose export carries no Created column, which
+       is a real and common state rather than a fault — the same shape the defect
+       rate column already has in the feature view, and Data to is the column
+       that explains patchy data.
+
+       NO ⓘ, under the rule above: its note opens from the percentile lead time
+       tile on the dashboard, which is named for this same heading. It cost the
+       header row a second line at an ordinary window, which is what the wrap
+       rule was bought for; nothing is squeezed and nothing scrolls sideways,
+       measured at 1100, 1265 and 1500 with long team names and a renamed cycle
+       time label. */
+    { key: 'leadP85', label: train.cyclePercentile + 'th lead time', desc: true,
+      get: (d) => d.summary.p85LeadTime, fmt: (v) => or(v, num1) },
     { key: 'wip', label: 'In progress', desc: true,
       get: (d) => d.summary.currentWip, fmt: (v) => or(v, String) },
     /* WIP vs month was here until 2026-09-04 and is on the dashboard still. It

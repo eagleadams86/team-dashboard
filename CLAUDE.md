@@ -45,6 +45,28 @@ as a mean**, which is the statistic the whole file argues against.
 - The gap worth teaching, and the help text says it: **percentile lead time minus percentile cycle
   time is the queue** — the cheapest thing on the page to fix, because nobody has to work faster.
 
+### And then a column, beside the cycle time one (same day)
+
+Charles came back to the question the tile started: *"on the all teams table, which is more
+important: completed, 85% lead time? or is there room for both?"* Measured rather than guessed, and
+the earlier answer was wrong: **the table never overflows** — extra columns spend HEADER HEIGHT,
+not sideways scroll. At a 1265px window with 1180px of table: 9 columns is a 36px header, +Completed
+36px, +85th lead time 36px, +BOTH 56px. Under stress (long team names and `cycleTimeLabel` renamed
+to "Time in Process") both go to 75px, and nothing is squeezed at 1100, 1265 or 1500. So the width
+argument that killed `completed` was never the real constraint; header lines are.
+
+- **Lead time took the slot and `completed` stayed out on MERIT, not on width.** An absolute count
+  ranks teams by size in a table whose whole question is which one needs you, and `Per week` already
+  carries it normalised over the shared window. If absolute volume is ever wanted back it belongs in
+  the window note, not in a column.
+- **THE ADJACENCY IS THE FEATURE.** `leadP85` sits immediately after `p85`, and separating them
+  would take the column's reason with it: the left cell starts counting when work started, the right
+  when it was raised, so the gap between them is that team's queue, readable along the row with no
+  arithmetic. Pinned as an index relationship, not just a membership check.
+- Dashes on a team with no Created column, which is ordinary — the shape the defect rate column
+  already has in the feature view, with Data to as the column that explains patchy data.
+- No third ⓘ: its note opens from the tile of the same name. The count is pinned beside it.
+
 ## Aged Share of WIP (2026-09-04) — SCHEMA 14 → 15
 
 Asked for after Charles demoed the app: *"percentage of Aged work compared to WIP would be a

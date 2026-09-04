@@ -374,8 +374,14 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    dates as null rather than nought; that the Flow row's three tiles open three
    DIFFERENT windows, which is the rule a pair of tiles sharing a metric is most
    likely to break; and that its line is styled identically to the cycle time
-   card's percentile, because they are the same question asked of two spans. */
-const EXPECTED = 3395;
+   card's percentile, because they are the same question asked of two spans.
+
+   And to 3400 the same day when the percentile lead time gained its All Teams
+   column: the ordered column list moved, and the ADJACENCY to the cycle time
+   percentile is pinned as an index relationship rather than a membership check,
+   because separating the two takes the column's whole reason with it — the gap
+   between those two cells is the team's queue. */
+const EXPECTED = 3400;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9450,10 +9456,19 @@ group('ARTs — the grouping, and the boundary it crosses');
      passing if one were swapped for another. */
   const colKeys = [...win.document.querySelectorAll('#allTeamsTable thead th')]
     .map(th => { const b = th.querySelector('[data-sort]'); return b ? b.dataset.sort : null; });
-  is(colKeys, ['name', 'rate', 'trend', 'p85', 'wip', 'aged', 'agedPct', 'defects', 'dataEnd'],
+  is(colKeys, ['name', 'rate', 'trend', 'p85', 'leadP85', 'wip', 'aged', 'agedPct',
+               'defects', 'dataEnd'],
      'the table’s columns, in order — no Completed and no WIP vs month');
   ok(colKeys.indexOf('agedPct') === colKeys.indexOf('aged') + 1,
      'and the share sits beside the count it is a share OF, which is what makes both readable');
+  /* The pairing IS the feature. Separate the two percentile columns and the
+     queue stops being readable along the row, which is the only reason this
+     table gained a lead time column at all. */
+  ok(colKeys.indexOf('leadP85') === colKeys.indexOf('p85') + 1,
+     'and the lead time percentile sits beside the cycle time one — the gap between the '
+     + 'two cells is that team’s queue');
+  is(win.document.querySelectorAll('#allTeamsTable thead [data-help]').length, 2,
+     'the lead time column adds no third ⓘ — its note opens from the tile of the same name');
 
   /* A SAVED SORT CAN NAME A COLUMN THAT NO LONGER EXISTS — a browser that used
      the app yesterday has `completed` sitting in its td-view. Booted for real in

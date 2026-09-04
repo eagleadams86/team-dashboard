@@ -343,7 +343,7 @@ people actually scan for:
 |---|---|
 | **Per week** | Who is delivering, and at what pace? |
 | **Throughput trend** | Which team is *changing*? |
-| **85th cycle time** | Who is slow, and who is unpredictable? |
+| **85th cycle time** / **85th lead time** | Who is slow at *doing* the work, who is slow at *responding* — and the gap between the two is their queue |
 | **In progress** | Who is overloaded? |
 | **Aged** / **Aged %** | Who has work going stale — and how much of their board is it? |
 | **Defect rate** | Who has a quality problem? — empty in the feature view, and the note under the table says why |
@@ -366,6 +366,20 @@ note was not deleted with its column: it moved to the dashboard tile labelled *W
 throughput*, which had the same problem the column's ⓘ was added to fix — it was opening a window
 titled *Work in Progress*, which tells a reader who came about the ratio that the window is not
 for them.
+
+**85th lead time** sits immediately beside **85th cycle time**, and the adjacency is the point.
+The cycle time column measures from the moment work *started*, so it cannot see a request that sat
+for three weeks before anybody picked it up. The lead time column measures from the moment it was
+raised. **The gap between the two cells is that team's queue** — readable along the row without
+doing any arithmetic, and normally the cheapest thing on this table to act on, because closing a
+queue takes scheduling rather than anyone working faster. In the demo, Team Healthy Flow reads
+6.0 against 9.0 and Team Long Tail 23.0 against 30.0.
+
+It reads as a dash for a team whose export carries no **Created** column — a real and ordinary
+state rather than a fault, and the same shape the defect rate column already has in the feature
+view. *Data to* is the column that explains patchy data. It carries no ⓘ, under the rule above:
+its note opens from the 85th percentile lead time tile on the dashboard, which is named for the
+same heading.
 
 **Aged %** is the ageing column worth sorting on, because it is the one that compares. Six aged
 items is a tail on a board of thirty and a stop on a board of six; the count beside it ranks
