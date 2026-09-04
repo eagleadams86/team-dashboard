@@ -11,6 +11,115 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## Aged Share of WIP (2026-09-04) — SCHEMA 14 → 15
+
+Asked for after Charles demoed the app: *"percentage of Aged work compared to WIP would be a
+helpful metric. maybe a summary card, chart over time, and in the all teams view. they'd like a
+configurable RAG for this metric if possible."* All four landed. What must not regress:
+
+- **It is a DIVISION of two series this app already had, never a third count.** `agedCounts` is
+  handed the `wip` series and subtracts from it, so `agedCount[k] <= wip[k]` holds by
+  construction; `agedShare` is one `.map` over the pair, right beside them in `derive()`. That is
+  the whole reason the figure is safe to state — the tile can never contradict the two tiles
+  beside it, which is the rule this file has argued hardest for. Anything that recomputes an aged
+  count or a WIP count for this metric is a bug, however correct its arithmetic.
+- **Null in both directions, and never a zero.** No threshold means a null numerator, so the share
+  is unknown rather than nought — the feature view with `featureAgedDays` unset. And a period with
+  NOTHING OPEN has no share at all: zero aged out of zero open is not 0% and not 100%, it is no
+  ratio, the reading `wipRatio` already takes of a month that finished nothing. A 0 here would
+  draw a healthy floor across a board that had simply stopped.
+- **It is the count's answer to "compared with what?", and that is why it earned the All Teams
+  column.** Six aged is a tail on a board of thirty and a stop on a board of six. The raw count
+  ranks teams by size; this one compares them.
+
+### NOTHING TURNS A COLOUR — amended, decided with Charles
+
+The rule at *The Limit and the Target* said the verdict is a sentence and the bars over a limit
+are the colour of the bars under them. **It now reads: nothing turns a colour unless the reader
+drew the line.** Both halves of the original argument were put to Charles and he chose this.
+
+- **The "no targets" half had already expired.** It was written before `wipLimit` and `sleDays`;
+  this app has had targets for a fortnight and went on stating them in words.
+- **The palette half is answered by the pack, not waived.** `ok`/`warn`/`err` are gated against
+  EACH OTHER at CIE ΔE ≥ 18 under deuteranopia and protanopia, and three is the documented ceiling
+  for that palette — **do not reach for `--serious` as a fourth**, it tops out near ΔE 16.
+- **This is ADOPTION, not local invention.** `rag()`, `RAG_TEXT`, `RAG_GLYPH`, `RAG_VAR` and
+  `ragVar()` are Sprint Predictability's, names and all, so a second graded figure later is one
+  entry in `rag()` and nothing else. No colour was invented here and the theme pack is untouched.
+- **OPT IN, and that is what keeps the reversal narrow.** `ragBounds` returns nothing unless BOTH
+  boundaries are typed, so a fresh browser grades nothing and the app still just states figures.
+  One boundary on its own is a pass/fail, not a three-state scale, and inferring the second would
+  be the app drawing the half of the line the reader had not drawn.
+- **Colour is never the only signal, in three places at once**: the glyph, the `sr-only` status,
+  and the verdict written out in the tile's foot whether the tile is coloured or not. A reader who
+  sees no colour at all loses nothing — which is the test, because that reader is who this is for.
+
+### The chart, and the one thing the drawing had to teach
+
+`chartAgedShare` sits beside `#cardWip` rather than beside the aged-work card: it plots the ratio,
+so it belongs next to its own denominator, and the two ageing cards below stay side by side as
+their own comment requires. Health went 4 charts to 5, so **`#cardDefectRate` takes the `solo`
+class back** — it lost it when Health went 3 to 4, and this is the odd group the class was kept for.
+
+- **The line is NEVER recoloured.** It keeps `--series-1` in every band. The bands are the reader's
+  scale; a line that changed colour would be the app grading their figures.
+- **The y axis is pinned to 100%**, so the bands do not move under the line every time the data
+  does, and a quiet board reads as quiet rather than as full.
+- **The bands are the pack's `*-bg` tints pulled HALFWAY BACK toward the surface by `tint()`**, and
+  that was not taste. At full strength, with the axis pinned and most boards living under 40%, six
+  tenths of every chart came out red before anything was plotted and the eye read the AREA as the
+  finding. Only the drawing showed it. Halved, they read as a scale. Don't restore full strength.
+- `ragBands` runs on **`beforeDraw`, not `beforeDatasetsDraw`** — the other way round the fill
+  swallowed the gridlines, which is what makes a percentage readable.
+- The bands are named where they are drawn, by the same `refLabels` plugin the age chart uses.
+
+### Two All Teams columns went, at Charles's decision
+
+The table had no width left — three ⓘ took it 38px past a 1265px window. **`completed` and
+`ratio` were dropped to make room**; the table nets one column fewer and now fits with room over.
+
+- `Per week` is the same measure normalised to the window. What is genuinely gone is the roll-up's
+  only ABSOLUTE volume figure, in the table and in its CSV export. Said plainly because it is the
+  kind of thing noticed a fortnight later.
+- **Two ⓘ now, not three.** The heading-wrap rule that bought the third one STAYS — it is what
+  pays for the two-word headings, and taking it out puts the table back into a sideways scroll
+  from the other direction. Both halves are still pinned.
+- **`teamWipRatio` was NOT deleted with its column.** It is the only place in the app that explains
+  what the ratio divides, and the tile it would have fallen back to — labelled "WIP vs
+  throughput" — was opening the *Work in Progress* note, which is the exact naming mismatch that
+  column's ⓘ was added to fix. Renamed `wipRatio`, retitled **WIP vs Throughput**, and pointed at
+  the tile it now answers for. A note whose column goes should be re-homed, not tidied away.
+- `view.teamSort` resting on a removed column needed no migration: `cols.find(...)` returns
+  undefined and the `if (sortCol)` guard falls back to ART order. Pinned.
+- **Not added to the All Teams TILE row.** `#allTeamsTiles` is plain `.tiles`, which is pinned at
+  exactly four and deliberately mirrors the dashboard's headline four — neither carries the aged
+  share, which lives in Health and in the column. Adding a fifth there would have broken a rule
+  with a test behind it to duplicate a figure the column already states.
+
+### The trap the drawing found, and the settings
+
+**`Number(null)` is 0, and `Number.isFinite(0)` is true.** It bit TWICE, in the two places that
+read these boundaries, and each miss looked different:
+
+- `clampPct` in `normalizeSettings` turned every unset boundary into a real zero on the way into
+  storage, so both boxes read as set and `loadSample`'s `== null` seed check quietly stopped firing.
+- `ragBounds` did the same thing on the way OUT, independently. With that one alone the defaults
+  were correct in storage and every board on screen was still graded RED, *off target above 0%*,
+  against a line nobody had drawn — the harder half to notice, because the saved data looked right.
+
+Both reject null and empty string *before* `Number` ever sees them now. **Any future scale here must
+test the raw value, not its `Number()`.**
+The general shape: **a nullable numeric setting whose zero is meaningful cannot borrow the
+positive-or-null coercion** `outlierDays` and `featureAgedDays` use, and `PERCENT_SETTINGS` exists
+beside `NULLABLE_SETTINGS` for exactly that reason.
+
+Both keys ride into a share link with the rest of `settings` (`SHARE_PAYLOAD_V` unbumped, matching
+every additive field before them), so a recipient sees the sender's grading — the point, given who
+these links go to — and both are attacker-controlled. Out-of-range is **not set**, not clamped into
+range: 400 is not somebody asking for 100. The demo seeds 20/40 only when the reader has answered
+NEITHER, which puts its three teams on 0%, 33% and 67% — one on each state, so the feature is
+visible on the demo rather than shipped invisibly.
+
 ## Pinning the Tabs and the View Controls (2026-09-03) — no schema change
 
 Charles: *"let a user pin this whole section to the top, similar to how we did it

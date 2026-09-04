@@ -951,8 +951,13 @@ select { cursor: pointer; }
   font-size: var(--fs-xs); color: var(--text-secondary); }
 .controls .window strong { color: var(--text-primary); font-weight: var(--fw-semibold); }
 
-/* summary tiles — the sibling app's tile, minus the RAG states: this dashboard
-   has no targets, and a threshold nobody chose shouldn't be invented by CSS.
+/* summary tiles — the sibling app's tile. It shipped here MINUS the RAG states,
+   on the reasoning that this dashboard had no targets and a threshold nobody
+   chose shouldn't be invented by CSS. The first half of that stopped being true
+   when the WIP limit and the cycle time target landed, and the second half is
+   what the aged share now honours from the other end: the states exist, and
+   nothing wears one until the reader has typed both boundaries in. See
+   `.tile.green` below and the rag() block in the script.
    Tiles share the parent's rows via subgrid so label, number and caption line
    up straight across the row; browsers without subgrid lay each tile out on
    its own, which is an acceptable fallback. */
@@ -1094,6 +1099,30 @@ select { cursor: pointer; }
   display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .tile .value { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.02em; margin-top: 2px; }
 .tile .foot { font-size: var(--fs-xs); color: var(--text-secondary); margin-top: 2px; }
+/* RAG state, taken from Sprint Predictability verbatim rather than invented here.
+   COLOUR IS NEVER THE ONLY SIGNAL: every graded tile also carries a glyph and an
+   sr-only status (WCAG 1.4.1), and the foot states the verdict in words whether
+   the tile is coloured or not — a reader who sees no colour at all loses nothing.
+
+   The tint FILL is load-bearing, not decoration, and the sibling's comment
+   records why: a 4px rule and a line of coloured digits are thin things to judge
+   a colour on, and on the light themes WCAG forces every status colour dark, so
+   at that size all three read as near-black — two sighted reviewers and one
+   colourblind one all reported it. A filled panel gives the eye a large flat area
+   of the hue instead. The pack's *-bg tints are gated to keep both the status
+   colour and --text-secondary at 4.5:1 on top of them, and the trio is gated
+   against EACH OTHER at CIE dE >= 18 under deuteranopia and protanopia.
+
+   THREE STATES AND NO MORE. Once the red-green axis is gone the pack's blue-yellow
+   plus lightness carries about three reliable levels; --serious as a fourth tops
+   out near dE 16 and would be the one nobody could name. */
+.tile.green  { border-left-color: var(--green); background: var(--green-bg); }
+.tile.yellow { border-left-color: var(--amber); background: var(--amber-bg); }
+.tile.red    { border-left-color: var(--red);   background: var(--red-bg); }
+.tile.green  .value { color: var(--green); }
+.tile.yellow .value { color: var(--amber); }
+.tile.red    .value { color: var(--red); }
+.tile .glyph { font-size: var(--fs-base); font-weight: 700; margin-left: 6px; vertical-align: 2px; }
 
 /* ── The info dot ────────────────────────────────────────────────────────────
    A circled "i" beside a label, opening the help window rather than a hover
@@ -2676,9 +2705,12 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <p id="dashNoFeaturesBody"></p>
     </div>
 
-    <!-- Summary tiles — the sibling app's pattern, without RAG colour: this
-         dashboard has no targets, so a tile states the figure and the ⓘ says
-         what to make of it. Rendered by renderDashboard(). -->
+    <!-- Summary tiles — the sibling app's pattern. A tile states the figure and
+         the ⓘ says what to make of it; a tile whose metric has BOTH of its
+         boundaries typed in also wears the sibling's RAG state, with a glyph and
+         a spelled-out status beside the colour. These four carry none: only the
+         aged share is graded, and only once somebody has drawn the line.
+         Rendered by renderDashboard(). -->
     <div id="dashTiles" class="tiles" hidden></div>
 
     <!-- The first three are charts, grouped by what the data MEANS rather than by
@@ -2813,6 +2845,22 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           <div class="chart-wrap"><canvas id="chartWip"></canvas></div>
         </div>
 
+        <!-- Beside the card above rather than beside the aged-work card below,
+             and that is the placement decision: this plots the RATIO of the two,
+             so it belongs next to its own denominator, and the two ageing cards
+             underneath stay side by side as their own comment requires.
+
+             It is the only chart in the app that draws a band the reader's own
+             boundaries shade, and the bands appear only once both are typed —
+             the line itself is never graded. Same empty face as the card below
+             for the same reason: no threshold, no numerator, nothing to plot. -->
+        <div class="chart-card" id="cardAgedShare">
+          <div class="chart-name" id="nameAgedShare"></div>
+          <div class="chart-title" id="titleAgedShare"></div>
+          <div class="chart-wrap"><canvas id="chartAgedShare"></canvas></div>
+          <div class="note info" id="agedShareNone" hidden></div>
+        </div>
+
         <!-- It gained an id and an empty face when the feature threshold landed.
              The threshold this chart counts against is a number the reader sets,
              and there is no number this app is entitled to assume about
@@ -2848,7 +2896,10 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              itself rather than disappearing, which is the rule the lead time
              card already follows: the answer to "where did the defect rate go?"
              belongs on screen. -->
-        <div class="chart-card" id="cardDefectRate">
+        <!-- `solo`, and it has had the class before: it lost it when Health went
+             from three charts to four, and the aged share taking it to five is
+             the odd group the class was kept for. -->
+        <div class="chart-card solo" id="cardDefectRate">
           <div class="chart-name" id="nameDefectRate"></div>
           <div class="chart-title" id="titleDefectRate"></div>
           <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
@@ -3522,7 +3573,8 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <div class="row spread">
       <strong class="manage-head">Aged Work</strong>
     </div>
-    <p class="manage-note">How long something can sit unfinished before the app flags it.</p>
+    <p class="manage-note">How long something can sit unfinished before the app flags it, and how
+      much of a board may be flagged before that is worth acting on.</p>
     <div class="grid two pairs" style="margin-top:var(--sp-5)">
       <div>
         <label for="setAgedDays" id="setAgedDaysLabel">Count an in-progress item as aged after (days)</label>
@@ -3543,6 +3595,29 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       work items, and nothing here assumes it holds for features. Until you set a number, the
       Aged Work card in the feature view says so and shows what that team&rsquo;s finished
       features actually took, so the number you pick is measured against your own board.</p>
+    <!-- The second question this section answers, and the only two numbers in the
+         app that put a COLOUR on a figure. Both empty by default and both needed
+         before anything is graded — see the rag() block in the script for why one
+         on its own is not a scale. They sit here rather than in a section of their
+         own because they are read against the threshold above: what counts as
+         aged, then how much aged is too much. -->
+    <div class="grid two pairs" style="margin-top:var(--sp-5)">
+      <div>
+        <label for="setAgedShareGreen" id="setAgedShareGreenLabel">Aged share is on target at or below (%)</label>
+        <input type="number" id="setAgedShareGreen" style="--digits:3" step="1" min="0" max="100">
+      </div>
+      <div>
+        <label for="setAgedShareRed" id="setAgedShareRedLabel">Aged share is off target above (%)</label>
+        <input type="number" id="setAgedShareRed" style="--digits:3" step="1" min="0" max="100">
+      </div>
+    </div>
+    <p class="hint" style="margin-top:var(--sp-3)">Both are <strong>empty by default, and nothing
+      is graded until both are set</strong> &mdash; with either box blank the Aged share tile and
+      its chart state the figure and leave the judgement to you, which is how every other figure
+      in this app behaves. Set them and the tile takes a colour, a symbol and a spelled-out
+      status, and the chart shades the bands behind its line. They are your team&rsquo;s
+      boundaries, not the app&rsquo;s: there is no number here worth assuming, and one you had
+      not agreed to would be a finding you never made.</p>
   </section>
 
   <!-- The feature layer's one switch. On its own line with room for a hint,
@@ -8813,6 +8888,19 @@ function derive(rows, settings, view, stages, statuses) {
      board with no ageing problem. */
   const agedCount = agedDays == null ? evalPoints.map(() => null)
     : agedCounts(items, evalPoints, agedDays, wip, workingDays);
+  /* The same two series as a share, and it is a DIVISION of them rather than a
+     third count — `agedCounts` is handed `wip` and subtracts from it, so
+     `agedCount[k] <= wip[k]` holds by construction and this figure can never
+     contradict the two tiles it sits beside. That is the whole reason it is
+     safe to state.
+
+     Null in both directions and never a zero. A null threshold gives a null
+     numerator, so the share is unknown rather than nought — the feature view
+     with nothing set. And a period with NOTHING OPEN has no share at all: zero
+     aged out of zero open is not 0% and not 100%, it is no ratio, the same
+     reading `wipRatio` takes of a month that finished nothing. A 0 here would
+     draw a healthy floor across a board that had simply stopped. */
+  const agedShare = agedCount.map((a, k) => (a == null || !wip[k]) ? null : a / wip[k]);
 
   /* ── The cumulative flow diagram ───────────────────────────────────────────
      Three cumulative counts read at the same points work in progress is read
@@ -9354,7 +9442,7 @@ function derive(rows, settings, view, stages, statuses) {
     throughput, unplannedRate, avgCycleTime, netFlow, started,
     avgLeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
     throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
-    wip, agedCount, agedDays, ageing, cycleScatter, forecast, cfd,
+    wip, agedCount, agedShare, agedDays, ageing, cycleScatter, forecast, cfd,
     /* The two figures the team set, returned as USED rather than as passed —
        every label that states one reads it from here, the same rule
        `workingDays` and `dayNoun` follow, so a line on a chart and the sentence
@@ -9463,6 +9551,10 @@ function derive(rows, settings, view, stages, statuses) {
          that nothing has aged on a board it never measured. */
       agedNow: agedDays == null ? null
         : (agedCount.length ? agedCount[agedCount.length - 1] : 0),
+      /* The last point of the share series, so the tile and the right-hand end
+         of the chart are the same number read once. Null when there is no
+         threshold and null when nothing is open — see the series itself. */
+      agedShareNow: agedShare.length ? agedShare[agedShare.length - 1] : null,
       asOf: endDate,
       monthlyThroughput,
       /* Null rather than Infinity when nothing was finished in the last month —
@@ -9518,6 +9610,10 @@ function derive(rows, settings, view, stages, statuses) {
       cfd: 'Raised, started, finished',
       wip: 'Work in progress',
       agedWork: 'Aged work',
+      /* WIP rather than "work in progress" spelled out, because the name has to
+         fit the eyebrow on a half-width card and the tile beside it already
+         says the words. */
+      agedShare: 'Aged share of WIP',
       /* Named for what a dot IS rather than for the chart type — nobody at a
          stand-up asks for the scatter plot. */
       itemAge: 'Work ' + unitOne + ' age',
@@ -9554,6 +9650,10 @@ function derive(rows, settings, view, stages, statuses) {
       agedWork: agedDays == null
         ? Units + ' in Progress Too Long — No Threshold Set'
         : Units + ' in Progress Longer Than ' + agedDays + ' ' + DayNoun,
+      agedShare: agedDays == null
+        ? 'Share of Open ' + Units + ' Past the Ageing Threshold — No Threshold Set'
+        : 'Share of Open ' + Units + ' Older Than ' + agedDays + ' ' + DayNoun
+          + ', at the End of Each ' + Noun,
       itemAge: 'Age of Every ' + Unit + ' Still in Progress on ' + prettyDate(endDate)
         + (ageing.byStage ? ', by Workflow Stage'
            : ageing.byStatus ? ', by Status' : ', by Work Type'),
@@ -9583,6 +9683,8 @@ function derive(rows, settings, view, stages, statuses) {
       wip: Units + ' open at period end',
       agedWork: agedDays == null ? Units + ' past the threshold'
         : Units + ' older than ' + agedDays + ' ' + dayNoun,
+      agedShare: agedDays == null ? 'Share past the threshold'
+        : 'Share older than ' + agedDays + ' ' + dayNoun,
       itemAge: 'Age so far (' + dayNoun + ')',
       itemAgeX: ageing.byStage ? 'Workflow stage'
         : ageing.byStatus ? 'Status' : 'Work type',
@@ -9992,6 +10094,25 @@ const DEFAULT_SETTINGS = {
      "not set", never 0: a cutoff of zero days would exclude every item that
      ever finished. */
   outlierDays: null,
+  /* The two boundaries the aged share is graded against, as whole percents, and
+     the only two numbers in this app that put a colour on a figure.
+
+     BOTH NULL, AND THAT IS THE FEATURE. There is no share of a board that is
+     universally fine: a platform team carrying long-running spikes and a support
+     team turning work over in a day would be handed the same verdict by any
+     number shipped here, and one of them would be wrong. Null means the tile and
+     the chart state the figure and say nothing about it, which is what every
+     other figure in this app does and what it went on doing for a year.
+
+     They are read as a PAIR — `ragBounds` returns nothing unless both are
+     finite — because one boundary is a pass/fail and not a three-state scale,
+     and inferring the second would be the app drawing the half of the line the
+     reader had not drawn. Zero is a legitimate value for the green one (a team
+     may well mean "nothing older than the threshold, ever"), which is why these
+     take a 0-100 clamp rather than the positive-or-null shape `outlierDays` and
+     `featureAgedDays` use. */
+  agedShareGreen: null,
+  agedShareRed: null,
 
   /* TWO ROWS, and this trims a list of five. It used to ship Spikes, Stories and
      Tasks as well, on the reasoning that they are "the four types a Jira board
@@ -10646,6 +10767,30 @@ function normalizeSettings(raw) {
      "not set" rather than as a threshold the reader never chose. */
   const fa = Number(s.featureAgedDays);
   s.featureAgedDays = Number.isFinite(fa) && fa > 0 ? fa : null;
+  /* The two grading boundaries, as whole percents clamped to 0-100. Anything
+     that is not a finite number in that range is NOT SET rather than clamped
+     into range — a hand-edited backup or a share link saying 400 is not a team
+     asking for a boundary of 100, it is a payload this app should decline to
+     read a verdict out of. Zero survives, unlike the day thresholds above:
+     "nothing past the threshold, ever" is a real target.
+
+     Settings ride into a share link verbatim, so both of these arrive from
+     somewhere else on somebody else's screen. The clamp here is the guard; the
+     max= on the input is only a courtesy to whoever is typing. */
+  const clampPct = (v) => {
+    /* NULL AND EMPTY STRING FIRST, before Number() ever sees them: `Number(null)`
+       is 0 and `Number('')` is 0, so a boundary that is simply not set would come
+       back out of here as a real zero — and a zero is a legitimate target, so
+       nothing downstream could tell the two apart. Both boxes would then read as
+       set, and every board in the app would be graded against 0% by a line
+       nobody drew. The defaults ARE null, so this is the ordinary path, not the
+       edge case. */
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
+  };
+  s.agedShareGreen = clampPct(s.agedShareGreen);
+  s.agedShareRed = clampPct(s.agedShareRed);
   /* A checkbox, so only the boolean true means on. A hand-edited backup saying
      "yes" or 1 must not switch the measure every figure is taken in — and it
      must be a real boolean either way: JSON.stringify drops an undefined
@@ -10681,7 +10826,10 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 14 added the status vocabulary — `state.statuses`, a `u` (status id) on
+/* SCHEMA 15 added the two boundaries the aged share is graded against —
+   `agedShareGreen` and `agedShareRed`, whole percents, both null by default and
+   read only as a pair, and the first settings in this app that put a COLOUR on a
+   figure rather than a sentence under one. 14 added the status vocabulary — `state.statuses`, a `u` (status id) on
    each row, and a `statuses` list of ticked ids on each stage. It REVERSED the
    rule that no status name is ever stored; the argument that replaced it is at
    cleanStatusLabel. 13 added the feature ageing threshold — `featureAgedDays`, the one
@@ -10707,7 +10855,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 14;
+const SCHEMA = 15;
 
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
@@ -11446,6 +11594,51 @@ const refLabels = {
   }
 };
 Chart.register(refLabels);
+
+/* ── The bands behind the aged share ─────────────────────────────────────────
+   The one place in this app where a chart carries a colour that means good or
+   bad, and it is carefully not the app's judgement: the two boundaries are typed
+   by the reader, the plugin does nothing at all until both are, and the LINE
+   ITSELF IS NEVER RECOLOURED — the data stays the first series colour whatever
+   band it is in. What is shaded is the reader's own scale, drawn once behind
+   everything, not a verdict painted onto their figures.
+
+   `beforeDraw` rather than `beforeDatasetsDraw`, so the grid lines and the axis
+   are drawn ON TOP of the bands. The other way round the fill swallowed the
+   gridlines and the chart lost the thing that makes a percentage readable.
+
+   The pack's own `*-bg` tints, PULLED HALFWAY BACK TOWARDS THE SURFACE by the
+   app's own `tint()`. Not a new colour — the same mix the forecast shading uses,
+   toward each theme's own ground, so it fades to near-black on Midnight and
+   near-white on Light rather than picking a hue of its own. At full strength the
+   red band was wrong in a way only the drawing showed: the axis is pinned to
+   100%, most boards live under 40%, so six tenths of every chart came out red
+   before the data was plotted and the eye read the AREA as the finding. Halved,
+   the bands read as the scale they are and the line is still the loudest thing
+   on the card. */
+const ragBands = {
+  id: 'ragBands',
+  beforeDraw(chart, args, opts) {
+    const b = opts && opts.bounds;
+    if (!b) return;
+    const area = chart.chartArea, y = chart.scales.y, ctx = chart.ctx;
+    if (!area || !y) return;
+    const px = (v) => Math.min(area.bottom, Math.max(area.top, y.getPixelForValue(v)));
+    const top = area.top, bottom = area.bottom;
+    const gy = px(b.green), ry = px(b.red);
+    const fill = (y0, y1, tok) => {
+      if (y1 - y0 <= 0) return;
+      ctx.fillStyle = tint(token(tok), 0.5);
+      ctx.fillRect(area.left, y0, area.right - area.left, y1 - y0);
+    };
+    ctx.save();
+    fill(top, ry, '--red-bg');            /* above the red boundary */
+    fill(ry, gy, '--warn-bg');            /* between the two */
+    fill(gy, bottom, '--ok-bg');          /* at or below the green one */
+    ctx.restore();
+  }
+};
+Chart.register(ragBands);
 
 /* tickFormat defaults to tipFormat — pass it separately when the axis wants
    rounder numbers than the tooltip. xTitle and partial come from derive(), so
@@ -12224,6 +12417,75 @@ function drawCharts(d) {
   });
   }
 
+  /* ── The same two series as a share ──
+     Empty for exactly the same reason as the card above and with the same face,
+     because it has the same numerator: no threshold, nothing counted, nothing to
+     plot. It also goes empty when nothing has EVER been open in the window, which
+     the null-safe series already expresses as a gap rather than a floor. */
+  const shareCard = $('cardAgedShare');
+  const shareNone = $('agedShareNone');
+  const hasShare = d.agedDays != null && d.agedShare.some(v => v != null);
+  shareCard.querySelector('.chart-wrap').hidden = !hasShare;
+  shareCard.classList.toggle('no-chart', !hasShare);
+  shareNone.hidden = hasShare;
+  shareNone.textContent = hasShare ? ''
+    : d.agedDays == null
+      ? 'No ageing threshold is set for features, so there is no aged count to take a '
+        + 'share of. Set one under Settings — the Aged Work card beside this one names '
+        + 'the figures on this team’s own board to pick between.'
+      : 'Nothing has been in progress in this window, so there is no share to state — '
+        + 'a board with nothing open is not a board with nothing stale. Paste an export '
+        + 'covering a period this team had work open in, or add an item by hand from '
+        + 'the Your Data tab.';
+
+  if (!hasShare) {
+    if (charts.chartAgedShare) { charts.chartAgedShare.destroy(); delete charts.chartAgedShare; }
+  } else {
+  const shareOpts = baseOptions(d.axisTitles.agedShare, pct1, pct0, d.axisTitles.x, d.partial);
+  shareOpts.scales.y.beginAtZero = true;
+  /* Pinned to the whole scale rather than fitted to the data. A share is read
+     against 100% and against the reader's own boundaries — an axis that stopped
+     at 30% would make a quiet board look like a full one, and would move the
+     bands under the line every time the data did. */
+  shareOpts.scales.y.max = 1;
+  const shareBounds = ragBounds('agedShare');
+  if (shareBounds) {
+    shareOpts.plugins.ragBands = { bounds: shareBounds };
+    /* The bands are named where they are drawn, by the same plugin the age chart
+       uses — a shaded area with nothing saying what it is would be decoration.
+       The chips are in the status colours, which is the one place the colour and
+       the words sit together. */
+    shareOpts.plugins.refLabels = { lines: [
+      { value: shareBounds.green, text: 'on target ≤ ' + Math.round(shareBounds.green * 100) + '%',
+        colour: token('--green') },
+      { value: shareBounds.red, text: 'off target > ' + Math.round(shareBounds.red * 100) + '%',
+        colour: token('--red') }
+    ] };
+  }
+  renderChart('chartAgedShare', {
+    type: 'line',
+    data: {
+      labels: d.bucketLabels,
+      /* The FIRST series colour whatever band it lands in. The bands are the
+         reader's scale; recolouring the line would be the app grading their
+         figures, which is the thing this whole file declines to do. */
+      datasets: [{
+        label: 'Aged share',
+        data: d.agedShare,
+        borderColor: seriesMain,
+        backgroundColor: tint(seriesMain, 0.2),
+        borderWidth: 2,
+        pointRadius: 2,
+        tension: 0.2,
+        spanGaps: false,
+        fill: false,
+        order: 1
+      }, trendDataset(d.agedShare)]
+    },
+    options: shareOpts
+  });
+  }
+
   /* ── Every finished item, at the time it took ──
      The canonical Kanban chart, and the one view here where a single item is a
      thing you can point at. The line chart beside it averages within a period,
@@ -12533,6 +12795,19 @@ function drawCharts(d) {
      claim this whole change exists to stop the app making. */
   else {
     const c = $('chartAgedWork');
+    if (c) { c.removeAttribute('aria-label'); c.removeAttribute('role'); }
+  }
+  /* Same condition and the same stripping, for the same reason: the share has
+     the aged count as its numerator, so wherever that chart is absent this one
+     is too. The label adds the two boundaries where they are set — a shaded band
+     is the one thing on this card a screen reader gets nothing at all from. */
+  if (d.agedDays != null && d.agedShare.some(v => v != null)) {
+    const b = ragBounds('agedShare');
+    describe('chartAgedShare', label('agedShare')
+      + (b ? '. Shaded on target at or below ' + Math.round(b.green * 100)
+             + '% and off target above ' + Math.round(b.red * 100) + '%' : ''));
+  } else {
+    const c = $('chartAgedShare');
     if (c) { c.removeAttribute('aria-label'); c.removeAttribute('role'); }
   }
   if (d.hasCreated) describe('chartLeadTime', label('leadTime'));
@@ -12956,6 +13231,31 @@ const METRIC_HELP = {
       + 'and shows what that team’s finished features actually took, so the number you '
       + 'pick is measured against your own board rather than guessed.'],
   ] },
+  agedShare: { title: 'Aged Share of WIP', body: [
+    ['What proportion of the work currently open has been open too long. It is ',
+      b('the aged work count divided by the work in progress count'), ' — the two tiles beside '
+      + 'this one, at the same moment, over the same window — so the three can never disagree. '
+      + 'Read as of the newest date in your data, not today.'],
+    ['The count on its own does not travel between teams, and that is what this is for. ',
+      b('Six aged items is a different board on a team of thirty than on a team of six'),
+      ': the first has a tail, the second has stopped. On All Teams it is the ageing column '
+      + 'worth sorting on, because it is the one that compares.'],
+    ['A dash means there is nothing to state rather than nothing wrong. Either no ageing '
+      + 'threshold is set — the feature view ships without one — or ',
+      b('nothing is open at all'), ', and no items open is not a share of nought.'],
+    ['This is ', b('the only figure in this app that takes a colour'), ', and only once you '
+      + 'have typed both boundaries under Aged Work in Settings: at or below the first is on '
+      + 'target, above the second is off target, between them is worth watching. Leave either '
+      + 'box empty and the tile and the chart state the figure and say nothing about it, which '
+      + 'is what every other figure here does. There is no number worth assuming — a platform '
+      + 'team carrying long spikes and a support team turning work over in a day would be '
+      + 'handed the same verdict, and one of them would be wrong.'],
+    ['The colour is never on its own: the tile carries a symbol and a spelled-out status '
+      + 'beside it, and ', b('the verdict is written out under the figure'), ' whether the '
+      + 'boundaries are set or not. The chart shades your bands behind the line and names '
+      + 'them where they are drawn — but the line itself keeps one colour in every band, '
+      + 'because the scale is yours and the figures are your team’s.'],
+  ] },
   teamTrend: { title: 'Throughput Trend', body: [
     ['Which way this team’s throughput has been going across the window on screen — the '
       + 'same fitted line the chart above draws, one per team. ', b('The figure is what that '
@@ -12996,9 +13296,16 @@ const METRIC_HELP = {
       + 'in the table below can, which is what it is there for: read the tile for a promise, '
       + 'read the column to find who needs help.'],
   ] },
-  teamWipRatio: { title: 'WIP vs Month', body: [
+  /* It was `teamWipRatio` and belonged to the All Teams column until 2026-09-04,
+     when that column was dropped to make room for the aged share. The entry did
+     NOT go with it, and deleting it would have been the wrong tidy-up: it is the
+     only place in the app that explains what the ratio divides, and the tile that
+     inherits it was until now pointing at the Work in Progress note — a window
+     named for a different heading, which is the very mismatch the column's own ⓘ
+     was added to fix. Renamed for the tile it now answers for. */
+  wipRatio: { title: 'WIP vs Throughput', body: [
     ['How much work this team has open, measured against ', b('a month of its own finished '
-      + 'work'), '. In progress, the column beside it, is the top of that division; the '
+      + 'work'), '. Work in progress, the tile above it, is the top of that division; the '
       + 'bottom is what the team completed in the last month.'],
     ['The common coaching rule is to keep work in progress ', b('under half a month’s '
       + 'throughput'), ' — 0.5× — and nearer a quarter for most teams. Lower is better: less '
@@ -13117,12 +13424,103 @@ function helpBtn(key, label) {
     '" aria-label="What does ' + escapeHtml(label) + ' mean?">i</button>';
 }
 
-/* A summary tile. No RAG state on purpose: this app has no targets, so the
-   tile states the figure and the ⓘ says what to make of it. */
-function tile(label, valueHtml, foot, helpKey) {
-  return '<div class="tile">' +
+/* ── The RAG states, and whose line they draw ────────────────────────────────
+   Taken from Sprint Predictability rather than written here, names and all, so a
+   second graded figure later is one entry in `rag()` and nothing else. That app
+   is the design lead of the pair and had the whole machinery already; inventing a
+   local one would have been the drift the shared chrome exists to stop.
+
+   THIS APP STILL GRADES NOTHING BY DEFAULT. `rag()` answers 'none' unless BOTH
+   boundaries have been typed, so out of the box every tile is the colour it
+   always was and the app goes on stating figures rather than judging them. The
+   old rule was "nothing turns a colour"; the rule now is that nothing turns a
+   colour unless the reader drew the line — which is the same argument the WIP
+   limit and the cycle time target already make, one step further on.
+
+   And the colour is never alone: `RAG_GLYPH` puts a shape on the tile, an sr-only
+   status spells the state out, and the foot states the verdict in words whether
+   the tile is coloured or not. That is WCAG 1.4.1, and it is also the only way
+   these figures survive being read by somebody with red-green deficiency — which
+   is who reads them here. */
+const RAG_TEXT  = { green: 'On target', yellow: 'Watch', red: 'Off target', none: 'No data' };
+const RAG_GLYPH = { green: '✓', yellow: '!', red: '✕', none: '' };
+/* The custom property a state paints with, so the chart bands and the tile can
+   never drift apart: `ragVar(v, s)` gives the status colour, `ragVar(v, s, '-bg')`
+   its tint. 'none' has no status colour and borrows the muted pair. */
+const RAG_VAR = { green: '--green', yellow: '--amber', red: '--red' };
+
+/* Which way each scale runs, and the only place in the app that knows. Guarded
+   for `state` the way the sibling's `tgt()` is: nothing on the load path grades a
+   figure today, and the guard is so that adding one is not a crash. */
+function ragBounds(scale) {
+  let s = null;
+  try { s = state && state.settings; } catch (e) { s = null; }
+  if (!s) return null;
+  if (scale === 'agedShare') {
+    /* NULL IS TESTED BEFORE Number() EVER SEES IT, and this is the second place
+       that mattered — `Number(null)` is 0 and `Number.isFinite(0)` is true, so a
+       pair of unset boundaries read as a perfectly valid 0/0 scale and every
+       board in the app came out RED, off target above 0%, against a line nobody
+       had drawn. The settings boundary has the same guard for the same reason;
+       fixing one and not the other left the defaults correct in storage and
+       wrong on screen, which is the harder half to notice. Any future scale here
+       must test the raw value, not its Number(). */
+    const gRaw = s.agedShareGreen, rRaw = s.agedShareRed;
+    if (gRaw == null || rRaw == null || gRaw === '' || rRaw === '') return null;
+    const g = Number(gRaw), r = Number(rRaw);
+    /* BOTH, or nothing. One boundary on its own is not a three-state scale, and
+       guessing the other would be the app drawing a line nobody agreed to. */
+    if (!Number.isFinite(g) || !Number.isFinite(r)) return null;
+    return { green: g / 100, red: r / 100 };
+  }
+  return null;
+}
+
+/* 'agedShare' is lower-is-better, the sibling's `churn` scale: at or below the
+   green boundary green, at or below the red one amber, above it red. Written out
+   rather than left to the wording, because "at or below" and "below" are a whole
+   band apart and the sibling learnt that the expensive way. */
+function rag(value, scale) {
+  if (value === null || value === undefined || !isFinite(value)) return 'none';
+  const b = ragBounds(scale);
+  if (!b) return 'none';
+  return value <= b.green ? 'green' : value <= b.red ? 'yellow' : 'red';
+}
+
+/* The verdict as a SENTENCE, and it is not decoration beside the colour — it is
+   the half a reader with red-green deficiency actually reads, and the only half
+   that survives a printed page or a screenshot. It names the boundary as well as
+   the state, because "off target" without a number is a judgement with its
+   working hidden. Empty string when nothing is graded, so the caller can append
+   it unconditionally. */
+function agedShareVerdict(value) {
+  const b = ragBounds('agedShare');
+  if (!b || value == null) return '';
+  const g = Math.round(b.green * 100), r = Math.round(b.red * 100);
+  const k = rag(value, 'agedShare');
+  return k === 'green' ? 'on target, at or below ' + g + '%'
+    : k === 'yellow' ? 'watch — above ' + g + '%, at or below ' + r + '%'
+    : 'off target — above ' + r + '%';
+}
+
+const ragVar = (value, scale, suffix) => {
+  const key = rag(value, scale);
+  if (key === 'none') return suffix ? '--surface-alt' : '--border-strong';
+  return RAG_VAR[key] + (suffix || '');
+};
+
+/* A summary tile. `ragClass` is APPENDED to the signature rather than slotted
+   into the sibling's argument order — the shared thing across the family is the
+   shape (a tile may carry a state, and colour is never the only signal), not
+   where the arguments sit, and reordering would have touched every call here for
+   nothing. Omit it and the tile is exactly what it always was. */
+function tile(label, valueHtml, foot, helpKey, ragClass) {
+  const ragSt = ragClass && ragClass !== 'none' ? ragClass : '';
+  const glyph = ragSt ? '<span class="glyph" aria-hidden="true">' + RAG_GLYPH[ragSt] + '</span>'
+    + '<span class="sr-only"> — ' + RAG_TEXT[ragSt] + '</span>' : '';
+  return '<div class="tile' + (ragSt ? ' ' + ragSt : '') + '">' +
     '<div class="label">' + escapeHtml(label) + helpBtn(helpKey, label) + '</div>' +
-    '<div class="value">' + valueHtml + '</div>' +
+    '<div class="value">' + valueHtml + glyph + '</div>' +
     (foot ? '<div class="foot">' + escapeHtml(foot) + '</div>' : '') +
     '</div>';
 }
@@ -13815,7 +14213,7 @@ function renderDashboard() {
   const ag = d.ageing;
   $('tilesHealth').innerHTML =
     tile('WIP vs throughput', s.wipRatio == null ? '—' : num1(s.wipRatio) + '×',
-      'against ' + s.monthlyThroughput + ' completed in the last month', 'wip') +
+      'against ' + s.monthlyThroughput + ' completed in the last month', 'wipRatio') +
     /* The one figure on the dashboard that points at a single item. It sits
        here rather than in the headline row because the aged-work tile up there
        already answers "is anything stale?"; this answers "how bad is the worst
@@ -13823,6 +14221,24 @@ function renderDashboard() {
        is yes. Read against the median rather than against the threshold: the
        threshold is a round number somebody chose, where the median is what
        this team's finished work actually took. */
+    /* The aged-work tile in the headline row counts the stale items; this states
+       what share of the board they are, which is the half that means anything
+       across two teams of different sizes. It is a DIVISION of the two tiles
+       above it and never a third count, so the three can never disagree — see
+       the series in derive().
+
+       The only graded tile in the app, and only once both boundaries are typed.
+       Its foot states the verdict in words either way. */
+    tile('Aged share',
+      s.agedShareNow == null ? '—' : pct0(s.agedShareNow),
+      s.agedNow == null
+        ? 'no threshold set for features — set one in Settings'
+        : s.currentWip === 0
+          ? 'nothing is in progress, so there is no share to state'
+          : s.agedNow + ' of ' + s.currentWip + ' open ' + d.unitMany
+            + ' over ' + d.agedDays + ' ' + d.dayNoun
+            + (agedShareVerdict(s.agedShareNow) ? '; ' + agedShareVerdict(s.agedShareNow) : ''),
+      'agedShare', rag(s.agedShareNow, 'agedShare')) +
     tile('Oldest in progress', ag.oldest == null ? '—' : String(ag.oldest),
       ag.oldest == null ? 'nothing is in progress'
         : ag.median == null ? d.dayNoun + ' so far'
@@ -15002,21 +15418,26 @@ function teamColumns(train) {
      inside: nine circles at 28px apiece is 250px of a comparison table, spent
      mostly on notes a reader can already open one tab to the left.
 
-     WIP VS MONTH IS THE THIRD, added 2026-09-03 because Charles asked what the
-     column meant. The rule above says its note opens from the dashboard tile —
-     but that tile is labelled "WIP vs throughput", so a reader in this table has
-     no way to know the two are the same figure, and the cross-reference this
-     column was resting on was one nobody could follow. Its own note, named for
-     THIS heading, also states the thing the tile's cannot: the denominator is a
-     month and not the window on screen, which is what makes this the one column
-     here that does not move when the window does. Three circles is 84px and the
-     table still fits — the count is the thing to watch, and the test beside it
-     is what watches. */
+     WIP VS MONTH WAS THE THIRD, added 2026-09-03 because Charles asked what the
+     column meant, and REMOVED 2026-09-04 with the column itself to make room for
+     the aged share. Its reasoning is worth keeping because it is the reasoning
+     any future third dot will have to make: a cross-reference to a tile with a
+     different name is one nobody can follow, so a column whose note only opens
+     from a differently-named tile needs its own.
+
+     TWO CIRCLES NOW, at 40px apiece. The count is the thing to watch and the
+     test beside it is what watches. The heading-wrap rule that was bought to pay
+     for a third one stays regardless — it is what keeps the two-word headings on
+     this table from setting the column widths. */
   return [
     { key: 'name', label: 'Team', text: true, desc: false,
       get: (r) => r.name.toLowerCase() },
-    { key: 'completed', label: 'Completed', desc: true,
-      get: (d) => d.summary.completedTotal, fmt: (v) => or(v, String) },
+    /* NO `completed` COLUMN since 2026-09-04, dropped with WIP vs month to make
+       room for the aged share. Per week below is the same measure normalised to
+       the window, and the two were the pair a reader compared teams on least —
+       an absolute count over a shared window mostly ranks teams by size. The
+       figure is still on the dashboard and still in the window note; what is
+       gone is its column here and its column in the export. */
     { key: 'rate', label: 'Per ' + n, desc: true,
       get: (d) => d.summary.avgThroughput, fmt: (v) => or(v, num1) },
     /* Beside Per week, because it is that number's history. Ascending on the
@@ -15035,10 +15456,22 @@ function teamColumns(train) {
       get: (d) => d.summary.p85CycleTime, fmt: (v) => or(v, num1) },
     { key: 'wip', label: 'In progress', desc: true,
       get: (d) => d.summary.currentWip, fmt: (v) => or(v, String) },
-    { key: 'ratio', label: 'WIP vs month', desc: true, help: 'teamWipRatio',
-      get: (d) => d.summary.wipRatio, fmt: (v) => or(v, (x) => num1(x) + '×') },
+    /* WIP vs month was here until 2026-09-04 and is on the dashboard still. It
+       went with Completed to buy the width for the column below — see the ⓘ
+       arithmetic above, which now runs to two circles rather than three. The
+       heading-wrap rule that bought the third one STAYS: it is what pays for the
+       two-word heading below, and taking it out would put the table back into a
+       sideways scroll from the other direction. */
     { key: 'aged', label: 'Aged', desc: true,
       get: (d) => d.summary.agedNow, fmt: (v) => or(v, String) },
+    /* Beside the count it is a share OF, which is the pairing that makes both
+       readable: six aged is a tail on a board of thirty and a stop on a board of
+       six, and this is the column that says which. NO ⓘ, under the rule above —
+       its note opens from the Aged share tile on the dashboard, which is named
+       for this same heading. Plain text like every other cell: the tile grades,
+       the comparison table states. */
+    { key: 'agedPct', label: 'Aged %', desc: true,
+      get: (d) => d.summary.agedShareNow, fmt: (v) => or(v, pct0) },
     /* NO UNIT GUARD HERE, and that is the point rather than an omission:
        `unplannedShare` is null over features at source, so `or` renders this
        table's own em dash for the same reason it does in every other
@@ -15785,6 +16218,13 @@ function renderSettingsForm() {
      one setting whose whole point is that nothing was assumed. */
   $('setFeatureAgedDays').value = state.settings.featureAgedDays == null
     ? '' : state.settings.featureAgedDays;
+  /* Null renders as an EMPTY BOX, not a 0. The box has to say "nothing set" and
+     a zero here is a real target — see the settings block for why these two are
+     the one pair where those are different states. */
+  $('setAgedShareGreen').value = state.settings.agedShareGreen == null
+    ? '' : state.settings.agedShareGreen;
+  $('setAgedShareRed').value = state.settings.agedShareRed == null
+    ? '' : state.settings.agedShareRed;
   $('setUnplannedLabel').value = state.settings.unplannedLabel;
   $('setWorkingDays').checked  = state.settings.workingDays === true;
   /* The ageing threshold is counted in whichever days the toggle says, so its
@@ -16072,7 +16512,7 @@ TABS.forEach(t => {
 const CHART_GROUPS = {
   flow:     ['chartCycleTime', 'chartCycleScatter', 'chartLeadTime', 'chartFeatureSize'],
   delivery: ['chartThroughput', 'chartNetFlow'],
-  health:   ['chartWip', 'chartAgedWork', 'chartItemAge', 'chartDefectRate'],
+  health:   ['chartWip', 'chartAgedShare', 'chartAgedWork', 'chartItemAge', 'chartDefectRate'],
   /* Forecast is last because it is the only group that says anything about the
      future: the three before it are what happened, and this is what that
      implies. It is also the only one with inputs of its own. */
@@ -18922,7 +19362,8 @@ $('scReset').addEventListener('click', () => {
 /* settings — shared by every team */
 /* Coerced to a non-negative number on the way in; everything else is a capped
    label, never free text. */
-const NUMERIC_SETTINGS = new Set(['sameDayValue', 'agedDays', 'outlierDays', 'featureAgedDays']);
+const NUMERIC_SETTINGS = new Set(['sameDayValue', 'agedDays', 'outlierDays', 'featureAgedDays',
+  'agedShareGreen', 'agedShareRed']);
 /* Emptying the box is "no cutoff", not "a cutoff of zero" — the one numeric
    setting here where a blank is a meaningful value rather than a half-typed
    one, because the mode above it can legitimately be on 'days' before a number
@@ -18932,11 +19373,19 @@ const NUMERIC_SETTINGS = new Set(['sameDayValue', 'agedDays', 'outlierDays', 'fe
    and the state a reader returns it to when they decide features should not be
    aged at all. */
 const NULLABLE_SETTINGS = new Set(['outlierDays', 'featureAgedDays']);
+/* Nullable too, but on their OWN rule: blank is off and zero is a number. The
+   set above collapses both to null because a cutoff or a threshold of nought
+   days is meaningless — a share of 0% is not, it is a team saying "nothing past
+   the threshold, ever", so these cannot borrow that branch. Clamped to 0-100
+   here as well as in normalizeSettings, because save() serialises this live
+   object straight out and a typed 400 must not reach a share link. */
+const PERCENT_SETTINGS = new Set(['agedShareGreen', 'agedShareRed']);
 const SETTING_INPUTS = {
   setCycleLabel: 'cycleTimeLabel', setUnplannedType: 'unplannedType',
   setSameDay: 'sameDayValue', setUnplannedLabel: 'unplannedLabel',
   setAgedDays: 'agedDays', setOutlierDays: 'outlierDays',
-  setFeatureAgedDays: 'featureAgedDays'
+  setFeatureAgedDays: 'featureAgedDays',
+  setAgedShareGreen: 'agedShareGreen', setAgedShareRed: 'agedShareRed'
 };
 
 /* Every keystroke here tears down and rebuilds every chart. That was tolerable
@@ -18951,7 +19400,10 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
        the number inputs' min attributes don't stop a typed minus sign. Aged
        days floors at 1 to match derive(), which treats 0 as "use the default"
        — without the floor the box could say 0 while the charts say 14. */
-    state.settings[key] = NULLABLE_SETTINGS.has(key)
+    state.settings[key] = PERCENT_SETTINGS.has(key)
+      ? (e.target.value.trim() === '' ? null
+        : Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))
+      : NULLABLE_SETTINGS.has(key)
       /* Blank, junk or zero all mean the same thing: no cutoff. Null rather
          than 0 so it matches what normalizeSettings would make of it, and so
          JSON.stringify keeps it — an undefined would be dropped silently and
@@ -20860,6 +21312,25 @@ const DEMO_AGED = (() => {
    the reasoning is at the assignment in loadSample. */
 const DEMO_FEATURE_AGED = 30;
 
+/* The demo's two grading boundaries, and the same rule applies: constants of the
+   demo, never of the app — both DEFAULT_SETTINGS entries are null and must stay
+   null. Chosen so the three teams land on THREE DIFFERENT STATES rather than to
+   be advice: Team Healthy Flow reads 0%, Team Bare Export a third and Team Long
+   Tail two thirds, so a reader loading the demo sees green, amber and red at
+   once and can tell what the colour is doing. A demo where every team was green
+   would ship the feature invisibly, which is the one thing the sample data rule
+   exists to stop. */
+const DEMO_AGED_SHARE_GREEN = 20;
+const DEMO_AGED_SHARE_RED = 40;
+
+/* Counted off the profile rather than written out, like DEMO_AGED above it, so
+   the confirm dialog can never claim a figure the demo does not produce. */
+const demoAgedShare = (name) => {
+  const p = DEMO_TEAMS.find(t => t.name === name);
+  if (!p || !p.wip.length) return null;
+  return Math.round(100 * p.wip.filter(a => a > DEFAULT_SETTINGS.agedDays).length / p.wip.length);
+};
+
 function loadSample() {
   if (!confirm(
       'Load the demo? Three teams and about nine months of work items, ending today. '
@@ -20881,6 +21352,12 @@ function loadSample() {
     + 'more in size. Team Bare Export has none. Features are aged against a threshold of '
     + 'their own, set here to ' + DEMO_FEATURE_AGED + ' days, because a feature that has run '
     + 'for a fortnight is not late.\n\n'
+    + 'The aged share is graded here, at ' + DEMO_AGED_SHARE_GREEN + '% and '
+    + DEMO_AGED_SHARE_RED + '%, so you can see what that looks like: Team Healthy Flow reads '
+    + demoAgedShare('Team Healthy Flow') + '%, Team Bare Export '
+    + demoAgedShare('Team Bare Export') + '% and Team Long Tail '
+    + demoAgedShare('Team Long Tail') + '% — one team on each of the three states. Your own '
+    + 'browser starts with both boxes empty and nothing graded.\n\n'
     + 'It is added alongside anything you already have, and you can delete it later.')) return;
 
   /* A first run auto-creates an empty "My team" (hydrateState), so loading the
@@ -20976,6 +21453,20 @@ function loadSample() {
      All Teams column — to show one empty card. The empty card is one cleared
      box away; the other four are not. */
   if (state.settings.featureAgedDays == null) state.settings.featureAgedDays = DEMO_FEATURE_AGED;
+
+  /* Both or neither, and ONLY when the reader has answered neither. Setting one
+     of a pair the reader had half-drawn would be the demo finishing a line
+     somebody had started for their own reasons — and `ragBounds` deliberately
+     refuses to read one boundary on its own, so a half-set pair is a state the
+     app already understands as "not graded". Set rather than left empty for the
+     same reason the feature threshold is: leaving them empty hides the colour,
+     the glyph, the spelled-out status and the chart's bands, which is four
+     things, to show one uncoloured tile — and the uncoloured tile is two cleared
+     boxes away. */
+  if (state.settings.agedShareGreen == null && state.settings.agedShareRed == null) {
+    state.settings.agedShareGreen = DEMO_AGED_SHARE_GREEN;
+    state.settings.agedShareRed = DEMO_AGED_SHARE_RED;
+  }
 
   let landOn = null;
   DEMO_TEAMS.forEach(profile => {

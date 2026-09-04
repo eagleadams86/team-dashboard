@@ -25,7 +25,7 @@ measures that move together are read together:
 |---|---|---|
 | **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); **every finished item, as a dot**; lead time |
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started); **[raised, started, finished](#raised-started-finished-the-cumulative-flow-diagram)** — the cumulative flow diagram |
-| **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **[work item age](#work-item-age-what-to-do-this-morning)**, by workflow stage where your export says one; defect rate — defects resolved and defects raised; **[time in stage](#where-the-time-goes-time-in-stage)**, where the wait actually goes |
+| **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **[aged share of WIP](#aged-share-of-wip-the-count-in-proportion)**, the two in proportion; **[work item age](#work-item-age-what-to-do-this-morning)**, by workflow stage where your export says one; defect rate — defects resolved and defects raised; **[time in stage](#where-the-time-goes-time-in-stage)**, where the wait actually goes |
 | **Forecast** — what that implies | When will this batch be done, and how much by a date? | Two distributions from ten thousand simulated runs, one per question |
 
 The first three describe what already happened. **Forecast** is the only one that looks
@@ -124,8 +124,8 @@ Each group then adds a small tile row of its own, stating what its charts can't:
 - **Delivery** — **steady delivery**, the band most whole periods land in (15th to 85th
   percentile of the per-period counts); total **net flow**; and **started vs completed**, the two
   counts net flow is the difference of.
-- **Health** — the ratio of work in progress to a month's throughput, the age of the **oldest
-  item still in progress**, and the defect rate.
+- **Health** — the ratio of work in progress to a month's throughput, the **aged share of WIP**,
+  the age of the **oldest item still in progress**, and the defect rate.
 - **Forecast** — the 85%-confident answer to each of its two questions, and the number of whole
   periods both were dealt from.
 
@@ -135,8 +135,11 @@ particular says which *way* work in progress is moving, where the headline tile 
 stands — and a net figure of +2 reads the same from 12 started and 10 completed as from 2 and 0,
 which is why the pair of counts sits beside it.
 
-The headline four stay visible whichever group is open. The tiles are deliberately neutral: this
-app has no targets, so no tile is ever coloured "good" or "bad". There being exactly four in the
+The headline four stay visible whichever group is open. The tiles are deliberately neutral —
+with one exception, and only when you ask for it: **the aged share is the one figure here that
+takes a colour**, and only once you have typed both of its boundaries in Settings. Leave either
+box empty and it behaves like every other tile, stating the figure and leaving the judgement to
+you. See *Aged Share of WIP* below. There being exactly four in the
 headline row, they go four-across on a wide window and pair into a 2x2 on a narrower one — never
 three and a stray fourth; the group rows vary in count and are laid out by `auto-fit` instead.
 
@@ -334,28 +337,37 @@ people actually scan for:
 
 | Column | The question |
 |---|---|
-| **Completed** / **Per week** | Who is delivering, and at what pace? |
+| **Per week** | Who is delivering, and at what pace? |
 | **Throughput trend** | Which team is *changing*? |
 | **85th cycle time** | Who is slow, and who is unpredictable? |
-| **In progress** / **WIP vs month** | Who is overloaded? |
-| **Aged** | Who has work going stale? |
+| **In progress** | Who is overloaded? |
+| **Aged** / **Aged %** | Who has work going stale — and how much of their board is it? |
 | **Defect rate** | Who has a quality problem? — empty in the feature view, and the note under the table says why |
 | **Data to** | …and whose figures are worth trusting at all |
 
-**Throughput trend**, **WIP vs month** and **Data to** carry an ⓘ of their own. The first and
-last are the two columns that exist only here — every other column is a dashboard tile laid on
-its side, and the tile carries the note. Nine circles across one header row costs 360px of a
-table already tight for width, which is the whole reason it is three and not nine.
+**Throughput trend** and **Data to** carry an ⓘ of their own. They are the two columns that
+exist only here — every other column is a dashboard tile laid on its side, and the tile carries
+the note. Nine circles across one header row costs 360px of a table already tight for width,
+which is the whole reason it is two and not nine. Making room for a third circle is why the
+headings of this table wrap onto a second line where every other table's stay on one, and that
+rule stays even though the third circle has gone: it is what keeps the two-word headings from
+setting the column widths.
 
-**WIP vs month** is the third because the cross-reference did not work: its note opens from a
-dashboard tile labelled *WIP vs throughput*, and nothing told a reader of this table that the
-two are the same figure. Its own note says what the ratio divides — the open work beside it
-against **what that team finished in the last month**, not over the window on screen, which
-makes it the one column here that does not move when you change the window — and what to make
-of the answer: **under half a month's throughput is the common coaching rule**, nearer a
-quarter for most teams, lower being better. It is a rule of thumb and not a target, which is
-why nothing turns a colour when a team crosses it. Making room for the third circle is why the
-headings of this table wrap onto a second line where every other table's stay on one.
+**Completed** and **WIP vs month** were columns here until September 2026, when they were dropped
+to make room for **Aged %**. Both figures are still on the dashboard. *Per week* is the same
+measure as *Completed* normalised to the window, and it is the more useful of the two here — an
+absolute count over a shared window mostly ranks teams by size. What is genuinely gone from this
+table, and from its CSV export, is the roll-up's only absolute volume figure. *WIP vs month*'s
+note was not deleted with its column: it moved to the dashboard tile labelled *WIP vs
+throughput*, which had the same problem the column's ⓘ was added to fix — it was opening a window
+titled *Work in Progress*, which tells a reader who came about the ratio that the window is not
+for them.
+
+**Aged %** is the ageing column worth sorting on, because it is the one that compares. Six aged
+items is a tail on a board of thirty and a stop on a board of six; the count beside it ranks
+teams by size, and this one ranks them by trouble. It carries no ⓘ, under the rule above — its
+note opens from the **Aged share** tile on the dashboard, which is named for the same heading.
+The cells are plain text whatever the figure: the tile grades, the comparison table states.
 
 **Throughput trend** deserves its own paragraph, because it answers something none of the other
 columns can.
@@ -612,6 +624,12 @@ On **All Teams** the three read as a train with one obvious problem: Team Long T
 percentile is three or four times the other two, it holds most of the aged work, and its defect
 rate is the highest — while Team Bare Export's *Data to* column quietly explains why its
 delivery rate looks worse there than on its own page.
+
+The demo also **seeds the two aged-share boundaries**, at 20% and 40%, and that is the only way
+to see the grading without setting it up: its three teams land on **0%, 33% and 67%** — one on
+each of green, amber and red — so the tile, its symbol and the chart's bands all have a face to
+show. They are only written if you have not answered either box yourself, and your own browser
+starts with both empty and nothing graded.
 
 The **work item age** chart reads differently on each of the three, which is what makes it worth
 looking at from the demo: Team Healthy Flow has nothing past the threshold and every dot below
@@ -903,6 +921,15 @@ Everything the charts depend on, shared by all your teams:
   guessed. While it is empty the feature view's Aged work card and tile say so and show what
   that team's finished features actually took, so the number you pick is measured against your
   own board. See [The ageing threshold is per unit](#the-ageing-threshold-is-per-unit).
+- **Aged share is on target at or below (%)** and **off target above (%)** — the two boundaries
+  the [aged share](#aged-share-of-wip-the-count-in-proportion) is graded against, and the only
+  two numbers in this app that put a colour on a figure. **Both empty by default, and nothing is
+  graded until both are set** — one boundary on its own is a pass/fail rather than a three-state
+  scale, and the app will not infer the other half of a line you have not drawn. Zero is a real
+  value here, unlike the day thresholds above: a team may well mean *nothing past the threshold,
+  ever*. There is no number worth shipping — a platform team carrying long spikes and a support
+  team turning work over in a day would be handed the same verdict, and one of them would be
+  wrong.
 - **Count working days only (Monday to Friday)** — off by default. On, cycle time, lead time
   and the ageing threshold skip weekends: an item started on a Friday and finished on the
   Monday takes one day, not three. It is one switch for all three, because a screen mixing the
@@ -1269,6 +1296,11 @@ worth knowing:
   that falls entirely inside a weekend is zero working days and takes the same-day value, which
   is the same statement that setting always makes. The ageing threshold moves with it: 14
   working days is nearly three calendar weeks, so items age later and the Aged work count drops.
+- **A share is null when it has no denominator, never nought.** The
+  [aged share](#aged-share-of-wip-the-count-in-proportion) divides the aged count by the work in
+  progress count, so a period with nothing open has no share to state — the same reading *WIP vs
+  throughput* takes of a month that finished nothing, where "∞×" is not a figure anyone can act
+  on. A zero would say the board was clean when it had simply stopped.
 - **A duration can be left out of the pool without the item leaving the count.** With
   [ignoring outliers](#ignoring-major-outliers) on, an item past the cutoff contributes no cycle
   time, no lead time and no stage times, while still counting as delivered, started, raised and —
@@ -1825,6 +1857,47 @@ whose dots and whose line disagreed about what a day is would be unreadable. And
 progress and aged work, ages are read **as of the newest date in your data**, not today — so a
 paste of last quarter's export reports that quarter rather than ageing everything by the months
 since.
+
+## Aged Share of WIP: the Count in Proportion
+
+The **Aged work** tile counts the items that have been open too long. This one says what
+proportion of the board they are — **the aged count divided by the work in progress count**, the
+two tiles beside it, at the same moment and over the same window.
+
+It exists because the count on its own does not travel. **Six aged items is a tail on a board of
+thirty and a stop on a board of six**, and the raw count ranks teams by size rather than by
+trouble. That is why it is also a column in All Teams, and the ageing column worth sorting on.
+
+It is a division of two series the app already had rather than a third count of its own, which is
+what makes it safe to state: the aged count is worked out by subtracting from the work in
+progress count, so the numerator can never exceed the denominator and the tile can never
+contradict the two tiles beside it.
+
+**A dash means there is nothing to state, not that nothing is wrong.** Either no ageing threshold
+is set — the feature view ships without one — or nothing is open at all, and no items open is not
+a share of nought. A zero here would draw a healthy floor across a board that had simply stopped.
+
+### The one figure that takes a colour
+
+This app states figures and judges nothing. That is still true out of the box, and it stays true
+until *you* draw the line: set both boundaries in Settings and the tile takes a **green, amber or
+red** state, and the chart shades your bands behind its line. Leave either box empty and both
+behave exactly as they always did.
+
+**The colour is never the only signal.** The tile also carries a symbol — ✓, ! or ✕ — a status
+spelled out for a screen reader, and the verdict written into the caption in words, naming the
+boundary as well as the state. That last one is there whether the tile is coloured or not: it is
+the half that survives a printed page, a screenshot, and red-green colour blindness. The three
+colours are the theme pack's own, checked against each other under both common forms of
+red-green deficiency as well as for contrast — but a reader who sees no colour at all still loses
+nothing.
+
+The **chart's line is never recoloured**, in any band. The bands are your scale; the line is your
+team's figures, and a line that changed colour would be the app grading them. Its y axis is
+pinned to 100% so the bands stay put and a quiet board reads as quiet rather than as full, and
+the bands themselves are drawn at half strength — at full strength, with most boards living under
+40%, six tenths of every chart came out red before anything was plotted and the eye read the
+*area* as the finding.
 
 ## Features: the Unit Above a Work Item
 
