@@ -2006,7 +2006,8 @@ Dashboard with the Forecast group and nothing else, the typed-pace tick already 
 boxes waiting.
 
 It does **not** type a pace for you. Every number in the answer has to be one you chose, so
-until the range is filled in the tiles read *waiting for a pace below* rather than a date. Fill
+until the range is filled in the tiles read *waiting for a pace under "Adjust for what you know"
+below* rather than a date, and the two chart cards say the same. Fill
 it in and you get the same two answers, at the same three confidences, that real data would
 give — dealt from your range instead of from history, counting from today.
 
@@ -2262,8 +2263,15 @@ setting.
 otherwise refuse a forecast for want of history — nothing recorded at all, fewer than eight whole
 periods, or periods with nothing finished in them — and *unchecked* wherever there is history to
 resample. That is the app's own refusal condition rather than a second opinion about it, so the
-boxes are open in exactly the cases the card would otherwise have nothing to say in, and the
-tiles read *waiting for a pace below* rather than naming history you have no way to conjure.
+boxes are *enabled* in exactly the cases the card would otherwise have nothing to say in —
+enabled, not shown: they live inside **Adjust for what you know**, which stays folded or open
+exactly as you left it — and the tiles read *waiting for a pace under "Adjust for what you know"
+below* rather than naming history you have no way to conjure. The two chart cards name the same
+route beside their own (group by a shorter period, or widen the window), so the tiles and the
+cards agree; over a plan with no history at all the cards name the typed pace alone, rather than
+offering to widen a window over nothing. (Until 2026-09-04 the tiles said *waiting for a pace
+below* with the fold shut — pointing at a box that was not on screen — and the cards below them
+gave a different remedy.)
 
 It is a **default, not a rule**. The setting is three-state — on, off, and not chosen — so the
 first press wins for good, in either direction: untick it over a brand-new team and it stays

@@ -3619,3 +3619,17 @@ red against the unfixed page before the fix went in; the commit quotes the red r
   box itself changed. The bottom margin stays 0 because that 4px was already in the row. Money
   Map's `.yearrail` had this pattern first. Four checks in the pin group measure it rather than
   grepping for it.
+
+- **The tile names the fold by its heading, and the cards name the same route (fix 3).** With the typed-pace tick
+  defaulted on and its boxes empty — sample data, Team Long Tail, a three-month window grouped
+  by fortnight — the tiles said *waiting for a pace below* while "Adjust for what you know" sat
+  SHUT, and the chart cards under them said *group by a shorter period, or widen the date
+  window*: two remedies for one state, and the tile's pointed at nothing on screen. The tile now
+  reads *waiting for a pace under "Adjust for what you know" below* — the heading is visible
+  whichever way the fold is, so the sentence is true either way, which is why it does not say
+  "folded": the fold is pressed without a render and a tile claiming it was shut would go stale
+  on the press. `waitingForPace` is one boolean shared with `excuse()`, which appends the same
+  route to the few-periods, stale-team and no-throughput sentences; on a plan, which has no
+  window to widen, the card names the typed pace alone (it used to offer to widen a window over
+  no data at all). The fold is never opened FOR the reader. The README paragraph that said the
+  tick "arrives checked so the boxes are open" now says enabled, not shown.

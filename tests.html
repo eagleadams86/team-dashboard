@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3220;
+const EXPECTED = 3226;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9961,8 +9961,18 @@ group('ARTs — the grouping, and the boundary it crosses');
     ok(/nothing to resample/.test(plDoc.getElementById('fcHint').textContent),
        'the card says there is no history rather than claiming 0 weeks of it');
     ok(/waiting for a pace/.test(plDoc.getElementById('tilesForecast').textContent),
-       'and the tiles say what they are waiting for, not "not enough history" \u2014 '
+       'and the tiles say what they are waiting for, not "not enough history" — '
        + 'which is true here and is not the problem');
+    /* The chart cards under them (2026-09-04 audit): over a plan with no history
+       at all they offered to "widen the date window", which is a remedy over
+       nothing. They name the typed pace, the same route the tiles are waiting
+       for. */
+    const planCards = () => [...plDoc.querySelectorAll('#spanel-forecast .forecast-none')]
+      .filter(n => !n.hidden).map(n => n.textContent).join(' | ');
+    ok(!/widen the date window/.test(planCards())
+       && /under “Adjust for what you know” below/.test(planCards()),
+       'and the chart cards name the typed pace rather than offering to widen a window '
+       + 'over no history at all', planCards().slice(0, 160));
 
     const lo = plDoc.getElementById('scEstLo'), hi = plDoc.getElementById('scEstHi');
     lo.value = '4'; lo.dispatchEvent(new win.Event('change', { bubbles: true }));
@@ -10133,9 +10143,10 @@ group('ARTs — the grouping, and the boundary it crosses');
     ok(pDoc.getElementById('scEstOn').checked,
        'a team under the eight-period floor gets the tick already on');
     ok(!pDoc.getElementById('scEstWrap').hidden, 'with its boxes open');
-    ok(/waiting for a pace below/.test(pDoc.getElementById('tilesForecast').textContent),
-       'and the tiles point at the remedy that is open rather than at the history '
-       + 'it has no way to conjure',
+    ok(/waiting for a pace under “Adjust for what you know” below/.test(
+         pDoc.getElementById('tilesForecast').textContent),
+       'and the tiles point at the remedy by the heading it is under, rather than at the '
+       + 'history it has no way to conjure',
        pDoc.getElementById('tilesForecast').textContent.replace(/\s+/g, ' ').slice(0, 90));
 
     /* An explicit press wins over the default, in BOTH directions — which is the
@@ -10172,7 +10183,39 @@ group('ARTs — the grouping, and the boundary it crosses');
     ok(!isOpen(), 'and the next render leaves it shut rather than reopening it');
     foldBtn.click();
     win.renderAll();
-    ok(isOpen(), 'both ways round \u2014 a render must never fight the reader\u2019s own press');
+    ok(isOpen(), 'both ways round — a render must never fight the reader’s own press');
+
+    /* ── The tile names a remedy the reader can SEE (2026-09-04 audit) ────
+       "waiting for a pace below" was written as if the boxes sat open two
+       inches down. They are inside "Adjust for what you know", which stays as
+       the reader left it and is only ever opened by the planning door or their
+       own press — so group a three-month window by fortnight and the tick
+       defaults on with the fold SHUT: the tile pointed "below" at nothing while
+       the cards under it offered a different remedy altogether. The sentence
+       names the heading, which is on screen whichever way the fold is, and the
+       cards name the same route beside their own. The fold is NOT opened for
+       the reader: a fold they closed stays closed. */
+    pDoc.getElementById('scReset').click();
+    ok(pDoc.getElementById('scEstOn').checked,
+       'reset hands the tick back to the data, which under three periods says on');
+    foldBtn.click();
+    win.renderAll();
+    ok(!isOpen() && foldBody.hidden, 'the fold is shut, and a render leaves it shut');
+    const waitTile = () => pDoc.getElementById('tilesForecast').textContent.replace(/\s+/g, ' ');
+    const waitCards = () => [...pDoc.querySelectorAll('#spanel-forecast .forecast-none')]
+      .filter(n => !n.hidden).map(n => n.textContent).join(' | ');
+    ok(/waiting for a pace under “Adjust for what you know” below/.test(waitTile()),
+       'with the fold shut the tile names the fold by its heading — the boxes are behind '
+       + 'it, and a box folded away is not “below”', waitTile().slice(0, 120));
+    ok(/under “Adjust for what you know” below/.test(waitCards())
+       && /shorter period|widen the date window/.test(waitCards()),
+       'and the chart cards name the same route beside their own, so the tile and the '
+       + 'cards agree', waitCards().slice(0, 220));
+    foldBtn.click();
+    win.renderAll();
+    ok(isOpen() && /under “Adjust for what you know” below/.test(waitTile()),
+       'open again, the sentence is still true — it names the heading the boxes are '
+       + 'under whichever way the fold is, so a press cannot leave it stale');
 
     /* Back to a working app for every group after this one. */
     plant({ teams: [{ id: 'pl2', name: 'Started', rows: Array.from({ length: 12 }, (_, i) => ({

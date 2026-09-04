@@ -14683,10 +14683,24 @@ function renderForecast(d, scope, stale) {
     : (f.estimated ? 'estimated runs' : 'runs');
   /* "Not enough history" is true wherever the tick has defaulted itself on —
      that IS why it defaulted on — and saying it there points the reader at the
-     one remedy this card cannot offer while the one it can sits open two inches
-     below. So a ticked box with an empty range names the range instead,
-     wherever it is: planning has no history by definition, and a team three
-     weeks old is in exactly the same position with a paste to look forward to. */
+     one remedy this card cannot offer. So a ticked box with an empty range
+     names the range instead, wherever it is: planning has no history by
+     definition, and a team three weeks old is in exactly the same position
+     with a paste to look forward to.
+
+     NAMED BY THE HEADING IT IS UNDER (2026-09-04 audit). This said "waiting for
+     a pace below", written as if the boxes sat open two inches down. They are
+     inside "Adjust for what you know", which stays as the reader left it —
+     only the planning door and their own press ever open it — so group a
+     three-month window by fortnight and the tick defaults on with the fold
+     SHUT: the tile pointed "below" at nothing, while the cards under it
+     offered a different remedy altogether. The heading is on screen whichever
+     way the fold is, so a sentence that names it is true either way — which is
+     why it does not say "folded": the fold is pressed without a render, and a
+     tile that claimed it was shut would go stale on the press. The fold is
+     never opened FOR the reader; a fold they closed stays closed. Shared with
+     excuse() below, so the cards name the same route. */
+  const waitingForPace = !!(f.scenario && f.scenario.estOn === true && !f.estimated);
   const noAnswerFoot = f.tooWide ? 'too uncertain to answer'
     /* A forecast that HAS its pace and still cannot answer is missing the other
        typed half. Naming the pace there would send the reader to re-check a box
@@ -14695,7 +14709,7 @@ function renderForecast(d, scope, stale) {
        not yet put a number in it. */
     : (f.reason === 'few-sizes' && (d.planning || view.planSizeOn === true))
         ? 'waiting for a size below'
-    : (f.scenario && f.scenario.estOn === true && !f.estimated) ? 'waiting for a pace below'
+    : waitingForPace ? 'waiting for a pace under “Adjust for what you know” below'
     : f.estimated ? 'no pace to draw from' : 'not enough history to forecast';
   const rp = f.requiredPace;
   const whenRow = f.when && f.when.rows.find(r => r.confidence === conf85);
@@ -14813,10 +14827,31 @@ function renderForecast(d, scope, stale) {
      fixes it. `few-periods` is the common one and the only one the reader can
      act on from the strip in front of them. */
   const excuse = () => {
-    if (f.reason === 'few-periods')
+    /* THE TYPED ROUTE, named wherever the tile above is waiting for it
+       (2026-09-04 audit). With the tick on and its boxes empty, the tile said
+       "waiting for a pace" while this card said only "widen the window" — two
+       remedies for one state, neither mentioning the other, and the tile's was
+       behind a fold. Same heading, same words, so the two agree. `lead` is the
+       verb, because on a plan it is the only route and reads as "Type", and
+       under a short window it is the second one and reads as "Or type". */
+    const typedRoute = (lead) => waitingForPace
+      ? ' ' + lead + ' the pace you expect under “Adjust for what you know” below '
+        + '— the tick there is already on, and the two boxes are waiting.'
+      : '';
+    if (f.reason === 'few-periods') {
+      /* A plan has no window to widen and no period short enough — there is no
+         history at all — and this sentence used to offer both over nothing.
+         Mirrors fcHint, which names the tick when it is off because the boxes
+         are behind it. */
+      if (d.planning)
+        return 'There is no history here to resample.' + (waitingForPace ? typedRoute('Type')
+          : ' Tick “Use a typed pace instead of this history” under '
+            + '“Adjust for what you know” below and say what you expect.');
       return 'A forecast needs at least ' + f.minPeriods + ' whole ' + d.bucketNounPlural
         + ' of history to resample, and this window holds ' + f.samples + '. '
-        + 'Group by a shorter period, or widen the date window, and it will fill in.';
+        + 'Group by a shorter period, or widen the date window, and it will fill in.'
+        + typedRoute('Or type');
+    }
     /* The spread guard. It only ever fires under a scenario — unadjusted, this
        ratio sits between 1.15 and 1.4 on a typical team — so it is always
        actionable: something the reader turned on made the answer this wide, and
@@ -14863,10 +14898,11 @@ function renderForecast(d, scope, stale) {
       return 'Trimming this window back to where every team in scope still had data leaves '
         + f.samples + ' whole ' + periodNoun(f.samples) + ', short of the '
         + f.minPeriods + ' a forecast needs. Re-export the teams that are behind, narrow '
-        + 'the scope to the ones that are current, or widen the date window.';
+        + 'the scope to the ones that are current, or widen the date window.'
+        + typedRoute('Or type');
     if (f.reason === 'no-throughput')
       return 'Nothing was completed in any whole ' + d.bucketNoun + ' of this window, '
-        + 'so there is no pace to project forward.';
+        + 'so there is no pace to project forward.' + typedRoute('Or type');
     if (f.beyondReach)
       return 'That is more ' + d.unitMany + ' than this team\u2019s recorded pace clears in any '
         + 'reasonable time. Try a smaller number.';
