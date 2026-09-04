@@ -16529,8 +16529,9 @@ const PIN_ICON = {
 /* WHAT IS ACTUALLY STUCK, asked of the CASCADE rather than of a breakpoint
    copied into JS. Three answers fall out of one question: the whole band on a
    desktop, the tab row alone under the phone rule, and nothing at all when the
-   pin is off or the welcome card has taken the page. A hard-coded 720 here would
-   be a second copy of the media query to keep in step. */
+   pin is off. A hard-coded 720 here would be a second copy of the media query
+   to keep in step. The welcome card is the one answer the cascade CANNOT give
+   on its own — see the second question inside. */
 const stuckPin = () => {
   const sticky = (el) => {
     if (!el) return null;
@@ -16539,7 +16540,19 @@ const stuckPin = () => {
        display generates NO BOX — it is still `position: sticky` as far as the
        cascade is concerned, and its rectangle is 0×0. Reading the height off it
        wrote a `--pin-clear` that cleared nothing. */
-    return (cs.position === 'sticky' && cs.display !== 'contents') ? el : null;
+    if (cs.position !== 'sticky' || cs.display === 'contents') return null;
+    /* NOT ON THE PAGE IS NOT STUCK (2026-09-04, from the 2026-09-03 audit). The
+       welcome card hides the band with `display: none`, and a computed
+       `position` is still `sticky` on a box that is not there — so with the pin
+       remembered, this answered the band over a card with no tabs on it. Until
+       then the comment above believed the card "fell out" of the cascade; it
+       never did. Asked as "does it generate a box" rather than "is it
+       display:none", because on a phone the sticky thing is the ROW, and the
+       row is hidden by being INSIDE the hidden band — its own display reads
+       flex. Sprint Predictability's pinStuck asks the same question of its
+       row's `hidden` attribute; here the hiding is a stylesheet rule. */
+    if (cs.display === 'none' || !el.getClientRects().length) return null;
+    return el;
   };
   return sticky($('pinBar')) || sticky(document.querySelector('.tabrow')) || null;
 };

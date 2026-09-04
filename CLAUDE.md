@@ -3695,6 +3695,19 @@ first, red against the unfixed page, and the commit quotes the row.
   so the paragraph cannot drift from the code again. The README paragraph now says which is
   which and why.
 
+- **A hidden band is not a stuck band (fix 10).** `stuckPin()` asks the cascade, and the welcome
+  card hides `#pinBar` with a stylesheet rule (`html[data-welcome] .pinbar { display: none }`) —
+  but a computed `position` is still `sticky` on a box that is not there, so with the pin
+  remembered `tdPin.stuck()` said true over a card with no tabs on it. Nothing visible depended
+  on it (`measurePinTop` read a 0 height off the hidden box, so `--pin-clear` came out right by
+  accident), but the comment above it claimed the card "fell out" of the cascade, and anything
+  built on that answer would have inherited the lie. The helper now returns null for a box that
+  is `display: none` or has no client rects — the second question, not the first alone, because
+  on a phone the sticky thing is the ROW, hidden by being inside the hidden band with its own
+  display still `flex`. Sprint Predictability's `pinStuck` took the same guard the same day
+  (db7e256) off its row's `hidden` attribute; here the hiding is CSS. Nine checks at the end of
+  the suite, at 1265 and 375, on the card and then off it with the same pin.
+
 - **A restore that worked closes the window behind it (fix 8).** *Restore a Backup* on the welcome
   card opens the Back Up & Restore window, and the `importFile` change handler restored, saved
   and toasted — and left the window standing over the app it had just filled. Every early

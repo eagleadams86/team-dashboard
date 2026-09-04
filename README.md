@@ -70,6 +70,14 @@ is bought with vertical space and only you can make that trade; press it again t
 scroll away, and it is remembered for next time. Nothing else moves when you pin — the page is
 exactly the height it was.
 
+**The welcome card has nothing to pin.** The card hides the tab row and the controls, so a first
+run with the pin remembered has no band, and the app's own answer to *what is stuck right now?*
+says so. (Until 2026-09-04 it reported the hidden band as stuck — a box that is not on the page
+still reads `position: sticky` from the stylesheet — and the clearance it wrote happened to be
+right only because a hidden box measures 0 tall. The answer is now asked of whether the band is
+on the page at all, which also covers a phone, where the sticky thing is the tab row inside the
+hidden band.)
+
 **On a phone it pins the tab row only.** The band there is the tab row plus a control strip
 whose four pickers stack, which comes to 537px against a header of 173 — seven hundred pixels
 of an 812px screen before a figure appears. The tab row alone is 42, and buys the thing a

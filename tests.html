@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3269;
+const EXPECTED = 3278;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -13315,6 +13315,58 @@ group('a card with no chart matches the one beside it');
     ok(/isn\u2019t a Flow Metrics backup/.test(said3), 'a file that is not a backup is refused', said3);
     ok(rDialog.open, 'and the window stays open on the refusal');
     rDialog.close();
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the welcome card is not a stuck band, even with the pin remembered');
+
+  /* 2026-09-04 audit. The card hides the band by CSS — `html[data-welcome]
+     .pinbar` is display:none — and a box that is not on the page still reads
+     `position: sticky` from the cascade, so with the pin remembered stuckPin()
+     answered the band, and tdPin.stuck() said true over a card with no tabs
+     on it. Sprint Predictability's pinStuck asks whether its row is `hidden`;
+     the hiding here is a stylesheet rule, so the question is whether the
+     element generates a box at all — which also answers for the phone, where
+     the band is display:none and the sticky thing is the ROW inside it,
+     boxless too. Both widths, the way the pin group does it: the suite's
+     frame is 1px wide and only ever matches the phone rule on its own. */
+  {
+    const wDoc = win.document;
+    const frame = document.getElementById('app');
+    const wasCss = frame.style.cssText;
+    const wide = async (w) => {
+      frame.style.cssText =
+        'position:absolute;width:' + w + 'px;height:900px;opacity:0;border:0;left:-9999px';
+      await new Promise((r) => setTimeout(r, 250));
+    };
+    ok(!wDoc.getElementById('welcomeCard').hidden && wDoc.documentElement.hasAttribute('data-welcome'),
+       'the frame is on the welcome card');
+    win.tdPin.apply(true);
+    await wide(1265);
+    ok(!!wDoc.documentElement.dataset.pin, 'with the pin on');
+    is(win.getComputedStyle(wDoc.getElementById('pinBar')).position, 'sticky',
+       'the cascade still calls the hidden band sticky — which is the trap');
+    is(win.tdPin.stuck(), false,
+       'but nothing is stuck: a band that is not on the page is not stuck, whatever its '
+       + 'position reads');
+    await wide(375);
+    is(win.getComputedStyle(wDoc.querySelector('.tabrow')).position, 'sticky',
+       'at phone width the ROW is the sticky thing, and it sits inside the hidden band');
+    is(win.tdPin.stuck(), false, 'and it is not stuck either — no box, no band');
+    /* Off the card, the same pin is a real band again, at both widths — the
+       guard must not have taken the pin away from a page that has tabs. */
+    plant({ teams: [{ id: 'wp1', name: 'Pinned',
+                      rows: [{ c: '2026-01-21', s: '2026-01-19', t: 'Story' }] }], settings: {} });
+    win.renderAll();
+    await new Promise((r) => setTimeout(r, 150));
+    ok(wDoc.getElementById('welcomeCard').hidden, 'with data the card is gone');
+    is(win.tdPin.stuck(), true, 'and the row is stuck on a phone');
+    await wide(1265);
+    is(win.tdPin.stuck(), true, 'and the band on a desktop');
+    win.tdPin.apply(false);
+    frame.style.cssText = wasCss;
+    await new Promise((r) => setTimeout(r, 250));
     plant({ teams: [], settings: {} });
   }
 
