@@ -2119,6 +2119,13 @@ about delivery.
 
 So a pooled forecast is **dealt only from periods every team in scope still had data for**, and
 the card says which teams are behind, where the window stops, and how many periods that cost.
+**A team counts as behind when at least one whole period lies between its last row and the
+newest date.** The forecast is dealt in whole periods, so a team whose export stops a day or two
+before the others has cost it nothing — the gap falls inside the part-period the samples never
+count — and the card says nothing. (Until 2026-09-04 any gap at all put a team on the card: the
+sample data's Team Long Tail ends one day before Team Healthy Flow, and the Delivery ART forecast
+told you to re-export it "before promising anything from this" over a forecast that had lost
+nothing. The *Data to* column on All Teams still reports the date, which is still true.)
 Only the forecast's window moves; everything else stays read as of the newest date. If trimming
 leaves fewer than eight whole periods it **refuses under its own name** — the fix is a different
 one from "not enough history": re-export the teams that are behind, or narrow the scope to the

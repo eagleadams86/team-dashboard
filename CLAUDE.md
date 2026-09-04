@@ -3654,3 +3654,20 @@ red against the unfixed page before the fix went in; the commit quotes the red r
   for the same reason), and the list is commas between with *and* before the last. No list helper
   exists in the file to share — every other `join(', ')` is a plain comma list. Three checks in
   "the delete-all sentence lists what goes, in English".
+
+### Round Two, 2026-09-04
+
+The leftovers of the same audit that Charles chose to fix the next day. Same routine: a test
+first, red against the unfixed page, and the commit quotes the row.
+
+- **A team is stale when it is a whole period behind, not a day (fix 6).** `staleTeams` in
+  `deriveTeams` listed every team with `dataEnd < endDate`, and the sample data has one a single
+  day behind (Team Long Tail ends the day before Team Healthy Flow) — so the Delivery ART
+  forecast, and the feature forecast across all three teams, told the reader to re-export a team
+  the forecast had lost nothing from. Lost nothing because the samples are WHOLE periods: a gap
+  shorter than one falls inside the part-period they never count. The rule is now the
+  forecast's own — `periods >= 1` — and `coverageEnd` is cut from the same list (null when no
+  team is stale), so the two cannot disagree; the earliest end is always a stale team's end
+  whenever there is one, so nothing that was ever trimmed trims differently now. The All Teams
+  "Data to" column is untouched: it reports the date, which is still true. Four checks in the
+  pure stale group and five on the sample data, through the scope picker's own change event.

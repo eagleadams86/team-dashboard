@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3239;
+const EXPECTED = 3248;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -4496,6 +4496,26 @@ async function run(TD, win) {
     is(one.staleTeams, [], 'one team is never behind itself');
     is(one.train.forecast.lostPeriods, 0, 'and its forecast is never trimmed');
     is(one.train.forecast.coverageEnd, null, 'nor does it claim a coverage end');
+
+    /* A GAP OF LESS THAN ONE WHOLE PERIOD IS NOT STALE (2026-09-04, round two
+       of the 2026-09-03 audit). The forecast is dealt in whole periods, so a
+       team whose export stops a day before the others has cost it nothing —
+       every whole period that closed before the newest date closed before
+       that team's last row too. The list was built on `dataEnd < endDate`,
+       which is true of a one-day gap, and the card then told the reader to
+       re-export a team it had lost nothing from. The sample data did exactly
+       this on the Delivery ART. A day behind is a fact for the All Teams "Data
+       to" column, which reports the date; it is not a reason on this card. */
+    const nearly = win.TDState.sanitizeTeams([
+      { id: 'cur', name: 'Current', rows: weekly(20, 0) },
+      { id: 'day', name: 'A Day Behind', rows: weekly(20, 0).slice(0, -1) }
+    ]);
+    const near1 = TD.deriveTeams(nearly, S9, { months: 'all', bucket: 'week', forecastItems: 10 }, []);
+    ok(near1.train.endDate > TD.derive(nearly[1].rows, S9, { months: 'all', bucket: 'week' }, []).dataEnd,
+       'the second team really does end before the first');
+    is(near1.staleTeams, [], 'but a gap short of one whole period is not stale');
+    is(near1.coverageEnd, null, 'so the pool claims no coverage end');
+    is(near1.train.forecast.lostPeriods, 0, 'and the forecast is dealt from every whole period, untrimmed');
 
     /* Trimming below the floor REFUSES under its own name, because the fix is a
        different one from the fix for too little history. */
@@ -13114,6 +13134,56 @@ group('a card with no chart matches the one beside it');
   is(doubled.rows.map(r => r.key), ['DAE-1'],
      'a doubled quote inside a quoted cell is a literal, not a close-and-reopen');
   is(iso(doubled.rows[0].completed), '2026-08-10', 'and the record still ends where it ends');
+
+  /* ══════════════════════════════════════════════════════════
+     ROUND TWO OF THE 2026-09-03 AUDIT (2026-09-04) — the leftovers Charles
+     chose to fix. Each group below was red against the unfixed page first.
+     ══════════════════════════════════════════════════════════ */
+  group('a team a day behind is not a stale export — on the sample data');
+
+  /* The demo's Team Long Tail ends one day before Team Healthy Flow, so the
+     Delivery ART forecast told the reader to re-export it "before promising
+     anything from this" — over a forecast that had lost nothing, because it
+     is dealt in whole periods and a one-day gap falls inside the part-period
+     the forecast never counts anyway. Driven through the app's own controls,
+     because the sentence is drawn by the render the scope picker triggers. */
+  {
+    plant({ teams: [], settings: {} });
+    loadDemo();
+    win.renderAll();
+    win.selectTab('dashboard');
+    win.selectChartTab('forecast');
+    const sDoc = win.document;
+    const sScope = sDoc.getElementById('fcScope');
+    const sUnit = sDoc.getElementById('unitSel');
+    const sBucket = sDoc.getElementById('bucketSel');
+    const sFire = (el, v) => { el.value = v; el.dispatchEvent(new win.Event('change', { bubbles: true })); };
+    const optionNamed = (re) => [...sScope.options].find(o => re.test(o.textContent));
+    const staleLine = () => sDoc.getElementById('fcStale').hidden ? null
+      : sDoc.getElementById('fcStale').textContent.replace(/\s+/g, ' ').trim();
+    sFire(sUnit, 'items');
+    sFire(sBucket, 'week');
+    ok(!!optionNamed(/Delivery ART/), 'the sample data offers the Delivery ART as a scope');
+    sFire(sScope, optionNamed(/Delivery ART/).value);
+    is(staleLine(), null,
+       'on the Delivery ART the card says nothing about a stale export — Team Long Tail is '
+       + 'a day behind, and the forecast lost no whole period to it');
+    /* All three teams: Team Bare Export IS behind by a whole week, so the line
+       stays for it — and names it alone, not Team Long Tail beside it. */
+    sFire(sScope, '~all');
+    ok(/^1 team\u2019s export stops before the others \(Team Bare Export\)/.test(staleLine() || ''),
+       'across all three teams the line names Team Bare Export alone, which is nine days behind',
+       staleLine());
+    ok(/1 period short/.test(staleLine() || ''), 'and says what that cost', staleLine());
+    /* Features: Team Bare Export has none, so the only team behind is Team
+       Long Tail's one day — and the line goes away with it. */
+    sFire(sUnit, 'features');
+    is(staleLine(), null,
+       'counting features, where only the one-day gap remains, the line is gone too');
+    sFire(sUnit, 'items');
+    sFire(sScope, '');
+    plant({ teams: [], settings: {} });
+  }
 
   /* ────────────────────────────────────────────────────────── */
   /* A completeness floor. This suite has no per-test isolation, so "everything

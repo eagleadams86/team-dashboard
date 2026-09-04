@@ -9656,7 +9656,36 @@ function deriveTeams(teams, settings, view, stages, statuses) {
           statuses) }))
     : [];
   const ends = preScan.map(x => x.d.dataEnd).filter(Boolean);
-  const coverageEnd = ends.length ? new Date(Math.min(...ends.map(d => d.getTime()))) : null;
+  const earliestEnd = ends.length ? new Date(Math.min(...ends.map(d => d.getTime()))) : null;
+
+  /* Which teams are behind, and by how many whole periods — named on the card,
+     because a forecast that quietly used a shorter window would be a figure
+     moving for a reason that is not on the page. The same fact the All Teams
+     "Data to" column reports, said where it changes an answer.
+
+     BEHIND BY AT LEAST ONE WHOLE PERIOD (2026-09-04, round two of the
+     2026-09-03 audit). The list was every team with `dataEnd < endDate`, which
+     is true of a team one day behind — and the sample data has one: Team Long
+     Tail ends the day before Team Healthy Flow, so the Delivery ART forecast
+     told the reader to re-export a team it had lost nothing from. Lost
+     nothing, because the forecast is dealt in WHOLE periods: a gap shorter
+     than one falls inside the part-period the samples never count anyway, so
+     no sample was trimmed and no zero was read as a slow week. The rule here
+     is the forecast's own — a team is stale when at least one whole period
+     lies between its last row and the newest date — and `coverageEnd` is cut
+     from the same list below, so the two can never disagree: no stale team,
+     no trim. The "Data to" column still reports the date, which is still
+     true; a day behind is a fact for that column, not a reason on this card. */
+  const staleTeams = preScan.map(({ t, d }) => {
+    if (!d.dataEnd || d.dataEnd >= train.endDate) return null;
+    const periods = Math.floor(periodsBetween(d.dataEnd, train.endDate, train.bucket));
+    if (periods < 1) return null;
+    return { id: t.id, name: t.name, dataEnd: d.dataEnd, periods };
+  }).filter(Boolean).sort((a, b) => a.dataEnd - b.dataEnd);
+  /* The earliest end IS a stale team's end whenever any team is stale — a team
+     a whole period behind ends before one a day behind — so this is the same
+     date as before wherever it was ever right, and null where it was not. */
+  const coverageEnd = staleTeams.length ? earliestEnd : null;
 
   const shared = Object.assign({}, view, { asOf: train.endDate });
 
@@ -9669,15 +9698,6 @@ function deriveTeams(teams, settings, view, stages, statuses) {
       Object.assign({}, view, { forecastCoverageEnd: coverageEnd }), stages, statuses);
   }
 
-  /* Which teams are behind, and by how many whole periods — named on the card,
-     because a forecast that quietly used a shorter window would be a figure
-     moving for a reason that is not on the page. The same fact the All Teams
-     "Data to" column reports, said where it changes an answer. */
-  const staleTeams = preScan.map(({ t, d }) => {
-    if (!d.dataEnd || d.dataEnd >= train.endDate) return null;
-    return { id: t.id, name: t.name, dataEnd: d.dataEnd,
-             periods: Math.floor(periodsBetween(d.dataEnd, train.endDate, train.bucket)) };
-  }).filter(Boolean).sort((a, b) => a.dataEnd - b.dataEnd);
   return {
     train,
     asOf: train.endDate,
