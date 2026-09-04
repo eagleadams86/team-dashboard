@@ -19251,6 +19251,14 @@ $('importFile').addEventListener('change', (e) => {
        chose this file over what was here. */
     if (!window.tdAdopt(parsed)) { e.target.value = ''; return; }
     save();
+    /* THE WINDOW CLOSES BEHIND A RESTORE THAT WORKED (2026-09-04, round two of
+       the 2026-09-03 audit). Restore a Backup on the welcome card opens this
+       window, and a restore from it left the window standing over the app it
+       had just filled — the toast read under a dialog with nothing left to do.
+       Every return above this line is a refusal, and those leave it open on
+       purpose: a refusal is read where the file was chosen. The header's ⇩
+       is the same window, so it gets the same rule for free. */
+    $('dataDialog').close();
     window.toast(`Backup restored — ${plural(inc.teams, 'team')}, ${plural(inc.items, 'item')}`);
     e.target.value = '';
   };

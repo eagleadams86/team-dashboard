@@ -352,7 +352,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
    heading too long to be a name. */
-const EXPECTED = 3257;
+const EXPECTED = 3266;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -13233,6 +13233,72 @@ group('a card with no chart matches the one beside it');
     is(rows().map(r => r.i || ''), ['', 'HRN-12'],
        'a lower-case key saves upper-cased, the way a pasted one lands');
     if (kDoc.getElementById('itemDialog').open) kDoc.getElementById('itemCancel').click();
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a restore closes the Back Up & Restore window behind it');
+
+  /* Restore a Backup on the welcome card opens the same window the header's
+     ⇩ does, and until 2026-09-04 a successful restore from either left it
+     standing over the restored app — the reader saw the toast under a dialog
+     that had nothing left to do. A REFUSED restore keeps it open on purpose,
+     so the refusal is read where the file was chosen. Driven through the real
+     file input: a File on a DataTransfer, then the input's own change event,
+     which is the only road the restore code has. */
+  {
+    const rDoc = win.document;
+    const rDialog = rDoc.getElementById('dataDialog');
+    const rInput = rDoc.getElementById('importFile');
+    const restoreFile = async (payload) => {
+      const real = { confirm: win.confirm, toast: win.toast };
+      let said = '';
+      win.confirm = () => true;
+      win.toast = (m) => { said = String(m); };
+      try {
+        const dt = new win.DataTransfer();
+        dt.items.add(new win.File([JSON.stringify(payload)], 'backup.json', { type: 'application/json' }));
+        rInput.files = dt.files;
+        rInput.dispatchEvent(new win.Event('change', { bubbles: true }));
+        /* FileReader is asynchronous; the toast is the end of the road. */
+        for (let i = 0; i < 100 && !said; i++) await new Promise(r => setTimeout(r, 20));
+      } finally { Object.assign(win, real); }
+      return said;
+    };
+    const backup = { app: 'team-dashboard', schema: win.TDState.SCHEMA, settings: {},
+      teams: [{ id: 'rb1', name: 'Restored', rows: [{ c: '2026-01-21', s: '2026-01-19', t: 'Story' }] }] };
+
+    /* Back in front of the card the way a reader gets there mid-sitting:
+       `welcomeStarted` is an in-memory flag an earlier group set with Start
+       Fresh, and delete-all is the one thing that clears it. */
+    plant({ teams: [{ id: 'rb0', name: 'Going', rows: [{ c: '2026-01-21', s: '2026-01-19', t: 'Story' }] }],
+            settings: {} });
+    win.renderAll();
+    rDoc.getElementById('clearBtn').click();
+    rDoc.getElementById('clearConfirm').click();
+    ok(!rDoc.getElementById('welcomeCard').hidden, 'an emptied browser is on the welcome card');
+    rDoc.getElementById('welcomeRestoreBtn').click();
+    ok(rDialog.open, 'Restore a Backup opens the Back Up & Restore window');
+    const said1 = await restoreFile(backup);
+    ok(/^Backup restored/.test(said1), 'the file restores and the toast says so', said1);
+    is(win.tdGet().teams.map(t => t.name), ['Restored'], 'with the file’s team in place');
+    ok(!rDialog.open, 'and the window has closed — nothing in it is left to do');
+    ok(rDoc.getElementById('welcomeCard').hidden, 'over an app that is no longer on the card');
+
+    /* The header’s own button: the same window, the same rule. */
+    rDoc.getElementById('dataBtn').click();
+    ok(rDialog.open, 'the header’s ⇩ opens the same window');
+    const said2 = await restoreFile(backup);
+    ok(/^Backup restored/.test(said2) && !rDialog.open,
+       'and a restore from there closes it too', said2);
+
+    /* Refused: the wrong file keeps the window open, so the refusal is read
+       where the file was chosen. */
+    rDoc.getElementById('dataBtn').click();
+    const said3 = await restoreFile({ nothing: 'here' });
+    ok(/isn\u2019t a Flow Metrics backup/.test(said3), 'a file that is not a backup is refused', said3);
+    ok(rDialog.open, 'and the window stays open on the refusal');
+    rDialog.close();
     plant({ teams: [], settings: {} });
   }
 

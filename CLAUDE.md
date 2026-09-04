@@ -3682,3 +3682,13 @@ first, red against the unfixed page, and the commit quotes the row.
   is the right rule for hundreds of rows arriving unwatched. The one pure check that pinned the
   old drop was rewritten, not deleted. The parent-key box still drops silently; it was not in the
   finding and is left for a decision of its own.
+
+- **A restore that worked closes the window behind it (fix 8).** *Restore a Backup* on the welcome
+  card opens the Back Up & Restore window, and the `importFile` change handler restored, saved
+  and toasted — and left the window standing over the app it had just filled. Every early
+  `return` in that handler is a refusal (not a backup, a newer build, Cancel at the confirm,
+  tdAdopt declining) and those keep the window open ON PURPOSE, so the refusal is read where the
+  file was chosen; only the success line closes it. The header's ⇩ is the same window and the
+  same handler, so it took the rule for free — the test drives both doors, and the refusal. The
+  test reaches the card through delete-all, because `welcomeStarted` is an in-memory flag an
+  earlier group sets with Start Fresh and delete-all is the one thing that clears it.

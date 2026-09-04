@@ -2729,7 +2729,11 @@ anywhere else, and the only way back from a cleared browser.
 **Restoring replaces everything.** You're shown what the file holds against what's already
 here — *"Restore 2 teams and 3 items from this file? This replaces the 1 team and 0 items in
 this browser"* — and nothing changes until you confirm. Restoring on another device is how you
-move your data between devices.
+move your data between devices. A restore that worked closes the window behind it, whether it
+was opened from the header or from the welcome card's *Restore a Backup*; a file that is
+refused — not a backup, or from a newer version — leaves the window open, so the refusal is
+read where the file was chosen. (Until 2026-09-04 a successful restore left the window standing
+over the app it had just filled.)
 
 A restored file goes through exactly the same sanitising as a share link (`hydrateState`), so a
 hand-edited backup can't introduce anything a link couldn't.
