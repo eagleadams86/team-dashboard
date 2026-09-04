@@ -351,8 +351,23 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    deliberately, because the "no status name is ever stored" argument it rested
    on had already gone. Nearly all nineteen are the three admission rules
    refusing: prose under the column, one bad cell in it, a terminal status, a
-   heading too long to be a name. */
-const EXPECTED = 3290;
+   heading too long to be a name.
+
+   And to 3370 on 2026-09-04 for the aged share, where the ninety-odd new checks
+   split three ways. The metric itself: that every point of the series IS the aged
+   count over work in progress rather than a third count, which is what makes the
+   tile unable to contradict the two beside it, plus the two nulls that are not
+   noughts — no threshold, and nothing open at all. The GRADING, which is the
+   first colour this app has ever put on a figure: that it stays off until BOTH
+   boundaries are typed, that one on its own is not a scale, that a boundary out
+   of range grades nobody, and that all three states carry a shape and a
+   spelled-out status as well as a hue — the assertions that would have caught
+   `Number(null) === 0` reading a pair of unset boxes as a valid 0/0 scale and
+   colouring every board red. And the All Teams table, whose columns are pinned as
+   an ORDERED LIST now rather than a count, because a count goes on passing when
+   one column is swapped for another — with a second copy of the app booted to
+   prove a saved sort naming a dropped column falls back rather than throwing. */
+const EXPECTED = 3370;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -1584,7 +1599,7 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 14, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 15, 'SCHEMA was bumped in the same commit as the whitelist widening');
 
 
   /* ══════════════════════════════════════════════════════════
@@ -2528,8 +2543,9 @@ async function run(TD, win) {
      it plots — and every name must have a help entry behind it, since the ⓘ
      that opens one sits on the name. */
   is(Object.keys(d.names).sort(),
-     ['agedWork', 'cfd', 'cycleScatter', 'cycleTime', 'defectRate', 'forecastHowMany',
-      'forecastWhen', 'itemAge', 'leadTime', 'netFlow', 'stageTime', 'throughput', 'wip'],
+     ['agedShare', 'agedWork', 'cfd', 'cycleScatter', 'cycleTime', 'defectRate',
+      'forecastHowMany', 'forecastWhen', 'itemAge', 'leadTime', 'netFlow', 'stageTime',
+      'throughput', 'wip'],
      'every chart has a name of its own');
   ok(Object.keys(d.names).every(k => d.titles[k]),
      'and a sentence under it saying what it plots');
@@ -2559,7 +2575,7 @@ async function run(TD, win) {
   is('smuggled' in strayS, false, 'a stray settings key is dropped at the boundary');
   is(strayS.agedDays, 21, 'while every known key still comes through');
   is(Object.keys(strayS).sort().join(','),
-     'agedDays,cycleTimeLabel,featureAgedDays,featureTypes,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,workingDays',
+     'agedDays,agedShareGreen,agedShareRed,cycleTimeLabel,featureAgedDays,featureTypes,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,workingDays',
      'and the surviving keys are exactly the known set');
 
   is(d.names.wip, 'Work in progress', 'the rest are the standard metric names');
@@ -3532,6 +3548,65 @@ async function run(TD, win) {
     is(norm('21'), 21, 'including one a hand-edited backup wrote as a string');
   }
 
+  /* ── The aged share ─────────────────────────────────────────────────────
+     THE assertion is the first one: the share is a division of the two series
+     beside it and never a third count, which is what makes it impossible for the
+     tile to contradict the two tiles it sits next to. Everything else here is a
+     null rule, because every null rule in this app has been got wrong once. */
+  {
+    const dS = TD.derive(p.rows, SAMPLE_SETTINGS,
+      { filterValue: '', months: 'all', bucket: 'week' });
+    ok(dS.agedShare.length === dS.wip.length && dS.wip.length === dS.agedCount.length,
+       'the share series is the same length as the two it comes from');
+    ok(dS.agedShare.every((v, i) => (dS.wip[i] === 0 || dS.agedCount[i] === null)
+         ? v === null
+         : Math.abs(v - dS.agedCount[i] / dS.wip[i]) < 1e-9),
+       'and every point IS aged over work in progress, at that same point');
+    is(dS.summary.agedShareNow, dS.agedShare[dS.agedShare.length - 1],
+       'the tile reads the last point of the series, not a second calculation');
+
+    /* Zero open is NO ratio, never 0% and never 100%. A board that has stopped
+       must not read as a board with nothing stale. */
+    const dEmpty = TD.derive([{ started: D(2015, 1, 5), completed: D(2015, 1, 6), type: 'Story' }],
+      SAMPLE_SETTINGS, { months: 'all', bucket: 'week' });
+    ok(dEmpty.agedShare.every((v, i) => dEmpty.wip[i] !== 0 || v === null),
+       'a period with nothing open has no share at all');
+    is(dEmpty.summary.agedShareNow, null,
+       'and the tile says so with a dash rather than a reassuring nought');
+
+    /* No threshold, no numerator, so no share — the feature view. The series
+       still keeps its length, the way agedCount does. */
+    const dNoT = TD.derive(p.rows, Object.assign({}, SAMPLE_SETTINGS,
+        { agedDays: 14, featureAgedDays: null }),
+      { filterValue: '', months: 'all', bucket: 'week', unit: 'features' });
+    is(dNoT.agedDays, null, 'the feature view with no threshold set has none');
+    ok(dNoT.agedShare.every(v => v === null), 'so every point of the share is null');
+    is(dNoT.agedShare.length, dNoT.wip.length, 'and the series still keeps its length');
+    is(dNoT.summary.agedShareNow, null, 'with the tile reading a dash');
+    ok(!/null/.test(dNoT.titles.agedShare) && !/null/.test(dNoT.axisTitles.agedShare),
+       'and neither the title nor the axis says the word null', dNoT.titles.agedShare);
+    ok(!!dNoT.names.agedShare && !!dNoT.titles.agedShare && !!dNoT.axisTitles.agedShare,
+       'all three of the chart’s strings exist even with nothing to plot');
+
+    /* The two boundaries at the storage boundary. They are NOT the
+       positive-or-null shape the day thresholds use, and the difference is the
+       whole point: nought per cent is a real target, so it has to survive — while
+       a null must never become one, which `Number(null) === 0` made it do until
+       this was written. */
+    const ng = (v) => win.TDState.normalizeSettings({ agedShareGreen: v }).agedShareGreen;
+    is(ng(undefined), null, 'the green boundary ships unset');
+    is(ng(null), null, 'and an explicit null stays null — Number(null) is 0, which it must not be');
+    is(ng(''), null, 'an empty box is unset, not nought');
+    is(ng(0), 0, 'but a typed zero IS a target: nothing past the threshold, ever');
+    is(ng(-5), null, 'a negative share is not a share');
+    is(ng(400), null, 'and one out of range is NOT SET rather than clamped into range');
+    is(ng('nonsense'), null, 'nor is anything that is not a number');
+    is(ng(20), 20, 'a real number comes through');
+    is(ng('20'), 20, 'including one a hand-edited backup wrote as a string');
+    is(win.TDState.normalizeSettings({ agedShareRed: 40 }).agedShareRed, 40,
+       'and the red boundary takes the same clamp');
+  }
+
   /* The coaching ratio: work in progress against a month of throughput. */
   ok(dW.summary.monthlyThroughput > 0, 'a month of throughput is counted for the ratio',
      String(dW.summary.monthlyThroughput));
@@ -3834,8 +3909,8 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 14, 'the schema marker is 14 — the version that started storing the status '
-     + 'itself, and made stages a grouping over it');
+  is(St.SCHEMA, 15, 'the schema marker is 15 — the version that added the two boundaries the '
+     + 'aged share is graded against');
 
 
   /* ────────────────────────────────────────────────────────── */
@@ -4128,8 +4203,8 @@ async function run(TD, win) {
   group('features at the storage boundary');
   {
     const S4 = win.TDState;
-    is(S4.SCHEMA, 14, 'the feature layer took the schema to 12, the feature ageing '
-       + 'threshold to 13, and the status vocabulary to 14');
+    is(S4.SCHEMA, 15, 'the feature layer took the schema to 12, the feature ageing '
+       + 'threshold to 13, the status vocabulary to 14 and the aged share boundaries to 15');
 
     const t = S4.sanitizeTeams([{ id: 'a', name: 'X', rows: [],
       features: [{ c: '2026-01-12', s: '2026-01-06', t: 'Feature', i: 'DAE-1' }] }])[0];
@@ -8593,6 +8668,19 @@ group('ARTs — the grouping, and the boundary it crosses');
   is([healthy.summary.agedNow, longTail.summary.agedNow], [0, 6],
      'and only Team Long Tail has aged work, so the Aged work tile has both faces');
 
+  /* THREE STATES, ONE PER TEAM, and that is the whole reason the demo seeds the
+     two boundaries at all. A demo where every team came out green would ship the
+     grading invisibly, which is the failure the sample-data rule exists to stop.
+     Shares are read off the profiles the same way the confirm dialog counts
+     them, so this cannot drift from what the dialog claims. */
+  const bareExport = settle(demoOf(demo, 'Team Bare Export').rows);
+  const agedPctOf = (d) => Math.round(d.summary.agedShareNow * 100);
+  is([agedPctOf(healthy), agedPctOf(bareExport), agedPctOf(longTail)], [0, 33, 67],
+     'the demo’s three teams land on three different aged shares');
+  ok(agedPctOf(healthy) <= 20 && agedPctOf(bareExport) > 20 && agedPctOf(bareExport) <= 40
+       && agedPctOf(longTail) > 40,
+     'one on each side of the 20/40 boundaries the demo seeds — green, amber and red');
+
   /* THE DIALOG THAT OFFERS THE DEMO HAS TO DESCRIBE IT. It said "five items aged
      past the threshold" for as long as Team Long Tail's `wip` list had six of them past
      it — the README was corrected and this sentence was not, and a demo that
@@ -9008,6 +9096,99 @@ group('ARTs — the grouping, and the boundary it crosses');
      'the offer goes once anything holds data — it is a first-run affordance, not a button');
 
   /* ────────────────────────────────────────────────────────── */
+  /* ────────────────────────────────────────────────────────── */
+  group('the aged share is the one tile that grades — and only when asked to');
+
+  /* THE OPT-IN GUARANTEE FIRST. This app stated figures and judged nothing for a
+     year, and the amendment agreed with Charles is that nothing turns a colour
+     UNLESS THE READER DREW THE LINE. A fresh browser has both boxes empty, so
+     every tile here must come out exactly as it did before the feature. */
+  /* Planted through tdAdopt with the settings SPELLED OUT every time, never by
+     reaching into the app's live state. The group before this one loads the demo,
+     which seeds both boundaries — a plant that left them to "whatever was there"
+     read the demo's 20/40 and the first assertion here failed claiming the app
+     grades out of the box. Ambient state from the group above is the trap this
+     suite has fallen into before. */
+  const GRADED_ROWS = [
+    { c: null, s: '2015-01-01', t: 'Story' },
+    { c: null, s: '2015-01-02', t: 'Story' },
+    { c: null, s: '2015-06-01', t: 'Story' },
+    { c: null, s: '2015-06-02', t: 'Story' },
+    { c: '2015-06-10', s: '2015-06-08', t: 'Story' }
+  ];
+  const setBounds = (g, r) => {
+    plant({ teams: [{ id: 'g1', name: 'Graded', rows: GRADED_ROWS }],
+            settings: { agedShareGreen: g, agedShareRed: r } });
+    win.selectTab('dashboard');
+    win.document.getElementById('stab-health').click();
+  };
+  const shareTile = () => [...win.document.querySelectorAll('#tilesHealth .tile')]
+    .find(t => /AGED SHARE/i.test(t.innerText));
+  setBounds(null, null);
+
+  is(win.TDState.normalizeSettings({}).agedShareGreen, null, 'both boundaries ship unset');
+  is(win.TDState.normalizeSettings({}).agedShareRed, null, 'neither has a default to inherit');
+  is(shareTile().className, 'tile',
+     'so the tile carries no state at all out of the box — the app still just states the figure');
+  ok(!shareTile().querySelector('.glyph'), 'and no glyph either');
+  ok(/\d+%/.test(shareTile().innerText), 'while the figure itself is still stated', shareTile().innerText);
+
+  /* ONE BOUNDARY IS NOT A SCALE. Half a line is not a line, and completing it
+     for the reader would be the app drawing the half they had not drawn. */
+  setBounds(20, null);
+  is(shareTile().className, 'tile', 'a green boundary on its own grades nothing');
+  setBounds(null, 40);
+  is(shareTile().className, 'tile', 'and neither does a red one on its own');
+
+  /* Two of the four open items were started in January and two in June, against a
+     14-day threshold read as of the newest date in the data — so the board reads
+     50%, and every boundary below is placed around that one figure. Stated here
+     so a failure below says which half moved. */
+  setBounds(90, 95);
+  ok(/\b50%/.test(shareTile().querySelector('.value').textContent),
+     'the planted board reads 50% — two of its four open items are aged',
+     shareTile().querySelector('.value').textContent);
+
+  /* Lower is better, and the green boundary is read AT OR BELOW — the same
+     strictly-over reading the ageing threshold and the WIP limit already take. */
+  setBounds(50, 90);
+  is(shareTile().className, 'tile green', '50% is AT the green boundary, which counts as met');
+  setBounds(49, 90);
+  is(shareTile().className, 'tile yellow', 'a hair under it and the same figure is amber');
+  setBounds(49, 90);
+  is(shareTile().className, 'tile yellow', 'at or below the red boundary is still only amber');
+  setBounds(30, 49);
+  is(shareTile().className, 'tile red', 'and above the red boundary it is red');
+
+  /* COLOUR IS NEVER THE ONLY SIGNAL — WCAG 1.4.1, and the reader these figures
+     are for reads the glyph rather than the hue. Three channels, checked in all
+     three states: a shape, a status spelled out for a screen reader, and the
+     verdict written into the foot where everyone else reads it. */
+  [[50, 90, '✓', 'On target'], [49, 90, '!', 'Watch'], [30, 49, '✕', 'Off target']]
+    .forEach(([g, r, glyph, words]) => {
+      setBounds(g, r);
+      const t = shareTile();
+      is(t.querySelector('.glyph').textContent, glyph,
+         'the ' + words.toLowerCase() + ' state carries its own shape');
+      ok(t.querySelector('.sr-only') && t.querySelector('.sr-only').textContent.includes(words),
+         'and spells the status out for a screen reader');
+      ok(t.querySelector('.glyph').getAttribute('aria-hidden') === 'true',
+         'with the shape itself hidden from it, so the status is not announced twice');
+      ok(/on target|watch|off target/i.test(t.querySelector('.foot').textContent),
+         'and the foot states the verdict in words, which is the half that survives a '
+         + 'printed page, a screenshot and red-green deficiency',
+         t.querySelector('.foot').textContent);
+      ok(/\d+%/.test(t.querySelector('.foot').textContent),
+         'naming the boundary as well as the state — a judgement with its working shown');
+    });
+
+  /* Out of range is NOT SET rather than clamped into range, all the way through
+     to the screen: a crafted share link saying 400 must not grade anybody. */
+  setBounds(400, 49);
+  is(shareTile().className, 'tile', 'a boundary out of range grades nothing on screen either');
+  setBounds(null, null);
+
+  /* ────────────────────────────────────────────────────────── */
   group('the All teams table on screen');
 
   /* Driven through the real app rather than through derive(), because the two
@@ -9099,15 +9280,16 @@ group('ARTs — the grouping, and the boundary it crosses');
     .findIndex(th => th.querySelector('[data-sort="' + key + '"]'));
   ok(helpOn('trend'), 'the throughput trend column carries its ⓘ');
   ok(helpOn('dataEnd'), 'and so does Data to — the other column unique to this view');
-  ok(helpOn('ratio'),
-     'and so does WIP vs month — the dashboard tile its note used to open from is '
-     + 'labelled "WIP vs throughput", which nobody reading this table could follow');
+  is(helpOn('agedPct'), null,
+     'and Aged % does not — its note opens from the Aged share tile, which is named for '
+     + 'this same heading, which is the whole test the ⓘ rule applies');
   is(helpOn('name'), null, 'the team name is not a metric, so it has none');
   is(helpOn('wip'), null,
      'and neither does In progress — its note opens from the tile of the same name');
-  is(win.document.querySelectorAll('#allTeamsTable thead [data-help]').length, 3,
-     'three, and no more: at 40px each they are what put this table over the width '
-     + 'of an ordinary window');
+  is(win.document.querySelectorAll('#allTeamsTable thead [data-help]').length, 2,
+     'two, and no more: at 40px each they are what put this table over the width '
+     + 'of an ordinary window. It was three until WIP vs month was dropped on '
+     + '2026-09-04 to make room for Aged %');
   /* The other half of the same sum. `table.data td` is nowrap and so is every
      other heading in the app — a figure broken over two lines is worse than a
      wide column — and this table's headings are the one exception, which is what
@@ -9142,23 +9324,72 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and does NOT re-sort the table underneath the dialog');
   helpDlg.close();
 
-  /* The new one, named for ITS heading rather than for the tile it used to lean
-     on: a window titled "Work in Progress" over a column called WIP vs month
-     tells the reader who came about the ratio that this window is not for them,
-     which is the naming half of the app\u2019s own one-dot-one-explanation rule. */
-  const ratioSortBefore = win.document.querySelectorAll('#allTeamsTable thead th')[colIndexEarly('ratio')]
-    .getAttribute('aria-sort');
-  helpOn('ratio').click();
-  is(win.document.getElementById('helpTitle').textContent, 'WIP vs Month',
-     'the WIP vs month ⓘ opens a window named for that heading');
+  /* THE RATIO'S NOTE MOVED RATHER THAN GOING. It was the third ℹ here, added
+     2026-09-03 because a window titled "Work in Progress" over a column called
+     WIP vs month tells the reader who came about the ratio that this window is
+     not for them. The column was dropped 2026-09-04 to make room for Aged %, and
+     the note went to the dashboard tile carrying the SAME naming problem: it is
+     labelled "WIP vs throughput" and had been opening the Work in Progress note.
+     Deleting the entry would have taken the only explanation of what the figure
+     divides with it, so it is pinned here, on the tile it now answers for. */
+  win.document.getElementById('tab-dashboard').click();
+  win.document.getElementById('stab-health').click();
+  const ratioDot = [...win.document.querySelectorAll('#tilesHealth .tile')]
+    .find(t => /WIP VS THROUGHPUT/i.test(t.innerText))
+    .querySelector('[data-help]');
+  is(ratioDot.getAttribute('data-help'), 'wipRatio',
+     'the WIP vs throughput tile opens a note of its own, not the Work in Progress one');
+  ratioDot.click();
+  is(win.document.getElementById('helpTitle').textContent, 'WIP vs Throughput',
+     'and that window is named for the heading the dot sits on');
   ok(/month/i.test(win.document.getElementById('helpBody').textContent)
      && /0\.5|half/i.test(win.document.getElementById('helpBody').textContent),
      'saying what the figure divides and what a reader should make of it',
      win.document.getElementById('helpBody').textContent.slice(0, 80));
-  is(win.document.querySelectorAll('#allTeamsTable thead th')[colIndexEarly('ratio')]
-       .getAttribute('aria-sort'), ratioSortBefore,
-     'and does not re-sort the column it sits in either');
   helpDlg.close();
+  win.document.getElementById('tab-allteams').click();
+
+  /* ── The columns that went, and the one that came ────────────────────────
+     Completed and WIP vs month were dropped 2026-09-04 to buy the width for Aged
+     %. Pinned as a LIST rather than a count, because "nine columns" would go on
+     passing if one were swapped for another. */
+  const colKeys = [...win.document.querySelectorAll('#allTeamsTable thead th')]
+    .map(th => { const b = th.querySelector('[data-sort]'); return b ? b.dataset.sort : null; });
+  is(colKeys, ['name', 'rate', 'trend', 'p85', 'wip', 'aged', 'agedPct', 'defects', 'dataEnd'],
+     'the table’s columns, in order — no Completed and no WIP vs month');
+  ok(colKeys.indexOf('agedPct') === colKeys.indexOf('aged') + 1,
+     'and the share sits beside the count it is a share OF, which is what makes both readable');
+
+  /* A SAVED SORT CAN NAME A COLUMN THAT NO LONGER EXISTS — a browser that used
+     the app yesterday has `completed` sitting in its td-view. Booted for real in
+     a second hidden copy, because `view` is a module binding and the saved copy
+     is the one that actually decides what you see: `cols.find` returns undefined
+     and the `if (sortCol)` guard falls back to the picker's order. The
+     alternative is a throw on the first render after an upgrade, which nobody
+     would see coming. */
+  {
+    const savedView = localStorage.getItem('td-view');
+    localStorage.setItem('td-view', JSON.stringify(
+      Object.assign(JSON.parse(savedView || '{}'), { teamSort: 'completed', teamSortDir: 'desc' })));
+    const f3 = document.createElement('iframe');
+    f3.setAttribute('data-td-tests', '');
+    f3.setAttribute('aria-hidden', 'true');
+    f3.style.cssText = 'position:absolute;width:1265px;height:900px;opacity:0;border:0;left:-9999px';
+    await new Promise((resolve) => {
+      f3.onload = resolve; f3.src = 'index.html' + BUST; document.body.appendChild(f3);
+    });
+    const w3 = f3.contentWindow;
+    w3.selectTab('allteams');
+    const names = [...w3.document.querySelectorAll('#allTeamsTable tbody tr')]
+      .map(tr => tr.cells[0].innerText.trim());
+    is(names, ['Petrel', 'Osprey', 'Avocet'],
+       'a saved sort naming a removed column falls back to the picker’s order rather than throwing');
+    is([...w3.document.querySelectorAll('#allTeamsTable th[aria-sort]')].length, 0,
+       'and no heading claims to be the one sorted on');
+    f3.remove();
+    if (savedView != null) localStorage.setItem('td-view', savedView);
+    else localStorage.removeItem('td-view');
+  }
 
   /* Furniture, not a value: the export reads the rendered page, and a column of
      "Throughput trend i" headings would be in every file. */
