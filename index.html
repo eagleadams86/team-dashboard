@@ -8790,7 +8790,7 @@ function derive(rows, settings, view, stages, statuses) {
   const weeks = [], bucketLabels = []
 , throughput = [], unplannedRate = [],
         avgCycleTime = [], netFlow = [], started = [],
-        avgLeadTime = [], defectCreatedRate = [], p85CycleTime = [];
+        avgLeadTime = [], p85LeadTime = [], defectCreatedRate = [], p85CycleTime = [];
   /* Every individual cycle time inside the window, pooled — the summary tile
      averages these rather than the per-bucket means, so an empty bucket (stored
      as 0 in the series to keep the line unbroken) can't drag it down. */
@@ -8862,6 +8862,17 @@ function derive(rows, settings, view, stages, statuses) {
        impossible, so a 0 would be a claim, not a gap — and linearTrend already
        skips nulls, so a break doesn't drag the trend line. */
     avgLeadTime.push(lts.length ? mean(lts) : null);
+    /* The percentile beside the mean, on the SAME population — `lts` already has
+       the outlier exclusion applied, so the two lines on the card can never be
+       drawn from different sets of items.
+
+       It is the same CYCLE_PERCENTILE the cycle time chart reads, deliberately:
+       the app asks one question about promises and 85 is its answer to it, and a
+       second percentile setting for lead time would be two numbers to keep in
+       step for no gain. Null, not 0, on an empty period — the same break the
+       mean beside it takes, and for the same reason: a lead time of zero days is
+       impossible, so a 0 would be a claim rather than a gap. */
+    p85LeadTime.push(lts.length ? percentileOf(lts, CYCLE_PERCENTILE) : null);
 
     windowLeads.push(...lts);
 
@@ -9440,7 +9451,7 @@ function derive(rows, settings, view, stages, statuses) {
     weeks, buckets: weeks, bucketLabels,
     bucket, bucketNoun: noun, bucketNounPlural: noun + 's', partial,
     throughput, unplannedRate, avgCycleTime, netFlow, started,
-    avgLeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
+    avgLeadTime, p85LeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
     throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
     wip, agedCount, agedShare, agedDays, ageing, cycleScatter, forecast, cfd,
     /* The two figures the team set, returned as USED rather than as passed —
@@ -9490,6 +9501,12 @@ function derive(rows, settings, view, stages, statuses) {
       unplannedShare,
       netFlowTotal: netFlow.reduce((a, b) => a + b, 0),
       avgLeadTime: windowLeads.length ? mean(windowLeads) : null,
+      /* Over every item in the window, not the mean of the per-bucket
+         percentiles — a percentile of percentiles is not a percentile. The same
+         rule `p85CycleTime` below follows, and it matters more here: lead time
+         carries the queue as well as the work, so its tail is longer than cycle
+         time's and a mean sits further from the item anybody is waiting on. */
+      p85LeadTime: percentileOf(windowLeads, CYCLE_PERCENTILE),
       /* The two counts behind net flow, and the band the periods sit in. Counted
          over the same buckets the charts plot, so each tile equals the sum of
          the bars beside it. */
@@ -9645,7 +9662,8 @@ function derive(rows, settings, view, stages, statuses) {
       netFlow: 'Net Flow per ' + Noun + ' (' + Units + ' Completed − ' + Units + ' Started)',
       cfd: 'Work Raised, Started and Finished in This Window, Stacked at the End of Each '
         + Noun + ' — the Cumulative Flow Diagram',
-      leadTime: 'Average Lead Time per ' + Noun + ' (Raised to Delivered)',
+      leadTime: 'Lead Time per ' + Noun + ' (Raised to Delivered) — Average and '
+        + CYCLE_PERCENTILE + 'th Percentile',
       wip: 'Work in Progress at the End of Each ' + Noun,
       agedWork: agedDays == null
         ? Units + ' in Progress Too Long — No Threshold Set'
@@ -12235,10 +12253,25 @@ function drawCharts(d) {
   if (d.hasCreated) {
     const leadOpts = baseOptions(d.axisTitles.leadTime, num1, null, d.axisTitles.x, d.partial);
     leadOpts.scales.y.beginAtZero = true;
+    /* The card carries two lines now, so it needs the legend the cycle time card
+       already has — and the SAME legend, filtering the trend out, because these
+       two cards are the same pair of questions asked of two spans and a reader
+       who has learnt one should not have to learn the other. */
+    leadOpts.plugins.legend = {
+      display: true, position: 'top',
+      labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
+                font: { size: fsPx('xs') }, filter: item => item.text !== 'Trend' }
+    };
     renderChart('chartLeadTime', {
       type: 'line',
       data: {
         labels: d.bucketLabels,
+        /* Deliberately identical to the cycle time card's two datasets — same
+           colours, same dash, same triangle for the percentile. It is the same
+           measure over a longer span, and a second styling for it would only
+           invite the question of what is different about it. NO value labels,
+           unlike that card: this one is half the width in the Flow grid and two
+           sets of numbers over one 300px card is unreadable. */
         datasets: [{
           label: 'Avg lead time',
           data: d.avgLeadTime,
@@ -12246,6 +12279,14 @@ function drawCharts(d) {
           backgroundColor: seriesMain,
           borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false,
           spanGaps: false, order: 1
+        }, {
+          label: d.cyclePercentile + 'th percentile',
+          data: d.p85LeadTime,
+          borderColor: seriesAlt,
+          backgroundColor: seriesAlt,
+          borderWidth: 2, borderDash: [2, 3],
+          pointStyle: 'triangle', pointRadius: 3, pointHoverRadius: 6,
+          tension: 0, fill: false, spanGaps: false, order: 1
         }, trendDataset(d.avgLeadTime)]
       },
       options: leadOpts
@@ -13169,6 +13210,24 @@ const METRIC_HELP = {
       + 'though the two read alike. This one is checked against work that has finished; the '
       + 'threshold flags work that has not, and normally sits below the target so something '
       + 'is caught while there is still time to act on it. See Aged Work.'],
+  ] },
+  leadTimePercentile: { title: CYCLE_PERCENTILE + 'th Percentile Lead Time', body: [
+    [b('The promise you can make to whoever asked.'), ' ' + CYCLE_PERCENTILE + '% of the '
+      + 'requests delivered in this window went from raised to delivered within this many '
+      + 'days. It is the same statistic as the percentile cycle time above it and for the same '
+      + 'reason — an average is a figure most work beats and a sixth of it misses badly — but '
+      + 'asked of the whole wait rather than of the part your team was working on.'],
+    ['It is normally ', b('a good deal larger than the percentile cycle time'), ', and the gap '
+      + 'between the two is the queue: how long a request sat before anybody picked it up. '
+      + 'That gap is usually the cheapest thing on this page to fix, because nobody has to '
+      + 'work faster to close it — and it is invisible in every cycle time figure here, which '
+      + 'starts counting only once the work began.'],
+    ['Read it against the average beside it rather than instead of it. ', b('A wide gap means '
+      + 'the queue is erratic'), ' — some requests are picked up at once and others sit — '
+      + 'which is a scheduling problem rather than a capacity one, and it is the version of '
+      + 'this figure a requester actually experiences.'],
+    ['It needs ', b('a created date on the row'), ', so an export without one leaves this and '
+      + 'the average beside it empty. The card below says which column to paste.'],
   ] },
   throughputBand: { title: 'Steady Delivery', body: [
     ['Is our pace steady? The band most periods land in: ' + THROUGHPUT_HIGH_PERCENTILE
@@ -14181,7 +14240,24 @@ function renderDashboard() {
       s.avgCycleTime == null ? '—' : num1(s.avgCycleTime),
       d.dayNoun + ' from start to finish' + outlierFoot(d), 'cycleTime') +
     tile('Avg lead time', s.avgLeadTime == null ? '—' : num1(s.avgLeadTime),
-      d.dayNoun + ' from raised to delivered' + outlierFoot(d), 'leadTime');
+      d.dayNoun + ' from raised to delivered' + outlierFoot(d), 'leadTime') +
+    /* THE PERCENTILE LEAD TIME IS THE PROMISE, and the average beside it is what
+       a typical request costs — the same pair, in the same order, as the cycle
+       time tiles. It sits here rather than in the headline row because that row
+       is exactly four and stays four; the cycle time percentile earned the
+       headline slot by being the figure a stand-up asks for, and this is the
+       same question asked of the queue as well as the work.
+
+       It is normally the LARGER of the two by some way. Lead time carries the
+       wait before anybody started, which is where the long tail lives, so a mean
+       sits further from the item somebody is actually waiting on here than it
+       does on cycle time. */
+    tile(CYCLE_PERCENTILE + 'th percentile lead time',
+      s.p85LeadTime == null ? '—' : num1(s.p85LeadTime),
+      s.p85LeadTime == null ? 'no created dates in this window'
+        : d.dayNoun + ' — ' + CYCLE_PERCENTILE + '% of requests were delivered within it'
+          + outlierFoot(d),
+      'leadTimePercentile');
 
 
   /* The Delivery group's own tiles. None restates a headline tile: the band

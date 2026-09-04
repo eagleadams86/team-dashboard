@@ -23,7 +23,7 @@ measures that move together are read together:
 
 | Group | Question it answers | What's plotted |
 |---|---|---|
-| **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); **every finished item, as a dot**; lead time |
+| **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); **every finished item, as a dot**; lead time (average and 85th percentile) |
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started); **[raised, started, finished](#raised-started-finished-the-cumulative-flow-diagram)** — the cumulative flow diagram |
 | **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **[aged share of WIP](#aged-share-of-wip-the-count-in-proportion)**, the two in proportion; **[work item age](#work-item-age-what-to-do-this-morning)**, by workflow stage where your export says one; defect rate — defects resolved and defects raised; **[time in stage](#where-the-time-goes-time-in-stage)**, where the wait actually goes |
 | **Forecast** — what that implies | When will this batch be done, and how much by a date? | Two distributions from ten thousand simulated runs, one per question |
@@ -120,7 +120,11 @@ lines.
 Each group then adds a small tile row of its own, stating what its charts can't:
 
 - **Flow** — average cycle time (pooled over the items in the window, so an empty week can't
-  drag it down) and average lead time.
+  drag it down), average lead time, and the **85th percentile lead time** beside it. The two
+  lead time figures are the same pair as the two cycle time ones: what a typical request costs,
+  and what you can promise about the next one. The percentile is normally a good deal the larger
+  of the two — lead time carries the queue as well as the work, so its tail is longer than cycle
+  time's, and the gap between percentile lead time and percentile cycle time *is* the queue.
 - **Delivery** — **steady delivery**, the band most whole periods land in (15th to 85th
   percentile of the per-period counts); total **net flow**; and **started vs completed**, the two
   counts net flow is the difference of.
@@ -1070,7 +1074,7 @@ by claiming the team shipped one fewer item, so:
 | Moves | Does not move |
 | --- | --- |
 | Average cycle time | Throughput and the steady-delivery band |
-| Average lead time | Net flow, started vs completed |
+| Average and 85th percentile lead time | Net flow, started vs completed |
 | 85th percentile and median cycle time | The cumulative flow diagram |
 | Time in stage | Work in progress |
 | The two lines on the item-age chart | **Aged work** |

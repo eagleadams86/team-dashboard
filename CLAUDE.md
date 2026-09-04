@@ -11,6 +11,40 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## Lead Time Gets Its Percentile (2026-09-04) — no schema change
+
+Charles, weighing what the All Teams table should spend its width on: *"which do you think is more
+important the completed column or avg lead time?"* Lead time, easily — it is the only span here
+that includes the wait before anybody started, which is the one a requester actually experiences.
+But the answer exposed the real problem: **lead time was the one duration in this app stated only
+as a mean**, which is the statistic the whole file argues against.
+
+- **The app was contradicting itself.** Cycle time leads with the 85th percentile precisely because
+  a mean on right-skewed delivery data describes nothing — and lead time is MORE skewed than cycle
+  time, not less, because the queue is where the long tail lives. The most important span was
+  behind the weakest statistic.
+- **`p85LeadTime` comes off the SAME pool as the mean** — `lts` per period, `windowLeads` for the
+  tile — so the outlier exclusion reaches both and the two lines on one card can never be drawn
+  from different sets of items. Over every item in the window, never the mean of the per-bucket
+  percentiles: a percentile of percentiles is not a percentile.
+- **One percentile setting for the app.** It reads `CYCLE_PERCENTILE`, the same 85 the cycle time
+  chart does. A second setting for lead time would be two numbers to keep in step for no gain.
+- **Null, never 0**, with no created dates — the break the mean beside it already takes, because a
+  lead time of zero days is impossible and a 0 would be a claim rather than a gap.
+- **The tile is in Flow, not the headline row.** That row is exactly four and stays four. Flow now
+  holds three: average cycle time, average lead time, percentile lead time.
+- **THREE TILES, THREE HELP WINDOWS.** The pair sharing one `leadTime` key was the first draft and
+  was wrong — one dot, one explanation, and a dot on "85th percentile lead time" that opened a
+  window titled "Lead Time" tells the reader it is not for them. `leadTimePercentile` mirrors
+  `cycleTimePercentile`, which is the split the cycle time pair already makes. Pinned as a list.
+- **The chart's second line is deliberately identical to the cycle time card's** — same colour,
+  same dash, same triangle — because it is the same measure over a longer span, and a second
+  styling would only invite the question of what is different about it. It gains that card's
+  legend and NOT its value labels: the lead time card is half-width in the Flow grid, and two sets
+  of numbers over one 300px card is unreadable.
+- The gap worth teaching, and the help text says it: **percentile lead time minus percentile cycle
+  time is the queue** — the cheapest thing on the page to fix, because nobody has to work faster.
+
 ## Aged Share of WIP (2026-09-04) — SCHEMA 14 → 15
 
 Asked for after Charles demoed the app: *"percentage of Aged work compared to WIP would be a

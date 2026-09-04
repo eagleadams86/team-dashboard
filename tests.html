@@ -366,8 +366,16 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    colouring every board red. And the All Teams table, whose columns are pinned as
    an ORDERED LIST now rather than a count, because a count goes on passing when
    one column is swapped for another — with a second copy of the app booted to
-   prove a saved sort naming a dropped column falls back rather than throwing. */
-const EXPECTED = 3370;
+   prove a saved sort naming a dropped column falls back rather than throwing.
+
+   And to 3395 the same day for the 85th percentile lead time: that it comes off
+   the SAME pool as the mean beside it, outlier exclusion and all, so two lines on
+   one card cannot be drawn from two sets of items; that it survives no created
+   dates as null rather than nought; that the Flow row's three tiles open three
+   DIFFERENT windows, which is the rule a pair of tiles sharing a metric is most
+   likely to break; and that its line is styled identically to the cycle time
+   card's percentile, because they are the same question asked of two spans. */
+const EXPECTED = 3395;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3220,6 +3228,40 @@ async function run(TD, win) {
   is(dLead.summary.avgLeadTime, 15, 'the lead time tile pools every item in the window');
   ok(dLead.summary.avgLeadTime > dLead.summary.avgCycleTime,
      'lead time is longer than cycle time — the gap is the queue');
+
+  /* ── The percentile beside the mean ──────────────────────────────────────
+     Added 2026-09-04. Lead time was the one duration on this page stated only
+     as an average, which is the statistic the whole app argues against for
+     right-skewed data — and lead time is MORE skewed than cycle time, because
+     it carries the queue as well as the work. */
+  is(dLead.summary.p85LeadTime, 20,
+     'the percentile is a real duration some item actually took, never an interpolation');
+  ok(dLead.summary.p85LeadTime >= dLead.summary.avgLeadTime,
+     'and it sits at or above the mean on a right-skewed pool, which is the point of it');
+  is(dLead.p85LeadTime.length, dLead.avgLeadTime.length,
+     'the series is the same length as the mean it is drawn beside');
+  is(dLead.cyclePercentile, 85,
+     'both lines read the app’s one percentile — a second setting for lead time '
+     + 'would be two numbers to keep in step for no gain');
+
+  /* The SAME population as the mean, outlier exclusion and all, or the two lines
+     on one card would be drawn from different sets of items. */
+  const dLeadOut = TD.derive([
+    { created: D(2015, 1, 1), started: D(2015, 1, 2), completed: D(2015, 1, 3), type: 'Story' },
+    { created: D(2015, 1, 1), started: D(2015, 1, 2), completed: D(2015, 1, 4), type: 'Story' },
+    { created: D(2015, 1, 1), started: D(2015, 1, 2), completed: D(2015, 7, 1), type: 'Story' }
+  ], Object.assign({}, SAMPLE_SETTINGS, { outlierMode: 'days', outlierDays: 30 }),
+    { filterValue: '', months: 'all', bucket: 'month' });
+  ok(dLeadOut.summary.p85LeadTime < 30,
+     'an item past the outlier cutoff is out of the percentile as well as out of the mean',
+     String(dLeadOut.summary.p85LeadTime));
+
+  /* Null, never 0, with no created dates — the same break the mean takes, and
+     for the same reason: a lead time of zero days is impossible, so a 0 would be
+     a claim rather than a gap. */
+  ok(dLegacy.p85LeadTime.every(v => v === null),
+     'the percentile series is all null on rows with no created date');
+  is(dLegacy.summary.p85LeadTime, null, 'and its tile shows nothing rather than zero');
 
   /* A period with completions but no defects raised is a real 0. A period with
      no completions at all cannot have a rate, because the denominator is 0 —
@@ -9096,6 +9138,59 @@ group('ARTs — the grouping, and the boundary it crosses');
      'the offer goes once anything holds data — it is a first-run affordance, not a button');
 
   /* ────────────────────────────────────────────────────────── */
+  /* ────────────────────────────────────────────────────────── */
+  group('lead time is stated as a percentile as well as a mean');
+
+  /* Added 2026-09-04. Lead time was the one duration on this page with no
+     percentile, which put the app's most important span behind the statistic it
+     argues against everywhere else. */
+  plant({ teams: [{ id: 'lt', name: 'Lead', rows: [
+    { k: '2015-01-01', s: '2015-01-08', c: '2015-01-11', t: 'Story' },
+    { k: '2015-01-01', s: '2015-01-08', c: '2015-01-21', t: 'Story' },
+    { k: '2015-01-02', s: '2015-01-05', c: '2015-01-09', t: 'Story' }
+  ] }], settings: {} });
+  win.selectTab('dashboard');
+  win.document.getElementById('stab-flow').click();
+
+  const flowTiles = [...win.document.querySelectorAll('#tilesFlow .tile')];
+  is(flowTiles.length, 3, 'Flow states three figures now — two spans, and the promise');
+  ok(/85TH PERCENTILE LEAD TIME/i.test(flowTiles[2].innerText),
+     'the percentile lead time is the third of them', flowTiles[2].innerText);
+
+  /* ONE DOT, ONE EXPLANATION. The average and the percentile are two questions,
+     so they open two windows — the same split the cycle time pair already makes
+     between `leadTime` and `cycleTimePercentile`. A shared key here would open a
+     window named for the other tile. */
+  const flowKeys = flowTiles.map(t => {
+    const b = t.querySelector('[data-help]'); return b ? b.dataset.help : null;
+  });
+  is(flowKeys, ['cycleTime', 'leadTime', 'leadTimePercentile'],
+     'each Flow tile opens a window of its own');
+  flowTiles[2].querySelector('[data-help]').click();
+  is(win.document.getElementById('helpTitle').textContent, '85th Percentile Lead Time',
+     'and that window is named for the heading the dot sits on');
+  ok(/queue/i.test(win.document.getElementById('helpBody').textContent),
+     'saying what the gap from cycle time actually is',
+     win.document.getElementById('helpBody').textContent.slice(0, 80));
+  win.document.getElementById('helpDialog').close();
+
+  /* The card carries both lines, styled as the cycle time card's pair — same
+     colours, same dash, same triangle. It is the same measure over a longer
+     span, and a second styling would invite the question of what is different. */
+  const leadSets = win.tdCharts().chartLeadTime.data.datasets;
+  is(leadSets.map(x => x.label), ['Avg lead time', '85th percentile', 'Trend'],
+     'the lead time chart draws the mean, the percentile and the trend');
+  const cycleSets = win.tdCharts().chartCycleTime.data.datasets;
+  is(leadSets[1].borderDash, cycleSets[1].borderDash,
+     'the percentile line takes the same dash as the cycle time card’s');
+  is(leadSets[1].pointStyle, cycleSets[1].pointStyle, 'and the same point shape');
+  is(leadSets[1].borderColor, cycleSets[1].borderColor, 'and the same colour');
+  ok(!win.tdCharts().chartLeadTime.options.plugins.valueLabels
+       || !win.tdCharts().chartLeadTime.options.plugins.valueLabels.enabled,
+     'but NO value labels — two sets of numbers over one half-width card is unreadable');
+  ok(win.tdCharts().chartLeadTime.options.plugins.legend.display,
+     'and it gains the legend a two-line card needs');
+
   /* ────────────────────────────────────────────────────────── */
   group('the aged share is the one tile that grades — and only when asked to');
 
