@@ -16646,9 +16646,37 @@ const visibleTabs = () => TABS.filter(t => !$('tab-' + t).hidden);
    `const` before its declaration would be the temporal-dead-zone error that has
    taken the whole app down twice. */
 window.tdVisibleTabs = visibleTabs;
+/* A TAB PRESS STARTS THE NEW VIEW AT THE TOP. The family's rule, given by
+   Charles on 2026-09-05 after the All Teams press was fixed the same morning:
+   CHANGING WHAT YOU ARE LOOKING AT GOES TO THE TOP, CHANGING WHICH PERIOD OR
+   TEAM YOU ARE LOOKING AT HOLDS STILL. Nothing moved the page on a tab press,
+   so Your Data opened still scrolled to wherever the dashboard's charts had
+   you, and what that showed was never twice the same — the three views are
+   different heights, so the browser clamps a position that no longer exists,
+   and the pinned band changes what the same number has under it.
+
+   THE CONTROL STRIP IS THE OTHER HALF OF THE RULE and is deliberately left
+   alone: the team picker, the date window, the grouping and the Count switch
+   all hold the scroll, because changing one of them is a comparison and it
+   needs the figure to stay under your eye.
+
+   IT IS A PRESS THAT SCROLLS, NOT selectTab() — which also runs at boot, from
+   renderAll's fallbacks when a tab is taken away, and from goToSearchHit. A
+   page that jumped to the top from inside a render would be the mutation-in-a-
+   render trap this file warns about elsewhere. And the test is what selectTab
+   ACTUALLY DID, not what was asked of it: selectTab is free to fall back to
+   another tab, and a fallback that landed you where you already were is not a
+   move. Instant, never smooth: a scripted smooth scroll is out of the
+   reduced-motion rule's reach. */
+function pressTab(name) {
+  const was = activeTab;
+  selectTab(name);
+  if (activeTab !== was) window.scrollTo(0, 0);
+}
+
 TABS.forEach(t => {
   const tab = $('tab-' + t);
-  tab.addEventListener('click', () => selectTab(t));
+  tab.addEventListener('click', () => pressTab(t));
   tab.addEventListener('keydown', e => {
     const step = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' }[e.key];
     if (step === undefined) return;
@@ -16659,8 +16687,10 @@ TABS.forEach(t => {
       : step === 'last' ? list[list.length - 1]
       : list[(i + step + list.length) % list.length];
     if (!next) return;
-    $('tab-' + next).focus();
-    selectTab(next);
+    /* `preventScroll`, so the landing pressTab makes below is the last word on
+       where the page sits rather than the browser's own scroll-into-view. */
+    $('tab-' + next).focus({ preventScroll: true });
+    pressTab(next);
   });
 });
 
@@ -17809,7 +17839,16 @@ function goToSearchHit(h) {
   /* An item hit opens straight into its editor — the row found is the row on
      screen. The index is into the team just switched to, which is why the team
      is set first. */
-  if (h.view === 'data' && typeof h.index === 'number') openItemDialog(h.index);
+  const opensRecord = h.view === 'data' && typeof h.index === 'number';
+  /* AND WHERE THE PAGE LANDS (2026-09-05). A hit that only changes the view is
+     a tab press by another route, so it starts that view at the top rather than
+     at the offset the last one left behind. A hit that OPENS A RECORD is the
+     exception Charles settled: the page behind the editor is left where it is,
+     because the reader asked for that row, the editor is over it, and moving
+     the page would strand them at the top of a long table the moment they
+     closed it. */
+  if (!opensRecord) window.scrollTo(0, 0);
+  if (opensRecord) openItemDialog(h.index);
 }
 $('findBtn').addEventListener('click', () => {
   const dlg = $('searchDialog');

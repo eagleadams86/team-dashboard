@@ -62,6 +62,17 @@ Weekly is the default and the finest grain; monthly smooths out the lumpiness th
 single week hard to read. The grouping also drives the last column of the Your Data table, so
 the table and the charts always name the same period.
 
+**A tab press starts the new view at the top**, and so does a
+[Find](#find-k) result that opens no record — changing what you are looking at means the
+page you open begins at its beginning, rather than at whatever offset the last view had you
+scrolled to. Pressing the tab you are already on is not a move and leaves the page alone.
+**The control strip holds the scroll**, on purpose: the team picker, the date window and the
+Count switch all leave the page exactly where it is, because changing one of them is a
+comparison and it only works if the figure stays under your eye. That is the family's rule
+in one sentence — *changing what you are looking at goes to the top, changing which period
+or team you are looking at holds still.* A Find result that opens a work item holds too,
+since the editor is over the row you searched for.
+
 **Pin the tabs and controls to the top.** The 📌 at the end of the tab row holds that whole
 band — the tabs and the control strip under them — against the top of the window while the
 page scrolls underneath, so you can change the window or the grouping from halfway down a long
