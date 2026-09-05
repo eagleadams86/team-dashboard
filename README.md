@@ -435,7 +435,10 @@ is running: a team with no data has not got the shortest cycle time in the train
 
 **Press a team's name to open its dashboard.** That is the move the whole view sets up — the
 table says who needs looking at, and this is looking at them. The team you currently have
-selected is marked in the table, so you can always find your way back to where you were.
+selected is marked in the table, so you can always find your way back to where you were. You
+arrive on that team's **Flow** charts **at the top of the page**, whether or not you have the tab
+row pinned — before September 2026 the press kept whatever place the table had scrolled you to,
+which landed you somewhere different every time.
 
 If your teams are [grouped into ARTs](#grouping-teams-into-arts), a **train picker** appears
 above the tiles and everything on the page follows it — including the summary row, which becomes

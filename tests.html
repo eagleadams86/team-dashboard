@@ -381,7 +381,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
    between those two cells is the team's queue. */
-const EXPECTED = 3442;
+const EXPECTED = 3446;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9818,6 +9818,45 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and the header picker says so — the reported bug');
   is(win.document.getElementById('tab-dashboard').getAttribute('aria-selected'), 'true',
      'on the dashboard, where it has always landed');
+
+  /* AND AT THE TOP OF IT, pinned or not (2026-09-05). Reported by Charles: where
+     the press landed him changed with the pin. It did, and for two reasons at
+     once — the chrome is out of the way unpinned and still on screen pinned, so
+     the same scroll number shows different things; and the dashboard is a
+     different height from the table, so the browser clamps a position that no
+     longer exists. Both are answered by not keeping the old position at all.
+
+     THE FRAME IS RESIZED, and it has to be: the suite's frame is 1px by 1px, so
+     nothing in it can scroll, `scrollY` is 0 before and after, and this whole
+     check would pass without the app doing anything — the 1x1-frame trap the
+     pin group above is resized for. Short on purpose, so All Teams overflows it
+     however few teams are planted. The `ok` below is the guard: it fails rather
+     than waving through a frame that turned out not to scroll after all. */
+  {
+    const frame = document.getElementById('app');
+    const wasCss = frame.style.cssText;
+    const wasPin = win.tdPin.on();
+    frame.style.cssText =
+      'position:absolute;width:1265px;height:400px;opacity:0;border:0;left:-9999px';
+    await new Promise((r) => setTimeout(r, 250));
+    for (const pinned of [false, true]) {
+      const said = pinned ? 'pinned' : 'unpinned';
+      win.tdPin.apply(pinned);
+      win.selectTab('allteams');
+      await new Promise((r) => setTimeout(r, 150));
+      win.scrollTo(0, 300);
+      await new Promise((r) => setTimeout(r, 50));
+      ok(win.scrollY > 0, 'the frame really can scroll, ' + said + ' — a check that '
+         + 'a 1x1 frame would pass on its own is no check', win.scrollY);
+      const btn = win.document.querySelector('#panel-allteams [data-open="p2"]');
+      btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 150));
+      is(win.scrollY, 0, 'pressing a team name lands at the top of its page, ' + said);
+    }
+    win.tdPin.apply(wasPin);
+    frame.style.cssText = wasCss;
+    await new Promise((r) => setTimeout(r, 250));
+  }
 
   /* ────────────────────────────────────────────────────────── */
   group('the Loaded Data table sorts like the others');

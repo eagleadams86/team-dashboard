@@ -17312,6 +17312,20 @@ $('panel-allteams').addEventListener('click', (e) => {
     renderAll();
     selectTab('dashboard');
     selectChartTab('flow');
+    /* AND THE PAGE GOES TO THE TOP. Nothing here scrolled before, so the reader
+       kept whatever place the All Teams table had them in — which is usually a
+       long way down, because a team name worth pressing is a row worth scrolling
+       to. What that left them looking at on the Flow tab was never the same
+       twice: unpinned the chrome had scrolled away above them, pinned it was
+       still there and the same scroll number showed different content under it,
+       and either way the dashboard is a different height from the table, so the
+       browser clamped the position to whatever fitted. Reported by Charles
+       (2026-09-05) as the landing not being consistent with the pin on and off.
+       The answer is the same one for both: this press means "look at this team",
+       and looking at a team starts at the top of its page. Instant, not smooth —
+       a scripted smooth scroll is out of reach of the reduced-motion rule (pack
+       rule 15), so it is never asked for. */
+    window.scrollTo(0, 0);
     return;
   }
   /* Which way this column runs on a first press travels on the button, set when
