@@ -3924,3 +3924,13 @@ test proven red against the pre-fix `index.html` first, README and this file in 
   reader may mean. Thirteen checks in "boundaries the wrong way round grade nothing, and the
   window says so", including the note appearing on a keystroke and clearing on the next.
 
+- **A boundary box shows the number that was stored (fix 3).** The input listener clamped a
+  typed 400 to 100 and (since fix 1) rounds 12.5 to 13, and the box kept saying 400 and 12.5 — a
+  figure the app had changed, shown nowhere the reader was looking, while the tile graded against
+  the other number. A `change` listener on the two boxes writes the stored value back when the
+  box is left, not on every keystroke, so "12" on the way to "120" is not corrected mid-word.
+  `normalizeSettings` keeps its own rule for FILES — out of range there is "not set", because a
+  share link saying 400 is a payload and not a reader asking for 100 — and the two cannot
+  disagree about anything stored, since `save()` writes what the listener clamped. Seven checks
+  in "a boundary box shows the number that was stored".
+

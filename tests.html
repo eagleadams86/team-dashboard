@@ -381,7 +381,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
    between those two cells is the team's queue. */
-const EXPECTED = 3422;
+const EXPECTED = 3429;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9363,6 +9363,34 @@ group('ARTs — the grouping, and the boundary it crosses');
   ok(!orderNote.hidden, 'typing a green boundary above the red one raises the note at once');
   greenBox.value = '10'; greenBox.dispatchEvent(new win.Event('input', { bubbles: true }));
   ok(orderNote.hidden, 'and lowering it again clears it');
+  setBounds(null, null);
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a boundary box shows the number that was stored');
+
+  /* The input listener clamps and rounds; the box used to keep the typed
+     figure, so it said 400 while the tile graded against 100 — a changed figure
+     shown nowhere the reader was looking. */
+  setThird(20, 40);
+  win.renderSettingsForm();
+  const redBox = win.document.getElementById('setAgedShareRed');
+  const storedRed = () => JSON.parse(localStorage.getItem('td-state')).settings.agedShareRed;
+  const typeBoundary = (box, text) => {
+    box.value = text;
+    box.dispatchEvent(new win.Event('input', { bubbles: true }));
+    box.dispatchEvent(new win.Event('change', { bubbles: true }));
+  };
+  typeBoundary(redBox, '400');
+  is(storedRed(), 100, 'a typed 400 is stored as 100');
+  is(redBox.value, '100', 'and the box says 100 once it is left');
+  typeBoundary(redBox, '12.5');
+  is(storedRed(), 13, 'a typed 12.5 is stored as the whole percent 13');
+  is(redBox.value, '13', 'and the box says 13');
+  typeBoundary(redBox, '');
+  is(storedRed(), null, 'an emptied box stores nothing');
+  is(redBox.value, '', 'and stays empty');
+  typeBoundary(redBox, '40');
+  is(redBox.value, '40', 'a number in range is left exactly as typed');
   setBounds(null, null);
 
   /* ────────────────────────────────────────────────────────── */

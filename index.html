@@ -19566,6 +19566,20 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
     if (PERCENT_SETTINGS.has(key)) renderAgedShareOrderNote();
     scheduleSettingsRedraw();
   });
+  /* WHAT WAS STORED IS WHAT THE BOX SAYS (2026-09-04, from the evening audit).
+     The listener above clamps a typed 400 to 100 and rounds a 12.5 to 13, and
+     the box went on showing 400 and 12.5 — a figure the app had changed, shown
+     nowhere the reader was looking. Written back on `change` (when the box is
+     left), not on every keystroke, so a reader typing "1", "12" on the way to
+     "120" is not corrected mid-word; the tile is already grading the stored
+     value from the first keystroke. Money Map's percent boxes reformat on blur
+     for the same reason. */
+  if (PERCENT_SETTINGS.has(key)) {
+    $(id).addEventListener('change', e => {
+      const v = state.settings[key];
+      e.target.value = v == null ? '' : String(v);
+    });
+  }
 });
 
 /* Pulled out of the loop above when a second listener needed it. renderViews,
