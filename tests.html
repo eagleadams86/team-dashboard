@@ -381,7 +381,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
    between those two cells is the team's queue. */
-const EXPECTED = 3458;
+const EXPECTED = 3460;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9864,6 +9864,21 @@ group('ARTs — the grouping, and the boundary it crosses');
     frame.style.cssText = wasCss;
     await new Promise((r) => setTimeout(r, 250));
   }
+
+  /* ── AND THE BROWSER DOES NOT GET A VOTE ON WHERE THE PAGE SITS ────────────
+     Mirrored from Money Map on 2026-09-05, on Charles's instruction, after a
+     bug there that he reported as "the page just keeps scrolling further down
+     with each press": with the strip pinned, every redraw of its Month page
+     slid the reader 15px further on. The cause was the browser's scroll
+     anchoring measuring a page mid-rebuild under a sticky band. This app has the
+     same shape and was measured for the same drift — team picker, date window,
+     chart tabs, all steady — so the rule is here BEFORE the symptom, and it
+     costs nothing when nothing anchors. The COMPUTED style, so a rule that is
+     present but overridden is caught too. */
+  is(win.getComputedStyle(win.document.documentElement).overflowAnchor, 'none',
+     'the page does not let the browser re-anchor its scroll');
+  is(win.getComputedStyle(win.document.body).overflowAnchor, 'none',
+     'on the body as well');
 
   /* ── A TAB PRESS, AND THE CONTROLS THAT DELIBERATELY HOLD ──────────────────
      Charles's rule, given the same day as the All Teams landing above:

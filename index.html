@@ -218,6 +218,27 @@ body {
   background: var(--bg); color: var(--text-primary);
   font: var(--fw-normal) var(--fs-base)/var(--lh-base) var(--font-sans);   /* text-size-adjust: theme.css, pack rule 9 */
 }
+/* ── SCROLL ANCHORING OFF, mirrored from Money Map (2026-09-05) ─────────────
+   Money Map had a bug Charles reported as "the page just keeps scrolling
+   further down with each press": with its strip pinned, every redraw of the
+   Month page slid the reader 15px further on and never gave it back. The cause
+   was the browser's scroll anchoring — it picks a node in view, watches the
+   height above it and adds the difference to the scroll, which is right for a
+   page whose images and fonts arrive late and wrong for one that redraws itself
+   wholesale from state under a sticky band, where what it measures is a page
+   mid-rebuild.
+
+   THIS APP HAS THE SAME SHAPE — a pinned band, a full redraw on every change —
+   and was measured for the same drift: the team picker, the date window, the PI
+   picker and the chart tabs all hold their scroll today. So this is the rule
+   arriving BEFORE the symptom, on Charles's instruction to mirror it, and it
+   costs nothing: with nothing anchoring, the property does nothing.
+
+   What keeps the reader's place is the app saying so itself — a period or team
+   change holds the scroll because nothing moves it, a view change goes to the
+   top because pressTab and goToSearchHit put it there — rather than a heuristic
+   inherited from the browser. Both halves are pinned by tests. */
+html, body { overflow-anchor: none; }
 h1, h2, h3 { margin: 0; font-weight: var(--fw-semibold); letter-spacing: -.01em; }
 p { margin: 0; }
 code { font-family: var(--font-mono); font-size: var(--fs-xs); }
