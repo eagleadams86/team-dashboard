@@ -21495,6 +21495,51 @@ const demoAgedShare = (name) => {
   return Math.round(100 * p.wip.filter(a => a > DEFAULT_SETTINGS.agedDays).length / p.wip.length);
 };
 
+/* THE GRADING SENTENCE IS SAID FOR THIS BROWSER (2026-09-04, from the evening
+   audit). The dialog promised "graded here, at 20% and 40% … one team on each
+   of the three states" in every browser, and the seed below writes those two
+   numbers only when BOTH boxes are empty — so a reader with one boundary
+   already typed was promised a grading they would not see, and one with both
+   typed was told the demo's numbers rather than their own. Three sentences for
+   the three states of the pair, each true of the browser it is shown in. The
+   readings are the demo's own, at its threshold; demoThresholdCaveat says when
+   this browser's threshold will make the screen differ. */
+function demoGradingSentence() {
+  const g = state.settings.agedShareGreen, r = state.settings.agedShareRed;
+  const readings = 'Team Healthy Flow reads ' + demoAgedShare('Team Healthy Flow')
+    + '%, Team Bare Export ' + demoAgedShare('Team Bare Export') + '% and Team Long Tail '
+    + demoAgedShare('Team Long Tail') + '%';
+  const demoPair = DEMO_AGED_SHARE_GREEN + '% and ' + DEMO_AGED_SHARE_RED + '%';
+  if (g == null && r == null) {
+    return 'The aged share is graded here, at ' + demoPair + ', so you can see what that '
+      + 'looks like: ' + readings + ' \u2014 one team on each of the three states. Your own '
+      + 'browser starts with both boxes empty and nothing graded.';
+  }
+  if (g != null && r != null) {
+    return 'Your own aged-share boundaries \u2014 ' + g + '% and ' + r + '% \u2014 are kept, '
+      + (Number(g) > Number(r)
+          ? 'but they are the wrong way round, so nothing is graded until you swap them'
+          : 'so the grading you see is against them, not the demo\u2019s ' + demoPair)
+      + ': ' + readings + '.';
+  }
+  return 'One of your aged-share boundaries is set and the other box is empty, so nothing is '
+    + 'graded until you fill it in \u2014 the demo\u2019s own ' + demoPair + ' are written only '
+    + 'when both are empty. ' + readings + '.';
+}
+
+/* The counts in the dialog are at the demo's threshold, in calendar days —
+   see DEMO_AGED for why they are not re-counted against this browser's. So when
+   this browser's threshold is a different number, or working days, the dialog
+   says the screen will differ rather than letting the reader look for a 67%
+   that reads 11%. Empty on a default browser, which is most of them. */
+function demoThresholdCaveat() {
+  const d = state.settings.agedDays, wd = state.settings.workingDays === true;
+  if (d === DEFAULT_SETTINGS.agedDays && !wd) return '';
+  return ' Those counts, and the ' + DEMO_AGED + ' items above, are at the demo\u2019s '
+    + DEFAULT_SETTINGS.agedDays + '-day threshold; yours is ' + d + (wd ? ' working' : '')
+    + ' day' + (d === 1 ? '' : 's') + ', so the figures on your screen will differ.';
+}
+
 function loadSample() {
   if (!confirm(
       'Load the demo? Three teams and about nine months of work items, ending today. '
@@ -21516,12 +21561,7 @@ function loadSample() {
     + 'more in size. Team Bare Export has none. Features are aged against a threshold of '
     + 'their own, set here to ' + DEMO_FEATURE_AGED + ' days, because a feature that has run '
     + 'for a fortnight is not late.\n\n'
-    + 'The aged share is graded here, at ' + DEMO_AGED_SHARE_GREEN + '% and '
-    + DEMO_AGED_SHARE_RED + '%, so you can see what that looks like: Team Healthy Flow reads '
-    + demoAgedShare('Team Healthy Flow') + '%, Team Bare Export '
-    + demoAgedShare('Team Bare Export') + '% and Team Long Tail '
-    + demoAgedShare('Team Long Tail') + '% — one team on each of the three states. Your own '
-    + 'browser starts with both boxes empty and nothing graded.\n\n'
+    + demoGradingSentence() + demoThresholdCaveat() + '\n\n'
     + 'It is added alongside anything you already have, and you can delete it later.')) return;
 
   /* A first run auto-creates an empty "My team" (hydrateState), so loading the

@@ -647,7 +647,10 @@ The demo also **seeds the two aged-share boundaries**, at 20% and 40%, and that 
 to see the grading without setting it up: its three teams land on **0%, 33% and 67%** — one on
 each of green, amber and red — so the tile, its symbol and the chart's bands all have a face to
 show. They are only written if you have not answered either box yourself, and your own browser
-starts with both empty and nothing graded.
+starts with both empty and nothing graded. The dialog says which of those is true of your
+browser: with one box already filled it tells you nothing will be graded until the other is,
+with both filled it tells you your own pair is kept, and if your ageing threshold is not the
+default 14 calendar days it says the figures on your screen will differ from the ones it quotes.
 
 The **work item age** chart reads differently on each of the three, which is what makes it worth
 looking at from the demo: Team Healthy Flow has nothing past the threshold and every dot below

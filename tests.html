@@ -381,7 +381,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
    between those two cells is the team's queue. */
-const EXPECTED = 3429;
+const EXPECTED = 3439;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9392,6 +9392,39 @@ group('ARTs — the grouping, and the boundary it crosses');
   typeBoundary(redBox, '40');
   is(redBox.value, '40', 'a number in range is left exactly as typed');
   setBounds(null, null);
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the demo dialog says what THIS browser will see graded');
+
+  /* Captured at the confirm and declined, so nothing loads: the sentence is
+     what is under test. The seed writes 20/40 only when both boxes are empty,
+     and until 2026-09-04 the dialog promised "one team on each of the three
+     states" to every browser, including the one where nothing would be graded. */
+  const askDemo = (settings) => {
+    plant({ teams: [], settings });
+    let said = '';
+    const real = win.confirm;
+    win.confirm = (m) => { said = m; return false; };
+    try { win.loadSample(); } finally { win.confirm = real; }
+    return said;
+  };
+  const demoFresh = askDemo({});
+  ok(/graded here, at 20% and 40%/.test(demoFresh), 'a fresh browser is told the demo grades at 20% and 40%');
+  ok(/one team on each of the three states/.test(demoFresh), 'and that it will see all three states');
+  ok(!/will differ/.test(demoFresh), 'with nothing about its figures differing — the threshold is the default');
+  const half = askDemo({ agedShareGreen: 10 });
+  ok(!/one team on each/.test(half), 'a browser with one boundary set is NOT promised three states', half);
+  ok(/nothing is graded until you fill it in/.test(half), 'it is told nothing is graded until the other box is filled');
+  const demoBoth = askDemo({ agedShareGreen: 10, agedShareRed: 15 });
+  ok(/10% and 15% — are kept/.test(demoBoth), 'a browser with both set is told its own pair is kept', demoBoth);
+  ok(!/graded here, at 20%/.test(demoBoth), 'and not that the demo grades at 20% and 40%');
+  const swapped = askDemo({ agedShareGreen: 40, agedShareRed: 20 });
+  ok(/wrong way round/.test(swapped), 'a pair the wrong way round is told nothing is graded until swapped', swapped);
+  const thirty = askDemo({ agedDays: 30, workingDays: true });
+  ok(/yours is 30 working days, so the figures on your screen will differ/.test(thirty),
+     'a browser on a different threshold is told the screen will differ', thirty);
+  ok(/demo’s 14-day threshold/.test(thirty), 'and which threshold the counts were taken at');
+  plant({ teams: [], settings: {} });
 
   /* ────────────────────────────────────────────────────────── */
   group('the All teams table on screen');

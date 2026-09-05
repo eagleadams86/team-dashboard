@@ -3934,3 +3934,16 @@ test proven red against the pre-fix `index.html` first, README and this file in 
   disagree about anything stored, since `save()` writes what the listener clamped. Seven checks
   in "a boundary box shows the number that was stored".
 
+- **The demo dialog says what THIS browser will see graded (fix 4).** The new sentence promised
+  "graded here, at 20% and 40% … one team on each of the three states" to every browser, and the
+  seed writes those numbers only when BOTH boxes are empty — so a reader with one boundary typed
+  was promised a grading they would not see, and one with both typed was quoted the demo's pair
+  instead of their own; a browser on a 30-working-day threshold was told 67% and shown 11%.
+  `demoGradingSentence()` says one of three things for the three states of the pair (both empty,
+  one set, both set — with a wrong-way-round pair told nothing is graded until swapped), and
+  `demoThresholdCaveat()` adds, only when this browser's threshold is not the default 14
+  calendar days, that the counts quoted — the aged share readings AND the "6 items aged" line —
+  are at the demo's threshold and the screen will differ. The readings themselves stay at the
+  demo's threshold on purpose; DEMO_AGED's comment has the reason. Ten checks in "the demo dialog
+  says what THIS browser will see graded", each capturing the confirm and declining it.
+
