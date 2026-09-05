@@ -3984,7 +3984,8 @@ focus ended up. Three findings, all fixed:
   seventeen boxes — the paste boxes, the manage table's project ids, the stage names, six
   settings fields, the item dialog. One `::placeholder` rule in `--text-hint` now, the token the
   Find box already used (5.05 / 5.17 / 5.17 / 5.33). **It is a family fault** — the theme pack
-  carries no placeholder rule — flagged to Charles as a pack decision.
+  carried no placeholder rule — **Charles moved it into the pack the same day, rule 16, and
+  this app's own copy went**; the test stays, on the computed colour.
 - **The Copy fallback dropped the keyboard.** `copyText`'s textarea route selects a scratch box and
   removes it, and the focus went to `<body>` with it. Only reachable when the clipboard API
   refuses (headless and plain-http always, a real browser on a user gesture almost never). It now
