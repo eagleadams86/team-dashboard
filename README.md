@@ -1920,7 +1920,9 @@ off target above it, with no watch band between, if that is what you mean.
 
 **The colour is never the only signal.** The tile also carries a symbol — ✓, ! or ✕ — a status
 spelled out for a screen reader, and the verdict written into the caption in words, naming the
-boundary as well as the state. That last one is there whether the tile is coloured or not: it is
+boundary as well as the state. The chart names its two bands at the left end of the plot, over
+the oldest weeks, so the newest points — the ones the tile is stating — are never under a label.
+That last one is there whether the tile is coloured or not: it is
 the half that survives a printed page, a screenshot, and red-green colour blindness. The three
 colours are the theme pack's own, checked against each other under both common forms of
 red-green deficiency as well as for contrast — but a reader who sees no colour at all still loses

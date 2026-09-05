@@ -3947,3 +3947,13 @@ test proven red against the pre-fix `index.html` first, README and this file in 
   demo's threshold on purpose; DEMO_AGED's comment has the reason. Ten checks in "the demo dialog
   says what THIS browser will see graded", each capturing the confirm and declining it.
 
+- **The aged share chips sit over the oldest points, not the newest (fix 5).** `refLabels` drew
+  every chip at the right end of the plot, and on a time series the right end is the newest data —
+  the very weeks the tile beside the chart states; on a phone the two chips hid the last four
+  points. A line may now say `align: 'left'` and the plugin puts the chip at the left edge
+  (text, box and alignment together). Only the aged share asks for it: the age scatter's
+  reference lines keep the right end because that chart has no time axis and its right end is
+  nothing in particular. Four checks in "the aged share chips sit over the oldest points, not the
+  newest", read off the canvas by watching `fillText` during a draw — the age chart's chips are
+  pinned at the right in the same group so the default cannot drift.
+

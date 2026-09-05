@@ -11596,23 +11596,33 @@ const refLabels = {
     const PAD = 5, CHIP = Math.round(FS * 1.5), GAP = 2;
     ctx.save();
     ctx.font = '600 ' + FS + 'px ' + token('--font-sans');
-    ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     const surface = token('--surface');
     let last = -Infinity;
     lines.slice().sort((a, b) => b.value - a.value).forEach((l) => {
       let mid = y.getPixelForValue(l.value);
       if (mid - CHIP / 2 < last + GAP) mid = last + GAP + CHIP / 2;
+      /* WHICH END (2026-09-04, from the evening audit). The chips sat at the
+         right end of every chart, and on a time series the right end is the
+         NEWEST data — the weeks the tile beside the chart is stating. On the
+         aged share card the two chips covered the last four points on a phone.
+         A line may ask for the left end, where the oldest and least-read
+         points are; the reference lines on the age scatter keep the right,
+         because that chart has no time axis and its right end is nothing in
+         particular. */
+      const atLeft = l.align === 'left';
+      ctx.textAlign = atLeft ? 'left' : 'right';
       /* Clamped rather than skipped: the line datasets extend the axis to
          include their own values, so a line is always in range and a label that
          has been nudged to the floor should still be read. */
       mid = Math.min(area.bottom - CHIP / 2, Math.max(area.top + CHIP / 2, mid));
       const w = ctx.measureText(l.text).width;
-      const left = Math.max(area.left, area.right - w - PAD * 2);
+      const left = atLeft ? area.left : Math.max(area.left, area.right - w - PAD * 2);
+      const right = atLeft ? Math.min(area.right, area.left + w + PAD * 2) : area.right;
       ctx.fillStyle = surface;
-      ctx.fillRect(left, mid - CHIP / 2, area.right - left, CHIP);
+      ctx.fillRect(left, mid - CHIP / 2, right - left, CHIP);
       ctx.fillStyle = l.colour;
-      ctx.fillText(l.text, area.right - PAD, mid);
+      ctx.fillText(l.text, atLeft ? area.left + PAD : area.right - PAD, mid);
       last = mid + CHIP / 2;
     });
     ctx.restore();
@@ -12507,11 +12517,13 @@ function drawCharts(d) {
        uses — a shaded area with nothing saying what it is would be decoration.
        The chips are in the status colours, which is the one place the colour and
        the words sit together. */
+    /* At the LEFT end, over the oldest points: the right end is the newest
+       weeks, the ones the tile states, and the chips hid them. */
     shareOpts.plugins.refLabels = { lines: [
       { value: shareBounds.green, text: 'on target ≤ ' + Math.round(shareBounds.green * 100) + '%',
-        colour: token('--green') },
+        colour: token('--green'), align: 'left' },
       { value: shareBounds.red, text: 'off target > ' + Math.round(shareBounds.red * 100) + '%',
-        colour: token('--red') }
+        colour: token('--red'), align: 'left' }
     ] };
   }
   renderChart('chartAgedShare', {
