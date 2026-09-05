@@ -441,7 +441,7 @@ scales to any number of teams.
 press — most aged, longest cycle time — because the reason anyone presses a heading is to find
 the outlier, not to admire the ordering. *Data to* runs the other way, since the interesting end
 there is the oldest export. Press again to reverse, and **a third time to turn the sort off** and
-get the default order back. A team with no figure in a column always sorts last, whichever way it
+get the default order back. Sorting from the keyboard keeps you on the heading you pressed. A team with no figure in a column always sorts last, whichever way it
 is running: a team with no data has not got the shortest cycle time in the train.
 
 **Press a team's name to open its dashboard.** That is the move the whole view sets up — the
@@ -3364,8 +3364,11 @@ than furniture.
 element IS its role, so it would silently replace the landmark. That older note stands
 unchanged.
 
-Every page in this repo passes axe-core at WCAG 2.1 A and AA plus its best-practice rules, in
-all four themes, with data loaded and on every tab.
+Every page in this repo passes axe-core at WCAG 2.1 A and AA, the 2.2 AA additions and its
+best-practice rules, in all four themes, with data loaded, on every tab and in every window
+(last run 2026-09-05). The things axe cannot see are checked by hand the same day: a Tab
+through every view reading the focus ring, every window opened from the keyboard and closed
+with Esc, hover colours, a 320px-wide window, widened text spacing and reduced motion.
 
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)

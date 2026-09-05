@@ -1933,7 +1933,14 @@ dialog { background: var(--surface); color: var(--text-primary);
   padding: 7px 9px; font-family: inherit; font-size: var(--fs-base);
   color: var(--text-primary); background: var(--surface);
   border: 1px solid var(--input-border); border-radius: var(--radius-sm); }
-#searchBox::placeholder { color: var(--text-hint); opacity: 1; }
+/* A placeholder is TEXT, so it answers to the 4.5:1 rule like any other. Left to the
+   browser it is a fixed mid-grey at the UA's own opacity, which measured 3.84:1 on
+   Midnight, 3.58 on Dark and 4.24 on Sepia (2026-09-05 audit) — a hint nobody with low
+   vision could read, on the one control that says what the box is for. `--text-hint`
+   is the token the Find box already used for exactly this and it clears the bar on all
+   four themes; `opacity: 1` because the UA applies its own otherwise and would undo it.
+   One rule for every box, so a new field cannot arrive at the browser's grey again. */
+::placeholder { color: var(--text-hint); opacity: 1; }
 #searchBox:focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
 .searchresults { max-height: 50vh; overflow-y: auto; margin-top: 10px; }
 /* A hit is a full-width button so the keyboard reaches it — Tab walks the list,
@@ -17322,6 +17329,9 @@ $('loadedCard').addEventListener('click', (e) => {
   view.dataSortDir = next.dir;
   saveView();
   renderDataTable();
+  /* Same as the All teams headings: the rebuild took the pressed button with it. */
+  const again = $('loadedCard').querySelector('[data-datasort="' + btn.dataset.datasort + '"]');
+  if (again) again.focus({ preventScroll: true });
 });
 
 /* The All teams table: one delegated listener for both of the things in it that
@@ -17401,6 +17411,13 @@ $('panel-allteams').addEventListener('click', (e) => {
   view.teamSortDir = next.dir;
   saveView();
   renderAllTeams();
+  /* The table was just rebuilt, so the heading that was pressed no longer exists and a
+     keyboard's focus had fallen to <body> with it — every column, found by the
+     2026-09-05 audit. The same loss moveInList guards against, answered the same way:
+     put the focus on the new copy of the same heading, keyed off data-sort like the
+     tests are. The ring is the browser's call — a mouse press shows none, a key does. */
+  const again = $('panel-allteams').querySelector('[data-sort="' + target.dataset.sort + '"]');
+  if (again) again.focus({ preventScroll: true });
 });
 
 /* The forecast's two questions. 'change' rather than 'input': a Monte Carlo on
@@ -19976,6 +19993,12 @@ async function copyText(text) {
     console.warn('clipboard API refused, trying execCommand', e);
   }
   try {
+    /* `select()` moves the focus onto the scratch textarea, and removing it then drops
+       the focus to <body> — so a reader who pressed Copy from the keyboard was silently
+       sent back to the top of the page (2026-09-05 audit). Remember who had it and hand
+       it back; `document.contains` because a render in between can have replaced them,
+       and focusing a detached node is a no-op that hides the loss rather than fixing it. */
+    const had = document.activeElement;
     const ta = document.createElement('textarea');
     ta.value = text;
     ta.setAttribute('readonly', '');
@@ -19985,6 +20008,7 @@ async function copyText(text) {
     ta.select();
     const ok = document.execCommand('copy');
     ta.remove();
+    if (had && had !== document.body && document.contains(had)) had.focus({ preventScroll: true });
     return ok;
   } catch (e) {
     console.warn('execCommand copy refused too', e);

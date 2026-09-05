@@ -381,7 +381,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
    between those two cells is the team's queue. */
-const EXPECTED = 3460;
+const EXPECTED = 3471;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9459,6 +9459,42 @@ group('ARTs — the grouping, and the boundary it crosses');
   setBounds(null, null);
 
   /* ────────────────────────────────────────────────────────── */
+  group('two things axe never sees (2026-09-05 audit)');
+
+  /* A placeholder is TEXT and answers to 4.5:1. The browser's own grey fails it on
+     three of the four themes; one ::placeholder rule in --text-hint — the token the
+     Find box already used — clears the bar on all four. */
+  {
+    const hint = () => {
+      const d = win.document.createElement('div'); d.style.color = 'var(--text-hint)';
+      win.document.body.appendChild(d); const c = win.getComputedStyle(d).color; d.remove(); return c;
+    };
+    const boxes = [...win.document.querySelectorAll('input[placeholder], textarea[placeholder]')];
+    ok(boxes.length >= 2, 'there are placeholders to check', boxes.length);
+    const was = win.document.documentElement.getAttribute('data-theme');
+    for (const theme of ['midnight', 'dark', 'light', 'sepia']) {
+      win.document.documentElement.setAttribute('data-theme', theme);
+      const want = hint();
+      const wrong = boxes.filter(b => win.getComputedStyle(b, '::placeholder').color !== want)
+        .map(b => b.id || b.tagName);
+      is(wrong.join(','), '', theme + ': every placeholder is drawn in --text-hint, not the browser’s grey');
+    }
+    win.document.documentElement.setAttribute('data-theme', was);
+  }
+
+  /* copyText's textarea route selects a scratch box and removes it, and the focus
+     went to <body> with it. The clipboard API refusing is what sends it that way. */
+  {
+    const btn = win.document.getElementById('findBtn');
+    btn.focus();
+    Object.defineProperty(win.navigator, 'clipboard', { configurable: true,
+      value: { writeText: () => Promise.reject(new Error('refused')) } });
+    try { await win.copyText('sample'); } finally { delete win.navigator.clipboard; }
+    is(win.document.activeElement, btn,
+       'the copy fallback hands the focus back to the button that pressed it');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('the All teams table on screen');
 
   /* Driven through the real app rather than through derive(), because the two
@@ -9522,6 +9558,20 @@ group('ARTs — the grouping, and the boundary it crosses');
   press('name');
   is(sortedTeamCol(), -1, 'a third press turns the sort off');
   is(cellsOf(0), ['Petrel', 'Osprey', 'Avocet'], 'and the picker’s order comes back');
+
+  /* Sorting rebuilds the table, and until the 2026-09-05 audit a keyboard's focus
+     went with it: the pressed heading was gone and activeElement was <body>. The
+     handler now finds the new copy of the same heading, keyed off data-sort. */
+  const headBtn = (key) => win.document.querySelector('[data-sort="' + key + '"]');
+  headBtn('aged').focus();
+  headBtn('aged').click();
+  is(win.document.activeElement && win.document.activeElement.dataset.sort, 'aged',
+     'after a sort the focus is on the new copy of the heading that was pressed');
+  headBtn('aged').click();
+  headBtn('aged').click();
+  is(sortedTeamCol(), -1, 'three presses and the sort is off again');
+  is(win.document.activeElement && win.document.activeElement.dataset.sort, 'aged',
+     'and the focus has followed the heading through every rebuild');
 
   /* ── The ⓘ on a column heading ────────────────────────────────────────────
      Every column here carried a `help` key from the day the view was built and
@@ -10014,6 +10064,16 @@ group('ARTs — the grouping, and the boundary it crosses');
     const th = win.document.querySelectorAll('#dataItemsTable th')[sortedCol()];
     th.querySelector('button').click();
   }
+
+  /* The same rebuild, the same loss, the same answer as the All teams headings. */
+  const dHead = (k) => win.document.querySelector('[data-datasort="' + k + '"]');
+  dHead('cycle').focus();
+  dHead('cycle').click();
+  is(win.document.activeElement && win.document.activeElement.dataset.datasort, 'cycle',
+     'a sort from the keyboard leaves the focus on the heading, not on <body>');
+  dHead('cycle').click();
+  dHead('cycle').click();
+  is(sortedCol(), -1, 'and three presses put the sort back off');
 
   /* The order it opens in, and the one it returns to: still in play first, then
      newest. Pressing a heading asks for a different order rather than replacing
