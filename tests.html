@@ -381,7 +381,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
    between those two cells is the team's queue. */
-const EXPECTED = 3400;
+const EXPECTED = 3409;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9287,6 +9287,44 @@ group('ARTs — the grouping, and the boundary it crosses');
      to the screen: a crafted share link saying 400 must not grade anybody. */
   setBounds(400, 49);
   is(shareTile().className, 'tile', 'a boundary out of range grades nothing on screen either');
+  setBounds(null, null);
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the aged share is graded as the whole percent the tile shows');
+
+  /* Three open, one of them aged: a board that reads 33% on the tile and
+     0.333… underneath it. Graded against a boundary of 33 the raw fraction is
+     OVER the line and the rounded figure is ON it, and the tile printed both
+     halves on one line — "33% — watch — above 33%" — before 2026-09-04. The
+     rule now is that what is compared is what is read. */
+  const THIRD_ROWS = [
+    { c: null, s: '2015-01-01', t: 'Story' },
+    { c: null, s: '2015-06-01', t: 'Story' },
+    { c: null, s: '2015-06-02', t: 'Story' },
+    { c: '2015-06-10', s: '2015-06-08', t: 'Story' }
+  ];
+  const setThird = (g, r) => {
+    plant({ teams: [{ id: 'g3', name: 'A third', rows: THIRD_ROWS }],
+            settings: { agedShareGreen: g, agedShareRed: r } });
+    win.selectTab('dashboard');
+    win.document.getElementById('stab-health').click();
+  };
+  setThird(33, 40);
+  ok(/\b33%/.test(shareTile().querySelector('.value').textContent),
+     'the planted board reads 33% — one of its three open items is aged',
+     shareTile().querySelector('.value').textContent);
+  is(shareTile().className, 'tile green',
+     'and against a boundary of 33 it is ON TARGET: the whole percent shown is what is graded');
+  ok(/on target, at or below 33%/.test(shareTile().querySelector('.foot').textContent),
+     'so the verdict under the figure agrees with the figure',
+     shareTile().querySelector('.foot').textContent);
+  setThird(32, 40);
+  is(shareTile().className, 'tile yellow', 'while against 32 the same board is amber');
+  const shareTip = win.tdCharts().chartAgedShare.options.plugins.tooltip.callbacks.label;
+  is(shareTip({ dataset: { label: 'Aged share' }, parsed: { y: 1 / 3 } }), 'Aged share: 33%',
+     'and the chart tooltip states the same whole percent, not 33.3%');
+  is(win.TDState.normalizeSettings({ agedShareGreen: 12.5 }).agedShareGreen, 13,
+     'a boundary is stored as the whole percent it will be graded and named as');
   setBounds(null, null);
 
   /* ────────────────────────────────────────────────────────── */

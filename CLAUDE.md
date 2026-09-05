@@ -3895,3 +3895,21 @@ first, red against the unfixed page, and the commit quotes the row.
   same handler, so it took the rule for free — the test drives both doors, and the refusal. The
   test reaches the card through delete-all, because `welcomeStarted` is an in-memory flag an
   earlier group sets with Start Fresh and delete-all is the one thing that clears it.
+
+## Fixes From the 2026-09-04 Evening Audit
+
+Charles asked for a bug check the evening the aged share grading, the lead time percentile and
+Money Map's card moves had shipped; the findings are in the session memory. One fix per commit, a
+test proven red against the pre-fix `index.html` first, README and this file in the same commit.
+
+- **The aged share is graded as the whole percent the tile shows (fix 1).** `rag()` compared the
+  raw fraction with the boundaries while `pct0` rounded the figure beside it, so Team Bare Export
+  at 1 of 3 read "33% — watch — above 33%": the figure and its verdict on one line, each true of a
+  different number. The comparison is now made in whole percents, rounded exactly as `pct0`
+  rounds; a boundary is stored as a whole percent on both boundaries (`normalizeSettings` and the
+  live input handler), because a 12.5 would have been graded and named as 13 anyway; and the
+  chart's tooltip says `pct0` too, so the right-hand end of the line and the tile are one number
+  at one precision. Six checks in "the aged share is graded as the whole percent the tile
+  shows": a planted board at a third is green against 33 and amber against 32, the verdict under
+  it agrees with the figure, the tooltip says 33%, and 12.5 stores as 13.
+

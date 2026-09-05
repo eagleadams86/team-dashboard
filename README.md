@@ -1902,6 +1902,11 @@ until *you* draw the line: set both boundaries in Settings and the tile takes a 
 red** state, and the chart shades your bands behind its line. Leave either box empty and both
 behave exactly as they always did.
 
+**It is graded as the whole percent you read.** The tile states the share to a whole percent and
+the boundaries are whole percents, so the comparison is made in whole percents too: a board at 1
+of 3 reads 33% and is *on target* against a boundary of 33, not a hair over it. A boundary typed
+with a decimal is stored as the whole percent it will be named as.
+
 **The colour is never the only signal.** The tile also carries a symbol — ✓, ! or ✕ — a status
 spelled out for a screen reader, and the verdict written into the caption in words, naming the
 boundary as well as the state. That last one is there whether the tile is coloured or not: it is
