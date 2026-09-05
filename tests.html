@@ -381,7 +381,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
    between those two cells is the team's queue. */
-const EXPECTED = 3446;
+const EXPECTED = 3448;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9849,9 +9849,16 @@ group('ARTs — the grouping, and the boundary it crosses');
       ok(win.scrollY > 0, 'the frame really can scroll, ' + said + ' — a check that '
          + 'a 1x1 frame would pass on its own is no check', win.scrollY);
       const btn = win.document.querySelector('#panel-allteams [data-open="p2"]');
+      /* Focused first, the way a keyboard press leaves it — and the way a mouse
+         press leaves it everywhere but Safari. The button is inside the panel
+         this press hides, and renderAll() throws the node away on top of that,
+         so the focus has nowhere to stay. */
+      btn.focus();
       btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
       await new Promise((r) => setTimeout(r, 150));
       is(win.scrollY, 0, 'pressing a team name lands at the top of its page, ' + said);
+      is(win.document.activeElement && win.document.activeElement.id, 'tab-dashboard',
+         'and the keyboard lands on the tab it opened rather than on <body>, ' + said);
     }
     win.tdPin.apply(wasPin);
     frame.style.cssText = wasCss;

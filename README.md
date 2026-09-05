@@ -438,7 +438,10 @@ table says who needs looking at, and this is looking at them. The team you curre
 selected is marked in the table, so you can always find your way back to where you were. You
 arrive on that team's **Flow** charts **at the top of the page**, whether or not you have the tab
 row pinned — before September 2026 the press kept whatever place the table had scrolled you to,
-which landed you somewhere different every time.
+which landed you somewhere different every time. **The keyboard arrives with you**, on the
+*Dashboard* tab: the name you pressed is inside the panel the press takes away, so without that
+the focus fell to the top of the document and Tabbing carried on from nowhere. Find does the same
+thing with the result you open, for the same reason.
 
 If your teams are [grouped into ARTs](#grouping-teams-into-arts), a **train picker** appears
 above the tiles and everything on the page follows it — including the summary row, which becomes

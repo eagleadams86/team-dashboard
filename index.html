@@ -17325,6 +17325,20 @@ $('panel-allteams').addEventListener('click', (e) => {
        and looking at a team starts at the top of its page. Instant, not smooth —
        a scripted smooth scroll is out of reach of the reduced-motion rule (pack
        rule 15), so it is never asked for. */
+    /* WHERE THE KEYBOARD LANDS, the same rule goToSearchHit follows and for the
+       same reason: the button just pressed is inside the panel this press has
+       just hidden, so the focus was falling to <body> and a reader without a
+       mouse had to Tab in from the top of the document to get anywhere. It goes
+       onto the tab actually landed on — `activeTab`, not a literal 'dashboard',
+       because selectTab is free to fall back. A focus that is still somewhere
+       visible is left alone: a mouse click in Safari never moved it off <body>
+       in the first place, and nothing else here takes it. `preventScroll`,
+       because the scroll below is the one that decides where the page sits and
+       a focus() is not allowed a say in it. */
+    const had = document.activeElement;
+    const landing = $('tab-' + activeTab);
+    if (landing && (!had || had === document.body || !had.getClientRects().length))
+      landing.focus({ preventScroll: true });
     window.scrollTo(0, 0);
     return;
   }
