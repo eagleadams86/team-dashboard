@@ -943,7 +943,9 @@ Everything the charts depend on, shared by all your teams:
   the [aged share](#aged-share-of-wip-the-count-in-proportion) is graded against, and the only
   two numbers in this app that put a colour on a figure. **Both empty by default, and nothing is
   graded until both are set** — one boundary on its own is a pass/fail rather than a three-state
-  scale, and the app will not infer the other half of a line you have not drawn. Zero is a real
+  scale, and the app will not infer the other half of a line you have not drawn. The first must
+  be at or below the second; the wrong way round grades nothing, and a note under the boxes says
+  so. Zero is a real
   value here, unlike the day thresholds above: a team may well mean *nothing past the threshold,
   ever*. There is no number worth shipping — a platform team carrying long spikes and a support
   team turning work over in a day would be handed the same verdict, and one of them would be
@@ -1906,6 +1908,11 @@ behave exactly as they always did.
 the boundaries are whole percents, so the comparison is made in whole percents too: a board at 1
 of 3 reads 33% and is *on target* against a boundary of 33, not a hair over it. A boundary typed
 with a decimal is stored as the whole percent it will be named as.
+
+**The first boundary must be at or below the second.** Green above red is not a scale with its
+bands swapped, it is no scale, so the app grades nothing and says so under the two boxes in
+Settings until they are the other way round. Equal is allowed: on target at or below the number,
+off target above it, with no watch band between, if that is what you mean.
 
 **The colour is never the only signal.** The tile also carries a symbol — ✓, ! or ✕ — a status
 spelled out for a screen reader, and the verdict written into the caption in words, naming the

@@ -3611,11 +3611,15 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         <input type="number" id="setAgedShareRed" style="--digits:3" step="1" min="0" max="100">
       </div>
     </div>
+    <!-- Spoken only when the pair is the wrong way round; see ragBounds for why
+         that is refused rather than swapped. -->
+    <p class="note err" id="agedShareOrderNote" style="margin-top:var(--sp-3)" hidden></p>
     <p class="hint" style="margin-top:var(--sp-3)">Both are <strong>empty by default, and nothing
       is graded until both are set</strong> &mdash; with either box blank the Aged share tile and
       its chart state the figure and leave the judgement to you, which is how every other figure
       in this app behaves. Set them and the tile takes a colour, a symbol and a spelled-out
-      status, and the chart shades the bands behind its line. They are your team&rsquo;s
+      status, and the chart shades the bands behind its line. The first must be at or below the
+      second. They are your team&rsquo;s
       boundaries, not the app&rsquo;s: there is no number here worth assuming, and one you had
       not agreed to would be a finding you never made.</p>
   </section>
@@ -13537,9 +13541,36 @@ function ragBounds(scale) {
     /* BOTH, or nothing. One boundary on its own is not a three-state scale, and
        guessing the other would be the app drawing a line nobody agreed to. */
     if (!Number.isFinite(g) || !Number.isFinite(r)) return null;
+    /* IN ORDER, or nothing (2026-09-04, from the evening audit). A green
+       boundary above the red one is not a scale with the bands swapped, it is
+       no scale: graded as typed, a 33% board read "on target, at or below 40%"
+       while its neighbour at 67% read "off target — above 20%", the watch band
+       vanished, and the chart drew both chips inside one green wash. Equal is
+       allowed — a reader may mean "at or below 30 is fine and anything over is
+       not", a scale with no watch band by choice. Above is refused, and the
+       settings window says so under the boxes (renderAgedShareOrderNote). */
+    if (g > r) return null;
     return { green: g / 100, red: r / 100 };
   }
   return null;
+}
+
+/* The one sentence the settings window adds when the two boundaries are the
+   wrong way round. Drawn from the stored pair rather than from the boxes, so it
+   says what the app is actually reading; hidden whenever there is nothing to
+   say, which is every state ragBounds accepts and every state with a box empty
+   (the hint beside the boxes already covers "both, or nothing"). */
+function renderAgedShareOrderNote() {
+  const el = $('agedShareOrderNote');
+  if (!el) return;
+  const g = state.settings.agedShareGreen, r = state.settings.agedShareRed;
+  const inverted = g != null && r != null && Number(g) > Number(r);
+  el.hidden = !inverted;
+  el.textContent = inverted
+    ? 'The on-target boundary (' + g + '%) is above the off-target one (' + r
+      + '%), so nothing is graded until they are the other way round: on target at or '
+      + 'below the smaller number, off target above the larger.'
+    : '';
 }
 
 /* 'agedShare' is lower-is-better, the sibling's `churn` scale: at or below the
@@ -16339,6 +16370,7 @@ function renderSettingsForm() {
     ? '' : state.settings.agedShareGreen;
   $('setAgedShareRed').value = state.settings.agedShareRed == null
     ? '' : state.settings.agedShareRed;
+  renderAgedShareOrderNote();
   $('setUnplannedLabel').value = state.settings.unplannedLabel;
   $('setWorkingDays').checked  = state.settings.workingDays === true;
   /* The ageing threshold is counted in whichever days the toggle says, so its
@@ -19528,6 +19560,10 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
         : e.target.value.slice(0, 120);
 
     save();
+    /* The order note answers the stored pair, so it is refreshed on every
+       keystroke into either box — a reader typing the green one first, above
+       a red they have yet to lower, sees the sentence appear and then go. */
+    if (PERCENT_SETTINGS.has(key)) renderAgedShareOrderNote();
     scheduleSettingsRedraw();
   });
 });

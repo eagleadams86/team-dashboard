@@ -3913,3 +3913,14 @@ test proven red against the pre-fix `index.html` first, README and this file in 
   shows": a planted board at a third is green against 33 and amber against 32, the verdict under
   it agrees with the figure, the tooltip says 33%, and 12.5 stores as 13.
 
+- **Boundaries the wrong way round grade nothing, and the window says so (fix 2).** Nothing
+  checked the ORDER of the pair: with green 40 and red 20 the watch band vanished, a third read
+  "on target, at or below 40%", two thirds read "off target — above 20%", and the chart drew both
+  chips inside one green wash. `ragBounds` now returns null for green above red — refused, not
+  swapped, because a swapped pair is the app guessing which number the reader meant — and a
+  `.note.err` under the two boxes (`renderAgedShareOrderNote`, refreshed by `renderSettingsForm`
+  and by every keystroke into either box) names the two numbers and says which way round they
+  go. EQUAL IS ALLOWED: at or below is green and above is red with no amber between, a scale a
+  reader may mean. Thirteen checks in "boundaries the wrong way round grade nothing, and the
+  window says so", including the note appearing on a keystroke and clearing on the next.
+

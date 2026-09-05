@@ -381,7 +381,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
    between those two cells is the team's queue. */
-const EXPECTED = 3409;
+const EXPECTED = 3422;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9325,6 +9325,44 @@ group('ARTs — the grouping, and the boundary it crosses');
      'and the chart tooltip states the same whole percent, not 33.3%');
   is(win.TDState.normalizeSettings({ agedShareGreen: 12.5 }).agedShareGreen, 13,
      'a boundary is stored as the whole percent it will be graded and named as');
+  setBounds(null, null);
+
+  /* ────────────────────────────────────────────────────────── */
+  group('boundaries the wrong way round grade nothing, and the window says so');
+
+  /* Green above red is not a scale with its bands swapped, it is no scale:
+     graded as typed (before 2026-09-04) a third read "on target, at or below
+     40%" while a board at two thirds read "off target — above 20%", and the
+     chart drew both chips inside one green wash with no watch band between. */
+  setThird(40, 20);
+  is(shareTile().className, 'tile', 'a green boundary above the red one grades nothing');
+  ok(!shareTile().querySelector('.glyph'), 'so there is no glyph');
+  ok(!/target/.test(shareTile().querySelector('.foot').textContent),
+     'and no verdict under the figure', shareTile().querySelector('.foot').textContent);
+  is(win.ragBounds('agedShare'), null, 'ragBounds refuses the pair outright');
+  win.renderSettingsForm();
+  const orderNote = win.document.getElementById('agedShareOrderNote');
+  ok(!orderNote.hidden, 'the settings window explains why under the two boxes');
+  ok(/\(40%\).*\(20%\)/.test(orderNote.textContent),
+     'naming both numbers the wrong way round', orderNote.textContent);
+  /* Equal is allowed — a scale with no watch band, by choice. */
+  setThird(33, 33);
+  is(shareTile().className, 'tile green', 'equal boundaries still grade: at or below is green');
+  setThird(34, 34);
+  is(shareTile().className, 'tile green', 'and a third is at or below 34');
+  setThird(32, 32);
+  is(shareTile().className, 'tile red', 'while over both it goes straight to red — no amber band exists');
+  win.renderSettingsForm();
+  ok(orderNote.hidden, 'and the order note is silent for a pair in order');
+  /* Typed rather than planted: the note has to follow the keystroke, not wait
+     for the window to be reopened. */
+  setThird(20, 40);
+  win.renderSettingsForm();
+  const greenBox = win.document.getElementById('setAgedShareGreen');
+  greenBox.value = '50'; greenBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  ok(!orderNote.hidden, 'typing a green boundary above the red one raises the note at once');
+  greenBox.value = '10'; greenBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  ok(orderNote.hidden, 'and lowering it again clears it');
   setBounds(null, null);
 
   /* ────────────────────────────────────────────────────────── */
