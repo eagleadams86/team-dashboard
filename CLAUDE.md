@@ -62,10 +62,14 @@ taking all fifteen teams and reading past the ones you had not asked about.
   to be made. `ART_NONE` is "No ART" on the picker, where it is one option beside the names, and
   "no train" in a sentence — "All teams on No ART" reads as the name of a train somebody called
   No ART.
-- **The sibling app was deliberately left alone.** Sprint Velocity has the same picker, but it
-  keeps `artFilter` in `settings` — synced, shared, schema-checked — so the same change there is
-  a schema bump and a share-payload question, not a view field widening. Raised with Charles
-  rather than done quietly.
+- **The sibling app followed the next day, after asking.** Sprint Velocity has the same picker
+  but keeps `artFilter` in `settings` — saved, shared, and crossing `sanitizeIds()` — so the
+  same change there was a boundary question rather than a view field widening, and it was put
+  to Charles rather than mirrored quietly. He said yes (2026-09-08). SV's own CLAUDE.md carries
+  what is different there: a new `idList` kind at the boundary, a per-entry `cleanArt`, the
+  open state surviving a wholesale re-render, and the recorded decision NOT to bump `SCHEMA`.
+  **This file stays the reference implementation** — the class names, the reset-not-an-option
+  rule and the caret are shared, so a change to either belongs in both.
 
 ## Lead Time Gets Its Percentile (2026-09-04) — no schema change
 
