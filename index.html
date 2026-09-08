@@ -1665,10 +1665,11 @@ table.manage .target-set { display: inline-flex; align-items: center; gap: 6px;
   color: var(--text-secondary); font-size: var(--fs-xs); }
 /* Sized by `--digits` like every other number box since 2026-08-27, rather than
    by the 64px it carried before. That figure was set by eye for "999" and the
-   85% box takes a HALF day — `step="0.5"`, so "999.5" — which did not fit it:
-   40px of text and a spinner in 44px of content box. Found by the width test,
-   not by looking. The two boxes now differ in width because they differ in what
-   they hold, which is the whole point of the rule. */
+   85% box then took a HALF day — `step="0.5"`, so "999.5" — which did not fit
+   it: 40px of text and a spinner in 44px of content box. Found by the width
+   test, not by looking. The target is whole days as of 2026-09-08, so the two
+   boxes hold the same three characters again and claim the same width; the rule
+   still decides it from what they hold rather than from a figure set by eye. */
 table.manage input.target { text-align: right; }
 /* A row with nothing in it yet — the ARTs table before the first train. */
 table.manage td.empty-row { text-align: left; color: var(--text-secondary);
@@ -5577,10 +5578,18 @@ function cleanWipLimit(v) {
   return Number.isFinite(n) && n > 0 ? Math.min(n, TEAM_TARGET_MAX) : null;
 }
 function cleanSleDays(v) {
-  /* A tenth of a day, matching what a cycle time can actually be: sameDayValue
-     defaults to 0.5, so a target of half a day is a figure this app can really
-     compare against. */
-  const n = Math.round(Number(v) * 10) / 10;
+  /* WHOLE DAYS, and this reverses what stood here until 2026-09-08. It used to
+     keep a tenth of a day, on the argument that sameDayValue defaults to 0.5 so
+     half a day is a cycle time this app can really produce. True, and beside the
+     point: a target is a promise a team says out loud, and nobody promises 11.6
+     days. Charles reported the box's own arrows walking 11.1, 11.6, 12.1 — a
+     `step` of half a day counted from a `min` of a tenth, which is where those
+     figures came from — and the fix is the field, not the spinner.
+     Rounded rather than refused, like cleanWipLimit: a stored 11.6 is somebody's
+     old value or a hand-edit, and twelve is the honest reading of it. A target
+     under half a day rounds to nothing and lands on null, which is not-set — the
+     ordinary state, and the one this app never invents a figure for. */
+  const n = Math.round(Number(v));
   return Number.isFinite(n) && n > 0 ? Math.min(n, TEAM_TARGET_MAX) : null;
 }
 
@@ -13875,14 +13884,16 @@ function renderTeamRows() {
     return '<td class="target"><span class="target-set">' +
       '<label for="' + escapeHtml(id) + '">' +
       (isWip ? 'WIP \u2264' : CYCLE_PERCENTILE + '% \u2264') + '</label>' +
-      /* WIP is whole items, so three characters; the 85% target is a number of
-         days at a half-day step, so five — "999.5". Read off the same `isWip`
-         that sets `step` two lines down, which is what keeps them agreeing. */
-      '<input class="target" type="number" style="--digits:' + (isWip ? '3' : '5')
-      + '" inputmode="numeric" id="' + escapeHtml(id) + '"' +
+      /* BOTH boxes hold whole numbers up to 999, so both are three characters
+         and both step by one from a min of one. The target used to differ —
+         five characters for "999.5", a half-day step, a min of a tenth — and
+         the arrows walked 11.1, 11.6, 12.1, because a step counts from the min
+         rather than from zero. See cleanSleDays for why it is whole days now;
+         `min` matters as much as `step` here, and they must move together. */
+      '<input class="target" type="number" style="--digits:3"' +
+      ' inputmode="numeric" id="' + escapeHtml(id) + '"' +
       ' data-' + (isWip ? 'wip-limit' : 'sle-days') + '="' + escapeHtml(t.id) + '"' +
-      ' min="' + (isWip ? '1' : '0.1') + '" max="' + TEAM_TARGET_MAX + '"' +
-      ' step="' + (isWip ? '1' : '0.5') + '" autocomplete="off"' +
+      ' min="1" max="' + TEAM_TARGET_MAX + '" step="1" autocomplete="off"' +
       /* The accessible name has to CONTAIN the visible label — WCAG 2.5.3, so
          somebody saying "WIP" to a voice control reaches the box in front of
          them. Hence "WIP limit" and "85% target" rather than the fuller wording
@@ -16285,12 +16296,23 @@ function renderAllTeams() {
       /* A name goes into a button's text, and it is the one piece of user text
          in this table — escaped here as everywhere else. The team's train goes
          under it, but only while the table is showing more than one: scoped to a
-         single ART, every row would carry the same word for no reason, and the
-         heading above already says which train this is. */
+         single train, every row would carry the same word for no reason, and the
+         heading above already says which train this is.
+
+         COUNTS THE TICKS, and it did not until 2026-09-08. `scope` became a
+         LIST when the picker learnt to take several trains, and `!scope` on an
+         array is never true — so this label stopped appearing anywhere, in every
+         state, and nothing on screen said so. Sprint Predictability took the
+         same widening and asked the same question the right way round; Charles
+         spotted the label there and asked for it back here.
+         `!== 1` rather than `=== 0`: two trains ticked is a table of rows from
+         both, which is a mixture the reader cannot otherwise account for — the
+         one case that needs the label most. */
       const team = state.teams.find(t => t.id === r.id);
-      const art = (!scope && state.arts.length && team && team.artId)
+      const named = scope.length !== 1;
+      const art = (named && state.arts.length && team && team.artId)
         ? (state.arts.find(a => a.id === team.artId) || {}).name : '';
-      const loose = (!scope && state.arts.length && team && !team.artId) ? 'No ART' : '';
+      const loose = (named && state.arts.length && team && !team.artId) ? 'No ART' : '';
       /* "No ART" here and not the sentence form: this is a label in a column of
          train names, which is the one place it reads as one option among them. */
       const under = art || loose;
@@ -16323,7 +16345,19 @@ function renderAllTeams() {
   /* The train, in a tfoot: a summary of the rows above rather than one more of
      them, which is what it is and what a screen reader is told. Its "Data to"
      is the shared date every row was read as of. */
-  const foot = '<tfoot><tr><td>' + escapeHtml(scope.length ? 'All teams ' + scopePhrase : 'All teams')
+  /* THE FOOT NAMES ONE TRAIN AND COUNTS SEVERAL, which is the rule the picker
+     button beside it already follows. Five trains spelt out ran to most of a
+     line — "All teams on DSO, CLORG, Core Retail & Item Processing, Enterprise
+     Customer Contact Innovation and no train" — and this is the first column of
+     a table of team names, so the longest thing in it sets the width of the
+     column and takes that space off every figure to its right. Charles reported
+     it on 2026-09-08. One train still says which, because a name is shorter
+     than any phrase standing in for it; past that the heading directly above
+     this table lists them in full, and it is the line a screenshot carries. */
+  const footLabel = !scope.length ? 'All teams'
+    : scope.length === 1 ? 'All teams ' + scopePhrase
+    : 'All selected teams';
+  const foot = '<tfoot><tr><td>' + escapeHtml(footLabel)
     + '</td>' + cols.slice(1).map(c =>
     c.spark ? sparkCell(train)
       : '<td class="figure">' + escapeHtml(c.key === 'dataEnd' ? prettyDate(train.endDate)

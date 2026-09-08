@@ -51,11 +51,27 @@ taking all fifteen teams and reading past the ones you had not asked about.
   fault as the pin button that rewrote its own icon under the pointer. `renderArtScope()` reads
   the focused box's id and the list's scrollTop before the rebuild and puts both back after.
   Pinned by a test that also asserts the element really was replaced, or it measures nothing.
-- **The closed button COUNTS, the sentences NAME.** One train is named; two or more read
-  "2 selected". That column is 240px, and five names in it would either truncate — a control
+- **The closed button COUNTS, the sentences NAME — AND SO DOES THE FOOT OF THE TABLE.** One
+  train is named; two or more read "2 selected". That column is 240px, and five names in it would either truncate — a control
   hiding its own value — or take the row's layout with it. So the note beside the picker gained
   the phrase ("Showing 2 of 15 teams, on Payments and Retail — the other 13 are…"), because the
   table heading that used to be the only place the scope was spelt is a long way further down.
+- **The table's foot follows the button, not the heading (2026-09-08).** `All teams` with
+  nothing ticked, `All teams on Payments` with one, `All selected teams` past that. It is the
+  first column of a table of team names, so the longest thing in it sets that column's width and
+  takes the space off every figure to its right — five trains spelt out there ran to most of a
+  line. Charles reported it on this app and Sprint Predictability the same day and both changed
+  together. The heading directly above still lists every ticked train in full, which is the line
+  a screenshot carries.
+- **The train under a team's name counts the TICKS, and `!scope` on a list is never true.** The
+  label is drawn when `scope.length !== 1` — with no filter, because the table spans the estate,
+  and at two or more, because rows from two trains are a mixture the table cannot otherwise
+  account for. It went when the picker learnt to take several: the old test was `!scope`, `scope`
+  became `[]`, and the label stopped appearing in EVERY state with nothing on screen to say so.
+  No test covered it; three now do. Restored 2026-09-08, after Charles saw the same label in
+  Sprint Predictability. **A `!x` guard that survives a widening from a value to a list is
+  the shape to look for** — it does not throw and it does not warn, it silently picks one branch
+  forever.
 - **One `artScopeWords()`, four sentences.** The heading, the note, the print line and the empty
   state all read from it, the way one `scopePhrase` already kept them together. Joined with
   "and", not "or": both trains' teams are on screen at once, so "or" would read as a choice still
@@ -1615,6 +1631,18 @@ stored field. `SCHEMA` and the whitelist moved in the same commit, as the rule a
   already takes of the ageing threshold, and pinned.
 - **The target is compared with the PERCENTILE, not the average.** A target is a promise about
   the next item, which is the one question an average cannot answer.
+- **BOTH ARE WHOLE NUMBERS, and the target only became one on 2026-09-08.** It kept a tenth of a
+  day until then, on the argument that `sameDayValue` defaults to 0.5 so half a day is a cycle
+  time this app can really produce — true, and beside the point: a target is a promise a team says
+  out loud, and nobody promises 11.6 days. Charles reported the box's own arrows walking 11.1,
+  11.6, 12.1. **A number field steps from its `min`, not from zero**, so `min="0.1"` with
+  `step="0.5"` put every value the arrows could reach a tenth off a whole day — which is why the
+  fix was the field rather than the spinner, and why `min` and `step` are pinned TOGETHER in
+  tests.html. Fractions are ROUNDED at both boundaries rather than refused, like `cleanWipLimit`:
+  a stored 11.6 from an older copy is somebody's real value and twelve is the honest reading of
+  it. Under half a day there is no whole day left, so it lands on null — not-set, the ordinary
+  state. **No `SCHEMA` bump**: a whole-day target is a value every earlier build already accepted,
+  so nothing older chokes on what this one writes.
 - **NOTHING TURNS A COLOUR.** The verdict is a sentence on the tile; the bars over a limit are
   the colour of the bars under it. The app states figures rather than grading them, the palette
   has nothing on the red-green axis to grade with, and a bar that changed colour would be the app

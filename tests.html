@@ -381,7 +381,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
    between those two cells is the team's queue. */
-const EXPECTED = 3515;
+const EXPECTED = 3527;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -7081,9 +7081,14 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(TD.cleanWipLimit(99999), TD.TEAM_TARGET_MAX,
      'a hand-edited copy cannot put a number on the axis that squashes every real figure');
   is(TD.cleanSleDays(10), 10, 'a target is a number of days');
-  is(TD.cleanSleDays(0.5), 0.5,
-     'and half a day is a real one — sameDayValue defaults to it, so a cycle time can BE it');
-  is(TD.cleanSleDays(10.44), 10.4, 'kept to a tenth, like the figures it is compared with');
+  /* WHOLE DAYS since 2026-09-08, where this used to keep a tenth. A target is a
+     promise said out loud and nobody promises 11.6 days — and the box's arrows
+     were walking .1 and .6 because of it. */
+  is(TD.cleanSleDays(11.6), 12, 'a fraction of a day is rounded — a target is whole days');
+  is(TD.cleanSleDays(10.44), 10, 'so a stored tenth from an older copy reads as the day it means');
+  is(TD.cleanSleDays(0.5), 1,
+     'and half a day rounds up to one rather than being refused, like a fraction of an item');
+  is(TD.cleanSleDays(0.4), null, 'under half a day there is no whole day left, so nothing is set');
   is(TD.cleanSleDays(0), null, 'zero is not a promise anybody can keep');
   is(TD.cleanSleDays(null), null, 'and nothing set is nothing set');
 
@@ -7187,6 +7192,21 @@ group('ARTs — the grouping, and the boundary it crosses');
   ok(!!wipBox && !!sleBox, 'both boxes are in the Teams dialog, from the first team');
   is([wipBox.value, sleBox.value], ['2', '10'], 'each showing what is stored');
 
+  /* ── THE ARROWS MOVE IN WHOLE DAYS ────────────────────────────────────────
+     Reported by Charles on 2026-09-08 with a target reading 11.6: the spin
+     arrows walked .1 and .6. A number field steps from its `min`, not from
+     zero, so `min="0.1"` with `step="0.5"` put every reachable value a tenth
+     off a whole day. BOTH attributes are pinned, on both boxes, because fixing
+     either one alone leaves the other producing fractions. */
+  is([wipBox.step, sleBox.step], ['1', '1'], 'both boxes step by one');
+  is([wipBox.min, sleBox.min], ['1', '1'],
+     'and both count from one — a step is measured from the min, so a fractional '
+     + 'min is a fractional spinner however whole the step is');
+  sleBox.stepUp();
+  is(sleBox.value, '11', 'so an arrow press on a target of 10 gives 11, not 10.1');
+  sleBox.value = '10';
+  sleBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+
   /* ── THE TARGET AND THE AGEING THRESHOLD ARE NOT THE SAME NUMBER ──────────
      Reported by Charles on 2026-08-22, looking at "85% ≤ 10 d" in this dialog
      beside "aged after 10 days" in Settings: "are these duplicate settings?"
@@ -7226,6 +7246,16 @@ group('ARTs — the grouping, and the boundary it crosses');
   wipBox.dispatchEvent(new win.Event('input', { bubbles: true }));
   is(win.tdGet().teams[0].wipLimit, undefined,
      'clearing the box removes the limit — not-set is reachable, and writes no key at all');
+  /* The target takes the same treatment as the limit above it, and for the same
+     reason: what is stored is what the chart draws a line at. */
+  sleBox.value = '11.6';
+  sleBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  is(win.tdGet().teams[0].sleDays, 12, 'a typed fraction is stored as the whole days it means');
+  sleBox.dispatchEvent(new win.Event('change', { bubbles: true }));
+  is(sleBox.value, '12', 'and on blur the box shows what was actually stored');
+  sleBox.value = '10';
+  sleBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  sleBox.dispatchEvent(new win.Event('change', { bubbles: true }));
   wipBox.value = '2';
   wipBox.dispatchEvent(new win.Event('input', { bubbles: true }));
   wipBox.dispatchEvent(new win.Event('change', { bubbles: true }));
@@ -9881,7 +9911,10 @@ group('ARTs — the grouping, and the boundary it crosses');
     btn:  win.document.getElementById('artFilterNow').textContent,
     note: win.document.getElementById('artScopeNote').textContent,
     head: win.document.getElementById('allTeamsHeading').firstChild.textContent.trim(),
-    foot: win.document.querySelector('#allTeamsTable tfoot td').textContent
+    foot: win.document.querySelector('#allTeamsTable tfoot td').textContent,
+    /* The train written under each team's name in the first column. */
+    unders: [...win.document.querySelectorAll('#allTeamsTable tbody .team-art')]
+      .map(el => el.textContent)
   });
 
   /* Every option is offered, and the teams on none are offered ONLY because
@@ -9896,11 +9929,27 @@ group('ARTs — the grouping, and the boundary it crosses');
      win.document.getElementById('artFilterMenu').textContent.replace(/\s+/g, ' ').trim());
 
   is(artSays().btn, 'All trains', 'nothing ticked reads as every team');
+  /* ── THE TRAIN UNDER EACH TEAM'S NAME, AND WHY IT COUNTS THE TICKS ─────────
+     A sort with no labels is just an order nobody can account for, so a table
+     drawn from more than one train writes each team's train under its name.
+     It stopped appearing ANYWHERE when the picker learnt to take several: the
+     test was `!scope`, `scope` became a list, and `![]` is false in every
+     state. No test saw it — this group only ever read the headings — and it
+     came back on 2026-09-08 because Charles noticed the label in Sprint
+     Predictability and asked for it here. */
+  /* In the table's own order, which is by team name: Four, One, Three, Two. */
+  is(artSays().unders, ['No ART', 'Payments', 'Platform', 'Retail'],
+     'with no filter the table spans every train, so each row says which one it is from');
 
   pick('p1', true);
   is(artSays().btn, 'Payments', 'ONE ticked is named — the name is shorter than any count of it');
   is(artSays().head, 'Every Team on Payments, Side by Side',
      'and the heading says it, so a screenshot of the table says what it is a table of');
+  is(artSays().foot, 'All teams on Payments',
+     'and the foot names it too, where one name costs the column nothing');
+  is(artSays().unders, [],
+     'and the label under each name GOES — scoped to one train every row would '
+     + 'carry the same word, and the heading above already says it');
 
   pick('p2', true);
   /* THE BUTTON COUNTS RATHER THAN LISTS, and the sentences beside it name them.
@@ -9913,8 +9962,16 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(artSays().head, 'Every Team on Payments and Retail, Side by Side',
      'and so does the heading, joined with “and” — both trains are on screen at once, '
      + 'so “or” would read as a choice still to be made');
-  is(artSays().foot, 'All teams on Payments and Retail',
-     'the train row at the foot of the table takes the same phrase');
+  is(artSays().unders, ['Payments', 'Retail'],
+     'and the label under each name COMES BACK at two: rows from two trains are a '
+     + 'mixture the table cannot otherwise account for');
+  /* THE FOOT COUNTS RATHER THAN LISTS PAST ONE, the rule the button follows.
+     Reported by Charles on 2026-09-08 with five trains ticked: the phrase ran to
+     most of a line, and this is the first column of the table, so it set the
+     column's width and took that space off every figure beside it. */
+  is(artSays().foot, 'All selected teams',
+     'two or more trains at the foot are the teams you picked, not a list of them '
+     + '— the heading directly above names them in full');
   ok(/2 of 4 teams/.test(artSays().note), 'and the count is of the estate', artSays().note);
 
   pick('p3', true);
@@ -9929,13 +9986,17 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(artSays().btn, 'No ART', 'the teams on none are “No ART” on the picker');
   is(artSays().head, 'Every Team Not on a Train, Side by Side',
      'and “not on a train” on its own in a sentence, in Title Case for a heading');
-  is(artSays().foot, 'All teams not on a train', 'with the same phrase at the foot');
+  is(artSays().foot, 'All teams not on a train',
+     'with the same phrase at the foot — ONE ticked is still named there, because a '
+     + 'name is shorter than any phrase standing in for it');
 
   pick('p1', true);
   is(artSays().head, 'Every Team on Payments and No Train, Side by Side',
      'and beside a real train it joins the list as “no train”');
-  ok(/on Payments and no train/.test(artSays().foot),
-     'sentence case where the sentence is not a heading', artSays().foot);
+  ok(/on Payments and no train/.test(artSays().note),
+     'sentence case where the sentence is not a heading', artSays().note);
+  is(artSays().foot, 'All selected teams',
+     'and the foot counts this pair like any other', artSays().foot);
 
   /* ── A TICK MUST NOT COST THE KEYBOARD ────────────────────────────────────
      Every tick re-renders the page, which replaces every box in this menu — so

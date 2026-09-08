@@ -326,8 +326,12 @@ number. What it does change:
   name with the number of teams on it, plus *No ART* if any team is un-grouped, and **All
   trains** at the top to clear the lot. Tick two and you get both trains' teams together —
   everything below follows: the four tiles, the chart, every row, and the summary row at the foot
-  of the table, which reads **All teams on Payments and Retail**. Ticking nothing *is* all
-  trains; there is no "select all" to remember to press.
+  of the table. Ticking nothing *is* all trains; there is no "select all" to remember to press.
+  The **heading** names every train you have ticked, in full. The **button** and the **foot of
+  the table** name one and count the rest — *Payments* and **All teams on Payments** with one
+  ticked, *3 selected* and **All selected teams** past that — because both of those sit in a
+  narrow column, and five train names spelt out there take the space off the figures beside
+  them.
   (Before September 2026 it was a single-choice dropdown, so wanting two trains out of five meant
   taking every team you have and reading past the ones you hadn't asked about.)
 - The menu **stays open while you tick**, because picking a second train is the point of it. It
@@ -339,8 +343,11 @@ number. What it does change:
   reason that isn't on the page. With two or more ticked the button itself says *2 selected* —
   the names are in the sentence beside it and in the table's heading, which have room for them.
 - With no filter, the table **groups by train** so a train's teams sit together, and each team
-  carries its ART under its name. **The header team picker groups the same way**, so a list you
-  know by eye reads the same in both places.
+  carries its ART under its name. It carries it **with two or more trains ticked too** — rows
+  from two trains are a mixture the table cannot otherwise account for — and drops it when you
+  scope to one, where every row would say the same word and the heading has already said it.
+  **The header team picker groups the same way**, so a list you know by eye reads the same in
+  both places.
 
 ARTs reorder with **↑** and **↓** like teams do, and that order is the order their groups appear
 in — both in the header picker and down the All Teams table.
@@ -1032,6 +1039,10 @@ Two figures a team **sets** rather than measures, both optional and both **empty
 
 - **WIP ≤** — how much work this team means to have open at once.
 - **85% ≤** — how long it means an item to take: the promise the 85th percentile is read against.
+
+Both are **whole numbers** — whole items, and whole days. Type a fraction and it is rounded to
+what it means; the box shows the figure that was kept as soon as you leave it, and the arrows on
+the box move a whole item or a whole day at a time.
 
 They live in **Teams & Stages**, on the team's own row, and **not** in the Settings window
 beside it — which is the one design decision here worth stating. Every setting in this app is shared by every team, and
