@@ -11,6 +11,62 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## The Train Picker Takes Several Trains (2026-09-08) — no schema change
+
+Asked for by Charles, with a screenshot of the picker showing five trains: *"let's make this a
+multi-select dropdown so multiple arts can be selected without having to select them all"*. The
+`<select>` could say ONE train or EVERY team and nothing between, so wanting two of five meant
+taking all fifteen teams and reading past the ones you had not asked about.
+
+- **`view.artFilter` is a LIST of ids now**, empty meaning every team. Still in `view` and still
+  not in `state`, so widening it needed no schema bump and no place in a share payload — which is
+  the whole dividend of having put it there: which trains you are looking at is a position on
+  this device. A copy saved before today holds a single id as a STRING; `loadView()` widens it,
+  rather than leaving the point of use to know the history, for the same reason `customFrom` is
+  cleared there.
+- **`teamsInArts()` is a new function, beside `teamsInArt()` and not instead of it.** The single
+  form is still what the Teams dialog's grouping and the forecast's Whose-pace picker ask, and
+  both are genuinely one-at-a-time. The list form is a UNION and has to be — a team is on one
+  train, so an intersection is always empty — and it filters in the TEAMS' order, so two ticks
+  come back in the estate's order and not the order the boxes were pressed. An empty list is
+  every team through the same code path as an empty string was, so there is no third state where
+  the list is empty and a filter is somehow still on.
+- **A DELETED TRAIN NOW TAKES ONLY ITSELF.** With one value a stale id had to fall back to every
+  team; with a list that would be the page silently widening to the estate because one of two
+  ticks went stale. `currentArtScope()` drops what no longer names anything and keeps the rest.
+- **The control is a button and a menu of `.checkline` checkboxes, not `<select multiple>`.**
+  The native control wants ⌘-click, has no usable shape on a phone, and draws a scrolling box in
+  the row rather than a picker — it would have cost this row its layout. Nothing in the new one
+  is invented: the button is styled to the same tokens the shared `select` rule uses, the list is
+  the same `.checkline` the share and cleanup dialogs pick teams with, and the caret is a border
+  triangle because the ▾ GLYPH came out a third the size of the native arrows beside it (how much
+  of its em box a character fills is the font's business, not this file's).
+- **"All trains" is the RESET, not a sixth option.** It is the state you get by ticking nothing,
+  so it is an action that clears — and it carries a ✓ while it is in effect, so it also reports.
+  It is the one press in the menu that closes it: a whole answer rather than a step towards one.
+  Every other tick leaves the menu up, because ticking a second train is the point of the change
+  and a picker that shut after each one would make the two-train case four presses.
+- **A TICK MUST NOT COST THE KEYBOARD.** Every tick re-renders the page, which replaces every box
+  in the menu — so the box just pressed is detached and focus falls to `<body>`, the same class of
+  fault as the pin button that rewrote its own icon under the pointer. `renderArtScope()` reads
+  the focused box's id and the list's scrollTop before the rebuild and puts both back after.
+  Pinned by a test that also asserts the element really was replaced, or it measures nothing.
+- **The closed button COUNTS, the sentences NAME.** One train is named; two or more read
+  "2 selected". That column is 240px, and five names in it would either truncate — a control
+  hiding its own value — or take the row's layout with it. So the note beside the picker gained
+  the phrase ("Showing 2 of 15 teams, on Payments and Retail — the other 13 are…"), because the
+  table heading that used to be the only place the scope was spelt is a long way further down.
+- **One `artScopeWords()`, four sentences.** The heading, the note, the print line and the empty
+  state all read from it, the way one `scopePhrase` already kept them together. Joined with
+  "and", not "or": both trains' teams are on screen at once, so "or" would read as a choice still
+  to be made. `ART_NONE` is "No ART" on the picker, where it is one option beside the names, and
+  "no train" in a sentence — "All teams on No ART" reads as the name of a train somebody called
+  No ART.
+- **The sibling app was deliberately left alone.** Sprint Velocity has the same picker, but it
+  keeps `artFilter` in `settings` — synced, shared, schema-checked — so the same change there is
+  a schema bump and a share-payload question, not a view field widening. Raised with Charles
+  rather than done quietly.
+
 ## Lead Time Gets Its Percentile (2026-09-04) — no schema change
 
 Charles, weighing what the All Teams table should spend its width on: *"which do you think is more

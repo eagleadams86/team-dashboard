@@ -381,7 +381,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
    between those two cells is the team's queue. */
-const EXPECTED = 3471;
+const EXPECTED = 3515;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -6621,6 +6621,31 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(TD.teamsInArt(grouped, 'gone').map(t => t.name), [],
      'and a train nobody is on is empty rather than everybody');
 
+  /* ── Several trains at once (2026-09-08) ──────────────────────────────────
+     The picker became a multi-select, so the same question is asked of a LIST.
+     A UNION, and it has to be: a team is on one train, so an intersection is
+     always empty and the only thing ticking two boxes can mean is "both". */
+  is(TD.teamsInArts(grouped, ['a1', 'a2']).map(t => t.name), ['One', 'Two', 'Four'],
+     'two trains come back as one list, in the TEAMS’ order and not the ticks’');
+  is(TD.teamsInArts(grouped, ['a2', 'a1']).map(t => t.name), ['One', 'Two', 'Four'],
+     'and the order the boxes were pressed in changes nothing');
+  is(TD.teamsInArts(grouped, ['a2', TD.ART_NONE]).map(t => t.name), ['One', 'Three', 'Four'],
+     'the teams on no train tick alongside a real one');
+  is(TD.teamsInArts(grouped, []).map(t => t.name), ['One', 'Two', 'Three', 'Four'],
+     'an EMPTY list is every team — the picker has no “all” to tick, it is what '
+     + 'ticking nothing gives you');
+  is(TD.teamsInArts(grouped, ['a1', 'gone']).map(t => t.name), ['Two'],
+     'a deleted train in the list takes nothing else with it');
+  is(TD.teamsInArts(grouped, ['a1', 'a1']).map(t => t.name), ['Two'],
+     'and a repeated id lists its teams once');
+  is(TD.teamsInArts(grouped, null).map(t => t.name), ['One', 'Two', 'Three', 'Four'],
+     'anything that is not a list is no filter, like the single value before it');
+  /* The one relationship that makes the figures safe to state: ticking every
+     option can never be more than the estate, and is exactly it when both
+     groups are ticked. */
+  is(TD.teamsInArts(grouped, ['a1', 'a2', TD.ART_NONE]).length, grouped.length,
+     'ticking every option is every team, once each');
+
   /* Grouping is a SORT, never a filter: every team comes back, in an order that
      puts a train's teams together. Within a group they keep the order they were
      added in, so a list somebody knows by eye never silently reshuffles. */
@@ -9783,14 +9808,224 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(trainChartOf().data.datasets.map(d => d.label), ['Throughput', 'Trend'],
      'one series plus its trend, and nothing per-team');
 
-  /* It follows the ART scope, like every other figure on the page. */
-  const scope = win.document.getElementById('artFilterSel');
-  scope.value = 'tr1'; scope.dispatchEvent(new win.Event('change'));
+  /* It follows the ART scope, like every other figure on the page. Driven
+     through the picker's own boxes rather than by writing `view.artFilter`: the
+     scope is only ever set by a tick, and a test that sets the field behind it
+     would go on passing with every listener unhooked. */
+  const artBox = (id) => [...win.document.querySelectorAll('input[data-art-pick]')]
+    .find(b => b.dataset.artPick === id);
+  const tick = (id, on) => {
+    const b = artBox(id);
+    b.checked = on;
+    b.dispatchEvent(new win.Event('change', { bubbles: true }));
+  };
+  win.document.getElementById('artFilterBtn').click();
+  tick('tr1', true);
   is(trainSeries().reduce((a, b) => a + b, 0), 2, 'scoped to a train, it plots that train alone');
   ok(/Payments/.test(win.document.getElementById('titleTrainThroughput').textContent),
      'and says which train it is', win.document.getElementById('titleTrainThroughput').textContent);
-  scope.value = ''; scope.dispatchEvent(new win.Event('change'));
-  is(trainSeries().reduce((a, b) => a + b, 0), 3, 'and back to every team');
+  /* THE POINT OF THE MULTI-SELECT (2026-09-08). Two teams, one on a train and
+     one on none, and the reader wants both without taking the whole estate —
+     which on this fixture happens to BE the whole estate, so what is being
+     pinned is that both ticks reach the figures, not that a filter is on. */
+  tick(TD.ART_NONE, true);
+  is(trainSeries().reduce((a, b) => a + b, 0), 3,
+     'ticking a second option ADDS its teams rather than replacing the first');
+  ok(/Payments and no train/.test(win.document.getElementById('titleTrainThroughput').textContent),
+     'and the chart names both, in a sentence rather than as picker labels',
+     win.document.getElementById('titleTrainThroughput').textContent);
+  /* The menu stays up: ticking a second train is the whole point of it, and a
+     picker that shut after every tick would make the two-train case four
+     presses instead of two. */
+  is(win.document.getElementById('artFilterMenu').hidden, false,
+     'the menu is still open after a tick, so the next one is one press away');
+  tick('tr1', false);
+  is(trainSeries().reduce((a, b) => a + b, 0), 1,
+     'unticking one of two leaves the other in scope');
+  /* "All trains" is the reset, not a sixth option: it is the state you get by
+     ticking nothing, so it clears rather than selecting everything. */
+  win.document.getElementById('artFilterAll').click();
+  is(trainSeries().reduce((a, b) => a + b, 0), 3, 'and All trains puts every team back');
+  is(win.document.getElementById('artFilterNow').textContent, 'All trains',
+     'which is what the closed button then says');
+  is(win.document.getElementById('artFilterMenu').hidden, true,
+     'and THAT one closes the menu — a whole answer, not a step towards one');
+
+  /* ────────────────────────────────────────────────────────── */
+  group('All Teams — the train picker says which trains, in one voice');
+
+  /* Three trains and a team on none, which is the smallest arrangement where a
+     multi-select says anything a single value could not: two of three ticked is
+     a scope that had no spelling before 2026-09-08. */
+  plant({ arts: [{ id: 'p1', name: 'Payments' }, { id: 'p2', name: 'Retail' },
+                 { id: 'p3', name: 'Platform' }],
+          teams: [
+            { id: 'm1', name: 'One',   artId: 'p1', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] },
+            { id: 'm2', name: 'Two',   artId: 'p2', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] },
+            { id: 'm3', name: 'Three', artId: 'p3', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] },
+            { id: 'm4', name: 'Four',  rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] }
+          ], settings: {} });
+  win.selectTab('allteams');
+  /* OPENED FIRST, because that is the only state a reader can tick from — and
+     a box inside a hidden menu cannot take focus, which is the state the
+     keyboard check below is about. */
+  win.document.getElementById('artFilterBtn').click();
+
+  const pick = (id, on) => {
+    const b = [...win.document.querySelectorAll('input[data-art-pick]')]
+      .find(x => x.dataset.artPick === id);
+    b.checked = on;
+    b.dispatchEvent(new win.Event('change', { bubbles: true }));
+  };
+  const artSays = () => ({
+    btn:  win.document.getElementById('artFilterNow').textContent,
+    note: win.document.getElementById('artScopeNote').textContent,
+    head: win.document.getElementById('allTeamsHeading').firstChild.textContent.trim(),
+    foot: win.document.querySelector('#allTeamsTable tfoot td').textContent
+  });
+
+  /* Every option is offered, and the teams on none are offered ONLY because
+     somebody is on none — a picker with an option that can never change a
+     figure is a control that lies about what it does. */
+  is([...win.document.querySelectorAll('input[data-art-pick]')].map(b => b.dataset.artPick),
+     ['p1', 'p2', 'p3', TD.ART_NONE],
+     'the menu lists the trains in their own order, with the teams on none last');
+  ok(/Payments \(1 team\)/.test(win.document.getElementById('artFilterMenu').textContent),
+     'and each option carries the count behind it, so a train nobody is on says so '
+     + 'without having to be ticked',
+     win.document.getElementById('artFilterMenu').textContent.replace(/\s+/g, ' ').trim());
+
+  is(artSays().btn, 'All trains', 'nothing ticked reads as every team');
+
+  pick('p1', true);
+  is(artSays().btn, 'Payments', 'ONE ticked is named — the name is shorter than any count of it');
+  is(artSays().head, 'Every Team on Payments, Side by Side',
+     'and the heading says it, so a screenshot of the table says what it is a table of');
+
+  pick('p2', true);
+  /* THE BUTTON COUNTS RATHER THAN LISTS, and the sentences beside it name them.
+     This column is 240px: five train names in the button would either truncate,
+     which is a control hiding its own value, or take the row's layout with it. */
+  is(artSays().btn, '2 selected', 'two or more are counted on the button');
+  ok(/on Payments and Retail/.test(artSays().note),
+     'but the NOTE beside it names them, which is the line always next to the picker',
+     artSays().note);
+  is(artSays().head, 'Every Team on Payments and Retail, Side by Side',
+     'and so does the heading, joined with “and” — both trains are on screen at once, '
+     + 'so “or” would read as a choice still to be made');
+  is(artSays().foot, 'All teams on Payments and Retail',
+     'the train row at the foot of the table takes the same phrase');
+  ok(/2 of 4 teams/.test(artSays().note), 'and the count is of the estate', artSays().note);
+
+  pick('p3', true);
+  is(artSays().head, 'Every Team on Payments, Retail and Platform, Side by Side',
+     'three is a comma list with “and” before the last, not “and” between every pair');
+
+  /* ART_NONE is "No ART" on the picker, where it is one option beside the train
+     names, and "no train" in a sentence — "All teams on No ART" reads as the
+     name of a train somebody called No ART. */
+  pick('p1', false); pick('p2', false); pick('p3', false);
+  pick(TD.ART_NONE, true);
+  is(artSays().btn, 'No ART', 'the teams on none are “No ART” on the picker');
+  is(artSays().head, 'Every Team Not on a Train, Side by Side',
+     'and “not on a train” on its own in a sentence, in Title Case for a heading');
+  is(artSays().foot, 'All teams not on a train', 'with the same phrase at the foot');
+
+  pick('p1', true);
+  is(artSays().head, 'Every Team on Payments and No Train, Side by Side',
+     'and beside a real train it joins the list as “no train”');
+  ok(/on Payments and no train/.test(artSays().foot),
+     'sentence case where the sentence is not a heading', artSays().foot);
+
+  /* ── A TICK MUST NOT COST THE KEYBOARD ────────────────────────────────────
+     Every tick re-renders the page, which replaces every box in this menu — so
+     the box just pressed is detached, and a reader tabbing the list with Space
+     lost focus to <body> after every one. Same class of fault as the pin button
+     that rewrote its own icon under the pointer. */
+  {
+    const box = [...win.document.querySelectorAll('input[data-art-pick]')]
+      .find(x => x.dataset.artPick === 'p2');
+    box.focus();
+    box.checked = true;
+    box.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const now = win.document.activeElement;
+    is(now && now.dataset ? now.dataset.artPick : null, 'p2',
+       'the keyboard stays on the box that was pressed, across the rebuild under it');
+    ok(now !== box, 'and it really is a NEW element, or this measures nothing');
+  }
+
+  /* ── The two keys a <select> answered ─────────────────────────────────────
+     Down opened one and moved into it; Escape shut it. A button that took the
+     picker's place has to answer both, or the change costs a keyboard user the
+     control. Down does the same thing whether the menu is up or not — the same
+     key meaning two things is worse than one it sometimes ignores. */
+  {
+    const btn = win.document.getElementById('artFilterBtn');
+    const menu = win.document.getElementById('artFilterMenu');
+    const down = () => btn.dispatchEvent(new win.KeyboardEvent('keydown',
+      { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    btn.click();                                   /* shut, whatever it was */
+    if (!menu.hidden) btn.click();
+    is(menu.hidden, true, 'starting shut');
+    btn.focus(); down();
+    is(menu.hidden, false, 'Down opens the menu');
+    is(win.document.activeElement.dataset.artPick, 'p1',
+       'and lands on the first option, the way arrowing into a select did');
+    btn.focus(); down();
+    is(win.document.activeElement.dataset.artPick, 'p1',
+       'and does the same on a menu already open, rather than nothing at all');
+    win.document.getElementById('artScope').dispatchEvent(new win.KeyboardEvent('keydown',
+      { key: 'Escape', bubbles: true, cancelable: true }));
+    is(menu.hidden, true, 'Escape shuts it');
+    is(win.document.activeElement.id, 'artFilterBtn',
+       'and hands the keyboard back to the button, not to <body>');
+  }
+
+  /* ── A DELETED TRAIN TAKES ONLY ITSELF ────────────────────────────────────
+     With a single value a stale id had to fall back to every team; with a list
+     it must not — deleting one of two ticked trains should leave the other in
+     scope, and widening silently to the estate would be the page answering a
+     question nobody asked. */
+  win.tdView.now().artFilter = ['p1', 'p2', 'gone'];
+  win.tdView.render();
+  is(artSays().head, 'Every Team on Payments and Retail, Side by Side',
+     'an id naming nothing is dropped and the rest of the scope stands');
+  win.tdView.now().artFilter = ['gone'];
+  win.tdView.render();
+  is(artSays().btn, 'All trains',
+     'and a list left holding nothing is every team, the one scope always available');
+  /* ART_NONE is validated the same way: it is only a scope while somebody is
+     actually on no train. */
+  win.tdView.now().artFilter = [TD.ART_NONE];
+  win.tdView.render();
+  is(artSays().btn, 'No ART', 'the teams on none scope while there are any');
+
+  /* ── A COPY SAVED BEFORE THE PICKER GREW ──────────────────────────────────
+     `artFilter` held a single id as a string until 2026-09-08. Widened on read
+     rather than left to the point of use, so what is stored and what is shown
+     are the same shape — the reason customFrom is cleared beside it. */
+  {
+    const keep = localStorage.getItem('td-view');
+    try {
+      localStorage.setItem('td-view', JSON.stringify(
+        Object.assign(JSON.parse(keep || '{}'), { artFilter: 'p2' })));
+      win.tdView.reload();
+      is(win.tdView.now().artFilter, ['p2'], 'a saved string becomes a list of one');
+      localStorage.setItem('td-view', JSON.stringify(
+        Object.assign(JSON.parse(keep || '{}'), { artFilter: '' })));
+      win.tdView.reload();
+      is(win.tdView.now().artFilter, [], 'and a saved empty string becomes an empty list');
+      localStorage.setItem('td-view', JSON.stringify(
+        Object.assign(JSON.parse(keep || '{}'), { artFilter: ['p1', { id: 'p2' }, 'no spaces here!'] })));
+      win.tdView.reload();
+      is(win.tdView.now().artFilter, ['p1'],
+         'a hand-edited copy keeps only what passes the family’s id shape');
+    } finally {
+      if (keep === null) localStorage.removeItem('td-view');
+      else localStorage.setItem('td-view', keep);
+      win.tdView.reload();
+    }
+  }
 
   /* ── The ⓘ in a sortable heading must not stand on the sort button ─────────
      The circle is 16px with an ::after growing it 5px in every direction, so any
@@ -11901,8 +12136,9 @@ group('a delete looks like a delete, everywhere');
     is(after.settings.agedDays, 21, 'the settings are kept, exactly as the dialog says');
     is(after.settings.unplannedLabel, 'Defect', 'labels included');
     /* A filter pointing into a list that no longer exists is cleared with it. */
-    is(JSON.parse(localStorage.getItem('td-view') || '{}').artFilter, '',
-       'and the ART filter that pointed at one is cleared too');
+    is(JSON.parse(localStorage.getItem('td-view') || '{}').artFilter, [],
+       'and the ART filter that pointed at one is cleared too — an EMPTY LIST '
+       + 'since the picker became a multi-select, which is what every team means');
   }
 
   /* ────────────────────────────────────────────────────────── */

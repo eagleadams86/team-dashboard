@@ -322,11 +322,22 @@ none is perfectly normal, and nothing forces you to use the feature at all.
 and the All Teams view adds them up; grouping changes what you are looking at and never a single
 number. What it does change:
 
-- **All Teams gains a train picker** — *All trains*, each train by name, and *No ART* if any team
-  is un-grouped. Everything below it follows: the four tiles, every row, and the summary row at
-  the foot of the table, which reads **All teams on Payments ART** when you scope to one.
-- The picker **says how many teams it is hiding**, the same way every other exclusion in this app
-  says what it left out. A figure should never move for a reason that isn't on the page.
+- **All Teams gains a train picker, and you can tick more than one.** It lists each train by
+  name with the number of teams on it, plus *No ART* if any team is un-grouped, and **All
+  trains** at the top to clear the lot. Tick two and you get both trains' teams together —
+  everything below follows: the four tiles, the chart, every row, and the summary row at the foot
+  of the table, which reads **All teams on Payments and Retail**. Ticking nothing *is* all
+  trains; there is no "select all" to remember to press.
+  (Before September 2026 it was a single-choice dropdown, so wanting two trains out of five meant
+  taking every team you have and reading past the ones you hadn't asked about.)
+- The menu **stays open while you tick**, because picking a second train is the point of it. It
+  closes on **Escape**, on *All trains*, on the button, or on a press anywhere else. From the
+  keyboard, **↓** moves into the list and **Space** ticks — and the keyboard stays where you put
+  it, tick after tick.
+- The picker **says how many teams it is hiding, and which trains it is showing**, the same way
+  every other exclusion in this app says what it left out. A figure should never move for a
+  reason that isn't on the page. With two or more ticked the button itself says *2 selected* —
+  the names are in the sentence beside it and in the table's heading, which have room for them.
 - With no filter, the table **groups by train** so a train's teams sit together, and each team
   carries its ART under its name. **The header team picker groups the same way**, so a list you
   know by eye reads the same in both places.
@@ -335,7 +346,9 @@ ARTs reorder with **↑** and **↓** like teams do, and that order is the order
 in — both in the header picker and down the All Teams table.
 
 Deleting an ART is the cheapest delete in the app: it takes no team and no work item with it —
-the teams that were on it simply go back to having none. The confirmation says so.
+the teams that were on it simply go back to having none. The confirmation says so. If the train
+you delete was one of several ticked in the picker, **the others stay ticked** — only the deleted
+one leaves the scope.
 
 **Share links carry only the trains their own teams are actually on**, so sharing one team never
 publishes the names of every train you support. Share a team that is on no train and the link
@@ -456,7 +469,8 @@ thing with the result you open, for the same reason.
 
 If your teams are [grouped into ARTs](#grouping-teams-into-arts), a **train picker** appears
 above the tiles and everything on the page follows it — including the summary row, which becomes
-that train's own figures rather than the whole estate's with some rows hidden.
+those trains' own figures rather than the whole estate's with some rows hidden. You can tick
+**more than one train**; ticking none is every team.
 
 The tab appears once you have a **second team**, the same rule the team picker follows: with one
 team there is no comparison to make.

@@ -934,6 +934,68 @@ select { cursor: pointer; }
   grid-template-columns: minmax(0, 240px) minmax(200px, 1fr); }
 @media (max-width: 720px) { .artscope-row { grid-template-columns: minmax(0, 1fr); } }
 .artscope-row .hint { margin: 0 0 4px; }
+/* ── The train picker is a MENU OF CHECKBOXES, not a <select> ────────────────
+   Asked for by Charles (2026-09-08): "let's make this a multi-select dropdown so
+   multiple arts can be selected without having to select them all". The old
+   <select> could say one train or every team and nothing in between, so a
+   reader with five trains who wanted two of them had to take all fifteen teams
+   and read past the ones they had not asked about.
+
+   Built rather than reached for: `<select multiple>` is the one native control
+   that answers this, and it answers it badly — it wants ⌘-click on a desktop,
+   it has no usable shape on a phone, and it draws a scrolling box in the row
+   rather than a picker, which would have cost this row its layout. So the
+   button below is styled to the same box the shared `select` rule draws (same
+   surface, border, radius, padding and min-height, all read off the same
+   tokens) and the menu under it is the app's OWN `.checkline` list, the one the
+   share and cleanup dialogs already use to pick teams. Nothing here invents a
+   colour, a shape or a checkbox.
+
+   z-index 11 on purpose: over the cards beside it, and UNDER the pinned band
+   (12) and the header (20), so scrolling with the menu open slides it beneath
+   the chrome rather than over the top of it. No shadow — pack rule 14 — which
+   is why the menu takes `--border-strong` rather than the ordinary border: it
+   has nothing but its edge to lift it off the card behind it. */
+.art-pick { position: relative; }
+/* Not a <label>: `for=` only points at a labelable element and a button is not
+   one, so the association is made with aria-labelledby on the button instead.
+   Styled to match `label` exactly — it is the same thing to a reader. */
+.art-pick-lbl { display: block; font-size: var(--fs-xs); color: var(--text-secondary);
+  font-weight: 600; margin-bottom: 4px; }
+.art-pick-btn { display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; width: 100%; text-align: left; cursor: pointer;
+  background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--input-border); border-radius: var(--radius-sm);
+  padding: 7px 9px; min-height: calc(1.5em + 16px); }
+.art-pick-btn > .art-pick-now { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* DRAWN, not typed. This stands in for the arrow a <select> draws itself, and
+   the ▾ glyph was the first attempt: at any size that did not look silly beside
+   16px text it came out a third the size of the native arrows in the row above,
+   because how much of its em box that character fills is the font's business
+   and not this file's. A border triangle is 5px because it is told to be. */
+.art-pick-caret { flex: none; width: 0; height: 0; align-self: center;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 5px solid var(--text-secondary);
+  transition: transform .12s ease; }
+.art-pick-btn[aria-expanded="true"] .art-pick-caret { transform: rotate(180deg); }
+/* Sized to its own longest train name rather than to the 240px column the
+   button sits in — a picker that wraps every name onto two lines is harder to
+   scan than a slightly wide one — but never past 340px or the phone's width,
+   whichever is smaller, so a long name wraps rather than hanging off the edge. */
+.art-pick-menu { position: absolute; z-index: 11; top: calc(100% + 4px); left: 0;
+  width: max-content; min-width: 100%; max-width: min(340px, calc(100vw - 40px));
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); padding: 8px; }
+/* The reset sits above a rule, not in the list: it is the state you get by
+   ticking nothing, so it is an action rather than a sixth train. */
+.art-pick-all { display: flex; align-items: center; gap: 8px; width: 100%;
+  text-align: left; cursor: pointer; background: none; border: 0; color: var(--text-primary);
+  font-size: var(--fs-sm); padding: 4px 2px; border-radius: var(--radius-sm); }
+.art-pick-all .art-pick-tick { flex: none; width: 1em; color: var(--ok); }
+.art-pick-all:hover { background: var(--accent-bg); }
+.art-pick-menu hr { border: 0; border-top: 1px solid var(--border); margin: 8px 0; }
+.art-pick-list { display: grid; gap: 7px; max-height: 260px; overflow: hidden auto; }
+@media (prefers-reduced-motion: reduce) { .art-pick-caret { transition-duration: .01ms; } }
 /* A team's train, under its name in the table. Only drawn when the table is
    showing more than one, which is the only time it says anything. */
 .team-art { display: block; font-size: var(--fs-xs); color: var(--text-secondary);
@@ -2169,8 +2231,12 @@ main:focus { outline: none; }
      which team and which window these figures are, so the picker itself is
      furniture. */
   .skip, .subtabs, .applink, .tile-help, .chart-max, .pinbtn, .table-scroll .btn,
-  header select, header label, #toast, #chartMaxi, #shareBar,
+  header select, header label, #toast, #chartMaxi, #shareBar, .art-pick-menu,
   [data-export], dialog, #viewControls .field, #unitFieldData { display: none !important; }
+  /* The train picker's BUTTON stays — unlike the header's select above, its
+     value is the answer: it says which trains these figures are of. Its menu
+     goes, because a menu left open at print time would print the list of
+     choices over the top of the figures under it. */
   /* A pinned band would otherwise print ONCE, over the top of whatever the first
      page happens to start with. The pack un-sticks `header` for every app in the
      family and hides `[role="tablist"]`, which takes the tabs — but `.pinbar`
@@ -2489,9 +2555,18 @@ main:focus { outline: none; }
          a control that cannot do anything. -->
     <div class="card" id="artScope" hidden style="margin-bottom:18px">
       <div class="artscope-row">
-        <div class="field">
-          <label for="artFilterSel">Agile Release Train</label>
-          <select id="artFilterSel" title="Show only the teams on one train"></select>
+        <div class="field art-pick">
+          <span class="art-pick-lbl" id="artFilterLbl">Agile Release Trains</span>
+          <button type="button" class="art-pick-btn" id="artFilterBtn"
+                  aria-haspopup="true" aria-expanded="false" aria-controls="artFilterMenu"
+                  aria-labelledby="artFilterLbl artFilterNow">
+            <span class="art-pick-now" id="artFilterNow">All trains</span>
+            <span class="art-pick-caret" aria-hidden="true"></span>
+          </button>
+          <!-- Rebuilt on every render, so the checkboxes are wired by delegation
+               on the menu rather than one listener per box. -->
+          <div class="art-pick-menu" id="artFilterMenu" role="group"
+               aria-labelledby="artFilterLbl" hidden></div>
         </div>
         <!-- A figure must never move for a reason that is not on the page. -->
         <p class="hint" id="artScopeNote"></p>
@@ -9924,6 +9999,28 @@ function teamsInArt(teams, artId) {
   return list.filter(t => t.artId === artId);
 }
 
+/* The same question asked of SEVERAL trains at once, which is what the All Teams
+   picker asks since it became a multi-select (2026-09-08). A UNION, and it has
+   to be: a team is on one train, so intersecting two trains is always empty and
+   the only thing a reader can mean by ticking two is "show me both".
+
+   An EMPTY list means every team, exactly as an empty string does above — the
+   picker has no "all" to tick, it is what you get by ticking nothing, so the
+   two ends of the range go through one code path and there is no third state
+   where the list is empty AND a filter is somehow on.
+
+   Filtered in the TEAMS' order rather than looped per id, so two ticked trains
+   come back in the order the estate lists its teams and not in the order the
+   boxes happened to be pressed — the table under it is sorted anyway, but the
+   train row, the tiles and the chart are all derived over this list and a
+   reordered input is a reordered export. */
+function teamsInArts(teams, artIds) {
+  const list = Array.isArray(teams) ? teams : [];
+  const want = new Set((Array.isArray(artIds) ? artIds : []).filter(Boolean));
+  if (!want.size) return list.slice();                /* no filter: every team */
+  return list.filter(t => want.has(t.artId || ART_NONE));
+}
+
 /* Teams ordered so a train's teams sit together: ARTs in the order they are
    listed in the Teams dialog, un-grouped teams last. Within a group the teams
    keep the order they were added in — the same order the picker uses — so
@@ -9993,7 +10090,7 @@ window.TD = {
   AGE_SPREAD, AGE_MAX_COLUMNS, AGE_UNTYPED, AGE_OTHER,
   /* The ART grouping is pure — it takes the team list rather than reading
      state — so tests can pin both without booting a dialog. */
-  teamsInArt, groupTeamsByArt, ART_NONE,
+  teamsInArt, teamsInArts, groupTeamsByArt, ART_NONE,
   /* The CSV writer's pure pieces. A CSV is the one place this app's text goes
      somewhere it can be INTERPRETED rather than displayed, so the guard on it is
      pinned as tightly as the HTML escaper beside it. */
@@ -10258,13 +10355,20 @@ const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', act
      opens in — unfinished first, then newest — which is where a reader expects
      to find the items still in play before they have asked for anything else. */
   dataSort: null, dataSortDir: 'desc',
-  /* Which train All Teams is scoped to: '' is every team, an ART's id is that
-     train, and ART_NONE is the teams on none. In `view` rather than in `state`
-     — like activeTeamId, and unlike the sibling app, which keeps it in settings.
-     Which train you are looking at is a position on this device: scoping the
-     laptop to Payments should not yank the phone to it. Validated at its point
-     of use, where an id pointing at a deleted ART falls back to every team. */
-  artFilter: '',
+  /* Which trains All Teams is scoped to: a LIST of ART ids, with ART_NONE
+     standing for the teams on none, and an EMPTY list meaning every team.
+     A list since 2026-09-08 — it held a single id before, and a reader who
+     wanted two of five trains had to take all fifteen teams.
+
+     In `view` rather than in `state` — like activeTeamId, and unlike the
+     sibling app, which keeps it in settings. Which trains you are looking at is
+     a position on this device: scoping the laptop to Payments should not yank
+     the phone to it. That is also why widening it to a list needed no schema
+     bump and no place in a share payload.
+
+     Validated at its point of use, where an id pointing at a deleted ART is
+     dropped and a list left holding nothing falls back to every team. */
+  artFilter: [],
   /* The custom window's two ends, as ISO dates, and empty when it has none.
      In `view` with the rest of the window controls — which dates you are looking
      at is a position on this device, like the team you have picked, so it needs
@@ -11231,6 +11335,17 @@ function loadView() {
   for (const k of ['customFrom', 'customTo']) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(view[k] || ''))) view[k] = '';
   }
+  /* The ART scope is a list, and a copy saved before 2026-09-08 holds a single
+     id as a string. Widened here rather than left to currentArtScope(), which
+     corrects it on read anyway: the same reason customFrom is cleared above and
+     the reason the delete-all clears this key by hand — what is stored and what
+     is shown should be the same shape, or the next thing to read it has to know
+     the history. Ids are shaped-checked against the family's id rule, which
+     ART_NONE deliberately fails, so it is named. */
+  if (typeof view.artFilter === 'string') view.artFilter = view.artFilter ? [view.artFilter] : [];
+  view.artFilter = Array.isArray(view.artFilter)
+    ? [...new Set(view.artFilter.filter(id => id === ART_NONE || ID_OK.test(String(id))))]
+    : [];
 }
 
 /* Both writers are view-mode chokepoints: in a shared view the state in memory
@@ -11337,6 +11452,12 @@ function isBackup(raw) {
 }
 
 window.tdGet = serializeState;
+/* The saved VIEW — which trains are in scope, which tab, which window — and the
+   two things that read it. Pinned by tests.html the way tdPin and tdMaxi are:
+   `view` is validated at its points of use rather than at a boundary, so the
+   only way to test what a stale or hand-edited value does is to put one there.
+   Reading it another way would test the writer instead. */
+window.tdView = { now: () => view, reload: loadView, render: renderAllTeams };
 /* Pinned by tests.html — see the openModal comment above for why the list of
    keyboard-raising types is a decision worth writing down. */
 window.tdRaisesKeyboard = raisesKeyboard;
@@ -15737,36 +15858,150 @@ function renderForecastScope() {
   $('fcScope').value = scope.value;
 }
 
+/* The scope as the rest of the view may rely on it: a list of ids that all
+   still mean something, in the ARTs' own order with the teams on no train last
+   — the order the picker lists them in, so every sentence built out of it reads
+   in the order the reader ticked past.
+
+   Ids that no longer name anything are DROPPED rather than falling back to
+   every team: with a list, deleting one of two ticked trains should leave the
+   other one in scope, and treating the whole list as spoilt would silently
+   widen the page to the estate. An empty result is every team, which is the
+   same fallback the single value had and the one scope always available. */
 function currentArtScope() {
-  const want = view.artFilter || '';
-  if (!want) return '';
-  if (want === ART_NONE) return state.teams.some(t => !t.artId) ? ART_NONE : '';
-  return state.arts.some(a => a.id === want) ? want : '';
+  const want = new Set(Array.isArray(view.artFilter) ? view.artFilter : []);
+  if (!want.size) return [];
+  const out = state.arts.filter(a => want.has(a.id)).map(a => a.id);
+  if (want.has(ART_NONE) && state.teams.some(t => !t.artId)) out.push(ART_NONE);
+  return out;
+}
+
+/* THE ONE PLACE THE SCOPE IS PUT INTO WORDS. Four sentences quote it — the
+   heading, the note under the picker, the print line and the empty state — and
+   the single-value version already kept one `scopePhrase` so they could not
+   drift apart. A list only makes that matter more.
+
+   `names` is what to call the ticked things: a train exactly as it was typed
+   (re-casing one turned "TiP" into "tip" once), and ART_NONE as "no train",
+   which is the sentence form. "No ART" is right on the picker, where it is one
+   option beside the train names, and wrong in a sentence, where "All teams on
+   No ART" reads as the name of a train somebody called No ART.
+
+   The joiner is "and", not "or". A reader is being shown the teams from both
+   trains at once, so "every team on Payments and Retail" is what is on screen;
+   "or" would read as a choice still to be made. */
+function artScopeWords(scope) {
+  const list = Array.isArray(scope) ? scope : [];
+  const names = list.map(id => id === ART_NONE
+    ? 'no train' : ((state.arts.find(a => a.id === id) || {}).name || ''));
+  const join = (parts) => parts.length < 2 ? (parts[0] || '')
+    : parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
+  /* The one train nobody is on keeps the sentence it had, because "on no train"
+     with nothing beside it is a clumsier way of saying the same thing. */
+  const phrase = !list.length ? ''
+    : (list.length === 1 && list[0] === ART_NONE) ? 'not on a train'
+    : 'on ' + join(names);
+  /* The heading takes the same phrase in Title Case, because every heading in
+     this app is — minor words stay lowercase unless they lead, so "on" and "a"
+     do and "Not" and "Train" don't. */
+  const heading = (list.length === 1 && list[0] === ART_NONE) ? 'Not on a Train'
+    : phrase.replace(/\bno train\b/g, 'No Train');
+  return { names, phrase, heading, join: join(names) };
 }
 
 function renderArtScope(scope) {
   const box = $('artScope');
   box.hidden = !state.arts.length;
-  if (!state.arts.length) return;
-  const sel = $('artFilterSel');
-  sel.innerHTML = '';
-  const add = (v, label) => {
-    const o = document.createElement('option');
-    o.value = v; o.textContent = label;
-    sel.appendChild(o);
+  if (!state.arts.length) { closeArtMenu(); return; }
+  const on = new Set(scope);
+  /* Every option carries the number of teams behind it, which is the figure the
+     tick is actually about — a train with nobody on it is still worth showing
+     (it is one team edit away from meaning something) but a reader should not
+     have to tick it to find out it changes nothing. */
+  const line = (id, label) => {
+    const n = teamsInArt(state.teams, id).length;
+    return '<label class="checkline"><input type="checkbox" data-art-pick="' + escapeHtml(id) + '"'
+      + (on.has(id) ? ' checked' : '') + '><span>' + escapeHtml(label)
+      + ' (' + n + ' team' + (n === 1 ? '' : 's') + ')</span></label>';
   };
-  add('', 'All trains');
-  state.arts.forEach(a => add(a.id, a.name));
+  const opts = state.arts.map(a => line(a.id, a.name));
   /* Offered only when there is somebody in it. */
-  if (state.teams.some(t => !t.artId)) add(ART_NONE, 'No ART');
-  sel.value = scope;
+  if (state.teams.some(t => !t.artId)) opts.push(line(ART_NONE, 'No ART'));
+  /* WHAT THE REBUILD WOULD OTHERWISE THROW AWAY. Ticking a box re-renders the
+     whole page, which replaces every box in this menu — so the one that was
+     just pressed is detached, and with it the keyboard: a reader tabbing the
+     list and pressing Space lost focus to <body> after every tick, which is the
+     same class of fault as the pin button that rewrote its own icon under the
+     pointer. The scroll position goes the same way on a long list. Both are
+     read off the live menu here and put back below. */
+  const hadFocus = (document.activeElement && document.activeElement.dataset)
+    ? document.activeElement.dataset.artPick : null;
+  const oldList = $('artFilterMenu').querySelector('.art-pick-list');
+  const hadScroll = oldList ? oldList.scrollTop : 0;
+  $('artFilterMenu').innerHTML =
+    '<button type="button" class="art-pick-all" id="artFilterAll">'
+      + '<span class="art-pick-tick" aria-hidden="true">' + (scope.length ? '' : '✓') + '</span>'
+      + '<span>All trains</span></button>'
+    + '<hr>'
+    + '<div class="art-pick-list">' + opts.join('') + '</div>';
+  const list = $('artFilterMenu').querySelector('.art-pick-list');
+  if (list) list.scrollTop = hadScroll;
+  if (hadFocus) {
+    /* Found by walking rather than by an attribute selector: an id is shape-
+       checked at every boundary but ART_NONE is not, and building a selector out
+       of a value is the habit that puts one somewhere it cannot be escaped. */
+    const again = [...$('artFilterMenu').querySelectorAll('input[data-art-pick]')]
+      .find(b => b.dataset.artPick === hadFocus);
+    /* preventScroll like every other focus() in this app — the browser's own
+       scrolling knows nothing about the pinned band above it. */
+    if (again) again.focus({ preventScroll: true });
+  }
 
-  const shown = teamsInArt(state.teams, scope).length;
+  const words = artScopeWords(scope);
+  /* WHAT THE CLOSED BUTTON SAYS. One train is named, because the name is
+     shorter than any count of it and is the thing the reader picked. Two or
+     more are counted rather than listed: this button sits in a 240px column
+     beside a sentence, and a list of five train names in it would either
+     truncate — which is a control that hides its own value — or take the row's
+     layout with it. The names are in the note beside it and in the heading
+     below, both of which have a line to spend on them. */
+  $('artFilterNow').textContent = !scope.length ? 'All trains'
+    : scope.length === 1 ? (scope[0] === ART_NONE ? 'No ART' : words.names[0])
+    : scope.length + ' selected';
+
+  const shown = teamsInArts(state.teams, scope).length;
   const hidden = state.teams.length - shown;
+  /* The phrase goes in the NOTE, not only in the table heading far below it: the
+     button can no longer say which two trains are ticked, so the one line that
+     is always beside the picker has to. */
   $('artScopeNote').textContent = hidden
-    ? 'Showing ' + shown + ' of ' + state.teams.length + ' teams — the other ' + hidden
-      + (hidden === 1 ? ' is' : ' are') + ' in none of the figures below.'
-    : 'Showing all ' + shown + ' teams. Every figure below follows this picker.';
+    ? 'Showing ' + shown + ' of ' + state.teams.length + ' teams, ' + words.phrase
+      + ' — the other ' + hidden + (hidden === 1 ? ' is' : ' are')
+      + ' in none of the figures below.'
+    : scope.length
+      ? 'Showing all ' + shown + ' teams, ' + words.phrase + '. Every figure below follows this picker.'
+      : 'Showing all ' + shown + ' teams. Every figure below follows this picker.';
+}
+
+/* ── Opening and closing the menu ────────────────────────────────────────────
+   Kept out of renderArtScope so a re-render — which the app does on every
+   keystroke anywhere on this page — never opens or closes it under the reader's
+   hand. The open state lives on the button's own aria-expanded, so there is one
+   answer to "is it open?" and assistive tech is reading the same one the code
+   is. */
+function artMenuOpen() { return $('artFilterBtn').getAttribute('aria-expanded') === 'true'; }
+function closeArtMenu(focusBtn) {
+  if (!artMenuOpen()) return;
+  $('artFilterBtn').setAttribute('aria-expanded', 'false');
+  $('artFilterMenu').hidden = true;
+  /* Only when the close was the reader's doing — Escape or a second press on
+     the button. A click somewhere else on the page has already landed
+     somewhere, and yanking the keyboard back here would undo it. */
+  if (focusBtn) $('artFilterBtn').focus();
+}
+function openArtMenu() {
+  $('artFilterBtn').setAttribute('aria-expanded', 'true');
+  $('artFilterMenu').hidden = false;
 }
 
 /* ── The train's throughput over time ────────────────────────────────────────
@@ -15850,7 +16085,7 @@ function renderAllTeams() {
      train row and the four tiles are DERIVED over the teams in scope, so
      "All teams on Payments" is a real figure for that train and not the whole
      estate's total with some rows hidden under it. */
-  const inScope = teamsInArt(state.teams, scope);
+  const inScope = teamsInArts(state.teams, scope);
   const all = deriveTeams(inScope, state.settings,
     { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket,
       customFrom: view.customFrom, customTo: view.customTo,
@@ -15876,27 +16111,19 @@ function renderAllTeams() {
   const table = $('allTeamsTable');
 
   const none = $('allTeamsNone');
-  const artName = scope && scope !== ART_NONE
-    ? (state.arts.find(a => a.id === scope) || {}).name : '';
-  /* One phrase, used in the four places the scope has to be said, so they can
-     never drift apart. "No ART" is right on a picker, where it is one option
-     beside the train names; it is wrong in a sentence, where "All teams on No
-     ART" reads as the name of a train somebody called No ART. */
-  const scopePhrase = scope === ART_NONE ? 'not on a train'
-    : scope ? 'on ' + artName : '';
-  /* The heading takes the same phrase in Title Case, because every heading in
-     this app is — minor words stay lowercase unless they lead, so "on" and "a"
-     do and "Not" and "Train" don't. A train's own name is dropped in exactly as
-     typed either way: re-casing one turned "TiP" into "tip" once. */
-  const scopeHeading = scope === ART_NONE ? 'Not on a Train' : scopePhrase;
+  /* Every sentence on this page comes out of the one place the scope is put
+     into words — see artScopeWords. */
+  const words = artScopeWords(scope);
+  const scopePhrase = words.phrase;
+  const scopeHeading = words.heading;
   /* Pluralised on the TOTAL when the "of" form is used: "1 of 3 team" is the
      kind of thing that reads as a bug in everything else on the page. */
-  $('allTeamsCount').textContent = scope
+  $('allTeamsCount').textContent = scope.length
     ? '(' + inScope.length + ' of ' + state.teams.length + ' teams)'
     : '(' + inScope.length + ' team' + (inScope.length === 1 ? '' : 's') + ')';
   /* The heading names the scope, so a screenshot of this table says what it is
      a table of. */
-  $('allTeamsHeading').firstChild.textContent = scope
+  $('allTeamsHeading').firstChild.textContent = scope.length
     ? 'Every Team ' + scopeHeading + ', Side by Side '
     : 'Every Team, Side by Side ';
 
@@ -15907,14 +16134,14 @@ function renderAllTeams() {
     table.hidden = true;
     none.hidden = false;
     $('allTeamsExport').innerHTML = '';
-    const where = scope ? ' ' + scopePhrase : '';
+    const where = scope.length ? ' ' + scopePhrase : '';
     /* A train nobody is on yet. It is easy to reach — add one, close the dialog,
        and it is already in the picker — and neither of the two messages below
        fits it: there is no filter to blame and nothing to paste, because the
        train has no teams rather than no data. */
-    none.textContent = (scope && !inScope.length)
-      ? 'No team is on ' + artName + ' yet. Open Teams & Stages in the header and set a team\u2019s '
-        + 'ART to put it on this train.'
+    none.textContent = (scope.length && !inScope.length)
+      ? 'No team is ' + scopePhrase + ' yet. Open Teams & Stages in the header and set a team\u2019s '
+        + 'ART to put it on ' + (scope.length === 1 ? 'this train' : 'one of them') + '.'
       : (inScope.some(t => t.rows.length) && view.months === 'custom'
          && customWindow(view.customFrom, view.customTo))
         ? 'No team' + where + ' finished anything'
@@ -15936,8 +16163,14 @@ function renderAllTeams() {
   none.hidden = true;
   /* The filename says which train it came from, so two exports taken a minute
      apart from two scopes do not land in Downloads under the same name. */
+  /* The filename says which trains it came from, so two exports taken a minute
+     apart from two scopes do not land in Downloads under the same name. One
+     train is named; more are counted, for the same reason the button is — a
+     filename made of five train names is one nobody can read in a folder. */
   $('allTeamsExport').innerHTML = exportButtons('allTeamsTable',
-    'all-teams' + (scope ? '-' + slugify(artName || 'no-art') : ''));
+    'all-teams' + (!scope.length ? ''
+      : scope.length === 1 ? '-' + slugify(words.names[0] || 'no-art')
+      : '-' + scope.length + '-trains'));
 
   /* The same sentence the dashboard writes, about the train instead of a team.
      The strip is shared, so whichever view is up owns the note under it. */
@@ -15949,7 +16182,7 @@ function renderAllTeams() {
   $('windowNote').innerHTML = span + customNote(train) + '<br>' + 'every team, as of the same date' +
     '<br>' + itemsInWindow(train) + ' across ' +
     inScope.length + ' team' + (inScope.length === 1 ? '' : 's') +
-    (scope ? ' ' + escapeHtml(scopePhrase) : '') +
+    (scope.length ? ' ' + escapeHtml(scopePhrase) : '') +
     /* NOT outlierNote(train). Every row in this table ignores its own team's
        outliers, measured against its own spread — see the comment in
        deriveTeams — so there is no single cutoff to state here, and quoting the
@@ -16090,7 +16323,7 @@ function renderAllTeams() {
   /* The train, in a tfoot: a summary of the rows above rather than one more of
      them, which is what it is and what a screen reader is told. Its "Data to"
      is the shared date every row was read as of. */
-  const foot = '<tfoot><tr><td>' + escapeHtml(scope ? 'All teams ' + scopePhrase : 'All teams')
+  const foot = '<tfoot><tr><td>' + escapeHtml(scope.length ? 'All teams ' + scopePhrase : 'All teams')
     + '</td>' + cols.slice(1).map(c =>
     c.spark ? sparkCell(train)
       : '<td class="figure">' + escapeHtml(c.key === 'dataEnd' ? prettyDate(train.endDate)
@@ -17341,13 +17574,67 @@ $('loadedCard').addEventListener('click', (e) => {
    Pressing a team's name selects that team and goes to its dashboard. That is
    the move the whole view exists to set up: the table says which team needs
    looking at, and this is looking at it. */
-/* Scoping the roll-up to one train. Only this view follows it — the dashboard
-   is about the one team in the header picker, which the scope has no bearing on. */
-$('artFilterSel').addEventListener('change', (e) => {
-  view.artFilter = e.target.value;
+/* Scoping the roll-up to a train, or to several. Only this view follows it — the
+   dashboard is about the one team in the header picker, which the scope has no
+   bearing on.
+
+   The menu is REBUILT on every render, so both listeners are delegated onto the
+   box rather than attached per checkbox: a per-element listener would have to be
+   re-hung on every keystroke that reaches this page, and one missed rehang is a
+   tick that silently does nothing. */
+$('artFilterBtn').addEventListener('click', () => {
+  if (artMenuOpen()) closeArtMenu(true); else openArtMenu();
+});
+/* Down opens it and lands on the first box — the move a <select> made, and the
+   one thing a reader who has used the old picker will try. It does that whether
+   or not the menu is already up: an ArrowDown that opened the list but refused
+   to enter one already open would be the same key meaning two things. */
+$('artFilterBtn').addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowDown') return;
+  e.preventDefault();
+  if (!artMenuOpen()) openArtMenu();
+  const first = $('artFilterMenu').querySelector('input[data-art-pick]');
+  if (first) first.focus({ preventScroll: true });
+});
+$('artFilterMenu').addEventListener('change', (e) => {
+  const box = e.target.closest ? e.target.closest('input[data-art-pick]') : null;
+  if (!box) return;
+  const id = box.dataset.artPick;
+  const on = new Set(Array.isArray(view.artFilter) ? view.artFilter : []);
+  if (box.checked) on.add(id); else on.delete(id);
+  view.artFilter = [...on];
   saveView();
+  /* The menu STAYS OPEN. Ticking a second train is the whole point of it, and a
+     picker that shuts after every tick would make the two-train case four
+     presses instead of two. It closes on Escape, on a press outside it, or on
+     the button — all three of which are the reader saying they are done. */
   renderAllTeams();
 });
+$('artFilterMenu').addEventListener('click', (e) => {
+  if (!e.target.closest || !e.target.closest('#artFilterAll')) return;
+  view.artFilter = [];
+  saveView();
+  renderAllTeams();
+  /* This one DOES close: "All trains" is a whole answer, not a step towards
+     one, and the button it was pressed on has just been rebuilt underneath it —
+     leaving the keyboard on a removed node drops focus to <body>. */
+  closeArtMenu(true);
+});
+/* Escape closes it and hands the keyboard back, wherever inside it the focus
+   was. Bound on the field rather than the document so it never competes with
+   the dialogs' own Escape. */
+$('artScope').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && artMenuOpen()) { e.stopPropagation(); closeArtMenu(true); }
+});
+/* A press anywhere else is the reader moving on — the same rule the app's
+   dialogs follow, where a click on the backdrop means Cancel. Capture, so a
+   handler that stops the bubble somewhere else on the page cannot leave this
+   menu hanging open over the view it was pressed on. */
+document.addEventListener('mousedown', (e) => {
+  if (!artMenuOpen()) return;
+  const f = e.target.closest ? e.target.closest('.art-pick') : null;
+  if (!f) closeArtMenu();
+}, true);
 
 $('panel-allteams').addEventListener('click', (e) => {
   const target = e.target.closest ? e.target.closest('[data-sort],[data-open]') : null;
@@ -17843,7 +18130,10 @@ function goToSearchHit(h) {
     view.activeTeamId = h.teamId;
     saveView();
   }
-  if (h.artId) { view.artFilter = h.artId; saveView(); }
+  /* A hit on a train REPLACES the scope rather than adding to it: Find was
+     asked for one train, and landing on All Teams still showing the two that
+     were ticked before would answer a question nobody asked. */
+  if (h.artId) { view.artFilter = [h.artId]; saveView(); }
   /* The Count switch follows the hit: openItemDialog edits whichever list the
      switch is on, so a feature found while it sat on Work items — or an item
      found while it sat on Features — would open the OTHER list's record at the
@@ -19069,8 +19359,13 @@ $('artRows').addEventListener('click', e => {
       : 'Delete ' + art.name + '?')) return;
   state.arts.splice(i, 1);
   state.teams.forEach(t => { if (t.artId === id) t.artId = null; });
-  /* A filter pointing at an ART that no longer exists would hide every team. */
-  if (view.artFilter === id) { view.artFilter = ''; saveView(); }
+  /* The deleted train comes out of the scope and the rest of it stands —
+     currentArtScope() would drop it on read anyway, but a stale id left in the
+     saved view means the next thing to read it has to know that. */
+  if (Array.isArray(view.artFilter) && view.artFilter.includes(id)) {
+    view.artFilter = view.artFilter.filter(x => x !== id);
+    saveView();
+  }
   save();
   renderAll();
   window.toast('Deleted ' + art.name);
@@ -20425,7 +20720,7 @@ $('clearConfirm').addEventListener('click', () => {
      left for their own validators: an ART filter is corrected on read anyway,
      but leaving a stale id in the saved view means the next thing to read it
      has to know that. */
-  view.artFilter = '';
+  view.artFilter = [];
   view.activeTeamId = state.teams[0].id;   // the team it pointed at no longer exists
   /* A scenario is an ADJUSTMENT to data, and the data is gone. Left standing it
      would be invisible until the next paste, at which point a forecast nobody
