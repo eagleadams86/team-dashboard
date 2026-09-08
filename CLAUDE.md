@@ -56,6 +56,19 @@ taking all fifteen teams and reading past the ones you had not asked about.
   hiding its own value — or take the row's layout with it. So the note beside the picker gained
   the phrase ("Showing 2 of 15 teams, on Payments and Retail — the other 13 are…"), because the
   table heading that used to be the only place the scope was spelt is a long way further down.
+- **The window note counts the teams and does not name the trains (2026-09-08).** `#artScopeNote`
+  sits about forty pixels below it and names them in full, so the top-right line was the same
+  list said twice — in the one corner of the page where the length of a sentence moves
+  everything under it. Nothing is lost on paper: `printHead()` puts the scope in the print-only
+  line, which is the sentence a printout is read by.
+- **`.controls .window` FLEXES; `margin-left: auto` alone let it take a row of the strip.** A
+  wrapping flex row places each item at its own content width and only shrinks what already
+  shares a line, so a long enough note was pushed onto a row of its own and the strip went from
+  90px to 164px — every figure on the page moved down with it. `flex: 1 1 260px; min-width: 0`
+  keeps it on the line and wraps its own text into what the fields leave: a long sentence costs
+  a LINE OF THE NOTE, never a row of the strip. The auto margin had to go — an auto margin eats
+  the free space before flex-grow sees it. Pinned in a 1240px frame, because the suite's own is
+  1px wide and every flex item is on its own row there.
 - **The table's foot follows the button, not the heading (2026-09-08).** `All teams` with
   nothing ticked, `All teams on Payments` with one, `All selected teams` past that. It is the
   first column of a table of team names, so the longest thing in it sets that column's width and

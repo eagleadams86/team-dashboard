@@ -381,7 +381,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
    between those two cells is the team's queue. */
-const EXPECTED = 3527;
+const EXPECTED = 3537;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -12910,6 +12910,120 @@ group('a card with no chart matches the one beside it');
     ok(boxes[1].getBoundingClientRect().width < gridW - 2,
        'while the two above it stay in their own columns');
     gd.getElementById('itemDialog').close();
+
+    f.remove();
+    if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
+    if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the window note cannot take a row of the strip to itself');
+
+  /* ── A SENTENCE THAT MOVES EVERY FIGURE UNDER IT ──────────────────────────
+     Charles, 2026-09-08, with five trains ticked: the line in the top right of
+     the control strip ran long and the whole page dropped. A wrapping flex row
+     places each item at its OWN content width and only shrinks what already
+     shares a line — so a long enough note was put on a row of its own and the
+     strip went from 90px to 164px.
+
+     Two things fix it and this block pins both, because either one alone leaves
+     the fault reachable: the note no longer NAMES the trains (`#artScopeNote`,
+     forty pixels below, already does, and printHead puts them on the printout),
+     and it flexes into the space the fields leave rather than claiming its
+     content width, so a long sentence costs a LINE OF THE NOTE instead of a row
+     of the strip.
+
+     A FULL-WIDTH FRAME, like the scenario block above: the suite's own frame is
+     1px wide, where every flex item is on a row of its own and the measurement
+     that matters cannot be made at all. */
+  {
+    const keep = { state: localStorage.getItem('td-state'),
+                   view: localStorage.getItem('td-view') };
+    const row = (d) => ({ c: '2015-01-' + d, s: '2015-01-02', t: 'Story' });
+    /* Long train names, because the length of the sentence is the whole subject
+       — these are the four Charles had on screen. */
+    localStorage.setItem('td-state', JSON.stringify({
+      schema: TD.SCHEMA, stages: [],
+      arts: [{ id: 'w1', name: 'Core Retail & Item Processing' },
+             { id: 'w2', name: 'Enterprise Customer Contact Innovation' },
+             { id: 'w3', name: 'Digital Sales & Onboarding' },
+             { id: 'w4', name: 'Consumer Lending Originations' }],
+      teams: ['w1', 'w2', 'w3', 'w4', 'w1', null].map((art, i) => ({
+        id: 'wn' + i, name: 'Team ' + (i + 1), artId: art,
+        rows: ['05', '09', '13', '17'].map(row) })),
+      settings: {}
+    }));
+    localStorage.setItem('td-view', JSON.stringify({ activeTab: 'allteams',
+      months: 'all', bucket: 'week' }));
+
+    const f = document.createElement('iframe');
+    f.setAttribute('data-td-tests', '');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;left:-9999px;width:1240px;height:1400px;border:0';
+    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html' + BUST; document.body.appendChild(f); });
+    const nw = f.contentWindow, nd = f.contentDocument;
+
+    const strip = () => Math.round(nd.getElementById('viewControls').getBoundingClientRect().height);
+    const noteEl = () => nd.getElementById('windowNote');
+    /* On the fields' own flex line = the two boxes OVERLAP vertically. Not
+       "same top": the note is `align-self: center`, so once it is taller than a
+       field their tops differ while both are still on the one line. */
+    const onFieldsLine = () => {
+      const n = noteEl().getBoundingClientRect();
+      /* The first VISIBLE field. `#unitField` is first in the markup and hidden
+         until some team has features, and a hidden box measures 0,0,0,0 — which
+         overlaps nothing and would fail this on a layout that is behaving. */
+      const fld = [...nd.querySelectorAll('#viewControls .field')]
+        .find(el => el.offsetParent !== null).getBoundingClientRect();
+      return n.top < fld.bottom && n.bottom > fld.top;
+    };
+    const tick = (id, on) => {
+      const b2 = [...nd.querySelectorAll('input[data-art-pick]')]
+        .find(x => x.dataset.artPick === id);
+      b2.checked = on;
+      b2.dispatchEvent(new nw.Event('change', { bubbles: true }));
+    };
+
+    ok(!nd.getElementById('viewControls').hidden, 'the strip is on screen, or this measures nothing');
+    ok(strip() > 40, 'and it has a real height in this frame', String(strip()));
+    const plain = strip();
+    ok(onFieldsLine(), 'with nothing ticked the note shares the fields’ line');
+
+    nd.getElementById('artFilterBtn').click();
+    tick('w1', true);
+    const one = strip();
+    tick('w2', true); tick('w3', true); tick('w4', true);
+    is([strip(), onFieldsLine()], [one, true],
+       'and four trains ticked leave the strip exactly the height one train did — '
+       + 'the report was 90px to 164px, which took every figure on the page down with it');
+    is(strip(), plain,
+       'the same height it had with no filter at all, so the picker cannot move the page');
+
+    const noteText = noteEl().textContent;
+    /* FIVE, not six: the team on no train is out of a scope of four trains, and
+       the count is of what the figures were taken over. */
+    ok(/across 5 teams/.test(noteText),
+       'the note still counts the teams the figures are of', noteText);
+    ok(!/Core Retail/.test(noteText),
+       'and does NOT name the trains — that is this sentence’s only unbounded part',
+       noteText);
+    ok(/Core Retail & Item Processing/.test(nd.getElementById('artScopeNote').textContent),
+       'because the picker’s own line, right below it, names them in full',
+       nd.getElementById('artScopeNote').textContent);
+
+    /* THE MECHANISM, not the wording. A sentence nothing in the app writes
+       today, so this fails if the flex rule goes even while the text is short. */
+    noteEl().innerHTML = 'Showing <strong>Jun 17, 2026</strong> to <strong>Sep 8, 2026</strong>'
+      + '<br>custom dates, every team, as of the same date<br>2091 of 4363 items across 15 '
+      + 'teams, each team ignoring its own outliers — 214 items in total, and the last '
+      + 'week covers 3 of 7 days';
+    ok(onFieldsLine(),
+       'a note twice as long as any the app writes STILL shares the fields’ line — it '
+       + 'wraps its own text into the space they leave, which costs a line of the note '
+       + 'rather than a row of the strip');
+    ok(noteEl().getBoundingClientRect().right
+       <= nd.getElementById('viewControls').getBoundingClientRect().right + 1,
+       'and nothing hangs out past the strip');
 
     f.remove();
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);

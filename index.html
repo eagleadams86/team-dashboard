@@ -1029,8 +1029,20 @@ select { cursor: pointer; }
 /* The strip bottom-aligns its children so the selects sit on one line whatever
    height their labels wrap to — but the window note has no control to line up
    with, so flex-end just left it sitting low against the taller fields beside
-   it. It centres on its own row instead. */
-.controls .window { margin-left: auto; align-self: center; text-align: right;
+   it. It centres on its own row instead.
+
+   IT FLEXES INTO THE SPACE THE FIELDS LEAVE, and `margin-left: auto` alone did
+   not (2026-09-08). A wrapping flex row places each item at its OWN content
+   width first and only shrinks what is already on the line — so a long enough
+   sentence was pushed onto a row of its own, and the strip went from 90px to
+   164px, taking every figure on the page down with it. Charles reported the
+   jump. A flex-basis the note can be shrunk below is what keeps it on the line:
+   it now wraps its own text into whatever the fields have left, which costs a
+   line of the note rather than a row of the strip. `min-width: 0` because a
+   flex item will not shrink past its longest word without it, and the dates in
+   here are long words. The auto margin goes with it — an auto margin eats the
+   free space before flex-grow can, which would pin this back at 260px. */
+.controls .window { flex: 1 1 260px; min-width: 0; align-self: center; text-align: right;
   font-size: var(--fs-xs); color: var(--text-secondary); }
 .controls .window strong { color: var(--text-primary); font-weight: var(--fw-semibold); }
 
@@ -16190,10 +16202,16 @@ function renderAllTeams() {
       + prettyDate(train.endDate) + '</strong>'
     : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(train.endDate) + '</strong>';
   printHead('every team' + (scopePhrase ? ' ' + scopePhrase : ''), train);
+  /* IT COUNTS THE TEAMS AND DOES NOT NAME THE TRAINS, and it named them until
+     2026-09-08. `#artScopeNote` sits about forty pixels below this line and
+     names them in full — "Showing all 15 teams, on DSO, CLORG, … Every figure
+     below follows this picker" — so this was the same list said twice, in the
+     one corner of the page where the length of a sentence moves everything
+     under it. On paper neither is lost: printHead() above puts the scope in the
+     print-only line, which is the sentence a printout is read by. */
   $('windowNote').innerHTML = span + customNote(train) + '<br>' + 'every team, as of the same date' +
     '<br>' + itemsInWindow(train) + ' across ' +
     inScope.length + ' team' + (inScope.length === 1 ? '' : 's') +
-    (scope.length ? ' ' + escapeHtml(scopePhrase) : '') +
     /* NOT outlierNote(train). Every row in this table ignores its own team's
        outliers, measured against its own spread — see the comment in
        deriveTeams — so there is no single cutoff to state here, and quoting the
