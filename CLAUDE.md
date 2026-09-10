@@ -386,6 +386,9 @@ drew the line.** Both halves of the original argument were put to Charles and he
   boundaries are typed, so a fresh browser grades nothing and the app still just states figures.
   One boundary on its own is a pass/fail, not a three-state scale, and inferring the second would
   be the app drawing the half of the line the reader had not drawn.
+  **An UNGRADED card names which of the two it is (2026-09-10, evening audit):** `ragInverted()`
+  is the one question — both typed, green above red — asked by the settings window's order note
+  and by the card's verdict, so a card cannot say "set both boundaries" under two full boxes.
 - **Colour is never the only signal, in three places at once**: the glyph, the `sr-only` status,
   and the verdict written out in the tile's foot whether the tile is coloured or not. A reader who
   sees no colour at all loses nothing — which is the test, because that reader is who this is for.

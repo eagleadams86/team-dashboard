@@ -14564,6 +14564,21 @@ const RAG_SCALES = {
 /* Which way each scale runs, and the only place in the app that knows. Guarded
    for `state` the way the sibling's `tgt()` is: nothing on the load path grades a
    figure today, and the guard is so that adding one is not a crash. */
+/* Both boundaries typed and the green one above the red (2026-09-10, evening
+   audit). ragBounds() answers null to that and to "one box empty" alike, which
+   is right for grading — neither is a scale — and wrong for a SENTENCE: a card
+   that said "set both boundaries" under boxes that were both full sent the
+   reader to fill in what was filled. The settings window and the card ask this
+   one question through one function, so they cannot disagree about it. */
+function ragInverted(scale) {
+  let s = null;
+  try { s = state && state.settings; } catch (e) { s = null; }
+  const def = RAG_SCALES[scale];
+  if (!s || !def) return false;
+  const g = s[def.green], r = s[def.red];
+  return g != null && r != null && g !== '' && r !== '' && Number(g) > Number(r);
+}
+
 function ragBounds(scale) {
   let s = null;
   try { s = state && state.settings; } catch (e) { s = null; }
@@ -14631,8 +14646,7 @@ function renderBandOrderNotes() {
     const el = $(def.note);
     if (!el) return;
     const g = state.settings[def.green], r = state.settings[def.red];
-    const inverted = g != null && r != null && g !== '' && r !== ''
-      && Number(g) > Number(r);
+    const inverted = ragInverted(scale);
     el.hidden = !inverted;
     el.textContent = inverted
       ? def.what + '\u2019s on-target boundary (' + g + def.noun
@@ -17619,7 +17633,10 @@ function scorecardCard(card, dNow, priorD, prior, ctx) {
     + '<p class="sc-verdict">'
     + escapeHtml(value == null ? card.why(dNow, ctx)
         : verdict ? verdict[0].toUpperCase() + verdict.slice(1) + '.'
-        : 'Not graded — set both boundaries for this figure under Grading in Settings.')
+        : ragInverted(card.scale)
+          ? 'Not graded — the on-target boundary for this figure is above the off-target one '
+            + 'under Grading in Settings. Swap them and it grades.'
+          : 'Not graded — set both boundaries for this figure under Grading in Settings.')
     + '</p>'
     + '<div class="sc-means"><div class="sc-means-h">What It Means</div><p>'
     + escapeHtml(scorecardMeans(card, value, prior, priorD, dNow))

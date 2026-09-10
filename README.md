@@ -2260,7 +2260,7 @@ past the threshold, ever"), and a slipped key must not draw that line for you.
 
 **The first boundary must be at or below the second.** Green above red is not a scale with its
 bands swapped, it is no scale, so the app grades nothing and says so under the two boxes in
-Settings until they are the other way round. Equal is allowed: on target at or below the number,
+Settings — and under the Scorecard card's figure — until they are the other way round. Equal is allowed: on target at or below the number,
 off target above it, with no watch band between, if that is what you mean.
 
 **The colour is never the only signal.** The tile also carries a symbol — ✓, ! or ✕ — a status

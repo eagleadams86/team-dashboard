@@ -10207,6 +10207,43 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('an ungraded card says WHY it is ungraded');
+
+  {
+    /* Green above red is no scale, and the card said "set both boundaries"
+       under two boxes that were both full (2026-09-10, evening audit). */
+    const ugRows = [{ c: '2026-09-01', s: '2026-08-20', t: 'Story' },
+                    { c: '2026-09-02', s: '2026-08-21', t: 'Bug' },
+                    { s: '2026-08-01', t: 'Story' }];
+    const ugDoc = win.document;
+    const predSays = (settings) => {
+      plant({ teams: [{ id: 'ug1', name: 'One', rows: ugRows },
+                      { id: 'ug2', name: 'Two', rows: ugRows }], settings });
+      win.renderAll();
+      win.selectTab('scorecard');
+      return [...ugDoc.querySelectorAll('.sc-card')][0].querySelector('.sc-verdict').textContent;
+    };
+    const swapped = predSays({ agedShareGreen: 40, agedShareRed: 20 });
+    ok(/above the off-target one/.test(swapped),
+       'a green boundary above the red one is named as the reason', swapped);
+    ok(!/set both boundaries/.test(swapped),
+       'rather than asking for boxes that are already full', swapped);
+    const half = predSays({ agedShareGreen: 20, agedShareRed: null });
+    ok(/set both boundaries/.test(half), 'one box empty still asks for both', half);
+    const none_ = predSays({});
+    ok(/set both boundaries/.test(none_), 'and so does neither', none_);
+    /* The same question, asked once: the settings window's order note and the
+       card cannot disagree, because both read ragInverted(). */
+    plant({ teams: [{ id: 'ug1', name: 'One', rows: ugRows },
+                    { id: 'ug2', name: 'Two', rows: ugRows }],
+            settings: { agedShareGreen: 40, agedShareRed: 20 } });
+    is(win.ragInverted('agedShare'), true, 'ragInverted reads the swapped pair');
+    win.renderSettingsForm();
+    ok(!ugDoc.getElementById('agedShareOrderNote').hidden, 'and the settings note shows for it');
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('the flow card does not blame the export for an outlier fence');
 
   {
