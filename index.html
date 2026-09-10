@@ -11954,8 +11954,13 @@ function loadView() {
      the history. Ids are shaped-checked against the family's id rule, which
      ART_NONE deliberately fails, so it is named. */
   if (typeof view.artFilter === 'string') view.artFilter = view.artFilter ? [view.artFilter] : [];
+  /* STRINGS ONLY, then the shape (2026-09-10, evening audit). `ID_OK.test(String(id))`
+     let 5, true and null through as "5", "true" and "null" — shapes that pass the
+     regex — and saveView() then persisted the non-strings. The family's id rule
+     is a rule about strings. */
   view.artFilter = Array.isArray(view.artFilter)
-    ? [...new Set(view.artFilter.filter(id => id === ART_NONE || ID_OK.test(String(id))))]
+    ? [...new Set(view.artFilter.filter(id => id === ART_NONE
+        || (typeof id === 'string' && ID_OK.test(id))))]
     : [];
 }
 
@@ -19200,7 +19205,13 @@ $('artFilterMenu').addEventListener('change', (e) => {
   const id = box.dataset.artPick;
   const on = new Set(Array.isArray(view.artFilter) ? view.artFilter : []);
   if (box.checked) on.add(id); else on.delete(id);
-  view.artFilter = [...on];
+  /* WRITTEN BACK CLEAN (2026-09-10, evening audit). currentArtScope() drops an
+     id that names nothing on every read, but nothing wrote the list back, so a
+     train deleted on another device — or before the picker took several — sat
+     in the stored list for ever and every tick re-saved it. Stored and shown are
+     one shape, which is the promise loadView() makes; this is where a tick
+     keeps it. ART_NONE stays: it is not stale, a team may lose its train later. */
+  view.artFilter = [...on].filter(x => x === ART_NONE || state.arts.some(a => a.id === x));
   saveView();
   /* The menu STAYS OPEN. Ticking a second train is the whole point of it, and a
      picker that shuts after every tick would make the two-train case four

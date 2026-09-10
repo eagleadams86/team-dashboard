@@ -34,6 +34,10 @@ taking all fifteen teams and reading past the ones you had not asked about.
 - **A DELETED TRAIN NOW TAKES ONLY ITSELF.** With one value a stale id had to fall back to every
   team; with a list that would be the page silently widening to the estate because one of two
   ticks went stale. `currentArtScope()` drops what no longer names anything and keeps the rest.
+  **And a tick writes the list back clean (2026-09-10, evening audit)** — dropping on read alone
+  left a deleted train in the stored list for ever, re-saved by every tick; the suite met this as
+  a `~none` and two dead ids left behind by an earlier group. `loadView()` also checks
+  `typeof id === 'string'` BEFORE the shape: `ID_OK.test(String(5))` passed, and the 5 was saved.
 - **The control is a button and a menu of `.checkline` checkboxes, not `<select multiple>`.**
   The native control wants ⌘-click, has no usable shape on a phone, and draws a scrolling box in
   the row rather than a picker — it would have cost this row its layout. Nothing in the new one

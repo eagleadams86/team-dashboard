@@ -11347,6 +11347,47 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('the stored scope list is the shown one');
+
+  {
+    /* Two leaks in the same promise (2026-09-10, evening audit): loadView()
+       coerced before shape-checking, so 5, true and null rode through as ids;
+       and a tick re-saved every stale id currentArtScope() had dropped on read,
+       so a deleted train sat in the stored list for ever. */
+    plant({ arts: [{ id: 'st1', name: 'Payments' }, { id: 'st2', name: 'Retail' }],
+            teams: [
+              { id: 'stm1', name: 'One', artId: 'st1', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] },
+              { id: 'stm2', name: 'Two', artId: 'st2', rows: [{ c: '2015-05-02', s: '2015-04-28', t: 'Story' }] }
+            ], settings: {} });
+    const stDoc = win.document;
+    win.renderAll();
+    win.selectTab('allteams');
+    const savedView = localStorage.getItem('td-view');
+    const planted = JSON.parse(savedView || '{}');
+    planted.artFilter = ['st1', 5, true, null, { id: 'st2' }, 'st1', TD.ART_NONE, 'no spaces here', 'st2'];
+    localStorage.setItem('td-view', JSON.stringify(planted));
+    win.tdView.reload();
+    is(JSON.stringify(win.tdView.now().artFilter), JSON.stringify(['st1', TD.ART_NONE, 'st2']),
+       'a stored list keeps only strings that pass the id rule, plus the named no-train, once each');
+    ok(win.tdView.now().artFilter.every(x => typeof x === 'string'), 'and nothing that is not a string');
+
+    /* Stale on the way OUT: tick with a dead id in the list and the save drops it. */
+    win.tdView.now().artFilter = ['gone-train', 'st1'];
+    win.tdView.render();
+    stDoc.getElementById('artFilterBtn').click();
+    const stBox = [...stDoc.querySelectorAll('input[data-art-pick]')].find(x => x.dataset.artPick === 'st2');
+    stBox.checked = true;
+    stBox.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(JSON.stringify(JSON.parse(localStorage.getItem('td-view')).artFilter), JSON.stringify(['st1', 'st2']),
+       'a tick writes the list back without the id that names nothing');
+    stDoc.getElementById('artFilterAll').click();
+    localStorage.setItem('td-view', savedView);
+    win.tdView.reload();
+    win.tdView.now().artFilter = [];
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('tabbing out of the train menu closes it');
 
   {
