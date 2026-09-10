@@ -4372,3 +4372,43 @@ four Tab stops with one id, so a loop keyed on element identity "closes" after f
 regex helper read out of a template literal by `readFileSync` keeps its doubled backslashes,
 so every colour parsed as null and every backdrop came back white — 372 "failures" that were
 one bug in the harness.
+
+## Fixes From the 2026-09-10 Evening Audit
+
+Four auditors read the post-2026-09-05 diff (the multi-train picker, the Scorecard, the pooled aged
+share, the week start, the future-date fence and the In progress trace) and drove each area
+headless. Three bugs, six minor defects and four nits, ALL fixed the same evening, one per commit,
+each with a test proven red against the build before it. The reasoning per fix sits in the feature
+section it belongs to, marked "(2026-09-10, evening audit)"; this list is the index.
+
+- `bf63b73` — A completion that has not happened yet is not a completion
+- `ffb8abb` — The Scorecard's note follows whichever list has a window
+- `1c1b2e8` — The Flow card checks for the outlier fence before blaming the export
+- `582859f` — The Scorecard's empty state tells a window miss from nothing finished
+- `854bf50` — A slipped minus in a boundary box clears it, it does not become a zero
+- `147b984` — An ungraded Scorecard card says which of the two reasons it has
+- `5340522` — An empty All Teams scope rewrites the print line too
+- `bff671c` — The Scorecard heading names the scope the way All Teams does
+- `b529701` — Tabbing out of the train menu closes it
+- `759bd78` — The stored scope list is the shown one
+- `6c71708` — A train's name is never re-cased, even when it says "no train"
+- `72c27d0` — A week start is a number or a digit string, never a boolean
+- `1c8b5f1` — The window before this one shares no bucket with it
+- `27e25da` — Two small truths on a Scorecard card
+- `29e978a` — A day boundary box shows the number that was stored, too
+- `1039c7b` — A trend figure is signed whenever it does not round to 0.0
+
+Three shapes worth carrying to the siblings:
+- **A gate added to a date scan has to reach every list built from the same field.** `arrived()`
+  gated `endDate` and `dataEnd`; `finished` was still built from the raw `completed`, and the
+  mismatch threw. When a boundary starts refusing a value, grep every reader of that value.
+- **Test the fact, never infer it from the figure it produces.** "no start date" was inferred from
+  a null average; "set both boundaries" from a null scale; "No ageing threshold" from a field the
+  empty shape does not carry. Each was a wrong reassurance sent to a reader who could act on it.
+- **A stored list corrected on read is not corrected.** `currentArtScope()` dropped stale ids on
+  every read and nothing wrote them back; the suite met the accumulation as ticks left by an
+  earlier group. Whatever cleans on read must also clean on write, or the promise is half kept.
+
+Left open on purpose: the In progress cell's `textContent` runs the count into the delta
+("9+6.3") for a hand-selected copy; Chromium's accessibility tree separates them, the export
+strips the delta, and a whitespace node would cost the 2px the 1024 layout was bought with.

@@ -389,8 +389,20 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    the CSV as "55 +5.0", which is text, in the column somebody exported to add
    up. The pair asserting which columns draw a trace is the one to keep: the data
    for three more exists and drawing it would be wrong, so a fourth has to be a
-   deliberate act rather than an easy one. */
-const EXPECTED = 3610;
+   deliberate act rather than an easy one.
+
+   And to 3800 on 2026-09-10 (evening audit), fifteen fixes and about 110 checks,
+   every one proven red against the build before its fix. The ones to know: a
+   list whose EVERY completion is dated after today must derive on every window
+   kind without throwing; the Scorecard's note follows whichever list has a
+   window; the Flow card tests for the outlier fence rather than inferring "no
+   start date"; the window before this one shares no bucket with it; and the
+   stored scope list holds only string ids that still name something. Two traps
+   met while adding them, for the next person: the Scorecard is not offered
+   below two teams, so a one-team fixture reads stale cards; and the scope list
+   is a position on the device that an earlier group may have left ticks in, so
+   press "All trains" before ticking. */
+const EXPECTED = 3800;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
