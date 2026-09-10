@@ -11368,6 +11368,23 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('a week start is a number or a digit string');
+
+  {
+    /* Types, not just range (2026-09-10, evening audit): Number(true) is 1 and
+       Number([3]) is 3, so a boolean was Monday and an array Wednesday — through
+       the settings boundary, and so through a share link. */
+    const S2 = win.TDState;
+    is(S2.normalizeSettings({ weekStart: true }).weekStart, 0, 'a boolean is not a day');
+    is(S2.normalizeSettings({ weekStart: [3] }).weekStart, 0, 'nor is an array holding one');
+    is(S2.normalizeSettings({ weekStart: '0x3' }).weekStart, 0, 'nor a hex string');
+    is(S2.normalizeSettings({ weekStart: 6.5 }).weekStart, 0, 'nor a half day');
+    is(S2.normalizeSettings({ weekStart: '3' }).weekStart, 3, 'while the string a select hands over is');
+    is(S2.normalizeSettings({ weekStart: 3 }).weekStart, 3, 'and so is the number');
+    is(win.cleanWeekStart(true), 0, 'the helper itself refuses the boolean');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('the stored scope list is the shown one');
 
   {

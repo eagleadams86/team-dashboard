@@ -4658,6 +4658,13 @@ const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
    somewhere nothing reads back. Out of range is the DEFAULT rather than clamped
    into range — 6.5 and "wat" are not opinions about Saturday. */
 function cleanWeekStart(v) {
+  /* A number, or the string a <select> or a JSON field hands over — nothing
+     else. `Number(true)` is 1 and `Number([3])` is 3, so a boolean rode through
+     here as Monday and an array as Wednesday (2026-09-10, evening audit); a
+     boolean is not an opinion about Monday any more than 6.5 is one about
+     Saturday. */
+  if (typeof v !== 'number' && typeof v !== 'string') return 0;
+  if (typeof v === 'string' && !/^\s*[0-6]\s*$/.test(v)) return 0;
   const n = Number(v);
   return Number.isInteger(n) && n >= 0 && n <= 6 ? n : 0;
 }
