@@ -19226,6 +19226,19 @@ $('artFilterMenu').addEventListener('click', (e) => {
 $('artScope').addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && artMenuOpen()) { e.stopPropagation(); closeArtMenu(true); }
 });
+/* THE KEYBOARD'S "CLICK OUTSIDE" (2026-09-10, evening audit). Tab past the last
+   box and focus is on the page below, the menu is still up over it, and the
+   Escape listener above cannot hear a key pressed outside the field — so a
+   keyboard user had no way to close it short of a return trip. Focus leaving
+   the field for a REAL element elsewhere closes it, without moving focus.
+   `relatedTarget` is tested for a reason: a tick re-renders the menu and
+   replaces the focused box, and a blur with nowhere to go is that replacement,
+   not the reader leaving — renderArtScope() is about to put focus back. */
+$('artScope').addEventListener('focusout', (e) => {
+  if (!artMenuOpen()) return;
+  const to = e.relatedTarget;
+  if (to && !$('artScope').contains(to)) closeArtMenu();
+});
 /* A press anywhere else is the reader moving on — the same rule the app's
    dialogs follow, where a click on the backdrop means Cancel. Capture, so a
    handler that stops the bubble somewhere else on the page cannot leave this

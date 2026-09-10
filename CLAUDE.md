@@ -51,6 +51,12 @@ taking all fifteen teams and reading past the ones you had not asked about.
   fault as the pin button that rewrote its own icon under the pointer. `renderArtScope()` reads
   the focused box's id and the list's scrollTop before the rebuild and puts both back after.
   Pinned by a test that also asserts the element really was replaced, or it measures nothing.
+- **TABBING OUT CLOSES IT (2026-09-10, evening audit).** Escape is bound on the field, so a key
+  pressed after Tab had carried focus onto the page below could not reach it, and the menu stayed
+  up over the view with no keyboard way to shut it. A `focusout` whose `relatedTarget` is a real
+  element outside `#artScope` closes it without moving focus. `relatedTarget` is the whole test:
+  a tick replaces the focused box, and THAT blur has nowhere to go and must not close anything —
+  the restore above is about to put focus back.
 - **The closed button COUNTS, the sentences NAME — AND SO DOES THE FOOT OF THE TABLE.** One
   train is named; two or more read "2 selected". That column is 240px, and five names in it would either truncate — a control
   hiding its own value — or take the row's layout with it. So the note beside the picker gained

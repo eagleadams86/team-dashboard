@@ -11347,6 +11347,47 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('tabbing out of the train menu closes it');
+
+  {
+    /* Tab past the last box left the menu open over the page with focus below
+       it, and the Escape listener on the field could not hear a key pressed
+       outside it (2026-09-10, evening audit). Focus leaving for a real element
+       elsewhere is the keyboard's click-outside; focus moving between two boxes
+       is not, and neither is the blur a re-render causes. */
+    plant({ arts: [{ id: 'fk1', name: 'Payments' }, { id: 'fk2', name: 'Retail' }],
+            teams: [
+              { id: 'fkm1', name: 'One', artId: 'fk1', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] },
+              { id: 'fkm2', name: 'Two', artId: 'fk2', rows: [{ c: '2015-05-02', s: '2015-04-28', t: 'Story' }] }
+            ], settings: {} });
+    const fkDoc = win.document;
+    win.renderAll();
+    win.selectTab('allteams');
+    const fkBtn = fkDoc.getElementById('artFilterBtn');
+    const fkMenu = fkDoc.getElementById('artFilterMenu');
+    const fkBoxes = () => [...fkDoc.querySelectorAll('input[data-art-pick]')];
+    fkBtn.click();
+    is(fkMenu.hidden, false, 'the menu opens');
+    fkBoxes()[0].focus();
+    fkBoxes()[1].focus();
+    is(fkMenu.hidden, false, 'focus moving between two boxes leaves it open');
+    /* A tick replaces the focused box; the blur that causes has no relatedTarget
+       and must not close the menu — the suite pins elsewhere that focus comes
+       back to the new copy. */
+    fkBoxes()[1].checked = true;
+    fkBoxes()[1].dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(fkMenu.hidden, false, 'a tick that rebuilds the menu leaves it open');
+    is(fkDoc.activeElement && fkDoc.activeElement.dataset.artPick, 'fk2', 'with focus back on the ticked box');
+    fkDoc.getElementById('monthsSel').focus();
+    is(fkMenu.hidden, true, 'focus leaving the field for the page below closes it');
+    is(fkBtn.getAttribute('aria-expanded'), 'false', 'and the button says so');
+    is(fkDoc.activeElement, fkDoc.getElementById('monthsSel'),
+       'without pulling focus back — the reader has moved on');
+    fkBtn.click(); fkDoc.getElementById('artFilterAll').click();
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('a scope with nothing in it still rewrites the print line');
 
   {
