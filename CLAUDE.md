@@ -100,6 +100,53 @@ taking all fifteen teams and reading past the ones you had not asked about.
   **This file stays the reference implementation** — the class names, the reset-not-an-option
   rule and the caret are shared, so a change to either belongs in both.
 
+## In Progress Gets a Trace, Inside Its Own Cell (2026-09-10) — no schema change
+
+Charles, of the throughput sparkline: *"the throughput trend is a pretty useful visual. which other
+items on this would benefit from the same and is there room enough?"* The answer to the first half
+is **one column, and only one**; the answer to the second is **not as a column**.
+
+- **WHICH SERIES MAY HAVE A TRACE IS A JUDGEMENT, NOT AN AVAILABILITY QUESTION**, and that is the
+  part to carry forward — `derive` returns a per-bucket array for every numeric column on this
+  table, so adding a fourth trace looks free and is not. `throughput` and `wip` are **censuses**:
+  every item on the board contributes to every point, so a bucket means the same thing on a team
+  finishing four a week and one finishing twenty-six. `p85CycleTime`, `p85LeadTime` and
+  `unplannedRate` are **percentiles and shares of that bucket's completions** — a handful of items
+  on most teams. The demo's Team Long Tail draws its weekly cycle time percentile as 5, 4, 39, 40,
+  29, 41, 31, 33, 8: a picket fence, lag-1 autocorrelation 0.08 against 0.48 for its WIP. The
+  killer is not the noise, it is that the noise is **uneven** — that column would be trustworthy on
+  the busiest row and meaningless on the quietest with nothing on screen saying which. Cycle time
+  drift is a real question and the honest answer is a fit over pooled items. The rule is written
+  above `seriesTrend`, and a test pins the spark columns as the list `['trend', 'wip']`.
+- **It earns its place on Little's Law.** Cycle time ≈ WIP ÷ throughput, so a board filling while
+  Per week stays flat is a cycle time rise that has not landed in the percentile column yet. That
+  is the same argument the throughput trace was added on — a finding the table could not otherwise
+  produce — and no third column can make it.
+- **IT IS IN THE In progress CELL AND NOT A TENTH COLUMN, and the numbers are why.** Min-content
+  with the demo loaded: **873px** before, **953px** like this, **1018px** with a column beside it —
+  against **1030px** of table at a 1100-wide window, which is the width the column comments say
+  this table is tested at, before a real team name is typed. Put to Charles with those figures; he
+  chose this over a sideways scroll and over dropping Aged % to buy the room. **The 2px that made
+  it fit at 1024 as well came from matching `.spark-level`'s gap to the 6px `.spark-val` already
+  used** — the convention was also the answer.
+- **It is the more truthful shape here anyway**, which is why it is not merely the one that fitted:
+  WIP is a level read at each bucket's end, so **the trace's last point IS the number in the
+  cell**. Throughput cannot do that — its trace ends on the newest bucket's count while Per week
+  states the mean over whole buckets, two figures that would read as one if they shared a cell.
+- **WHAT IT COSTS IS THE SORT**, stated rather than hidden: the column still sorts by the count, so
+  there is no way to rank teams by how fast their boards are filling. Ten traces are scannable by
+  eye where ten slopes are not. `get` is untouched, so a sort saved before today still means what
+  it did.
+- **`.spark-delta` IS STRIPPED FROM THE EXPORT AND `.spark-val` MUST NEVER BE.** Two figures in one
+  cell reach the CSV as `"55 +3.2"` — text, in the column somebody exported to add up — so the
+  delta joins `.team-art` in `cellText`'s named cases. The asymmetry is deliberate and the reverse
+  of the throughput column's rule, where the figure exists *because* the export would otherwise be
+  empty. It is still ordinary visible text, so a screen reader gets both; only the file drops it.
+- **`spark` names its series** rather than being a boolean, now that there are two. A flag would
+  have left the renderer asking "which kind" of a property that says yes.
+- **On a phone the cell reads exactly as it did before the feature existed** — trace and delta both
+  go at ≤620px, because the count is that column's own figure and the delta is the extra.
+
 ## Lead Time Gets Its Percentile (2026-09-04) — no schema change
 
 Charles, weighing what the All Teams table should spend its width on: *"which do you think is more
@@ -913,7 +960,7 @@ built-in Helvetica rather than the face the page is set in.
   threshold and to 2026-09-01 with the status vocabulary).
 
 - **Which tab you were on IS remembered, for the two number views only.** `view.activeTab`, restored at boot. It used to be deliberately not saved — the old comment said "a reload should open on the dashboard" — which was out of step with both siblings (Sprint Predictability keeps `settings.view`, Money Map keeps `ui.activeTab`) and with the fact that All Teams is where somebody with several teams works. Changed 2026-08-21 after it was reported as annoying. Settings and Your Data are NOT remembered, on purpose. No new guard was needed: `selectTab` already refuses a hidden or unknown tab and falls back to the dashboard, which is exactly the All-Teams-disappears-below-two-teams case.
-- **The All Teams Throughput trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **The header names the metric** — it shipped as a bare "Trend" and that was not enough beside eight other columns that each name theirs. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart.
+- **The All Teams Throughput trend column is a sparkline plus a signed figure, and both halves are load-bearing.** The SVG is `aria-hidden` and the figure beside it is the text equivalent — that is not only for screen readers: `cellText()` strips anything hidden from assistive technology as decoration, so without a VISIBLE figure the CSV export would have an empty column. It reuses `linearTrend`, the same fit the chart above draws, so the two can never disagree; if it ever grows its own regression, that is the bug. The trace is normalised to its own range (shape, not magnitude — Per week is the magnitude) and drawn in `currentColor` so one CSS rule themes it. **No red-for-falling**: nothing in this account's palette sits on the red-green axis, and rising throughput is not unambiguously good anyway. Sorting is ascending-first, like Data to and for the same reason — the interesting end is the most negative. **The header names the metric** — it shipped as a bare "Trend" and that was not enough beside eight other columns that each name theirs. **Deliberately not a line-per-team chart**: this view is written for eight teams, the theme pack's categorical ramp stops at five, and eight lines on one card is a spaghetti chart. **The In progress cell gained a second trace on 2026-09-10** off the same `seriesTrend` fit — see that section for which series may have one and which three must not.
 
 ## Both of a Team's Lists, Everywhere (2026-08-25) — no schema change
 

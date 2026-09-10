@@ -380,8 +380,17 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    column: the ordered column list moved, and the ADJACENCY to the cycle time
    percentile is pinned as an index relationship rather than a membership check,
    because separating the two takes the column's whole reason with it — the gap
-   between those two cells is the team's queue. */
-const EXPECTED = 3537;
+   between those two cells is the team's queue.
+
+   And to 3558 on 2026-09-10, when work in progress gained a trace inside its own
+   cell. Most of the new checks are about the two ways THAT shape can go wrong
+   rather than about the fit: the count surviving beside the trace, and the
+   export still taking the count alone — a cell with two figures in it reaches
+   the CSV as "55 +5.0", which is text, in the column somebody exported to add
+   up. The pair asserting which columns draw a trace is the one to keep: the data
+   for three more exists and drawing it would be wrong, so a fourth has to be a
+   deliberate act rather than an easy one. */
+const EXPECTED = 3558;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9744,6 +9753,36 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(win.document.querySelectorAll('#allTeamsTable thead [data-help]').length, 2,
      'the lead time column adds no third ⓘ — its note opens from the tile of the same name');
 
+  /* ── WHICH COLUMNS CARRY A TRACE, pinned as a list ──────────────────────
+     Two, and which two is a judgement rather than a matter of what data exists:
+     `derive` returns a per-bucket array for every numeric column here, and only
+     throughput and WIP are censuses. The other three are percentiles and shares
+     of that bucket's completions — a handful of items on most teams — so a trace
+     on them would be a picket fence, and unevenly so: readable on the busiest
+     row and noise on the quietest, with nothing on screen saying which. This is
+     the guard that makes adding a fourth a deliberate act. See seriesTrend. */
+  {
+    /* Over EVERY row, not the first: a team with nothing in the window draws no
+       trace at all, and which row that is depends on the sort the suite arrived
+       in. Reading one row made this assert [] the first time it ran. */
+    const sparkCols = new Set();
+    win.document.querySelectorAll('#allTeamsTable tbody tr').forEach(tr =>
+      [...tr.cells].forEach((td, i) => { if (td.classList.contains('spark-cell')) sparkCols.add(colKeys[i]); }));
+    is([...sparkCols].sort(), ['trend', 'wip'],
+       'exactly two columns draw a trace — throughput and work in progress, the two that are '
+       + 'a census of the board rather than a percentile of one bucket’s completions');
+    /* The In progress cell is the only one carrying a count AND a trace, so it
+       is the only one that can lose the count. Stated as a property of the cells
+       that HAVE a trace rather than as a row count — how many rows have enough
+       buckets to fit a line through is the fixture's business, not this rule's. */
+    const wipIdx = colKeys.indexOf('wip');
+    const traced = [...win.document.querySelectorAll('#allTeamsTable tbody tr')]
+      .map(tr => tr.cells[wipIdx]).filter(td => td.classList.contains('spark-cell'));
+    ok(traced.length > 0, 'at least one team has a board history to draw', traced.length);
+    ok(traced.every(td => (td.querySelector('.spark-level') || {}).textContent),
+       'and every In progress cell that draws one still states its count in front of it');
+  }
+
   /* A SAVED SORT CAN NAME A COLUMN THAT NO LONGER EXISTS — a browser that used
      the app yesterday has `completed` sitting in its td-view. Booted for real in
      a second hidden copy, because `view` is a module binding and the saved copy
@@ -11731,6 +11770,84 @@ group('ARTs — the grouping, and the boundary it crosses');
     /* End to end: the whole point is that the exported column is arithmetic. */
     is(TD.toCsv([['Trend'], [valOf(falling)], [valOf(rising)]]), 'Trend\r\n-8.0\r\n+5.0',
        'so the CSV guard lets both signs straight through');
+  }
+
+  group('All Teams — the trace inside the In progress cell');
+
+  /* Added 2026-09-10. Work in progress is the second series on this table worth
+     a trace and, on the width arithmetic, the last — it is a census at each
+     bucket's end rather than a percentile of that bucket's handful of
+     completions, which is what makes it readable on a team finishing four items
+     a week and on one finishing twenty-six alike.
+
+     It sits IN the In progress cell rather than in a tenth column, so these pin
+     the three things that arrangement can quietly get wrong: the count, the
+     export, and the sort. */
+  {
+    const rising  = [1, 2, 3, 4, 5, 6];
+    const falling = [9, 8, 6, 5, 3, 1];
+
+    /* THE SAME FIT AS THE COLUMN NEXT DOOR, through the same function — one
+       regression for the whole table. If wipTrend ever grows its own, the two
+       traces can disagree about a team and neither will say so. */
+    is(win.seriesTrend(rising).change, win.throughputTrend({ throughput: rising }).change,
+       'the WIP trace is fitted by the same function as the throughput one');
+    ok(win.wipTrend({ wip: rising }).change > 0, 'a filling board reads positive');
+    ok(win.wipTrend({ wip: falling }).change < 0, 'a draining one reads negative');
+    is(win.wipTrend({ empty: true }), null, 'a team with no data in the window has no trace');
+    is(win.wipTrend({ wip: [4] }), null, 'and neither has one bucket');
+    is(win.wipTrend(null), null, 'nor a missing derive');
+
+    /* The cell carries three things where the throughput pair spreads the same
+       three across two columns. The count is handed in already formatted, so
+       there is exactly one place the figure is made. */
+    const cellOf = (wip, count) => {
+      const box = win.document.createElement('table');
+      box.innerHTML = '<tr>' + win.wipCell({ wip }, count) + '</tr>';
+      return box.rows[0].cells[0];
+    };
+    const full = cellOf(rising, '55');
+    is(full.querySelector('.spark-level').textContent, '55', 'the count is in the cell');
+    ok(full.querySelector('svg.spark'), 'with its trace beside it');
+    is(full.querySelector('.spark-delta').textContent, '+5.0',
+       'and the change the fit moved by, signed and in ASCII like the column next door');
+    ok(full.querySelector('svg.spark').getAttribute('aria-hidden') === 'true',
+       'the trace is hidden from assistive tech, like the one in the column next door');
+    /* Both figures are ORDINARY VISIBLE TEXT, which is what gives the hidden
+       trace its equivalent — neither is `.sr-only` and neither is a `title`. So
+       what a screen reader reaches is the count and the change, in that order. */
+    ok(!full.querySelector('.sr-only, [aria-hidden="true"]:not(svg)'),
+       'and neither figure is hidden from it in turn');
+    is(full.textContent, '55+5.0',
+       'so the cell’s own text is the count then the change — the trace contributes none');
+
+    /* TOO FEW BUCKETS IS AN ORDINARY STATE, not a fault — a team one week into
+       an export has a count and no history. The cell has to degrade to exactly
+       what it rendered before this feature existed. */
+    const bare = cellOf([4], '4');
+    is(bare.querySelector('svg'), null, 'one bucket draws no trace');
+    is(bare.className, 'figure', 'and the cell falls back to a plain figure');
+    is(bare.textContent, '4', 'still stating the count');
+
+    /* ── THE EXPORT KEEPS ITS NUMBER ────────────────────────────────────────
+       The whole risk of putting two figures in one cell: these tables are read
+       off the rendered page, so "55 +5.0" would land in a spreadsheet as text,
+       in the column somebody exported to add up. `.spark-delta` is stripped for
+       the same reason `.team-art` is — a second thing the cell shows, in a
+       column that is the first. */
+    is(TD.cellText(full), '55', 'the export takes the count alone, not "55 +5.0"');
+    is(TD.toCsv([['In progress'], [TD.cellText(full)]]), 'In progress\r\n55',
+       'so that column of the file is still arithmetic');
+
+    /* AND THE ASYMMETRY IS DELIBERATE — the Throughput trend cell's figure is
+       NOT stripped and must never be, because it is the only thing in that cell
+       and the column of the file would otherwise be empty. Asserted against a
+       real cell rather than as a negative on nothing: a `!includes` here would
+       pass just as happily if sparkCell returned an empty string. */
+    const trendBox = win.document.createElement('table');
+    trendBox.innerHTML = '<tr>' + win.sparkCell({ throughput: rising }) + '</tr>';
+    is(TD.cellText(trendBox.rows[0].cells[0]), '+5.0',
+       'while the Throughput trend column still exports its figure — that cell has no other');
   }
 
   group('package.json — the manifest Dependabot scans');

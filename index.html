@@ -2096,14 +2096,41 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
    `--accent`, which on Sepia and Dark is the body-text ink and would draw this
    trace as one more piece of the table's text. */
 .spark { vertical-align: middle; color: var(--series-1); }
-.spark-val {
+/* `.spark-delta` is the In progress cell's change figure and is deliberately
+   identical to `.spark-val` on screen — the two are one rule because they are
+   one thing to a reader. They part company in `cellText`, which strips the delta
+   from the export so that column stays a plain count; see wipCell. */
+.spark-val, .spark-delta {
   display: inline-block; min-width: 3.4em; margin-left: 6px;
   font-variant-numeric: tabular-nums; color: var(--text-secondary);
 }
+/* The count that the In progress trace ends on, held off the trace so the two do
+   not touch. Both it and the pair to its right are fixed-width — the trace at
+   62px, the delta at a 3.4em floor — so the counts still line up down the column
+   under `td.figure`'s right alignment, which is the property that makes this
+   column scannable and the reason the trace went to the right of the number.
+
+   6px, THE SAME GAP `.spark-val` PUTS ON THE OTHER SIDE of a trace, so the cell
+   is symmetric about it. It was 8px for a day and the 2px mattered: the table's
+   min-content came to 955px against the 954px a 1024-wide window leaves it, so
+   the one width where this cell had made the table scroll was bought back by
+   using the number that was already the convention. */
+.spark-cell .spark-level { margin-right: 6px; }
 /* Printed and in a shared view the trace still means something, so it is not
    hidden — but a 62px graphic in a narrow column is the first thing to give up
    room when the table has to fit a phone. */
-@media (max-width: 620px) { .spark { display: none; } .spark-val { margin-left: 0; } }
+/* On a phone the traces go and the throughput column keeps its figure, which is
+   the whole of that cell. The In progress cell drops BOTH halves of its addition
+   and reads exactly as it did before this column had a trace: the count is that
+   column's own figure and the delta is the extra, so the extra is what gives way
+   when there is no room. `.spark-level`'s margin goes with it, or the count
+   would sit off the right edge of a column that has nothing else in it. */
+@media (max-width: 620px) {
+  .spark { display: none; }
+  .spark-val { margin-left: 0; }
+  .spark-delta { display: none; }
+  .spark-cell .spark-level { margin-right: 0; }
+}
 dialog h2 { font-size: var(--fs-md); margin-bottom: 12px; }
 dialog p { color: var(--text-secondary); font-size: var(--fs-xs); }
 /* ── The help window ─────────────────────────────────────────────────────────
@@ -11944,16 +11971,56 @@ function forecastFill(confidence) {
 
    The trace is scale-free — normalised to its own range — so what it shows is
    SHAPE. The magnitude lives in the figure beside it, and in Per week. */
-function throughputTrend(d) {
-  if (!d || d.empty || !Array.isArray(d.throughput)) return null;
-  /* The SAME fit the chart above draws, so the column and the chart can never
-     disagree about which way a train is going. linearTrend returns the fitted
-     line rather than its slope, and the change across the window is the two
-     ends of it — no second regression to drift from the first. */
-  const line = linearTrend(d.throughput);
+/* The fit, over any per-bucket series. The SAME fit the charts draw, so a column
+   and the chart it echoes can never disagree about which way a team is going.
+   linearTrend returns the fitted line rather than its slope, and the change
+   across the window is the two ends of it — no second regression to drift from
+   the first. Whatever asks for a trace comes through here.
+
+   WHICH SERIES MAY HAVE A TRACE IS A JUDGEMENT, NOT AN AVAILABILITY QUESTION,
+   and this function makes it look free — so the rule lives here where the next
+   person to add one will read it. `derive` returns a per-bucket array for every
+   numeric column on the All Teams table, and only two of them are worth drawing:
+
+   `throughput` and `wip` are CENSUSES. Every item on the board contributes to
+   each point, so a bucket means the same thing on a team finishing four items a
+   week and on one finishing twenty-six.
+
+   `p85CycleTime`, `p85LeadTime` and `unplannedRate` are PERCENTILES AND SHARES
+   OF THAT BUCKET'S COMPLETIONS, which is a handful of items on most teams. A
+   weekly 85th percentile over four completions is "the second-longest thing that
+   finished", and the demo's Team Long Tail draws it as a picket fence — 5, 4, 39,
+   40, 29, 41, 31, 33, 8 — where its WIP over the same weeks is a readable curve.
+   Worse than being noisy, it would be noisy UNEVENLY: trustworthy on the busiest
+   team in the table and meaningless on the quietest, with nothing on screen
+   saying which row is which. Cycle time drift is a real question and the honest
+   answer to it is a fit over pooled items, not a line joining per-bucket
+   percentiles. Do not add those three. */
+function seriesTrend(series) {
+  if (!Array.isArray(series)) return null;
+  const line = linearTrend(series);
   const fit = line.filter(v => v != null && isFinite(v));
   if (fit.length < 2) return null;
-  return { series: d.throughput, change: fit[fit.length - 1] - fit[0] };
+  return { series, change: fit[fit.length - 1] - fit[0] };
+}
+
+function throughputTrend(d) {
+  if (!d || d.empty) return null;
+  return seriesTrend(d.throughput);
+}
+
+/* Work in progress, added 2026-09-10 — the second and, on the width arithmetic
+   below, the last trace this table gets.
+
+   It earns its place on Little's Law: cycle time is roughly WIP over throughput,
+   so a board filling up while Per week stays flat is a cycle time rise that has
+   not landed in the percentile column yet. Every other figure in this row says
+   what is true now; this pair says a fortnight early which teams are heading
+   somewhere. That is the same argument the throughput trace was added on, and
+   the only other column that can carry it honestly. */
+function wipTrend(d) {
+  if (!d || d.empty) return null;
+  return seriesTrend(d.wip);
 }
 
 /* A scale-free trace, drawn in `currentColor` so the theme decides the colour
@@ -12010,13 +12077,64 @@ function sparkSvg(values) {
    a plain number alone, see FORMULA_LEAD), and a flat run reads `0.0` rather
    than `±0.0` — which says the same thing and says it as a number. The trace
    beside it is what makes the direction readable at a glance either way. */
+function trendFigure(t) {
+  const sign = t.change > 0.05 ? '+' : (t.change < -0.05 ? '-' : '');
+  return escapeHtml(sign + num1(Math.abs(t.change)));
+}
+
 function sparkCell(d) {
   const t = throughputTrend(d);
   if (!t) return '<td class="figure">—</td>';
-  const sign = t.change > 0.05 ? '+' : (t.change < -0.05 ? '-' : '');
-  const mag = num1(Math.abs(t.change));
   return '<td class="figure spark-cell">' + sparkSvg(t.series)
-    + '<span class="spark-val">' + escapeHtml(sign + mag) + '</span></td>';
+    + '<span class="spark-val">' + trendFigure(t) + '</span></td>';
+}
+
+/* ── The trace inside the In progress cell ───────────────────────────────────
+   `55 ⟋ +3.2`: the count, its history, and what the fit moved by. THREE THINGS
+   IN ONE CELL, where throughput spreads the same three across two columns, and
+   that is a width decision made honestly rather than a pattern break by
+   accident. Measured at min-content with the demo loaded: the table is 873px
+   today, 1018px with a tenth column beside this one, and 950px like this —
+   against 1015px of table at a 1100px window, which is the narrowest width this
+   table is tested at. The tenth column overflowed it by 3px before a single real
+   team name was typed. Put to Charles with those figures on 2026-09-10; he chose
+   this shape over a sideways scroll and over dropping Aged % to buy the room.
+
+   IT IS ALSO THE MORE TRUTHFUL SHAPE HERE, which is why it is not merely the
+   one that fitted. The trace's last point IS the number in the cell — WIP is a
+   level read at each bucket's end, and the last bucket's end is now. Throughput
+   cannot do that: its trace ends on the newest bucket's COUNT while Per week
+   beside it states the mean over whole buckets, two different figures that would
+   read as one if they shared a cell.
+
+   WHAT IT COSTS is the sort. This column still sorts by the count, so there is
+   no way to rank teams by how fast their boards are filling — a tenth column
+   would have given that. Ten traces are scannable by eye where ten slopes are
+   not, which is the reason it is a fair trade and not a silent loss.
+
+   The count keeps `escapeHtml` and `c.fmt` from the ordinary path rather than
+   reading `summary.currentWip` again here: one formatter for the column means
+   the figure cannot differ between the two branches. */
+function wipCell(d, countHtml) {
+  const t = wipTrend(d);
+  if (!t) return '<td class="figure">' + countHtml + '</td>';
+  return '<td class="figure spark-cell">'
+    + '<span class="spark-level">' + countHtml + '</span>' + sparkSvg(t.series)
+    /* `.spark-delta`, NOT `.spark-val`, and the two classes look the same on
+       screen on purpose — they differ in one place, `cellText`, which strips
+       this one from the export. The column's export cell has to stay the plain
+       count it has always been: two numbers in it would land in a spreadsheet as
+       "55 +3.2", which is text, and the whole argument that column of the file
+       exists for is that people do arithmetic on it. So the delta is on screen
+       and out of the file, and the Work in Progress window says so.
+       This is the same call `.team-art` already gets a line above for the same
+       reason: a second thing the cell shows, in a column that is the first.
+
+       IT IS STILL VISIBLE TEXT, so a screen reader reads "55 +3.2" and the
+       aria-hidden trace keeps its text equivalent. Only the export drops it —
+       which is the opposite of the throughput column's problem, where the
+       figure exists BECAUSE the export would otherwise be empty. */
+    + '<span class="spark-delta">' + trendFigure(t) + '</span></td>';
 }
 
 function trendDataset(values) {
@@ -13453,6 +13571,26 @@ const METRIC_HELP = {
       b('The bars are deliberately not recoloured where they cross the line'), ': this app '
       + 'states figures rather than judging them, and a period over the limit is something to '
       + 'look at rather than a failure to mark. Leave it blank and no line is drawn.'],
+    /* The All Teams cell's note lives HERE rather than behind a ⓘ of its own,
+       under the rule that a column whose heading matches a tile's takes that
+       tile's window — In progress and Work in Progress are the same words in a
+       different order, which is the case that rule was written for. A third
+       circle on that header row would also have cost 40px the cell has just
+       spent on the trace. */
+    ['On the All Teams table the In progress cell carries this same history as a small trace, '
+      + 'with the figure beside it saying what the fitted line moved by across the window — so ',
+      b('+3.2 is a board that has filled by about three items'), '. The trace is normalised to '
+      + 'its own range, like the throughput one next to it, so what it shows is the shape; the '
+      + 'count in front of it is the level, and the trace ends on that count.'],
+    ['It is worth reading ', b('against Per week rather than on its own'), '. A rising board '
+      + 'and a flat throughput is a cycle time rise that has not shown up yet — work is '
+      + 'arriving faster than it leaves, and the ' + CYCLE_PERCENTILE + 'th percentile column '
+      + 'will say so in a fortnight. A board rising alongside throughput is a team taking on '
+      + 'more and finishing more, which is a different thing entirely.'],
+    ['Two notes on it. The column ', b('still sorts by the count'), ', not by the change — '
+      + 'with a screenful of teams a filling board is visible without ranking them. And the '
+      + 'change is on screen but not in the export: that column of the file is the count, so '
+      + 'it stays a number you can add up.'],
   ] },
   agedWork: { title: 'Aged Work', body: [
     ['How many open items have been open too long? Anything still in progress beyond ',
@@ -15751,7 +15889,10 @@ function teamColumns(train) {
        "trend of what?" — with eight columns beside it, that is a fair question
        and the ⓘ is not an answer a table should need. It names throughput, the
        app's own word for the thing the chart above plots. */
-    { key: 'trend', label: 'Throughput trend', spark: true, desc: false, help: 'teamTrend',
+    /* `spark` NAMES ITS SERIES rather than being a flag, and it did not have to
+       be until there were two of them. A boolean would have left the renderer
+       asking "which kind of spark cell is this" of a property that says yes. */
+    { key: 'trend', label: 'Throughput trend', spark: 'throughput', desc: false, help: 'teamTrend',
       get: (d) => { const t = throughputTrend(d); return t ? t.change : null; },
       fmt: (v) => or(v, num1) },
     { key: 'p85', label: train.cyclePercentile + 'th ' + cycle.toLowerCase(), desc: true,
@@ -15779,7 +15920,10 @@ function teamColumns(train) {
        time label. */
     { key: 'leadP85', label: train.cyclePercentile + 'th lead time', desc: true,
       get: (d) => d.summary.p85LeadTime, fmt: (v) => or(v, num1) },
-    { key: 'wip', label: 'In progress', desc: true,
+    /* THE TRACE IS IN THIS CELL AND THE SORT IS STILL THE COUNT — see wipCell
+       for both halves of that. `get` is untouched, so a saved sort on `wip` from
+       before 2026-09-10 means what it always did. */
+    { key: 'wip', label: 'In progress', desc: true, spark: 'wip',
       get: (d) => d.summary.currentWip, fmt: (v) => or(v, String) },
     /* WIP vs month was here until 2026-09-04 and is on the dashboard still. It
        went with Completed to buy the width for the column below — see the ⓘ
@@ -16349,9 +16493,13 @@ function renderAllTeams() {
       if (c.key === 'dataEnd') return figure(r.d.dataEnd ? escapeHtml(prettyDate(r.d.dataEnd)) : '—');
       return figure('—');
     }
-    /* Its own branch rather than a fmt(): this cell is markup, and everything
-       that goes through the line below is escaped on the way past. */
-    if (c.spark) return sparkCell(r.d);
+    /* Their own branches rather than a fmt(): these cells are markup, and
+       everything that goes through the line below is escaped on the way past.
+       The In progress cell is handed its count already formatted and escaped by
+       that same line's expression, so the two branches cannot render the figure
+       differently. */
+    if (c.spark === 'throughput') return sparkCell(r.d);
+    if (c.spark === 'wip') return wipCell(r.d, escapeHtml(c.fmt(c.get(r.d))));
     return figure(escapeHtml(c.fmt(c.get(r.d))));
   };
 
@@ -16376,8 +16524,13 @@ function renderAllTeams() {
     : scope.length === 1 ? 'All teams ' + scopePhrase
     : 'All selected teams';
   const foot = '<tfoot><tr><td>' + escapeHtml(footLabel)
+    /* THE FOOT GETS BOTH TRACES, because `train` is a derived object like any
+       row's and its WIP series is the whole train's board period by period —
+       which is the one place an added-up WIP is a fair figure, since an item is
+       open on exactly one team's board and no team is counted twice. */
     + '</td>' + cols.slice(1).map(c =>
-    c.spark ? sparkCell(train)
+    c.spark === 'throughput' ? sparkCell(train)
+      : c.spark === 'wip' ? wipCell(train, escapeHtml(c.fmt(c.get(train))))
       : '<td class="figure">' + escapeHtml(c.key === 'dataEnd' ? prettyDate(train.endDate)
         : c.fmt(c.get(train))) + '</td>').join('') + '</tr></tfoot>';
 
@@ -20203,13 +20356,26 @@ function todayLocalISO() {
    The cost is that display values arrive with display furniture, which this
    strips. `[aria-hidden="true"]` and `.sr-only` are the general rule — anything
    hidden from assistive technology is decoration, and decoration is not data —
-   and the rest are named cases: the ⓘ buttons, and the ART printed under a team
+   and the rest are named cases: the ⓘ buttons, the ART printed under a team
    name on the All Teams table, which is a grouping the screen shows rather than
    a figure in that cell (the sibling strips its own `.artname` for the same
-   reason, and scoping to one train removes it from the screen anyway). */
+   reason, and scoping to one train removes it from the screen anyway), and
+   `.spark-delta`.
+
+   THAT LAST ONE IS THE ONLY THING HERE STRIPPED WHILE STILL BEING A FIGURE, so
+   it needs its reason stated. It is the change beside the In progress count,
+   added 2026-09-10, and it lives in a cell that already carries that column's
+   own number. Left in, the cell would reach the file as "55 +3.2" — two numbers
+   with a space between them, which every spreadsheet reads as text, in the
+   column somebody exported to add up. The trace it belongs to is aria-hidden
+   decoration and goes anyway; the delta goes with it, and the count stays
+   exactly the number that column has always exported. Note the asymmetry with
+   `.spark-val` in the Throughput trend column, which is NOT stripped and must
+   never be: it is the only figure in that cell, and stripping it would leave
+   that column of the file empty. */
 function cellText(cell) {
   const copy = cell.cloneNode(true);
-  copy.querySelectorAll('[aria-hidden="true"], .sr-only, .tile-help, .team-art')
+  copy.querySelectorAll('[aria-hidden="true"], .sr-only, .tile-help, .team-art, .spark-delta')
     .forEach(el => el.remove());
   return copy.textContent.replace(/\s+/g, ' ').trim();
 }

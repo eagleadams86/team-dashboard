@@ -375,7 +375,7 @@ people actually scan for:
 | **Per week** | Who is delivering, and at what pace? |
 | **Throughput trend** | Which team is *changing*? |
 | **85th cycle time** / **85th lead time** | Who is slow at *doing* the work, who is slow at *responding* — and the gap between the two is their queue |
-| **In progress** | Who is overloaded? |
+| **In progress** | Who is overloaded — and is their board filling or draining? |
 | **Aged** / **Aged %** | Who has work going stale — and how much of their board is it? |
 | **Defect rate** | Who has a quality problem? — empty in the feature view, and the note under the table says why |
 | **Data to** | …and whose figures are worth trusting at all |
@@ -438,6 +438,48 @@ magnitude. And check **Data to** before reading a fall as a slowdown: a team who
 stopped three weeks ago has a trace that falls away for exactly the same reason it has a stale
 date, which is a reporting problem rather than a delivery one. (The demo shows this on purpose —
 Team Bare Export has both the steepest fall and the oldest export.)
+
+### In Progress Carries a Trace Too
+
+Added September 2026. The **In progress** cell reads `9 ⟋ +6.3` — the count, its history across
+the window, and what the fitted line moved by. It is the same trace and the same fit as the
+throughput column, drawn from the same function so the two can never disagree about a team.
+
+**Read it against Per week rather than on its own.** Cycle time is roughly work in progress
+divided by throughput, so a board filling while the pace stays flat is a cycle time rise that
+has not landed in the percentile column yet — work is arriving faster than it leaves. A board
+rising *alongside* throughput is a team taking on more and finishing more, which is a different
+thing entirely. In the demo, Team Long Tail reads 4.2 per week with a trend of −0.9 and a board
+that has filled by +6.3: delivery slowing while the board grows, and its 23.0 cycle time and 67%
+aged share are what that has already cost.
+
+**Only two columns on this table draw a trace, and that is a judgement rather than a limit of
+the data.** A per-period series exists for the cycle time percentile, the lead time percentile
+and the defect rate as well, and drawing any of them would be wrong. Throughput and work in
+progress are *censuses* — every item on the board contributes to every point. The other three
+are percentiles and shares of that period's completions, which on most teams is a handful of
+items: a weekly 85th percentile over four completions is "the second-longest thing that
+finished", and it draws as a picket fence. Worse, it would be noisy *unevenly* — trustworthy on
+the busiest row of the table and meaningless on the quietest, with nothing on screen saying
+which. Cycle time drift is a real question, and the honest answer to it is a fit over pooled
+items rather than a line joining per-period percentiles.
+
+Two things it deliberately does not do. **The column still sorts by the count**, not by the
+change — with a screenful of teams a filling board is visible without ranking them, and a
+separate column to sort on would not fit (below). **The change is on screen but not in the
+export**: that column of the CSV is the count, so it stays a number you can add up. Everything
+else in the file follows the rule that what is on screen is what lands in it; this is the one
+cell that shows a second figure, and it is stripped for the same reason the ART printed under a
+team name is.
+
+**Why it is inside the cell rather than a column of its own.** Measured at min-content with the
+demo loaded, the table is 873px today, 953px like this, and 1018px with a tenth column beside
+*In progress* — against the 1030px a 1100-wide window leaves it, before a single real team name
+is typed. A tenth column overflowed the narrowest width this table is built to fit. It is also
+the more truthful shape here: work in progress is a level read at each period's end, so **the
+trace's last point is the number in the cell**. Throughput cannot do that — its trace ends on
+the newest period's count while *Per week* beside it is the mean over whole periods, two
+different figures that would read as one if they shared a cell.
 
 A reload puts you back on **whichever tab you were last using** — all four of them. A remembered
 tab that is no longer on offer (All Teams disappears below two teams) falls back to the dashboard,
@@ -680,6 +722,10 @@ On **All Teams** the three read as a train with one obvious problem: Team Long T
 percentile is three or four times the other two, it holds most of the aged work, and its defect
 rate is the highest — while Team Bare Export's *Data to* column quietly explains why its
 delivery rate looks worse there than on its own page.
+
+The two traces on that row say how it got there, which is what they are in the demo for: Team
+Long Tail's throughput is falling (−0.9) while its board fills (+6.3). Its cycle time is not a
+team that is slow at the work, it is a team taking on more than it finishes.
 
 The demo also **seeds the two aged-share boundaries**, at 20% and 40%, and that is the only way
 to see the grading without setting it up: its three teams land on **0%, 33% and 67%** — one on
