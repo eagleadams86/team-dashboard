@@ -21554,8 +21554,17 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
     state.settings[key] = PERCENT_SETTINGS.has(key)
       ? (e.target.value.trim() === '' ? null
         : (() => {
+            /* A MINUS SIGN OR TEXT CLEARS THE BOX, IT DOES NOT BECOME A ZERO
+               (2026-09-10, evening audit). `parseFloat('-5') || 0` clamped to
+               0 was a REAL target — on a share, 0 means "nothing past the
+               threshold, ever", the exact reason this set exists apart from the
+               nullable one — so a slipped minus graded every board amber
+               against a line nobody drew. Text is the same: not a number, not a
+               boundary. The cap at 100 stays as it was pinned on 2026-09-04. */
+            const n = parseFloat(e.target.value);
+            if (!Number.isFinite(n) || n < 0) return null;
             const p = Math.pow(10, percentSettingDp(key));
-            return Math.round(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)) * p) / p;
+            return Math.round(Math.min(100, n) * p) / p;
           })())
       : NULLABLE_SETTINGS.has(key)
       /* Blank, junk or zero all mean the same thing: no cutoff. Null rather

@@ -491,6 +491,10 @@ read these boundaries, and each miss looked different:
 
 Both reject null and empty string *before* `Number` ever sees them now. **Any future scale here must
 test the raw value, not its `Number()`.**
+**And the typing path rejects a negative or non-numeric value the same way (2026-09-10, evening
+audit)**: `parseFloat('-5') || 0` clamped to 0 stored a REAL zero target from a slipped minus and
+graded every board amber against a line nobody drew. Not finite or below 0 is null; the cap at 100
+stays, because it was pinned as the decision on 2026-09-04.
 The general shape: **a nullable numeric setting whose zero is meaningful cannot borrow the
 positive-or-null coercion** `outlierDays` and `featureAgedDays` use, and `PERCENT_SETTINGS` exists
 beside `NULLABLE_SETTINGS` for exactly that reason.

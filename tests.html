@@ -9755,6 +9755,17 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(redBox.value, '', 'and stays empty');
   typeBoundary(redBox, '40');
   is(redBox.value, '40', 'a number in range is left exactly as typed');
+  /* A SLIPPED MINUS IS NOT A ZERO (2026-09-10, evening audit). On a share, 0 is
+     a real target — "nothing past the threshold, ever" — so `-5` clamped to 0
+     graded every board amber against a line nobody drew. It clears the box. */
+  typeBoundary(redBox, '-5');
+  is(storedRed(), null, 'a typed minus stores nothing rather than a real zero target');
+  is(redBox.value, '', 'and the box is emptied once it is left');
+  typeBoundary(redBox, '-0.5');
+  is(storedRed(), null, 'however small the negative');
+  typeBoundary(redBox, '0');
+  is(storedRed(), 0, 'while a typed 0 is the real target it says');
+  is(redBox.value, '0', 'and the box keeps it');
   setBounds(null, null);
 
 

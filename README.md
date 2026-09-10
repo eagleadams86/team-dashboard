@@ -2254,7 +2254,9 @@ changed is that it is no longer alone.
 the boundaries are whole percents, so the comparison is made in whole percents too: a board at 1
 of 3 reads 33% and is *on target* against a boundary of 33, not a hair over it. A boundary typed
 with a decimal is stored as the whole percent it will be named as, one typed over 100 is stored as
-100, and the box shows the stored number once you leave it.
+100, and the box shows the stored number once you leave it. A minus sign, or anything that is not a
+number, **clears** the box rather than becoming a zero — a share of 0% is a real target ("nothing
+past the threshold, ever"), and a slipped key must not draw that line for you.
 
 **The first boundary must be at or below the second.** Green above red is not a scale with its
 bands swapped, it is no scale, so the app grades nothing and says so under the two boxes in
