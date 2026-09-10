@@ -17031,10 +17031,43 @@ const SCORECARD_CARDS = [
     get: (d) => d.summary.avgCycleTime,
     fmt: (v) => num1(v),
     dir: ['longer', 'shorter'], moveNoun: 'days',
-    why: (d, ctx) => ctx.anyFeatures
-      ? 'No feature finished in this window across the teams in scope.'
-      : 'No team in scope has any features yet — set which work types mean a feature in '
-        + 'Settings, and paste an export with a Parent key column.'
+    /* THREE DIFFERENT FINDINGS, and the first version of this card said the
+       middle one about all three. Reported by Charles on 2026-09-10 against a
+       real board: the card read "no feature finished in this window" over nine
+       teams, which is a claim the app had not checked — a feature layer nobody
+       has set up, a window shorter than a feature, and an export with no start
+       date on its features all produce the same dash, and only one of them is
+       about this month's delivery. Two of the three are fixable in a minute and
+       the reader cannot act on any of them without being told which it is.
+       See the empty-state rule: a wrong reassurance is a wrong number. */
+    why: (d, ctx) => {
+      if (!ctx.featuresHeld) {
+        return 'No team in scope has any features. Check “Work types that mean a feature” in '
+          + 'Settings — the parse report on Your Data names the work types your export actually '
+          + 'carried, so the right word is on screen — and that the export has a Parent key column.';
+      }
+      const held = ctx.featuresHeld + ' feature' + (ctx.featuresHeld === 1 ? '' : 's');
+      /* `empty` here means nothing has completed ANYWHERE in this list, not
+         merely inside the window — so widening it is advice that would not
+         work, and saying so would be the app sending the reader after a
+         setting that was never the problem. */
+      if (d.empty) {
+        return 'None of the ' + held + ' these teams hold has completed yet, so there is no '
+          + 'time from start to completion to average. Every one of them is still open.';
+      }
+      const done = (d.summary && d.summary.completedTotal) || 0;
+      if (!done) {
+        return 'None of the ' + held + ' these teams hold completed in this window. '
+          + 'A feature routinely runs for weeks, so a short window often catches none — widen '
+          + 'the window above.';
+      }
+      /* Completed, but no duration: the one case that is about the EXPORT
+         rather than about the board, and the one nobody would guess at. */
+      return done + ' feature' + (done === 1 ? '' : 's') + ' completed in this window, but '
+        + (done === 1 ? 'it carries no start date' : 'none of them carries a start date')
+        + ', so there is no time from start to completion to average. A feature needs a start '
+        + 'date as well as a completion date — the same two dates a work item needs.';
+    }
   }
 ];
 
@@ -17208,15 +17241,47 @@ function renderScorecard() {
      run would be work nobody can see. */
   const base = { filterValue: '', months: view.months, bucket: 'week',
     customFrom: view.customFrom, customTo: view.customTo, forecastMode: 'off' };
+  const viewFor = (u, extra) => Object.assign({}, base, { unit: u }, extra || {});
+
+  /* ── ONE DATE FOR THE WHOLE PAGE ──────────────────────────────────────────
+     A rolling window is counted back from the end of the data it is derived
+     over, and the two lists here are different data: a board whose features
+     stopped being updated in June would give the Flow card a window ending in
+     June while the note above it named September, and nothing on screen would
+     say so. It is the same fault deriveTeams' shared date exists to prevent
+     between two TEAMS, one level along — "the last month" has to mean the same
+     month in all three cards or they cannot be read as one page.
+
+     Found 2026-09-10, from Charles's board: the Flow card was empty over nine
+     teams and the honest reason turned out to be a question about WHICH month
+     it was describing.
+
+     The first pass settles where each list ends; whichever is behind is derived
+     again against the later of the two. `asOf` is exactly the right tool here
+     and the only place on this page it is — it moves an end date LATER, which
+     is what a list that stops early needs, and it is why the window BEFORE this
+     one cannot use it (see priorViewOf). */
+  const first = {};
+  ['items', 'features'].forEach(u => {
+    first[u] = deriveTrain(inScope, state.settings, viewFor(u), state.stages, state.statuses);
+  });
+  const ends = ['items', 'features'].map(u => first[u].endDate).filter(Boolean);
+  const sharedEnd = ends.length ? new Date(Math.max(...ends.map(d => d.getTime()))) : null;
+
   const derived = {};
   ['items', 'features'].forEach(u => {
-    const d = deriveTrain(inScope, state.settings, Object.assign({}, base, { unit: u }),
-      state.stages, state.statuses);
+    /* Derived again only when this list actually ends earlier, which is the
+       uncommon case — an ordinary board pays two derives here, not four. */
+    const behind = sharedEnd && first[u].endDate && first[u].endDate < sharedEnd;
+    const d = behind
+      ? deriveTrain(inScope, state.settings, viewFor(u, { asOf: sharedEnd }),
+          state.stages, state.statuses)
+      : first[u];
     const prior = priorWindowOf(d);
     /* The prior derive is skipped entirely when there is no window before this
        one — "All" has none — rather than derived and thrown away. */
     const priorD = prior ? deriveTrain(inScope, state.settings,
-      priorViewOf(Object.assign({}, base, { unit: u }), prior), state.stages, state.statuses) : null;
+      priorViewOf(viewFor(u), prior), state.stages, state.statuses) : null;
     derived[u] = { d, prior, priorD };
   });
   const itemsD = derived.items.d, featD = derived.features.d;
@@ -17252,7 +17317,10 @@ function renderScorecard() {
   }
   none.hidden = true;
 
-  const ctx = { anyFeatures: inScope.some(t => (t.features || []).length) };
+  /* How many features are behind the Flow card, not merely whether there are
+     any: its empty state has to tell three findings apart and the count is what
+     separates the first from the other two. */
+  const ctx = { featuresHeld: inScope.reduce((n, t) => n + ((t.features || []).length), 0) };
   /* The one sentence that says what the reader is looking at and what it does
      NOT follow. Both halves matter: three figures with no unit named is a
      scorecard nobody can argue with, and a reader arriving from the dashboard

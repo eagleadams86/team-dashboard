@@ -644,6 +644,25 @@ Three things it will not do:
   card. Three figures fail in three different ways, and one shared dash would report a quality
   problem where there is only an absence.
 
+### One Window, Read Over Two Lists
+
+Two of the cards are derived over work items and one over features, and a rolling window is
+counted back from the end of the data it is derived over — so **the two would drift apart on
+their own**. A board whose features stopped being updated in June would give the Flow card a
+window ending in June while the note above it named September, and nothing on screen would say
+so. The two are pinned to the **later** of the two end dates, exactly as All Teams pins every
+team to one shared date, so *the last month* means the same month in all three cards.
+
+The Flow card's empty state then tells you **which** of four things is going on, because they are
+four different findings and only one of them is about this month's delivery:
+
+| What the card says | What to do |
+|---|---|
+| No team in scope has any features | Check *Work types that mean a feature* in Settings — the parse report on Your Data names the types your export actually carried |
+| None of the *N* features has completed yet | Nothing; they are all still open, and widening the window will not help |
+| None completed *in this window* | Widen the window — a feature routinely runs for weeks, so a one-month window often catches none |
+| *N* completed but none carries a **start date** | Fix the export: a feature needs a start date as well as a completion date, the same two a work item needs |
+
 ### The Bands Are Generated, Not Typed
 
 Set a pair of boundaries under **Grading** in Settings and the card draws its scale: `≤20%`,
