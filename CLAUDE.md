@@ -415,6 +415,11 @@ drew the line.** Both halves of the original argument were put to Charles and he
   The Predictability card checks `d.empty` BEFORE `d.agedDays == null`: the empty shape carries
   no threshold because it carries no window, and the card was telling a reader with the default
   14 days in force that no threshold was set.
+- **THE PAGE'S OWN EMPTY STATE TELLS THE TWO EMPTIES APART (same audit).** An empty derive WITH
+  an end date is a typed window nothing fell in, and "widen the dates" is right; one with no end
+  date is a board where nothing has finished anywhere, and the same advice would not work — the
+  fault the Flow card was fixed for, one level up. The future-row note survives into this state
+  too, instead of the note being cleared.
 - **AN EMPTY FLOW CARD HAS FIVE CAUSES AND MUST NAME THE ONE IT HAS.** No feature layer set up /
   every feature still open / none completed inside the window / every completed one over the
   outlier fence / completed but carrying no start date. Four of those are fixable in a minute,

@@ -10156,6 +10156,46 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('the scorecard tells a window miss from a board with nothing finished');
+
+  {
+    /* Both lists empty, two ways (2026-09-10, evening audit). Nothing finished
+       ANYWHERE is not a window problem, and "widen the dates" is the advice the
+       Flow card was fixed not to give about a still-open list; a typed window
+       after the last completion IS one, and widening is the answer. */
+    const bDoc = win.document;
+    const openOnly = [{ s: '2026-08-20', t: 'Story' }, { s: '2026-08-21', t: 'Bug' }];
+    plant({ teams: [{ id: 'be1', name: 'One', rows: openOnly, features: [{ s: '2026-08-01', t: 'Feature', i: 'AB-4' }] },
+                    { id: 'be2', name: 'Two', rows: openOnly, features: [] }], settings: {} });
+    win.renderAll();
+    win.selectTab('scorecard');
+    const bMonths = bDoc.getElementById('monthsSel');
+    const setB = (v) => { bMonths.value = v; bMonths.dispatchEvent(new win.Event('change', { bubbles: true })); };
+    setB('3');
+    const nothing = bDoc.getElementById('scorecardNone');
+    ok(!nothing.hidden, 'a board with nothing finished shows the empty state');
+    ok(/has finished anything yet/.test(nothing.textContent),
+       'and says nothing has finished', nothing.textContent);
+    ok(!/Widen/.test(nothing.textContent),
+       'without telling the reader to widen dates that are not the problem', nothing.textContent);
+
+    const doneRows = [{ c: '2026-06-01', s: '2026-05-20', t: 'Story' }];
+    plant({ teams: [{ id: 'be3', name: 'One', rows: doneRows, features: [] },
+                    { id: 'be4', name: 'Two', rows: doneRows, features: [] }], settings: {} });
+    win.renderAll();
+    win.selectTab('scorecard');
+    win.tdView.now().customFrom = '2026-07-01';
+    win.tdView.now().customTo = '2026-08-01';
+    setB('custom');
+    ok(/finished anything in the window above/.test(nothing.textContent),
+       'a typed window after the last completion is called a window miss', nothing.textContent);
+    ok(/Widen the dates/.test(nothing.textContent), 'and THAT one is told to widen', nothing.textContent);
+    win.tdView.now().customFrom = ''; win.tdView.now().customTo = '';
+    setB('3');
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('the flow card does not blame the export for an outlier fence');
 
   {

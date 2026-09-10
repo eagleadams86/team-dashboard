@@ -17723,12 +17723,21 @@ function renderScorecard() {
     none.textContent = (scope.length && !inScope.length)
       ? 'No team is ' + words.phrase + ' yet. Open Teams & Stages in the header and set a '
         + 'team’s ART to put it on ' + (scope.length === 1 ? 'this train' : 'one of them') + '.'
-      : inScope.some(t => t.rows.length)
+      /* TWO EMPTIES, AND THE ADVICE FITS ONLY ONE (2026-09-10, evening audit).
+         An empty derive that carries an end date is a WINDOW nothing fell in —
+         a typed pair of dates after the last completion — and widening it is the
+         answer. One with no end date is a board where nothing has finished
+         anywhere, and "widen the dates" is the exact advice the Flow card was
+         fixed not to give about a still-open list: it would not work. */
+      : inScope.some(t => t.rows.length) && (itemsD.endDate || featD.endDate)
         ? 'No team' + where + ' finished anything in the window above, so there is nothing to '
           + 'score. Widen the dates and the three figures appear.'
+      : inScope.some(t => t.rows.length)
+        ? 'No team' + where + ' has finished anything yet, so there is nothing to score. The '
+          + 'three figures appear with the first item that completes.'
         : 'No team' + where + ' has any work items yet. Paste an export on the Your Data tab, '
           + 'or add items by hand there.';
-    $('windowNote').innerHTML = '';
+    $('windowNote').innerHTML = futureNote(itemsD, featD).replace(/^<br>/, '');
     printHead('every team' + where, itemsD);
     return;
   }
