@@ -270,6 +270,19 @@ drew the line.** Both halves of the original argument were put to Charles and he
   marked band becomes the same colour as what is behind it, so the fill would remove the signal it
   was added to provide. Everything else the rule asks for is on the card twice over. **Do not
   "restore" the tint.**
+- **THE SCORECARD PINS ITS TWO DERIVES TO ONE END DATE** (2026-09-10, from Charles's board).
+  Two cards are derived over work items and one over features, and a rolling window is counted
+  back from the end of whatever it is derived over — so a board whose features are stale gives
+  the Flow card a different month from the one the note names, silently. `renderScorecard` takes
+  a first pass, finds the later of the two `endDate`s, and re-derives whichever is behind with
+  `asOf`. That is the ONE place on that page `asOf` is right — it moves an end date later, which
+  is what a list that stops early needs, and is exactly why the window BEFORE this one cannot use
+  it. Same argument as `deriveTeams`' shared date, one level along.
+- **AN EMPTY FLOW CARD HAS FOUR CAUSES AND MUST NAME THE ONE IT HAS.** No feature layer set up /
+  every feature still open / none completed inside the window / completed but carrying no start
+  date. Three of those are fixable in a minute, only one is about delivery, and the first version
+  of the card asserted the third about all four. A wrong reassurance is a wrong number, and the
+  "still open" case must NOT be given the widen-the-window advice, which would not work.
 - **A BAND LABEL IS GENERATED FROM THE BOUNDARIES, never typed.** `≤20%`, `21–40%`, `>40%` come
   out of the two stored numbers at the scale's own `dp`, so they cannot overlap or contradict what
   `rag()` does. The printed scorecard the feature was built from read *16-25* beside *>=25* and

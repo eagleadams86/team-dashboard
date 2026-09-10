@@ -9817,6 +9817,95 @@ group('ARTs — the grouping, and the boundary it crosses');
     plant({ teams: [], settings: {} });
   }
 
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the scorecard reads both of its lists over the SAME window');
+
+  {
+    /* A rolling window is counted back from the end of the data it is derived
+       over, and this page derives TWO lists. A board whose features stopped
+       being updated last year would otherwise give the Flow card a window
+       ending last year while the note above it named this month — the same
+       fault deriveTeams' shared date prevents between two teams, one level
+       along. Found on Charles's board on 2026-09-10. */
+    const scRows = [{ c: '2026-09-01', s: '2026-08-20', t: 'Story' },
+                    { c: '2026-09-02', s: '2026-08-21', t: 'Bug' }];
+    const oldFeatures = [{ c: '2025-02-05', s: '2025-01-01', t: 'Feature', i: 'AB-1' },
+                         { c: '2025-03-05', s: '2025-01-05', t: 'Feature', i: 'AB-2' }];
+    plant({ teams: [{ id: 'w1', name: 'One', rows: scRows, features: oldFeatures },
+                    { id: 'w2', name: 'Two', rows: scRows, features: [] }], settings: {} });
+    const wDoc = win.document;
+    win.renderAll();
+    win.selectTab('scorecard');
+    const months = wDoc.getElementById('monthsSel');
+    const setMonths = (v) => {
+      months.value = v;
+      months.dispatchEvent(new win.Event('change', { bubbles: true }));
+    };
+    setMonths('1');
+    const flow = () => [...wDoc.querySelectorAll('.sc-card')][2];
+    is(flow().querySelector('.sc-value').textContent.trim(), '—',
+       'a month whose FEATURES are a year stale states no figure');
+    ok(/completed in this window/.test(flow().querySelector('.sc-verdict').textContent),
+       'and says so, rather than quietly reporting last year’s month as this one',
+       flow().querySelector('.sc-verdict').textContent);
+    /* The proof it is not merely hidden: widen the window and the same features
+       produce a real figure, so the dash above was about the WINDOW. */
+    setMonths('all');
+    ok(/^\d/.test(flow().querySelector('.sc-value').textContent.trim()),
+       'widening the window to All brings the figure back',
+       flow().querySelector('.sc-value').textContent);
+    setMonths('3');
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the flow card says WHICH kind of empty it is');
+
+  {
+    /* FOUR findings, and the first version of this card said one of them about
+       all four: a feature layer nobody has set up, a board whose features are
+       all still open, a window shorter than a feature, and an export whose
+       features carry no start date all produce the same dash. Three are fixable
+       in a minute and none of them is about this month's delivery. A wrong
+       reassurance is a wrong number. */
+    const scRows = [{ c: '2026-09-01', s: '2026-08-20', t: 'Story' },
+                    { c: '2026-09-02', s: '2026-08-21', t: 'Bug' }];
+    const eDoc = win.document;
+    const say = (features) => {
+      plant({ teams: [{ id: 'e1', name: 'One', rows: scRows, features },
+                      { id: 'e2', name: 'Two', rows: scRows, features: [] }], settings: {} });
+      win.renderAll();
+      win.selectTab('scorecard');
+      const card = [...eDoc.querySelectorAll('.sc-card')][2];
+      return { value: card.querySelector('.sc-value').textContent.trim(),
+               why: card.querySelector('.sc-verdict').textContent };
+    };
+
+    const none = say([]);
+    is(none.value, '—', 'no features at all states no figure');
+    ok(/Work types that mean a feature/.test(none.why),
+       'and names the setting that turns the layer on — not a claim about delivery', none.why);
+
+    const open = say([{ s: '2026-08-01', t: 'Feature', i: 'AB-1' }]);
+    ok(/still open/.test(open.why),
+       'every feature still open says exactly that, and does NOT send the reader to widen a '
+       + 'window that would not help', open.why);
+    ok(!/widen/.test(open.why), 'so no widening advice is given', open.why);
+
+    const noStart = say([{ c: '2026-09-05', t: 'Feature', i: 'AB-1' }]);
+    ok(/no start date/.test(noStart.why),
+       'a feature that completed with no start date is called out as an EXPORT problem — the '
+       + 'one case nobody would guess at', noStart.why);
+    ok(/1 feature completed/.test(noStart.why), 'and the count is stated', noStart.why);
+
+    /* And the ordinary case still reads as a figure, so none of the above is
+       firing when it should not. */
+    const real = say([{ c: '2026-09-05', s: '2026-08-01', t: 'Feature', i: 'AB-1' }]);
+    ok(/^\d/.test(real.value), 'a feature with both dates states a figure', real.value);
+    plant({ teams: [], settings: {} });
+  }
+
   /* ────────────────────────────────────────────────────────── */
   group('the demo dialog says what THIS browser will see graded');
 
