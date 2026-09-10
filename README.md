@@ -2137,6 +2137,26 @@ progress and aged work, ages are read **as of the newest date in your data**, no
 paste of last quarter's export reports that quarter rather than ageing everything by the months
 since.
 
+### Dates in the Future
+
+**No window is read as of a date that has not happened.** "The newest date in your data" means
+the newest date that has actually arrived — a rolling window, a typed **To** box and the shared
+end date the Scorecard imposes on its two lists are all held at today at the latest.
+
+This matters more than it sounds, and it is the reason the item form has always refused a future
+date outright: work in progress and aged work are read **at the window's end**, so an end date
+three months out ages every open item for free. One feature with a planned start in December did
+exactly that to the Scorecard on 10 September 2026 — the page reported *30 Nov to 31 Dec*, with
+nothing completed in it, every still-open item long past the threshold, and an aged share of
+**100%**. Everything on screen was arithmetically correct and none of it was about the present.
+
+A paste has never been held to the form's guard and still isn't — nothing is dropped, because a
+row dated next year is still a row and it is yours to fix. What changed is that it can no longer
+move the window, it no longer counts towards how fresh the export is, and **the note under the
+date picker says it is there**: *1 feature dated after today — the window stops at Sep 10, 2026*.
+On the Scorecard the note reads both lists, because the row that caused this was in the one that
+page does not show.
+
 ## Aged Share of WIP: the Count in Proportion
 
 The **Aged work** tile counts the items that have been open too long. This one says what

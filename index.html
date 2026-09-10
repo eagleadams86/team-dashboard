@@ -8899,6 +8899,39 @@ function derive(rows, settings, view, stages, statuses) {
       : rows.slice())
     .filter(r => r.completed || r.started);
 
+  /* ── Rows dated after today ────────────────────────────────────────────────
+     The reader's OWN calendar day, read as a UTC midnight so it compares with
+     the rows — the same split `buildForecast` draws, and the same one the item
+     form's future-date guard draws. A UTC "today" would be tomorrow for anyone
+     far enough east and would let a row through for a day.
+
+     THE ITEM FORM HAS REFUSED FUTURE DATES SINCE IT WAS BUILT, in those words:
+     "Every window on the dashboard is measured back from the newest date in
+     your data, so one item dated next year would empty every chart." A PASTE
+     has never been held to that, and on 2026-09-10 Charles's Scorecard proved
+     why it matters — one feature with a planned start in December moved the
+     shared end date to 31 December, and the whole page reported a window three
+     months into the future: nothing completed in it, every still-open item long
+     past the threshold, and an aged share of 100%.
+
+     Counted off `rows` and not `items`, like `dataEnd` below it: this is a fact
+     about the export rather than about the work type on screen. The clamp is
+     below, at the window; nothing is dropped here, because a row dated next
+     year is still a row and the reader is the one who has to fix it. */
+  const todayUTC = new Date(todayLocalISO() + 'T00:00:00Z');
+  let futureRows = 0;
+  for (const r of rows) {
+    if ((r.completed && r.completed > todayUTC) || (r.started && r.started > todayUTC)) futureRows++;
+  }
+  /* A date that has not happened yet is not evidence of anything, so neither of
+     the two scans below will read one. `dataEnd` is how fresh this export is and
+     a planned date does not make it fresh — worse, it would make a team three
+     weeks behind everyone else read as the most current on the board, which is
+     the exact finding that column exists to produce. `endDate` is where the
+     window hangs off, and the whole fault. Both take the newest date that has
+     actually arrived; `futureRows` above is what says the others are there. */
+  const arrived = (dt) => dt && dt <= todayUTC ? dt : null;
+
   /* When this team's export stops, and so how fresh everything below it is. The
      All teams table states it in a column of its own, because a team three weeks
      behind everyone else has three weeks of zero throughput dragging its rate
@@ -8913,8 +8946,9 @@ function derive(rows, settings, view, stages, statuses) {
      to date. Taken before the shared date below can move anything, too. */
   let dataEnd = null;
   for (const r of rows) {
-    if (r.completed && (!dataEnd || r.completed > dataEnd)) dataEnd = r.completed;
-    if (r.started && (!dataEnd || r.started > dataEnd)) dataEnd = r.started;
+    const c = arrived(r.completed), st = arrived(r.started);
+    if (c && (!dataEnd || c > dataEnd)) dataEnd = c;
+    if (st && (!dataEnd || st > dataEnd)) dataEnd = st;
   }
 
   /* Items still in progress. They contribute nothing to throughput, quality or
@@ -8929,8 +8963,9 @@ function derive(rows, settings, view, stages, statuses) {
      last quarter's export should show last quarter, not an empty chart. */
   let endDate = null;
   for (const r of items) {
-    if (r.completed && (!endDate || r.completed > endDate)) endDate = r.completed;
-    if (r.started && (!endDate || r.started > endDate)) endDate = r.started;
+    const c = arrived(r.completed), st = arrived(r.started);
+    if (c && (!endDate || c > endDate)) endDate = c;
+    if (st && (!endDate || st > endDate)) endDate = st;
   }
 
   /* Every metric here keys off a completion, so with none there is no axis and
@@ -8945,7 +8980,7 @@ function derive(rows, settings, view, stages, statuses) {
      always guarding. */
   if (!finished.length) return {
     empty: true, weeks: [], startDate: null, endDate: null,
-    dataEnd, inProgressCount: items.length
+    dataEnd, futureRows, inProgressCount: items.length
   };
 
   /* ── One shared date, for a comparison across teams ─────────────────────────
@@ -8986,6 +9021,21 @@ function derive(rows, settings, view, stages, statuses) {
      past the typed end or past the data. deriveTeams derives the train under the
      same window, so the date it shares is already inside it. */
   if (custom && custom.to < endDate) endDate = custom.to;
+  /* ── AND NEVER PAST TODAY ──────────────────────────────────────────────────
+     Last of the three, so it beats all of them: a typed `to` in the future, an
+     `asOf` shared from a list whose own newest date is in the future, and the
+     data's own newest date. Every one of those is the same fault wearing a
+     different hat, and it is the fault the custom clamp above already names in
+     full — work in progress and aged work are read AT THE WINDOW'S END, so an
+     end date next month ages every open item by a month for free.
+
+     It cannot move a window EARLIER than the data: today is by definition not
+     before a date that has already happened, so a paste of last quarter's
+     export still shows last quarter, which is the promise the whole "as of the
+     newest date, not today" rule is made of. All this says is that the newest
+     date it will read as of is today's. See `futureRows` above for what put it
+     here, and `futureNote` for where the screen says so. */
+  if (endDate > todayUTC) endDate = todayUTC;
   /* "All" means no start bound at all. */
   /* "All" means no start bound at all; a PI is a fixed number of WEEKS, where
      every other option is a number of months. It is the one window here that is
@@ -9977,6 +10027,11 @@ function derive(rows, settings, view, stages, statuses) {
         ? (wip.length ? wip[wip.length - 1] : 0) / monthlyThroughput : null
     },
     itemCount: items.length,
+    /* How many rows are dated after today — nought on every ordinary export.
+       Carried out of derive rather than recounted by the views, so the three
+       window notes that state it cannot disagree with the clamp that acted on
+       it. See the count itself for what it is for. */
+    futureRows,
     /* How many of those the WINDOW covers: what finished inside it, plus what is
        open now. `itemCount` beside it is every item this team holds — the window
        trims weeks, not rows, which is deliberate and pinned — and the two are
@@ -13631,6 +13686,34 @@ function customNote(d) {
   return '<br>Both dates are needed, and From must come before To.';
 }
 
+/* ── When the export runs past today ────────────────────────────────────────
+   '' on every ordinary board, which is what it is for: the sentence exists to
+   be absent. When it is not, it names the count and the date the window was
+   held at, because both halves are what a reader needs to act — the count says
+   how big the mistake is and the date says what they are looking at instead.
+
+   TAKES SEVERAL DERIVES, not one, because the Scorecard reads two lists and the
+   fault that put this here was in the one it does not show. A future-dated
+   FEATURE moved the whole page's window, so a note written off the items derive
+   alone would have said nothing on the exact screen that was wrong.
+
+   Each list names its own unit: "1 feature" and "3 items" are different fixes
+   on different tabs, and "4 rows" would send a reader to the wrong paste box. */
+function futureNote() {
+  const parts = [], ds = [...arguments].filter(d => d && d.futureRows);
+  for (const d of ds) {
+    /* The fallback is for the EMPTY derive, whose shape carries no unit words —
+       a board where every row is dated next year finishes nothing, so it takes
+       that return, and it is the board that most needs this sentence. */
+    parts.push(d.futureRows + ' '
+      + (d.futureRows === 1 ? (d.unitOne || 'row') : (d.unitMany || 'rows')));
+  }
+  if (!parts.length) return '';
+  const stop = ds[0].endDate;
+  return '<br>' + parts.join(' and ') + ' dated after today'
+    + (stop ? ' &mdash; the window stops at ' + prettyDate(stop) : '');
+}
+
 function itemsInWindow(d) {
   const inWindow = d.windowItemCount == null ? d.itemCount : d.windowItemCount;
   const all = d.itemCount;
@@ -15050,7 +15133,7 @@ function renderDashboard() {
      browser resolves to window.name and would put whatever the last page in this
      tab called itself on somebody's printout. */
   if (activeTab === 'dashboard') printHead((team && team.name.trim()) || 'This team', d);
-  if (activeTab === 'dashboard') $('windowNote').innerHTML = span + customNote(d) + '<br>' +
+  if (activeTab === 'dashboard') $('windowNote').innerHTML = span + customNote(d) + futureNote(d) + '<br>' +
     d.buckets.length + ' ' + (d.buckets.length === 1 ? d.bucketNoun : d.bucketNounPlural) +
     ' &middot; ' + itemsInWindow(d) + outlierNote(d) +
     (d.inProgressCount ? ' (' + d.inProgressCount + ' in progress)' : '') +
@@ -16932,7 +17015,8 @@ function renderAllTeams() {
      one corner of the page where the length of a sentence moves everything
      under it. On paper neither is lost: printHead() above puts the scope in the
      print-only line, which is the sentence a printout is read by. */
-  $('windowNote').innerHTML = span + customNote(train) + '<br>' + 'every team, as of the same date' +
+  $('windowNote').innerHTML = span + customNote(train) + futureNote(train)
+    + '<br>' + 'every team, as of the same date' +
     '<br>' + itemsInWindow(train) + ' across ' +
     inScope.length + ' team' + (inScope.length === 1 ? '' : 's') +
     /* NOT outlierNote(train). Every row in this table ignores its own team's
@@ -17514,7 +17598,11 @@ function renderScorecard() {
     : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(itemsD.endDate) + '</strong>';
   const p = derived.items.prior;
   printHead('every team' + (words.phrase ? ' ' + words.phrase : ''), itemsD);
-  $('windowNote').innerHTML = span + customNote(itemsD) +
+  /* BOTH derives, and the reason is the fault this note was added for: the
+     future-dated row that moved this page's window was a FEATURE, and a note
+     written off the items derive alone would have been silent on the one screen
+     that was wrong. */
+  $('windowNote').innerHTML = span + customNote(itemsD) + futureNote(itemsD, featD) +
     '<br>' + (p
       ? 'against <strong>' + prettyDate(p.from) + '</strong> to <strong>'
         + prettyDate(p.to) + '</strong>, the ' + p.days + ' days before'

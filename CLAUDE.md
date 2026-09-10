@@ -203,6 +203,37 @@ argument that killed `completed` was never the real constraint; header lines are
   already has in the feature view, with Data to as the column that explains patchy data.
 - No third ⓘ: its note opens from the tile of the same name. The count is pinned beside it.
 
+## No window is read as of a date that has not happened (2026-09-10)
+
+Charles's own board: *"the preset dates are broken on the scorecard tab. they are showing future
+dates with no data."* **One feature with a planned start on 31 December** moved the Scorecard's
+shared end date to 31 December, so "1 month" reported 30 Nov to 31 Dec — nothing completed, every
+still-open item long past the threshold, aged share **100%**. Reproduced exactly in the console
+before a line was changed; the repro is now a test.
+
+- **The item form has refused future dates since it was built**, in exactly these words: "Every
+  window on the dashboard is measured back from the newest date in your data, so one item dated
+  next year would empty every chart." **A PASTE was never held to that.** The hole was in the
+  paste path, not in the Scorecard — the Scorecard is only where it showed, because `asOf` carries
+  one list's end date onto the other and the future-dated row was a FEATURE.
+- **`arrived()` gates BOTH date scans.** `endDate` and `dataEnd` read only dates that have already
+  happened. `dataEnd` matters as much as `endDate` and is easy to miss: a planned date would make
+  the team three weeks behind everyone else read as the most current on the board, which is the
+  exact finding that column exists to produce.
+- **The clamp at the window is belt and braces and must stay.** `if (endDate > todayUTC)` comes
+  LAST, after `asOf` and after the custom `to`, because those are the two ways a future date can
+  arrive without passing a date scan. A test forces each one.
+- **NOTHING IS DROPPED.** A row dated next year is still a row; `futureRows` counts them and
+  `futureNote()` says so under the date picker on all three tabs. **The Scorecard passes BOTH
+  derives** — a note written off the items derive alone would have been silent on the exact screen
+  that was wrong.
+- **`todayLocalISO()` + `T00:00:00Z`, never a UTC today** — the same split `buildForecast` and the
+  item form's guard already draw. A UTC "today" is tomorrow for anyone far enough east.
+- **A test fixture with a long-running item must clear today by its own length.** The outlier
+  fixture ran a 400-day item from January 2026 and landed in February 2027; five checks went red
+  because there was no longer anything for the fence to catch. Its base is 2024 now, and the
+  comment says why.
+
 ## Aged Share of WIP (2026-09-04) — SCHEMA 14 → 15
 
 Asked for after Charles demoed the app: *"percentage of Aged work compared to WIP would be a

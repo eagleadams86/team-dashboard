@@ -390,7 +390,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    up. The pair asserting which columns draw a trace is the one to keep: the data
    for three more exists and drawing it would be wrong, so a fourth has to be a
    deliberate act rather than an easy one. */
-const EXPECTED = 3570;
+const EXPECTED = 3585;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -2786,8 +2786,15 @@ async function run(TD, win) {
   group('ignoring an outlier removes a duration, never a delivery');
   {
     /* Twenty-four ordinary items and one monster, so the fence has a sample to
-       work from and exactly one thing to catch. */
-    const day = 86400000, base = Date.UTC(2026, 0, 5), rows = [];
+       work from and exactly one thing to catch.
+
+       THE BASE IS FAR ENOUGH BACK THAT THE MONSTER STILL FINISHES IN THE PAST,
+       and that is a requirement rather than a date somebody liked: it runs for
+       400 days, and derive() reads no date that has not happened yet, so a base
+       of January 2026 put its completion in February 2027 and the fence had
+       nothing to catch. Any fixture with a long-running item has to clear
+       today by its own length. */
+    const day = 86400000, base = Date.UTC(2024, 0, 5), rows = [];
     for (let i = 0; i < 24; i++) {
       const s = new Date(base + i * 3 * day);
       rows.push({ started: s, completed: new Date(s.getTime() + (2 + i % 8) * day),
@@ -3694,6 +3701,79 @@ async function run(TD, win) {
     is(ng('20'), 20, 'including one a hand-edited backup wrote as a string');
     is(win.TDState.normalizeSettings({ agedShareRed: 40 }).agedShareRed, 40,
        'and the red boundary takes the same clamp');
+  }
+
+  /* ── No window is read as of a date that has not happened ──────────────────
+     Found on Charles's own board on 2026-09-10, and the Scorecard is where it
+     showed: ONE FEATURE with a planned start in December moved the page's shared
+     end date to 31 December, so "1 month" reported 30 Nov to 31 Dec — nothing
+     completed in it, every still-open item long past the threshold, and an aged
+     share of 100%. The item form has refused future dates since it was built,
+     in those words; a paste never was.
+
+     Dated relative to TODAY on purpose. A fixed future date would stop being one
+     eventually and the test would quietly go green on a build that had lost the
+     clamp. */
+  {
+    const dayMs = 86400000;
+    const t = new Date();
+    const today = new Date(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()));
+    const back = (n) => new Date(today.getTime() - n * dayMs);
+    const fwd  = (n) => new Date(today.getTime() + n * dayMs);
+    const S14 = win.TDState.normalizeSettings({ agedDays: 14 });
+    const V = { filterValue: '', months: '1', bucket: 'week' };
+
+    const items = [
+      { started: back(70), completed: back(50), type: 'Story' },
+      { started: back(40), completed: back(6),  type: 'Story' },
+      { started: back(60), completed: null,     type: 'Story' }
+    ];
+    const feats = [
+      { started: back(100), completed: back(45), type: 'Feature' },
+      /* The culprit: planned, not started. */
+      { started: fwd(112),  completed: null,     type: 'Feature' }
+    ];
+    const di = TD.derive(items, S14, V);
+    const df = TD.derive(feats, S14, Object.assign({}, V, { unit: 'features' }));
+
+    is(di.futureRows, 0, 'an ordinary list has nothing dated after today');
+    is(df.futureRows, 1, 'and the count finds the one planned feature');
+    ok(df.endDate <= today,
+       'whose date does NOT become the end of the features window',
+       df.endDate && df.endDate.toISOString().slice(0, 10));
+    ok(df.dataEnd <= today,
+       'nor the freshness date — a planned date must not make a stale export read as current',
+       df.dataEnd && df.dataEnd.toISOString().slice(0, 10));
+
+    /* The Scorecard's own shape: the later of the two ends is imposed on the
+       list that is behind. That is what carried the future date across. */
+    const shared = new Date(Math.max(di.endDate.getTime(), df.endDate.getTime()));
+    ok(shared <= today, 'so the date the Scorecard shares between its two lists is not in the future');
+    const pushed = TD.derive(items, S14, Object.assign({}, V, { asOf: shared }));
+    ok(pushed.endDate <= today, 'and the window it imposes ends today at the latest');
+    ok(pushed.summary.agedShareAvg < 1,
+       'so the aged share is a reading of real weeks rather than the 100% a dead window gives',
+       String(pushed.summary.agedShareAvg));
+
+    /* `asOf` is the one field a caller can put a future date into directly, so
+       the clamp has to hold against it and not only against the data. */
+    const forced = TD.derive(items, S14, Object.assign({}, V, { asOf: fwd(200) }));
+    ok(forced.endDate <= today, 'an asOf in the future is capped at today, not obeyed');
+
+    /* A typed window may not reach past today either — the same fault with the
+       reader's own hands on it. */
+    const typed = TD.derive(items, S14, { filterValue: '', months: 'custom',
+      customFrom: back(30).toISOString().slice(0, 10),
+      customTo: fwd(60).toISOString().slice(0, 10), bucket: 'week' });
+    ok(typed.endDate <= today, 'and so is a To box typed past today');
+
+    /* THE SCREEN HAS TO SAY SO, or the clamp is the app quietly disagreeing with
+       an export the reader still believes. Both derives are passed, because the
+       row that caused this was in the list the Scorecard does not show. */
+    const note = win.futureNote(di, df);
+    ok(/1 feature dated after today/.test(note), 'the note names the count and the unit', note);
+    ok(/window stops at/.test(note), 'and the date the window was held at instead', note);
+    is(win.futureNote(di), '', 'and it is silent on a board with nothing to say');
   }
 
   /* The coaching ratio: work in progress against a month of throughput. */
