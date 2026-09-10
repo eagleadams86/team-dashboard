@@ -1157,8 +1157,9 @@ buttons.
 Because it opens over the dashboard rather than replacing it, a change lands on the charts behind
 it — rename the defect word and the chart titles follow while the window is still open.
 
-**Seven sections, each ruled off from the one above it** — *Labels & Work Types*, *Aged Work*,
-*Grading*, *Features*, *Working Days*, *Unusually Long Items* and *Work Type Filter List*. Until
+**Eight sections, each ruled off from the one above it** — *Labels & Work Types*, *Aged Work*,
+*Grading*, *Features*, *Your Week*, *Working Days*, *Unusually Long Items* and *Work Type Filter
+List*. Until
 2 Sep 2026 the window had two headings covering six unrelated things, so everything from the
 ageing thresholds down read as one long column of prose with no way to see where a setting
 ended; the Teams & Stages window beside it is ruled off the same way. *Grading* was cut out of
@@ -1204,6 +1205,27 @@ Everything the charts depend on, shared by all your teams:
   share in whole percents, the defect share to a tenth of a percent (which is what its dashboard
   tile shows), the feature cycle time to a tenth of a day. A boundary the app would round is a
   boundary you never typed.
+- **Weeks start on** — **Sunday** by default, which is what every build before 10 Sep 2026 did.
+  Pick any day and a week runs from it: choose **Wednesday** and your weeks run *Wednesday to
+  Tuesday*.
+
+  **The day the week ENDS on is the half that moves figures.** Work in progress, aged work and
+  the [aged share](#aged-share-of-wip-the-count-in-proportion) are not counts over a period — they
+  are *levels read at the end of one*, so on a board whose sprints end on a Tuesday, a week that
+  ended on Saturday was reading the board three days into the next sprint. The aged share averages
+  fourteen of those readings, so it was fourteen readings taken on the wrong day.
+
+  It moves **every weekly and fortnightly bucket in the app**, not just one tab: the same week has
+  to mean the same week on the dashboard, on All Teams and on the Scorecard, or the three cannot
+  be read as one product. *Group by 2 weeks* pairs the same weeks, and the week numbers along
+  every axis move with it — **they have never been ISO week numbers** (ISO weeks begin on Monday
+  and are numbered by their Thursday); this app has always numbered from the week containing 1
+  January, and all that changed is that it now asks which day yours begin on instead of assuming
+  Sunday. Calendar months are untouched: a month is a month whatever the week says.
+
+  Global rather than per team, like everything else in this window. Two teams on one train keeping
+  different weeks would make the All Teams table a comparison of different periods, which is the
+  fault [one shared date](#one-shared-date-and-why-it-matters) exists to prevent one level along.
 - **Count working days only (Monday to Friday)** — off by default. On, cycle time, lead time
   and the ageing threshold skip weekends: an item started on a Friday and finished on the
   Monday takes one day, not three. It is one switch for all three, because a screen mixing the

@@ -4002,6 +4002,41 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       items to the features they belong to.</p>
   </section>
 
+  <!-- ── YOUR WEEK ────────────────────────────────────────────────────────────
+       Its own section rather than a third line inside Working Days below, and
+       the two are not the same question: that one is about whether a weekend
+       COUNTS, this one is about where a week BEGINS. A reader looking for one
+       under the other's heading would not find it.
+
+       One field, so it takes the `.pairs` span — a lone odd child stretches to
+       the full width rather than being left beside a hole. See the rule at
+       `.grid.two.pairs > :last-child:nth-child(odd)`. -->
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Your Week</strong>
+    </div>
+    <p class="manage-note">Which day a week starts on &mdash; and so which day every weekly
+      figure is read at the end of.</p>
+    <div class="grid two pairs" style="margin-top:var(--sp-5)">
+      <div>
+        <label for="setWeekStart">Weeks start on</label>
+        <select id="setWeekStart">
+          <option value="0">Sunday</option>
+          <option value="1">Monday</option>
+          <option value="2">Tuesday</option>
+          <option value="3">Wednesday</option>
+          <option value="4">Thursday</option>
+          <option value="5">Friday</option>
+          <option value="6">Saturday</option>
+        </select>
+      </div>
+    </div>
+    <!-- Written by renderSettings, because the sentence has to NAME BOTH DAYS
+         and the second is the one that matters: every weekly figure here is a
+         reading taken at a bucket's end. A static hint could name neither. -->
+    <p class="hint" id="weekStartHint" style="margin-top:var(--sp-3)"></p>
+  </section>
+
   <section class="manage-sec">
     <div class="row spread">
       <strong class="manage-head">Working Days</strong>
@@ -4599,12 +4634,54 @@ function startOfWeekdayOrdinal(k) {
   return (weeks * 7 + (k - 1 - weeks * 5) + WEEKDAY_EPOCH) * DAY_MS;
 }
 
-/* The Sunday on or before d — the start of the week every metric buckets into. */
-function priorSunday(d) { return addDays(d, -(weekdayNum(d) - 1)); }
+/* ── Which day a week starts on ──────────────────────────────────────────────
+   0 is Sunday and 6 is Saturday, the numbering `Date.getUTCDay` uses, so the
+   value can go straight into a `<select>` and come back out of a backup without
+   a lookup table in between.
 
-/* Week number where the week containing Jan 1 is week 1 and weeks start on
-   Sunday. JS has no equivalent, so count Sundays from the Sunday on or before
-   Jan 1.
+   IT DEFAULTS TO SUNDAY EVERYWHERE, and the default is not a preference — it is
+   what this app did before 2026-09-10, so a browser that never opens the
+   setting sees every figure and every axis label exactly where it left them.
+   Every function below takes it as a trailing argument for the same reason:
+   a caller that passes one fewer argument gets the old behaviour, which is the
+   shape `derive()` already uses for `stages`.
+
+   ASKED FOR BY CHARLES, whose PIs run Wednesday to Tuesday: the aged share is
+   averaged over a reading taken at the END of each week, and a week that ended
+   on Saturday was taking that reading three days into the next sprint. */
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+  'Friday', 'Saturday'];
+
+/* Positive-integer-or-default, and the same reasoning as every other setting
+   that rides into a share link: this is attacker-controlled text until it has
+   been through here, and a week starting on day 11 would put every bucket key
+   somewhere nothing reads back. Out of range is the DEFAULT rather than clamped
+   into range — 6.5 and "wat" are not opinions about Saturday. */
+function cleanWeekStart(v) {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n <= 6 ? n : 0;
+}
+
+/* The last day of a week that starts on `ws` — what the reader actually picks
+   out of the setting, because a week is named by the day it ENDS on wherever
+   sprints are. Sunday-start ends on Saturday. */
+function weekEndDow(ws) { return (cleanWeekStart(ws) + 6) % 7; }
+
+/* The start of the week containing d, for a week starting on `ws`. */
+function weekStartOn(d, ws) {
+  return addDays(d, -((((weekdayNum(d) - 1) - cleanWeekStart(ws)) + 7) % 7));
+}
+
+/* The Sunday on or before d. Kept as a name of its own because it is what a
+   week start IS when nobody has said otherwise, and because it reads better at
+   the two call sites that genuinely mean Sunday. */
+function priorSunday(d) { return weekStartOn(d, 0); }
+
+/* Week number where the week containing Jan 1 is week 1. JS has no equivalent,
+   so count week starts from the week start on or before Jan 1. NOT ISO, and
+   never was — ISO weeks begin on Monday and number by the Thursday. This has
+   been a house convention since the first build; all that changed on 2026-09-10
+   is that the house gets to say which day it begins on.
 
    THE WEEK HOLDING 1 JANUARY BELONGS TO THE NEW YEAR (2026-09-01), so a week
    is numbered — and, in weekKey, yeared — against the year its SATURDAY is
@@ -4614,22 +4691,22 @@ function priorSunday(d) { return addDays(d, -(weekdayNum(d) - 1)); }
    its 2nd. Week 01 never appeared; the axis ran 52, 53, 02. Read off the
    Saturday, the same week is 2026-01 and the next 2026-02, and a year with
    53 Sundays still gets a 53. */
-function weekNumber(d) {
-  const sunday = priorSunday(d);
-  const year = addDays(sunday, 6).getUTCFullYear();
-  const jan1Sunday = priorSunday(utcDate(year, 1, 1));
-  return Math.floor(diffDays(sunday, jan1Sunday) / 7) + 1;
+function weekNumber(d, ws) {
+  const start = weekStartOn(d, ws);
+  const year = addDays(start, 6).getUTCFullYear();
+  const jan1Start = weekStartOn(utcDate(year, 1, 1), ws);
+  return Math.floor(diffDays(start, jan1Start) / 7) + 1;
 }
 
 /* "YYYY-WW" — the label a week is plotted under. A pure function of the WEEK:
-   every day of it, Sunday to Saturday, gives the same key. It used to read the
+   every day of it, first to last, gives the same key. It used to read the
    year off the day it was handed, so the week straddling New Year had two
    keys depending on which day asked — and a bucket keyed off a completion
    date was never read back under the Sunday's key, which is how cycle times
    once vanished for items completed in the first days of January. */
-function weekKey(d) {
-  const year = addDays(priorSunday(d), 6).getUTCFullYear();
-  return year + '-' + String(weekNumber(d)).padStart(2, '0');
+function weekKey(d, ws) {
+  const year = addDays(weekStartOn(d, ws), 6).getUTCFullYear();
+  return year + '-' + String(weekNumber(d, ws)).padStart(2, '0');
 }
 
 /* Same day-of-month n months away, clamped to the month's end. */
@@ -4661,14 +4738,19 @@ const FORTNIGHT_EPOCH = utcDate(1970, 1, 4);
 const BUCKET_NOUNS = { week: 'week', fortnight: 'fortnight', month: 'month' };
 
 /* The first day of the bucket containing d. */
-function bucketStart(d, bucket) {
+function bucketStart(d, bucket, ws) {
   if (bucket === 'month') return utcDate(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
-  const sun = priorSunday(d);
-  if (bucket !== 'fortnight') return sun;
-  const weeks = diffDays(sun, FORTNIGHT_EPOCH) / 7;       /* always a whole number */
+  const start = weekStartOn(d, ws);
+  if (bucket !== 'fortnight') return start;
+  /* THE PARITY ANCHOR MOVES WITH THE WEEK. The epoch is a Sunday, so with any
+     other week start the gap to it is not a whole number of weeks and the
+     fortnight would land on a half — the epoch's OWN week start is what keeps
+     the division exact whichever day a week begins on. */
+  const epoch = weekStartOn(FORTNIGHT_EPOCH, ws);
+  const weeks = diffDays(start, epoch) / 7;               /* always a whole number */
   /* ((n % 2) + 2) % 2 rather than n % 2: JS keeps the sign, so a date before
      1970 would otherwise step forward a week instead of back. */
-  return addDays(sun, -(((weeks % 2) + 2) % 2) * 7);
+  return addDays(start, -(((weeks % 2) + 2) % 2) * 7);
 }
 
 /* d must be a bucket start. */
@@ -4680,25 +4762,25 @@ function nextBucket(d, bucket) {
 function bucketEnd(d, bucket) { return addDays(nextBucket(d, bucket), -1); }
 
 /* The key a bucket is stored under. Weeks and fortnights both key off their
-   start Sunday through weekKey, so the New Year rule above covers both. */
-function bucketKey(d, bucket) {
+   start day through weekKey, so the New Year rule above covers both. */
+function bucketKey(d, bucket, ws) {
   if (bucket === 'month') {
     return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
   }
-  return weekKey(d);
+  return weekKey(d, ws);
 }
 
 /* What the x-axis draws. Identical to the key for weeks, so a weekly axis is
    unchanged; a fortnight shows both of its week numbers rather than looking
    like a week that skipped one. */
-function bucketLabel(d, bucket) {
+function bucketLabel(d, bucket, ws) {
   if (bucket === 'month') {
     return d.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', year: 'numeric' });
   }
   if (bucket === 'fortnight') {
-    return weekKey(d) + '/' + String(weekNumber(addDays(d, 7))).padStart(2, '0');
+    return weekKey(d, ws) + '/' + String(weekNumber(addDays(d, 7), ws)).padStart(2, '0');
   }
-  return weekKey(d);
+  return weekKey(d, ws);
 }
 
 /* A window between two typed dates, or null where the pair does not make one.
@@ -8820,6 +8902,13 @@ function derive(rows, settings, view, stages, statuses) {
      a test fixture written before buckets existed — still means "weekly". */
   const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
   const noun   = BUCKET_NOUNS[bucket];
+  /* Which day a week begins on, read once and handed to every bucket call
+     below. It is a SETTING and not a view field: "our weeks run Wednesday to
+     Tuesday" is a fact about the company, and a per-tab answer would be two
+     definitions of a week inside one app. Sunday unless somebody said
+     otherwise, which is what this app did before 2026-09-10 — see
+     cleanWeekStart for why that default is not a preference. */
+  const weekStartsOn = cleanWeekStart(settings.weekStart);
   /* Titles are Title Case, so the grouping word needs a capitalised form. */
   const Noun   = noun.charAt(0).toUpperCase() + noun.slice(1);
   /* ── What one of these things is called ──────────────────────────────────
@@ -9050,8 +9139,8 @@ function derive(rows, settings, view, stages, statuses) {
     : edate(endDate, -Number(view.months));
 
   /* The bucket starts either end of the window. */
-  const startPS = startDate ? bucketStart(startDate, bucket) : null;
-  const endPS   = bucketStart(endDate, bucket);
+  const startPS = startDate ? bucketStart(startDate, bucket, weekStartsOn) : null;
+  const endPS   = bucketStart(endDate, bucket, weekStartsOn);
 
   /* First bucket is the window start, or the earliest completed bucket if the
      window is "All"; then step to the bucket holding the newest date in the
@@ -9062,7 +9151,7 @@ function derive(rows, settings, view, stages, statuses) {
      positive, and a work-in-progress count taken days before the date the
      tile claimed. A trailing zero-throughput bar is true — nothing finished —
      where the front padding the floor below prevents would not be. */
-  const completedSundays = finished.map(r => bucketStart(r.completed, bucket));
+  const completedSundays = finished.map(r => bucketStart(r.completed, bucket, weekStartsOn));
   const minCompletedPS = new Date(minOf(completedSundays.map(d => d.getTime())));
   const limit = endPS;
 
@@ -9114,19 +9203,19 @@ function derive(rows, settings, view, stages, statuses) {
   for (const r of items) {
     /* Started counts every item that has a start date, finished or not. */
     if (r.started) {
-      const sk = bucketKey(bucketStart(r.started, bucket), bucket);
+      const sk = bucketKey(bucketStart(r.started, bucket, weekStartsOn), bucket, weekStartsOn);
       byStartedWeek.set(sk, (byStartedWeek.get(sk) || 0) + 1);
     }
     /* Intake keys off the created date, not the completion — a defect raised
        this month counts this month even if it is still open, which is the whole
        point of measuring what comes in against what goes out. */
     if (r.created && isUnplanned(r)) {
-      const rk = bucketKey(bucketStart(r.created, bucket), bucket);
+      const rk = bucketKey(bucketStart(r.created, bucket, weekStartsOn), bucket, weekStartsOn);
       defectsRaised.set(rk, (defectsRaised.get(rk) || 0) + 1);
     }
     if (!r.completed) continue;
 
-    const ck = bucketKey(bucketStart(r.completed, bucket), bucket);
+    const ck = bucketKey(bucketStart(r.completed, bucket, weekStartsOn), bucket, weekStartsOn);
     if (!byCompletedWeek.has(ck)) byCompletedWeek.set(ck, []);
     byCompletedWeek.get(ck).push(r);
   }
@@ -9165,7 +9254,7 @@ function derive(rows, settings, view, stages, statuses) {
      could do. Do not "finish the job" by filtering agedCounts. */
   const windowCycleTimes = [];
   for (const ws of weekStarts) {
-    for (const r of byCompletedWeek.get(bucketKey(ws, bucket)) || []) {
+    for (const r of byCompletedWeek.get(bucketKey(ws, bucket, weekStartsOn)) || []) {
       const ct = cycleTimeOf(r, sameDay, workingDays);
       if (ct != null) windowCycleTimes.push(ct);
     }
@@ -9179,7 +9268,7 @@ function derive(rows, settings, view, stages, statuses) {
   const excluded = new Set();
   if (outlierCutoff != null) {
     for (const ws of weekStarts) {
-      for (const r of byCompletedWeek.get(bucketKey(ws, bucket)) || []) {
+      for (const r of byCompletedWeek.get(bucketKey(ws, bucket, weekStartsOn)) || []) {
         const ct = cycleTimeOf(r, sameDay, workingDays);
         if (ct != null && ct > outlierCutoff) excluded.add(r);
       }
@@ -9209,9 +9298,9 @@ function derive(rows, settings, view, stages, statuses) {
   let unplannedTotal = 0;
 
   for (const ws of weekStarts) {
-    const key = bucketKey(ws, bucket);
+    const key = bucketKey(ws, bucket, weekStartsOn);
     weeks.push(key);
-    bucketLabels.push(bucketLabel(ws, bucket));
+    bucketLabels.push(bucketLabel(ws, bucket, weekStartsOn));
 
     const done = byCompletedWeek.get(key) || [];
     windowItems.push(...done);
@@ -9502,7 +9591,7 @@ function derive(rows, settings, view, stages, statuses) {
      so the scatter's x axis reads identically to the line chart's beside it. */
   const scatterPoints = [];
   weekStarts.forEach((ws) => {
-    const key = bucketKey(ws, bucket);
+    const key = bucketKey(ws, bucket, weekStartsOn);
     (byCompletedWeek.get(key) || []).forEach((r) => {
       const ct = cycleTimeOf(r, sameDay, workingDays);
       /* No start date, no cycle time — the item is finished work with an unknown
@@ -9884,6 +9973,20 @@ function derive(rows, settings, view, stages, statuses) {
        name every caller and every pinned test already knows it by. */
     weeks, buckets: weeks, bucketLabels,
     bucket, bucketNoun: noun, bucketNounPlural: noun + 's', partial,
+    /* Carried out so a view can NAME the two days without reaching for the
+       settings object again — the note under the picker and the ⓘ both say
+       "Wednesday to Tuesday", and reading it twice is how two sentences about
+       one week end up disagreeing. */
+    weekStartsOn, weekStartDay: WEEKDAY_NAMES[weekStartsOn],
+    weekEndDay: WEEKDAY_NAMES[weekEndDow(weekStartsOn)],
+    /* THE DATES THE LEVELS WERE READ AT — one per bucket, each the last day of
+       that bucket clamped to the end of the window. Work in progress, the aged
+       count and therefore the aged share are all taken at these and nowhere
+       else, which makes this the array the week-start setting exists to move:
+       a board whose sprints end on Tuesday was being read on Saturday. Carried
+       out so that is a fact a test can pin rather than infer from a bucket key
+       it cannot invert. */
+    evalPoints,
     throughput, unplannedRate, avgCycleTime, netFlow, started,
     avgLeadTime, p85LeadTime, defectCreatedRate, p85CycleTime, cyclePercentile: CYCLE_PERCENTILE,
     throughputBand: [THROUGHPUT_LOW_PERCENTILE, THROUGHPUT_HIGH_PERCENTILE],
@@ -10461,7 +10564,7 @@ function groupTeamsByArt(teams, arts) {
 
 /* Exposed for tests.html, which drives the real app in a hidden iframe. */
 window.TD = {
-  weekdayNum, priorSunday, weekNumber, weekKey, edate, workDaysBetween,
+  weekdayNum, priorSunday, weekStartOn, weekNumber, weekKey, edate, workDaysBetween,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
   cleanIssueKey,
@@ -10650,6 +10753,19 @@ const DEFAULT_SETTINGS = {
      that quietly re-measured a saved board would be worse than a missing
      setting. */
   workingDays: false,
+  /* Which day a week starts on: 0 Sunday … 6 Saturday, and Sunday is what this
+     app did before 2026-09-10. Asked for by Charles, whose PIs run Wednesday to
+     Tuesday — every weekly reading in this app is taken at the END of a bucket,
+     so a week that ended on Saturday was reading his board three days into the
+     next sprint, and the aged share averages fourteen of those readings.
+
+     A SETTING and not a view field, so it survives a reload and rides into a
+     backup and a share link like the rest of this object: it is a fact about
+     the company rather than a way of looking at one screen. Global rather than
+     per team for the same reason — two teams on one train with different weeks
+     would make the All Teams table a comparison of different periods, which is
+     the fault the shared end date exists to prevent one level along. */
+  weekStart: 0,
   cycleTimeLabel: 'Cycle Time',
   /* OFF, and it should stay off for most boards. The median and the 85th
      percentile this dashboard leads with already resist a long tail by
@@ -11425,6 +11541,9 @@ function normalizeSettings(raw) {
      silently, so a setting that became undefined would read as "never set" on
      the next load rather than announcing itself. */
   s.workingDays = s.workingDays === true;
+  /* 0 to 6 or Sunday — see cleanWeekStart, which is shared with the readers so
+     an unnormalised settings object cannot bucket differently from a saved one. */
+  s.weekStart = cleanWeekStart(s.weekStart);
   /* Three literals and nothing else. This one matters more than the scalars
      above it: settings ride into a SHARE LINK, so every field here is
      attacker-controlled, and a mode this app doesn't know would fall through
@@ -11454,7 +11573,12 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 16 added the four boundaries the Scorecard's other two figures are
+/* SCHEMA 17 added `weekStart` — which day of the week every weekly and
+   fortnightly bucket begins on, 0 to 6, and 0 (Sunday) is what every build
+   before it did. It is the first setting that moves the BUCKET BOUNDARIES
+   rather than a figure inside them, so an older build reading a newer document
+   would draw the same charts on different weeks and say nothing; the halt is
+   what stops that. 16 added the four boundaries the Scorecard's other two figures are
    graded against — `defectShareGreen` and `defectShareRed` as whole percents,
    `featureCycleGreen` and `featureCycleRed` in days — all four null by default
    and each pair read only as a pair, exactly like the two below. 15 added the two boundaries the aged share is graded against —
@@ -11486,7 +11610,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 16;
+const SCHEMA = 17;
 
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
@@ -17609,7 +17733,13 @@ function renderScorecard() {
       : 'no window before this one to compare against') +
     '<br>every work type, across ' + inScope.length + ' team'
       + (inScope.length === 1 ? '' : 's') +
-    '<br>windows aligned to whole weeks';
+    /* NAMES THE DAYS when they are not the default, and says nothing when they
+       are. This page forces weekly buckets whatever Group by says, so it is the
+       one note that has to state which week it means — and on a board whose
+       sprints end on a Tuesday, "aligned to whole weeks" without the days is
+       the sentence a reader would take on trust and be wrong about. */
+    '<br>windows aligned to whole weeks'
+      + (itemsD.weekStartsOn ? ' (' + itemsD.weekStartDay + ' to ' + itemsD.weekEndDay + ')' : '');
 }
 
 
@@ -17672,6 +17802,9 @@ function renderDataTable() {
      the charts always name the same period. */
   const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
   const bucketHead = bucket.charAt(0).toUpperCase() + bucket.slice(1);
+  /* The same day derive() buckets on. Read off the settings here rather than
+     off a derive, because this table is built from rows and not from one. */
+  const wsDow = cleanWeekStart(state.settings.weekStart);
   const sameDay = Number(state.settings.sameDayValue);
   const workingDays = state.settings.workingDays === true;
   const cols = dataColumns(bucket, bucketHead);
@@ -17746,7 +17879,7 @@ function renderDataTable() {
         : '') +
       '<td class="num">' + (ct == null ? '—' : num1(ct)) + '</td>' +
       '<td class="num">' +
-        (r.completed ? bucketLabel(bucketStart(r.completed, bucket), bucket) : '—') + '</td>' +
+        (r.completed ? bucketLabel(bucketStart(r.completed, bucket, wsDow), bucket, wsDow) : '—') + '</td>' +
       '</tr>';
   }).join('');
 
@@ -17937,6 +18070,23 @@ function renderSettingsForm() {
   renderBandOrderNotes();
   $('setUnplannedLabel').value = state.settings.unplannedLabel;
   $('setWorkingDays').checked  = state.settings.workingDays === true;
+  /* ── The week, and the sentence under it ──────────────────────────────────
+     The hint names BOTH days and says what the second one is for, because the
+     end of the week is the half that moves figures: work in progress, the aged
+     count and the aged share are all readings taken at a bucket's END, and a
+     week ending on Saturday reads a Wednesday-to-Tuesday sprint three days
+     late. It also warns about the axis, which is the visible change a reader
+     would otherwise meet without explanation. */
+  const wsNow = cleanWeekStart(state.settings.weekStart);
+  $('setWeekStart').value = String(wsNow);
+  $('weekStartHint').innerHTML =
+    'A week then runs <strong>' + WEEKDAY_NAMES[wsNow] + ' to '
+    + WEEKDAY_NAMES[weekEndDow(wsNow)] + '</strong>, and every weekly figure is read at the '
+    + 'end of ' + WEEKDAY_NAMES[weekEndDow(wsNow)] + ' &mdash; work in progress, aged work and '
+    + 'the aged share are all taken at a period&rsquo;s end, so this is the day your board is '
+    + 'measured on. <strong>Group by 2 weeks pairs the same weeks</strong>, and the week '
+    + 'numbers along every axis move with it: they have never been ISO week numbers, and this '
+    + 'is the app asking which day yours begin on rather than assuming.';
   /* The ageing threshold is counted in whichever days the toggle says, so its
      label has to follow — a box reading "(days)" beside a working-days chart is
      the one place the two measures could be read as coexisting. */
@@ -21420,6 +21570,19 @@ $('setFeatureTypes').addEventListener('input', e => {
    changing it re-labels the ageing box beside it, so it renders the form again
    rather than joining the loop above. No debounce — it can only be pressed as
    fast as a mouse. */
+/* The one setting that moves a BUCKET BOUNDARY rather than a figure inside it,
+   so everything on screen is rebuilt rather than re-formatted — every chart's
+   x axis is a list of week keys and all of them have just changed. */
+$('setWeekStart').addEventListener('change', e => {
+  state.settings.weekStart = cleanWeekStart(e.target.value);
+  save();
+  /* Its own hint names both days, so the form has to be rewritten and not just
+     the value read back. */
+  renderSettingsForm();
+  renderDataTable();
+  renderViews();
+});
+
 $('setWorkingDays').addEventListener('change', e => {
   state.settings.workingDays = !!e.target.checked;
   save();

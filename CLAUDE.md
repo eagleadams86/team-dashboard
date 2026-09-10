@@ -203,6 +203,41 @@ argument that killed `completed` was never the real constraint; header lines are
   already has in the feature view, with Data to as the column that explains patchy data.
 - No third ⓘ: its note opens from the tile of the same name. The count is pinned beside it.
 
+## Which day a week starts on (2026-09-10) — SCHEMA 16 → 17
+
+Asked for by Charles: *"in this company PIs go Wednesday to Tuesday so the last day of the working
+week would be Tuesday … let's make that configurable."* `settings.weekStart`, 0 (Sunday) to 6.
+
+- **THE END OF THE WEEK IS WHAT MOVES FIGURES, not the start.** WIP, the aged count and the aged
+  share are LEVELS READ AT A BUCKET'S END — `evalPoints` — so a Saturday-ending week read a
+  Wednesday-to-Tuesday board three days into the next sprint, fourteen times over, once the aged
+  share started averaging. The setting is phrased as a start because that is what the code anchors
+  on; the hint under it names BOTH days and says which one the reading lands on.
+- **THE DEFAULT IS NOT A PREFERENCE, it is the old behaviour.** Every week helper takes the day as
+  a TRAILING OPTIONAL argument — `bucketStart(d, bucket, ws)`, `weekKey(d, ws)`, `weekNumber(d, ws)`,
+  `bucketKey`, `bucketLabel` — defaulting to Sunday, the shape `derive()` already used for
+  `stages`. A test walks 400 consecutive days asserting no-argument equals Sunday for all five, so
+  every caller and every test written before the setting goes on meaning what it meant.
+- **THE FORTNIGHT PARITY ANCHOR MOVES WITH THE WEEK.** `FORTNIGHT_EPOCH` is a Sunday, so a
+  Wednesday-start fortnight measured against it is half a week out and the `/7` stops being whole.
+  `bucketStart` measures from `weekStartOn(FORTNIGHT_EPOCH, ws)`. Pinned as the PROPERTY over all
+  seven days, not as one date.
+- **GLOBAL, never per team and never per tab.** Two teams on one train with different weeks makes
+  All Teams a comparison of different periods — the fault the shared end date prevents one level
+  along — and a Scorecard-only answer would be two definitions of a week in one app.
+- **`cleanWeekStart` is shared by the readers and the storage boundary**, so an unnormalised
+  settings object cannot bucket differently from a saved one. Out of range is the DEFAULT and not
+  a clamp into range: 6.5 and "wat" are not opinions about Saturday. It rides into a share link
+  like every other setting.
+- **SCHEMA 17 and the halt.** It is the first setting that moves BUCKET BOUNDARIES rather than a
+  figure inside them, so an older build reading a newer document would draw the same charts on
+  different weeks and say nothing.
+- **`evalPoints` is now carried out of `derive()`** so the reading dates are a fact a test can pin
+  — a bucket key cannot be inverted without already knowing the anchor.
+- **Week numbers were NEVER ISO** (ISO starts Monday, numbers by Thursday). This app numbers from
+  the week containing 1 January and always has; the setting only stops it assuming Sunday. Say
+  this when somebody asks why the axis disagrees with Jira.
+
 ## No window is read as of a date that has not happened (2026-09-10)
 
 Charles's own board: *"the preset dates are broken on the scorecard tab. they are showing future

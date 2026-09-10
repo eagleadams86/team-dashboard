@@ -390,7 +390,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    up. The pair asserting which columns draw a trace is the one to keep: the data
    for three more exists and drawing it would be wrong, so a fourth has to be a
    deliberate act rather than an easy one. */
-const EXPECTED = 3585;
+const EXPECTED = 3610;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -547,6 +547,108 @@ async function run(TD, win) {
      'a fortnight straddling New Year keeps the old year too');
   is(TD.bucketKey(TD.bucketStart(D(2025, 1, 2), 'month'), 'month'), '2025-01',
      'a month is the calendar month, whatever the week says');
+
+  /* ── A week that starts on some other day (2026-09-10) ────────────────────
+     Charles's PIs run Wednesday to Tuesday, so the reading every weekly figure
+     takes at a bucket's END was landing three days into the next sprint. The
+     day is a setting now; Sunday is what it was, and staying Sunday when nobody
+     says otherwise is the whole back-compatibility promise. */
+  {
+    /* THE DEFAULT IS THE OLD BEHAVIOUR, walked rather than asserted once: every
+       week-cased helper called with no day must equal the same helper told
+       Sunday, on every day of a year. This is what lets every test above — and
+       every caller written before the setting existed — go on meaning what it
+       meant. */
+    let driftFromDefault = 0;
+    for (let i = 0; i < 400; i++) {
+      const d = TD.utcDate(2015, 1, 1); d.setUTCDate(d.getUTCDate() + i);
+      if (iso(TD.weekStartOn(d, 0)) !== iso(TD.priorSunday(d))) driftFromDefault++;
+      if (iso(TD.bucketStart(d, 'week')) !== iso(TD.bucketStart(d, 'week', 0))) driftFromDefault++;
+      if (TD.weekKey(d) !== TD.weekKey(d, 0)) driftFromDefault++;
+      if (TD.weekNumber(d) !== TD.weekNumber(d, 0)) driftFromDefault++;
+      if (iso(TD.bucketStart(d, 'fortnight')) !== iso(TD.bucketStart(d, 'fortnight', 0))) {
+        driftFromDefault++;
+      }
+    }
+    is(driftFromDefault, 0,
+       'passing no day is passing Sunday, for every week helper over 400 consecutive days');
+
+    /* 2015-02-13 is a Friday. A Wednesday-start week holds it from the 11th. */
+    is(iso(TD.bucketStart(D(2015, 2, 13), 'week', 3)), '2015-02-11',
+       'a Wednesday-start week starts on the prior Wednesday');
+    is(iso(TD.bucketEnd(TD.bucketStart(D(2015, 2, 13), 'week', 3), 'week')), '2015-02-17',
+       'and ENDS ON THE TUESDAY — the day the reading is taken, which is the point of the setting');
+    is(iso(TD.bucketStart(D(2015, 2, 11), 'week', 3)), '2015-02-11',
+       'the first day of the week is its own start');
+    is(iso(TD.bucketStart(D(2015, 2, 10), 'week', 3)), '2015-02-04',
+       'and the day before it belongs to the week before');
+
+    /* A week key is a pure function of the WEEK, whichever day it begins on —
+       the property the New Year fix above was made of, and it must survive the
+       anchor moving or a completion would be filed under a key nothing reads. */
+    const wedKeys = [11, 12, 13, 14, 15, 16, 17].map(day => TD.weekKey(D(2015, 2, day), 3));
+    is(new Set(wedKeys).size, 1,
+       'every day of a Wednesday-to-Tuesday week gives one key', wedKeys.join(','));
+    is(TD.weekKey(D(2015, 2, 18), 3) === wedKeys[0], false,
+       'and the next Wednesday starts a new one');
+
+    /* THE FORTNIGHT PARITY ANCHOR MOVES WITH THE WEEK. The epoch is a Sunday, so
+       a Wednesday-start fortnight measured against it would sit half a week out
+       and the division would stop being whole. Checked as the property rather
+       than as one date: every fortnight start is an exact even number of weeks
+       from the epoch's own week start. */
+    let halfWeeks = 0;
+    for (let ws = 0; ws <= 6; ws++) {
+      const epoch = TD.weekStartOn(TD.FORTNIGHT_EPOCH, ws);
+      for (let i = 0; i < 120; i++) {
+        const d = TD.utcDate(2026, 1, 1); d.setUTCDate(d.getUTCDate() + i);
+        const start = TD.bucketStart(d, 'fortnight', ws);
+        const weeks = win.diffDays(start, epoch) / 7;
+        if (!Number.isInteger(weeks) || weeks % 2 !== 0) halfWeeks++;
+        if (TD.weekdayNum(start) - 1 !== ws) halfWeeks++;
+      }
+    }
+    is(halfWeeks, 0, 'a fortnight is a whole even number of weeks from the epoch, on all seven days');
+
+    /* The value at the storage boundary. It rides into a share link like every
+       other setting, so out of range is the DEFAULT and not a clamp into range. */
+    const nw = (v) => win.TDState.normalizeSettings({ weekStart: v }).weekStart;
+    is(nw(undefined), 0, 'the week starts on Sunday unless somebody says otherwise');
+    is(nw(3), 3, 'a real day comes through');
+    is(nw('3'), 3, 'including one a hand-edited backup wrote as a string');
+    is(nw(7), 0, 'a day out of range is Sunday, not clamped to Saturday');
+    is(nw(-1), 0, 'and so is a negative one');
+    is(nw(2.5), 0, 'half a day is not a day');
+    is(nw('nonsense'), 0, 'nor is anything that is not a number');
+    is(nw(null), 0, 'nor a null — Number(null) is 0, which happens to be right here, but not by luck');
+    is(win.weekEndDow(3), 2, 'a Wednesday-start week ends on Tuesday');
+    is(win.weekEndDow(0), 6, 'and a Sunday-start week on Saturday');
+
+    /* ── What it is actually for ────────────────────────────────────────────
+       The aged share is averaged over a reading taken at the END of every
+       period, so the day those readings land on is the whole ask. Asserted
+       through derive() rather than through the helpers, because the helpers
+       being right is not the same as derive() having been told. */
+    const rows = [];
+    for (let i = 0; i < 12; i++) {
+      rows.push({ started: D(2026, 6, 1 + i), completed: D(2026, 6, 20 + i), type: 'Story' });
+    }
+    rows.push({ started: D(2026, 6, 2), completed: null, type: 'Story' });
+    const wv = { filterValue: '', months: 'all', bucket: 'week' };
+    const dSun = TD.derive(rows, win.TDState.normalizeSettings({ agedDays: 14, weekStart: 0 }), wv);
+    const dWed = TD.derive(rows, win.TDState.normalizeSettings({ agedDays: 14, weekStart: 3 }), wv);
+    /* Off `evalPoints` — the dates the levels were ACTUALLY read at — and not
+       off the bucket keys, which cannot be inverted without already knowing the
+       anchor. The last point is clamped to the end of the data and so may land
+       on any day; every other one is a full period's end. */
+    const endsOn = (d) => new Set(d.evalPoints.slice(0, -1).map(p => TD.weekdayNum(p) - 1));
+    is([...endsOn(dSun)], [6], 'left alone, every weekly reading is taken at the end of a Saturday');
+    is([...endsOn(dWed)], [2], 'set to Wednesday, every one of them is taken at the end of a Tuesday');
+    is(dWed.weekStartDay, 'Wednesday', 'and derive names both days for the notes that quote them');
+    is(dWed.weekEndDay, 'Tuesday', 'the second being the one the readings are taken on');
+    ok(dWed.buckets.length > 0 && dSun.buckets.length > 0,
+       'both still produce an axis — this moves the weeks, it does not lose them');
+  }
 
   is(bs(2024, 2, 29, 'month'), '2024-02-01', 'a leap day is in February');
   is(iso(TD.bucketEnd(D(2024, 2, 1), 'month')), '2024-02-29', 'February 2024 ends on the 29th');
@@ -1622,7 +1724,7 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 16, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 17, 'SCHEMA was bumped in the same commit as the whitelist widening');
 
 
   /* ══════════════════════════════════════════════════════════
@@ -2598,7 +2700,7 @@ async function run(TD, win) {
   is('smuggled' in strayS, false, 'a stray settings key is dropped at the boundary');
   is(strayS.agedDays, 21, 'while every known key still comes through');
   is(Object.keys(strayS).sort().join(','),
-     'agedDays,agedShareGreen,agedShareRed,cycleTimeLabel,defectShareGreen,defectShareRed,featureAgedDays,featureCycleGreen,featureCycleRed,featureTypes,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,workingDays',
+     'agedDays,agedShareGreen,agedShareRed,cycleTimeLabel,defectShareGreen,defectShareRed,featureAgedDays,featureCycleGreen,featureCycleRed,featureTypes,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,weekStart,workingDays',
      'and the surviving keys are exactly the known set');
 
   is(d.names.wip, 'Work in progress', 'the rest are the standard metric names');
@@ -4078,8 +4180,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 16, 'the schema marker is 16 — the version that added the four boundaries the '
-     + 'Scorecard\u2019s other two figures are graded against');
+  is(St.SCHEMA, 17, 'the schema marker is 17 — the version that added which day a week starts on');
 
 
   /* ────────────────────────────────────────────────────────── */
@@ -4372,9 +4473,9 @@ async function run(TD, win) {
   group('features at the storage boundary');
   {
     const S4 = win.TDState;
-    is(S4.SCHEMA, 16, 'the feature layer took the schema to 12, the feature ageing '
-       + 'threshold to 13, the status vocabulary to 14, the aged share boundaries to 15 '
-       + 'and the Scorecard\u2019s other four to 16');
+    is(S4.SCHEMA, 17, 'the feature layer took the schema to 12, the feature ageing '
+       + 'threshold to 13, the status vocabulary to 14, the aged share boundaries to 15, '
+       + 'the Scorecard\u2019s other four to 16 and the week start to 17');
 
     const t = S4.sanitizeTeams([{ id: 'a', name: 'X', rows: [],
       features: [{ c: '2026-01-12', s: '2026-01-06', t: 'Feature', i: 'DAE-1' }] }])[0];
@@ -8186,9 +8287,9 @@ group('ARTs — the grouping, and the boundary it crosses');
      whole list because that is the invariant: a setting added here has to say
      which section it belongs to, or add one. */
   is([...sDlg.querySelectorAll('.manage-head')].map(e => e.textContent),
-     ['Labels & Work Types', 'Aged Work', 'Grading', 'Features', 'Working Days',
+     ['Labels & Work Types', 'Aged Work', 'Grading', 'Features', 'Your Week', 'Working Days',
       'Unusually Long Items', 'Work Type Filter List'],
-     'seven sections, each headed by its name, like the window beside it');
+     'eight sections, each headed by its name, like the window beside it');
   ok(sDoc.getElementById('btnAddFilter').closest('.row.spread'),
      'and the Add button in its section\u2019s heading row rather than under the table');
   /* Every heading is inside a section, and every section is separated from the
