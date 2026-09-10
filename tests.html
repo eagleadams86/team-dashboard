@@ -11309,6 +11309,47 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('a scope with nothing in it still rewrites the print line');
+
+  {
+    /* The All Teams empty branch returned above printHead() (2026-09-10, evening
+       audit), so a train nobody is on left the print-only line naming the LAST
+       populated scope — and since the picker took several trains, that line is
+       the only place a printout names them. */
+    plant({ arts: [{ id: 'pk1', name: 'Payments' }, { id: 'pk9', name: 'Ghost' }],
+            teams: [
+              { id: 'pkm1', name: 'One', artId: 'pk1', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] },
+              { id: 'pkm2', name: 'Two', rows: [{ c: '2015-05-02', s: '2015-04-28', t: 'Story' }] }
+            ], settings: {} });
+    const pkDoc = win.document;
+    win.renderAll();
+    win.selectTab('allteams');
+    /* Reset first: the scope is a position on this device and an earlier group
+       may have left ticks in it. "All trains" clears and closes, so open again. */
+    pkDoc.getElementById('artFilterBtn').click();
+    pkDoc.getElementById('artFilterAll').click();
+    pkDoc.getElementById('artFilterBtn').click();
+    const pkTick = (id, on) => {
+      const b = [...pkDoc.querySelectorAll('input[data-art-pick]')].find(x => x.dataset.artPick === id);
+      b.checked = on;
+      b.dispatchEvent(new win.Event('change', { bubbles: true }));
+    };
+    pkTick('pk1', true);
+    ok(/^every team on Payments/.test(pkDoc.getElementById('printHead').textContent),
+       'a populated train is named on the print line', pkDoc.getElementById('printHead').textContent);
+    pkTick('pk1', false);
+    pkTick('pk9', true);
+    ok(!pkDoc.getElementById('allTeamsNone').hidden, 'a train nobody is on shows the empty state');
+    ok(/^every team on Ghost/.test(pkDoc.getElementById('printHead').textContent),
+       'and the print line names THAT train, not the last populated one',
+       pkDoc.getElementById('printHead').textContent);
+    ok(!/Payments/.test(pkDoc.getElementById('printHead').textContent),
+       'with no trace of the previous scope', pkDoc.getElementById('printHead').textContent);
+    pkDoc.getElementById('artFilterAll').click();
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('the Loaded Data table sorts like the others');
 
   /* Driven through the real app, because the rules worth pinning are about the

@@ -17146,6 +17146,13 @@ function renderAllTeams() {
     $('windowNote').innerHTML = '';
     $('allTeamsTiles').innerHTML = '';
     drawTrainThroughput(null);
+    /* THE PRINT LINE IS REWRITTEN HERE TOO (2026-09-10, evening audit). This
+       return sat above the printHead() call below, so a scope with nothing in it
+       left the line saying whatever the LAST populated scope was — and since the
+       picker took several trains the print line is the only place a printout
+       names them, so a stale one misattributed the whole page. The Scorecard's
+       twin of this branch always did this. */
+    printHead('every team' + where, train);
     return;
   }
   table.hidden = false;
