@@ -1622,7 +1622,7 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 15, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 16, 'SCHEMA was bumped in the same commit as the whitelist widening');
 
 
   /* ══════════════════════════════════════════════════════════
@@ -2598,7 +2598,7 @@ async function run(TD, win) {
   is('smuggled' in strayS, false, 'a stray settings key is dropped at the boundary');
   is(strayS.agedDays, 21, 'while every known key still comes through');
   is(Object.keys(strayS).sort().join(','),
-     'agedDays,agedShareGreen,agedShareRed,cycleTimeLabel,featureAgedDays,featureTypes,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,workingDays',
+     'agedDays,agedShareGreen,agedShareRed,cycleTimeLabel,defectShareGreen,defectShareRed,featureAgedDays,featureCycleGreen,featureCycleRed,featureTypes,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,workingDays',
      'and the surviving keys are exactly the known set');
 
   is(d.names.wip, 'Work in progress', 'the rest are the standard metric names');
@@ -3966,8 +3966,8 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 15, 'the schema marker is 15 — the version that added the two boundaries the '
-     + 'aged share is graded against');
+  is(St.SCHEMA, 16, 'the schema marker is 16 — the version that added the four boundaries the '
+     + 'Scorecard\u2019s other two figures are graded against');
 
 
   /* ────────────────────────────────────────────────────────── */
@@ -4260,8 +4260,9 @@ async function run(TD, win) {
   group('features at the storage boundary');
   {
     const S4 = win.TDState;
-    is(S4.SCHEMA, 15, 'the feature layer took the schema to 12, the feature ageing '
-       + 'threshold to 13, the status vocabulary to 14 and the aged share boundaries to 15');
+    is(S4.SCHEMA, 16, 'the feature layer took the schema to 12, the feature ageing '
+       + 'threshold to 13, the status vocabulary to 14, the aged share boundaries to 15 '
+       + 'and the Scorecard\u2019s other four to 16');
 
     const t = S4.sanitizeTeams([{ id: 'a', name: 'X', rows: [],
       features: [{ c: '2026-01-12', s: '2026-01-06', t: 'Feature', i: 'DAE-1' }] }])[0];
@@ -6188,8 +6189,8 @@ const stripComments = (src) => {
     is(entries.filter((e) => !unitAware.includes(e.split(':')[0]))
        .filter((e) => /^\w+: \{ title: '[^']*\b(Item|Items|Feature|Features)\b/.test(e))
        .map((e) => e.split(':')[0]).sort(),
-       ['featureProgress', 'featureSize', 'schedule'],
-       'and the only entries left hard-coding a unit are the three that are about '
+       ['featureProgress', 'featureSize', 'scFeatureCycle', 'schedule'],
+       'and the only entries left hard-coding a unit are the four that are about '
        + 'FEATURES whichever list is counted \u2014 a new one spelling a noun into its '
        + 'title fails here');
 
@@ -8028,8 +8029,8 @@ group('ARTs — the grouping, and the boundary it crosses');
 
   is(sDoc.getElementById('tab-settings'), null, 'there is no Settings tab any more');
   is([...sDoc.querySelectorAll('.tabs .tab')].map(t => t.id),
-     ['tab-dashboard', 'tab-allteams', 'tab-data'],
-     'and the strip is three ways of reading the numbers, nothing else');
+     ['tab-dashboard', 'tab-allteams', 'tab-scorecard', 'tab-data'],
+     'and the strip is four ways of reading the numbers, nothing else');
   const sBtn = sDoc.getElementById('settingsBtn');
   ok(!!sBtn, 'a Settings button sits in the header instead');
   /* ── The family's header order ─────────────────────────────────────────────
@@ -8073,9 +8074,9 @@ group('ARTs — the grouping, and the boundary it crosses');
      whole list because that is the invariant: a setting added here has to say
      which section it belongs to, or add one. */
   is([...sDlg.querySelectorAll('.manage-head')].map(e => e.textContent),
-     ['Labels & Work Types', 'Aged Work', 'Features', 'Working Days',
+     ['Labels & Work Types', 'Aged Work', 'Grading', 'Features', 'Working Days',
       'Unusually Long Items', 'Work Type Filter List'],
-     'six sections, each headed by its name, like the window beside it');
+     'seven sections, each headed by its name, like the window beside it');
   ok(sDoc.getElementById('btnAddFilter').closest('.row.spread'),
      'and the Add button in its section\u2019s heading row rather than under the table');
   /* Every heading is inside a section, and every section is separated from the
@@ -9459,6 +9460,362 @@ group('ARTs — the grouping, and the boundary it crosses');
   typeBoundary(redBox, '40');
   is(redBox.value, '40', 'a number in range is left exactly as typed');
   setBounds(null, null);
+
+
+  /* ══════════════════════════════════════════════════════════
+     THE SCORECARD
+     One train, three figures, and which way each is moving. The maths is all
+     derive()'s and is pinned above; what these groups pin is the three things
+     that are new — the window before this one, three grading scales instead of
+     one, and a page that states two units at once.
+     ══════════════════════════════════════════════════════════ */
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the previous window is this window shifted back by its own length');
+
+  {
+    const win3 = { startDate: D(2026, 6, 9), endDate: D(2026, 9, 9) };
+    const p3 = TD.priorWindowOf(win3);
+    is(p3.days, 93, 'a 9 Jun–9 Sep window is 93 days, counting both ends');
+    is(iso(p3.to), '2026-06-08', 'and the window before it ends the day before it starts');
+    is(iso(p3.from), '2026-03-08', 'beginning 93 days before that');
+    is(Math.round((p3.to - p3.from) / 86400000) + 1, p3.days,
+       'so the two windows are the same length');
+
+    /* A PI is 84 days flat rather than three months rounded, and the shift is
+       by DAYS, so it serves the PI and the rolling months identically. */
+    const pi = TD.priorWindowOf({ startDate: D(2026, 6, 18), endDate: D(2026, 9, 9) });
+    is(pi.days, 84, 'a PI window is 84 days');
+    is(iso(pi.to), '2026-06-17', 'and its predecessor ends the day before it');
+    is(iso(pi.from), '2026-03-26', 'and is 84 days long too');
+
+    /* "All" has no start bound, so it has no window before it. That is a real
+       answer and the Scorecard says so rather than inventing a movement. */
+    is(TD.priorWindowOf({ startDate: null, endDate: D(2026, 9, 9) }), null,
+       'a window with no start has no window before it');
+    is(TD.priorWindowOf(null), null, 'and neither has nothing at all');
+    is(TD.priorWindowOf({ startDate: D(2026, 9, 9), endDate: null }), null,
+       'nor a half-formed one');
+
+    /* One day is a window, and its predecessor is the day before. */
+    const one = TD.priorWindowOf({ startDate: D(2026, 9, 9), endDate: D(2026, 9, 9) });
+    is(one.days, 1, 'a single day is a window of one');
+    is(iso(one.from) + '/' + iso(one.to), '2026-09-08/2026-09-08', 'and yesterday is its predecessor');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the previous window is read as of ITS end, never as of today');
+
+  {
+    /* The trap this pins: `view.asOf` only ever moves the end date LATER, so a
+       prior window expressed with it would state last quarter's completions
+       beside this morning's board. The aged share is a point-in-time reading
+       taken at the window's end, so getting this wrong is silent. */
+    const rows = [
+      /* Open since January and never finished — aged at every point after it. */
+      { s: '2026-01-05', t: 'Story' },
+      /* Opened in July, so it is NOT on the board in the January window. */
+      { s: '2026-07-01', t: 'Story' },
+      { c: '2026-02-10', s: '2026-02-01', t: 'Story' },
+      { c: '2026-08-10', s: '2026-08-01', t: 'Story' }
+    ];
+    const teams = [{ id: 'p1', name: 'Prior', rows: win.TDState.hydrateRows(rows) }];
+    const settings = win.TDState.normalizeSettings({ agedDays: 14 });
+    const base = { filterValue: '', bucket: 'week', forecastMode: 'off', unit: 'items' };
+    const now = TD.deriveTrain(teams, settings,
+      Object.assign({}, base, { months: 'custom', customFrom: '2026-07-01', customTo: '2026-09-09' }),
+      [], []);
+    const prior = TD.priorWindowOf(now);
+    const then = TD.deriveTrain(teams, settings, TD.priorViewOf(base, prior), [], []);
+
+    is(iso(then.summary.asOf), iso(prior.to),
+       'the earlier derive is read as of the end of ITS OWN window');
+    ok(then.summary.asOf < now.summary.asOf,
+       'which is before the window on screen, not the same date');
+    is(then.summary.currentWip, 1,
+       'so its board holds only what was open THEN — the July item is not on it');
+    is(now.summary.currentWip, 2, 'while the window on screen holds both');
+
+    /* And the reason it has to be a custom window rather than an asOf: an
+       earlier asOf is ignored by design, so nobody may "simplify" this onto it. */
+    const back = TD.deriveTrain(teams, settings,
+      Object.assign({}, base, { months: 'all', asOf: D(2026, 2, 1) }), [], []);
+    ok(back.summary.asOf > D(2026, 2, 1),
+       'an asOf EARLIER than the data is ignored — it can only ever move the date later');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a previous window with nothing in it says which kind of nothing');
+
+  {
+    const rows = [{ c: '2026-08-10', s: '2026-08-01', t: 'Story' },
+                  { c: '2026-08-20', s: '2026-08-05', t: 'Bug' }];
+    const teams = [{ id: 'q1', name: 'Quiet', rows: win.TDState.hydrateRows(rows) }];
+    const settings = win.TDState.normalizeSettings({ agedDays: 14 });
+    const base = { filterValue: '', bucket: 'week', forecastMode: 'off', unit: 'items' };
+    const now = TD.deriveTrain(teams, settings,
+      Object.assign({}, base, { months: 'custom', customFrom: '2026-08-01', customTo: '2026-08-31' }),
+      [], []);
+    const prior = TD.priorWindowOf(now);
+    const then = TD.deriveTrain(teams, settings, TD.priorViewOf(base, prior), [], []);
+    ok(then.empty, 'a window entirely before the data is empty, and the card says the data '
+       + 'does not reach back that far');
+    /* The three figures fail in three different ways over an empty window, and
+       collapsing them into one dash would report a quality problem where there
+       is only an absence. */
+    is(now.summary.unplannedShare != null, true, 'while the window on screen has a share to state');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('three grading scales, and one of them is in days');
+
+  {
+    plant({ teams: [], settings: { featureCycleGreen: 21, featureCycleRed: 35 } });
+    const b = win.ragBounds('featureCycle');
+    is(b.green, 21, 'a DAY boundary is not divided by a hundred');
+    is(b.red, 35, 'neither is the other one');
+    is(b.unit, 'days', 'and the scale knows it is a duration');
+    /* Graded to a tenth, because `num1` is what prints the figure beside it. */
+    is(win.rag(20.96, 'featureCycle'), 'green', '20.96 days prints as 21.0 and is on target at 21');
+    is(win.rag(21.04, 'featureCycle'), 'green', 'and so is 21.04, which also prints as 21.0');
+    is(win.rag(21.06, 'featureCycle'), 'yellow', 'while 21.1 is over it');
+    is(win.rag(35.04, 'featureCycle'), 'yellow', '35.0 is still at or below the red boundary');
+    is(win.rag(35.06, 'featureCycle'), 'red', 'and 35.1 is past it');
+
+    plant({ teams: [], settings: { agedShareGreen: 20, agedShareRed: 40 } });
+    const a = win.ragBounds('agedShare');
+    is(a.green, 0.2, 'a PERCENT boundary is divided by a hundred');
+    is(a.red, 0.4, 'so it can be compared with a fraction');
+
+    /* The defect share is printed with pct1 on its dashboard tile, so it is
+       graded to a tenth too — at whole percents the Scorecard would read 12%
+       where the tile reads 12.4%, two screens disagreeing about one figure. */
+    plant({ teams: [], settings: { defectShareGreen: 5, defectShareRed: 7.5 } });
+    is(win.ragBounds('defectShare').green, 0.05, 'the defect share divides by a hundred as well');
+    is(win.rag(0.0504, 'defectShare'), 'green', '5.04% prints as 5.0% and is on target at 5');
+    is(win.rag(0.0506, 'defectShare'), 'yellow', 'while 5.1% is over it');
+    is(win.rag(0.075, 'defectShare'), 'yellow', 'a boundary with a decimal is kept, not rounded away');
+    is(win.rag(0.0756, 'defectShare'), 'red', 'and 7.6% is past it');
+    is(win.ragBounds('notAScale'), null, 'a scale nobody defined grades nothing');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('every scale ships unset, and half a scale is still not a scale');
+
+  {
+    const fresh = win.TDState.normalizeSettings({});
+    ['agedShareGreen', 'agedShareRed', 'defectShareGreen', 'defectShareRed',
+     'featureCycleGreen', 'featureCycleRed'].forEach(k =>
+      is(fresh[k], null, k + ' ships unset — no line is drawn until the reader draws it'));
+
+    /* `Number(null)` is 0 and `Number.isFinite(0)` is true, so an unguarded
+       pair of nulls reads as a perfectly valid 0/0 scale and grades every board
+       in the app RED against a line nobody drew. Asked of all three. */
+    plant({ teams: [], settings: {} });
+    ['agedShare', 'defectShare', 'featureCycle'].forEach(s =>
+      is(win.ragBounds(s), null, s + ' grades nothing with both boxes empty'));
+    plant({ teams: [], settings: { defectShareGreen: 5 } });
+    is(win.ragBounds('defectShare'), null, 'one boundary on its own is a pass/fail, not a scale');
+    plant({ teams: [], settings: { featureCycleRed: 35 } });
+    is(win.ragBounds('featureCycle'), null, 'and the same is true of the day scale');
+
+    /* Zero is a real target on a SHARE — "nothing past the threshold, ever" —
+       and is not one on a DURATION, where nothing can finish in no days at all.
+       The two clamps are deliberately different and this is the difference. */
+    is(win.TDState.normalizeSettings({ agedShareGreen: 0, agedShareRed: 10 }).agedShareGreen, 0,
+       'a share boundary of 0 is a real target and survives');
+    is(win.TDState.normalizeSettings({ featureCycleGreen: 0, featureCycleRed: 35 }).featureCycleGreen,
+       null, 'a day boundary of 0 is not a target anybody set, so it reads as unset');
+    is(win.TDState.normalizeSettings({ featureCycleGreen: -1 }).featureCycleGreen, null,
+       'and neither is a negative one');
+    is(win.TDState.normalizeSettings({ featureCycleGreen: '21' }).featureCycleGreen, 21,
+       'a hand-edited backup writing the number as text is still a number');
+    is(win.TDState.normalizeSettings({ featureCycleGreen: 10.5, featureCycleRed: 35 }).featureCycleGreen,
+       10.5, 'and half a day survives — the figure beside it is printed to a tenth');
+    is(win.TDState.normalizeSettings({ defectShareGreen: 400 }).defectShareGreen, null,
+       'a share boundary out of range is NOT SET rather than clamped into range');
+    is(win.TDState.normalizeSettings({ defectShareGreen: 12.34 }).defectShareGreen, 12.3,
+       'and one typed finer than the figure is shown at is stored as it will be named');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('boundaries the wrong way round grade nothing on every scale');
+
+  {
+    plant({ teams: [], settings: { agedShareGreen: 40, agedShareRed: 20,
+      defectShareGreen: 8, defectShareRed: 5, featureCycleGreen: 60, featureCycleRed: 45 } });
+    ['agedShare', 'defectShare', 'featureCycle'].forEach(s =>
+      is(win.ragBounds(s), null, s + ' refuses a green boundary above the red one'));
+    win.renderSettingsForm();
+    ['agedShareOrderNote', 'defectShareOrderNote', 'featureCycleOrderNote'].forEach(id => {
+      const el = win.document.getElementById(id);
+      ok(el && !el.hidden, id + ' explains why, under its own two boxes');
+    });
+    /* The day note names DAYS and not a percent — a note that said 60% under a
+       box holding days would be describing a different setting. */
+    const dayNote = win.document.getElementById('featureCycleOrderNote');
+    ok(dayNote && /60 days/.test(dayNote.textContent) && !/60%/.test(dayNote.textContent),
+       'and the day scale names days, not percents', dayNote && dayNote.textContent);
+    /* Equal is allowed on the day scale too: a scale with no watch band. */
+    plant({ teams: [], settings: { featureCycleGreen: 30, featureCycleRed: 30 } });
+    is(win.rag(30, 'featureCycle'), 'green', 'equal boundaries still grade: at or below is green');
+    is(win.rag(30.2, 'featureCycle'), 'red', 'and over goes straight to red — no watch band exists');
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the aged share grades exactly as it did before there were three scales');
+
+  {
+    /* THE PIN. Everything above generalised one branch into a table; this is the
+       group that goes red if the generalisation moved the scale it started from. */
+    plant({ teams: [], settings: { agedShareGreen: 20, agedShareRed: 40 } });
+    is(win.rag(0.20, 'agedShare'), 'green', '20% is on target at 20');
+    is(win.rag(0.2049, 'agedShare'), 'green', 'and so is 20.49%, which prints as 20%');
+    is(win.rag(0.205, 'agedShare'), 'yellow', 'while 21% is over it');
+    is(win.rag(0.40, 'agedShare'), 'yellow', '40% is at or below the red boundary');
+    is(win.rag(0.405, 'agedShare'), 'red', 'and 41% is past it');
+    is(win.rag(null, 'agedShare'), 'none', 'nothing to grade is graded as nothing');
+    /* Graded as SHOWN — a raw third against a boundary of 33 reads 33% and is on
+       target, not "33% — watch — above 33%". */
+    plant({ teams: [], settings: { agedShareGreen: 33, agedShareRed: 40 } });
+    is(win.rag(1 / 3, 'agedShare'), 'green', 'a raw third is graded as the 33% it prints as');
+    is(win.agedShareVerdict(1 / 3), 'on target, at or below 33%',
+       'and the verdict sentence is word for word what it always was');
+    plant({ teams: [], settings: { agedShareGreen: 20, agedShareRed: 40 } });
+    is(win.agedShareVerdict(0.3), 'watch — above 20%, at or below 40%', 'the watch sentence too');
+    is(win.agedShareVerdict(0.5), 'off target — above 40%', 'and the off-target one');
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the scorecard states two units at once');
+
+  {
+    /* The first two cards are about work items and the third is about features,
+       which is why this page runs two derives and why the Count switch does not
+       reach it. Nothing may wire the quality figure to the feature list: the
+       defect share is null at source over features, so it would silently
+       disappear rather than be wrong — which is worse, not better. */
+    const rows = [{ c: '2026-08-10', s: '2026-08-01', t: 'Story' },
+                  { c: '2026-08-12', s: '2026-08-02', t: 'Bug' }];
+    const features = [{ c: '2026-08-20', s: '2026-07-01', t: 'Feature', i: 'AB-1' }];
+    const teams = [{ id: 'u1', name: 'Both', rows: win.TDState.hydrateRows(rows),
+      features: win.TDState.hydrateFeatures(features) }];
+    const settings = win.TDState.normalizeSettings({});
+    const base = { filterValue: '', months: 'all', bucket: 'week', forecastMode: 'off' };
+    const itemsD = TD.deriveTrain(teams, settings, Object.assign({}, base, { unit: 'items' }), [], []);
+    const featD = TD.deriveTrain(teams, settings, Object.assign({}, base, { unit: 'features' }), [], []);
+    is(itemsD.summary.unplannedShare, 0.5, 'the quality figure comes off the ITEM derive');
+    is(featD.summary.unplannedShare, null,
+       'and is null over features at source, so it cannot be read off the wrong one');
+    is(featD.summary.avgCycleTime, 50, 'while the flow figure comes off the FEATURE derive');
+    ok(itemsD.summary.avgCycleTime < 20, 'which is not the item figure', itemsD.summary.avgCycleTime);
+
+    /* trainRowsOf is what "the train" means, and deriveTeams reads it too, so
+       the Scorecard and the All Teams train row cannot pool differently. */
+    is(TD.trainRowsOf(teams, { unit: 'items' }).length, 2, 'a train is every team’s rows');
+    is(TD.trainRowsOf(teams, { unit: 'features' }).length, 1, 'or every team’s features');
+    is(TD.trainRowsOf(teams, {}).length, 2, 'and items is the default');
+    is(TD.trainRowsOf(null, {}).length, 0, 'no teams is an empty list, never a throw');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('a fourth tab, and what it does and does not obey');
+
+  {
+    const scRows = [{ c: '2026-08-10', s: '2026-07-01', t: 'Story' },
+                    { c: '2026-08-12', s: '2026-08-02', t: 'Bug' },
+                    { s: '2026-06-01', t: 'Story' }];
+    plant({ teams: [{ id: 'sc1', name: 'One', rows: scRows,
+                      features: [{ c: '2026-08-20', s: '2026-07-01', t: 'Feature', i: 'AB-1' }] },
+                    { id: 'sc2', name: 'Two', rows: scRows }],
+            settings: {} });
+    win.renderAll();
+    const scDoc = win.document;
+    ok(win.tdVisibleTabs().includes('scorecard'), 'with two teams the Scorecard is on offer');
+    ok(!!win.tdSearch.SEARCH_VIEW_LABEL.scorecard,
+       'and Find has a name for it, or a hit would print a raw tab id');
+
+    win.selectTab('scorecard');
+    ok(!scDoc.getElementById('viewControls').hidden, 'the shared strip is up on it');
+    ok(!scDoc.getElementById('monthsField').hidden,
+       'and the date window is on it — the comparison is what makes it mean anything');
+    ok(scDoc.getElementById('filterField').hidden,
+       'the work type filter is NOT: a defect share of everything completed would read '
+       + '100% under a Defects filter, which is a figure moving for a reason off the page');
+    ok(scDoc.getElementById('bucketField').hidden,
+       'nor Group by: a month-aligned bucket widens the left edge of BOTH windows, and '
+       + 'moves the movement between them');
+    ok(scDoc.getElementById('unitField').hidden,
+       'nor the Count switch, even though a team here has features — the page states '
+       + 'both units at once, so neither position of it fits');
+
+    /* Back on the dashboard every one of them returns, including the Count
+       switch that a team having features earned. */
+    win.selectTab('dashboard');
+    ok(!scDoc.getElementById('filterField').hidden, 'the filter comes back on the dashboard');
+    ok(!scDoc.getElementById('bucketField').hidden, 'and Group by');
+    ok(!scDoc.getElementById('unitField').hidden, 'and the Count switch');
+
+    /* Below two teams it goes, the rule All Teams follows, and a position saved
+       while it was there must not be landed on. */
+    plant({ teams: [{ id: 'sc1', name: 'One', rows: scRows }], settings: {} });
+    win.renderAll();
+    ok(scDoc.getElementById('tab-scorecard').hidden, 'below two teams the tab goes');
+    ok(!win.tdVisibleTabs().includes('scorecard'), 'so the arrow keys do not walk onto it');
+    win.selectTab('scorecard');
+    const landed = scDoc.querySelector('[role="tab"][aria-selected="true"]').id;
+    ok(landed !== 'tab-scorecard', 'and selectTab refuses to land on it', landed);
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the scorecard never says a colour and nothing else');
+
+  {
+    const scRows = [{ c: '2026-08-10', s: '2026-07-01', t: 'Story' },
+                    { c: '2026-08-12', s: '2026-08-02', t: 'Bug' },
+                    { s: '2026-06-01', t: 'Story' }];
+    const two = [{ id: 'c1', name: 'One', rows: scRows }, { id: 'c2', name: 'Two', rows: scRows }];
+    plant({ teams: two, settings: { agedShareGreen: 20, agedShareRed: 40 } });
+    win.renderAll();
+    win.selectTab('scorecard');
+    const card = () => [...win.document.querySelectorAll('.sc-card')][0];
+    const strip = () => card().querySelector('.sc-bands');
+
+    ok(!!strip(), 'a graded figure draws its band strip');
+    is(strip().querySelectorAll('.sc-band').length, 3, 'three bands, one per state');
+    is(strip().querySelectorAll('.sc-band.is-here').length, 1, 'exactly one of them is marked');
+    ok(/▸/.test(strip().querySelector('.is-here').textContent),
+       'the marked one carries a glyph, so colour is never the only signal');
+    ok(/at or below|above/.test(strip().getAttribute('aria-label')),
+       'and the strip is one image whose label names every range', strip().getAttribute('aria-label'));
+    ok(/band/.test(strip().getAttribute('aria-label')),
+       'and says which one the figure is in');
+    ok(!!card().querySelector('.glyph'), 'the figure carries a glyph of its own');
+    ok(!!card().querySelector('.sr-only'), 'and a status spelled out for a screen reader');
+    ok(/target|Watch/i.test(card().querySelector('.sc-verdict').textContent),
+       'with the verdict written out in words underneath',
+       card().querySelector('.sc-verdict').textContent);
+    /* THE LABELS COME OFF THE BOUNDARIES, so they cannot overlap the way the
+       printed scorecard this was built from did — it read "16-25" beside
+       ">=25" and claimed 25 twice. */
+    is([...strip().querySelectorAll('.sc-band')].map(b => b.textContent.replace('▸', '')),
+       ['≤20%', '21–40%', '>40%'], 'and the ranges are generated from the two boundaries');
+
+    /* Nothing graded: the strip is ABSENT, not empty, and the card says which
+       setting would fill it in. */
+    plant({ teams: two, settings: {} });
+    win.renderAll();
+    win.selectTab('scorecard');
+    is(strip(), null, 'with no boundaries set the strip is not drawn at all');
+    ok(!card().className.split(' ').some(c => ['green', 'yellow', 'red'].includes(c)),
+       'the card takes no state');
+    ok(/Grading in Settings/.test(card().querySelector('.sc-verdict').textContent),
+       'and it names the setting that would grade it',
+       card().querySelector('.sc-verdict').textContent);
+    plant({ teams: [], settings: {} });
+  }
 
   /* ────────────────────────────────────────────────────────── */
   group('the demo dialog says what THIS browser will see graded');

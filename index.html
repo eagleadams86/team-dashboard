@@ -1219,6 +1219,92 @@ select { cursor: pointer; }
 .tile.red    .value { color: var(--red); }
 .tile .glyph { font-size: var(--fs-base); font-weight: 700; margin-left: 6px; vertical-align: 2px; }
 
+/* ── The Scorecard ───────────────────────────────────────────────────────────
+   Three columns, one per question a leadership team asks, and they stay three
+   or become one: at two the odd card would sit alone under a pair, which is the
+   stranded-tile fault the `.tiles.group` block above exists to avoid, and there
+   is no arrangement of three that splits evenly into two rows.
+
+   The cards are `.card` — the same one surface as a chart card, a table and a
+   tile, per the rule at the top of this stylesheet. They are NOT `.tile`: a tile
+   is a figure with a caption, and these carry a band strip and a paragraph. */
+.scorecard { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch; margin-bottom: 18px; }
+@media (max-width: 900px) { .scorecard { grid-template-columns: 1fr; } }
+.sc-col { display: flex; flex-direction: column; min-width: 0; }
+/* The category, not the measure — PREDICTABILITY over "aged share of WIP". It
+   is set like a `.tile .label` rather than like a heading, because that is what
+   it is: the label on the column under it. */
+.sc-cat { font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--accent);
+  margin: 0 0 6px; text-align: center; }
+/* A GRADED CARD CARRIES THE EDGE AND THE FIGURE'S COLOUR, AND NOT THE TILE'S
+   TINT FILL, which is a deliberate divergence from `.tile.green` above rather
+   than an oversight. That fill exists because a tile is small — a label, a
+   number and a caption — and a 6px rule plus a line of coloured digits is a
+   thin thing to judge a hue on. This card is not small, and the thing it has
+   instead is the band strip: three filled panels of which the marked one is a
+   large flat area of exactly that hue, sitting directly under the figure. Tint
+   the card and the marked band is the same colour as what is behind it, so the
+   fill would take away the very signal it was added to provide.
+
+   Everything else the tile rule asks for is here twice over — the edge, the
+   coloured figure, the glyph, the sr-only status and the verdict in words. */
+.sc-card { flex: 1; display: flex; flex-direction: column;
+  border-left-width: 6px; padding: 14px 16px; }
+.sc-card.green  { border-left-color: var(--green); }
+.sc-card.yellow { border-left-color: var(--amber); }
+.sc-card.red    { border-left-color: var(--red); }
+.sc-name { display: flex; align-items: flex-start; font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold); color: var(--text-primary); }
+.sc-sub { font-size: var(--fs-xs); color: var(--text-secondary); margin-top: 2px; }
+.sc-value { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -.02em;
+  margin: 10px 0 2px; line-height: 1.05; }
+.sc-card.green  .sc-value { color: var(--green); }
+.sc-card.yellow .sc-value { color: var(--amber); }
+.sc-card.red    .sc-value { color: var(--red); }
+.sc-value .glyph { font-size: var(--fs-base); font-weight: 700; margin-left: 8px;
+  vertical-align: middle; }
+
+/* ── The band strip ──────────────────────────────────────────────────────────
+   The three ranges the figure is being read against, in words, with the one it
+   falls in marked. It exists because a colour on its own says a verdict and
+   hides the scale: a reader looking at a red 72% cannot tell whether the line
+   was drawn at 25 or at 70, and the one thing they will want to argue with is
+   the line.
+
+   THE LABELS ARE GENERATED FROM THE TWO BOUNDARIES, never typed, so they cannot
+   overlap or contradict what rag() actually does — the reference scorecard this
+   was built from read "16-25" beside ">=25" and claimed 25 twice.
+
+   COLOUR IS NEVER THE ONLY SIGNAL, and here that matters more than on a tile,
+   because three coloured boxes side by side are exactly the picture a red-green
+   reader cannot resolve. The marked band is told apart by an INSET RING (pack
+   rule 14 — never an elevation shadow), by weight, by a ▸ before its text, and
+   by an sr-only sentence; and the verdict is written out underneath in words
+   whether the strip is there or not. */
+.sc-bands { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px; margin-top: 10px; break-inside: avoid; }
+.sc-band { font-size: var(--fs-xs); font-weight: var(--fw-semibold); text-align: center;
+  padding: 5px 4px; border-radius: var(--radius-sm); border: 1px solid transparent;
+  color: var(--text-secondary); background: var(--surface-alt); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.sc-band.green  { background: var(--green-bg); color: var(--green); }
+.sc-band.yellow { background: var(--amber-bg); color: var(--amber); }
+.sc-band.red    { background: var(--red-bg);   color: var(--red); }
+/* The one the figure is in. The ring is inset so the strip's own geometry never
+   changes — a band that grew by a border width would shift the two beside it. */
+.sc-band.is-here { font-weight: 700; box-shadow: inset 0 0 0 2px currentColor; }
+.sc-band .sc-here-mark { margin-right: 4px; }
+.sc-verdict { font-size: var(--fs-xs); color: var(--text-secondary); margin-top: 8px; }
+
+/* "What It Means" — the movement against the window before this one. A heading
+   and one line, in the shape the printed scorecards it replaces use. */
+.sc-means { margin-top: auto; padding-top: 12px; }
+.sc-means-h { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase;
+  letter-spacing: var(--ls-label); color: var(--text-secondary); }
+.sc-means p { font-size: var(--fs-sm); margin-top: 4px; }
+
 /* ── The info dot ────────────────────────────────────────────────────────────
    A circled "i" beside a label, opening the help window rather than a hover
    tooltip so it works the same on a phone. THE SAME BLOCK IS IN EVERY APP THAT
@@ -1618,6 +1704,7 @@ table.data tr.no-data td.figure { color: var(--text-muted); }
 html[data-welcome] .pinbar,
 html[data-welcome] .tabs,
 html[data-welcome] #viewControls,
+html[data-welcome] #artScope,
 html[data-welcome] .panel { display: none !important; }
 .empty pre { display: inline-block; text-align: left; margin: 16px 0 0;
   background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -2295,6 +2382,16 @@ main:focus { outline: none; }
   /* Nothing scrolls on paper — a table inside an overflow box would print
      cropped at the edge of a box nobody can drag. */
   .table-scroll { overflow: visible !important; }
+  /* THE SCORECARD'S BAND STRIP IS A STATUS TINT, which is the one exception
+     theme.css's print block names by hand: a browser drops background colour to
+     save ink, and three identical white boxes have lost which band the figure is
+     in — the whole of what the strip says. The ▸, the weight and the verdict
+     sentence underneath still carry it if a printer drops colour anyway, which
+     is why the strip was never the only signal in the first place. */
+  .sc-band { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  /* Three cards side by side is exactly what this page is; keeping each whole
+     matters more than keeping the row together on one sheet. */
+  .sc-col, .sc-card { break-inside: avoid; }
   body, .shell, main { display: block; }
 }
 </style>
@@ -2432,6 +2529,15 @@ main:focus { outline: none; }
          the team picker follows, and the one the sibling app's All teams view
          follows too. Nothing shows until there is something behind it. -->
     <button class="tab" role="tab" id="tab-allteams" aria-controls="panel-allteams" aria-selected="false" tabindex="-1" hidden>All Teams</button>
+    <!-- Third, and the order is what the three views ask in turn: how is this
+         team, which of them needs me, and how is the whole train doing this
+         month. It is the roll-up of the two beside it, so it sits after them
+         and before the raw list.
+         Hidden below two teams, the same rule All Teams follows and for a
+         version of the same reason: with one team every figure on it is that
+         team's own dashboard tile, and a tab that restates the tab beside it is
+         chrome for nothing. -->
+    <button class="tab" role="tab" id="tab-scorecard" aria-controls="panel-scorecard" aria-selected="false" tabindex="-1" hidden>Scorecard</button>
     <!-- Settings used to be the fourth tab here. It moved into the header as a
          ⚙ button opening a window (2026-08-22), because it is not a VIEW of your
          numbers — it is a thing you go and set, like teams, backups and sharing,
@@ -2486,11 +2592,11 @@ main:focus { outline: none; }
         <option value="features">Features</option>
       </select>
     </div>
-    <div class="field">
+    <div class="field" id="filterField">
       <label for="filterSel">Work type filter</label>
       <select id="filterSel"></select>
     </div>
-    <div class="field">
+    <div class="field" id="monthsField">
       <label for="monthsSel">Show data for most recent</label>
       <select id="monthsSel">
         <option value="1">1 month</option>
@@ -2525,7 +2631,7 @@ main:focus { outline: none; }
       <label for="customTo">To</label>
       <input type="date" id="customTo">
     </div>
-    <div class="field">
+    <div class="field" id="bucketField">
       <label for="bucketSel">Group by</label>
       <select id="bucketSel">
         <option value="week">Week</option>
@@ -2582,6 +2688,37 @@ main:focus { outline: none; }
       arithmetic done, not a measurement.</p>
   </div></div>
 
+  <!-- ══════════════════ THE ART SCOPE ══════════════════
+       Above the panels rather than inside one, since 2026-09-10. It governs two
+       views now — All Teams and the Scorecard — and every figure on both
+       follows it, so a copy per panel would be two multi-select menus, two sets
+       of keyboard handling and two answers to one piece of state. It sits where
+       it always sat on screen: directly under the shared control strip and
+       directly above whichever panel is up.
+
+       Absent entirely until an ART exists — a picker with one option is a
+       control that cannot do anything — and taken away on the two tabs it means
+       nothing to, by selectTab. -->
+  <div class="card" id="artScope" hidden style="margin-bottom:18px">
+    <div class="artscope-row">
+      <div class="field art-pick">
+        <span class="art-pick-lbl" id="artFilterLbl">Agile Release Trains</span>
+        <button type="button" class="art-pick-btn" id="artFilterBtn"
+                aria-haspopup="true" aria-expanded="false" aria-controls="artFilterMenu"
+                aria-labelledby="artFilterLbl artFilterNow">
+          <span class="art-pick-now" id="artFilterNow">All trains</span>
+          <span class="art-pick-caret" aria-hidden="true"></span>
+        </button>
+        <!-- Rebuilt on every render, so the checkboxes are wired by delegation
+             on the menu rather than one listener per box. -->
+        <div class="art-pick-menu" id="artFilterMenu" role="group"
+             aria-labelledby="artFilterLbl" hidden></div>
+      </div>
+      <!-- A figure must never move for a reason that is not on the page. -->
+      <p class="hint" id="artScopeNote"></p>
+    </div>
+  </div>
+
   <!-- ══════════════════ ALL TEAMS ══════════════════
        Every team on one page, against one shared window and one shared date.
        The dashboard answers "how is this team doing?"; this answers "which of
@@ -2589,30 +2726,6 @@ main:focus { outline: none; }
        before. Every figure in it comes out of the same derive() the dashboard
        reads, so a row here and that team's dashboard cannot disagree. -->
   <section class="panel" id="panel-allteams" role="tabpanel" aria-labelledby="tab-allteams" hidden>
-    <!-- The ART scope. Above the tiles because it governs them too — every figure
-         on this page follows it, including the train row at the foot of the
-         table. Absent entirely until an ART exists: a picker with one option is
-         a control that cannot do anything. -->
-    <div class="card" id="artScope" hidden style="margin-bottom:18px">
-      <div class="artscope-row">
-        <div class="field art-pick">
-          <span class="art-pick-lbl" id="artFilterLbl">Agile Release Trains</span>
-          <button type="button" class="art-pick-btn" id="artFilterBtn"
-                  aria-haspopup="true" aria-expanded="false" aria-controls="artFilterMenu"
-                  aria-labelledby="artFilterLbl artFilterNow">
-            <span class="art-pick-now" id="artFilterNow">All trains</span>
-            <span class="art-pick-caret" aria-hidden="true"></span>
-          </button>
-          <!-- Rebuilt on every render, so the checkboxes are wired by delegation
-               on the menu rather than one listener per box. -->
-          <div class="art-pick-menu" id="artFilterMenu" role="group"
-               aria-labelledby="artFilterLbl" hidden></div>
-        </div>
-        <!-- A figure must never move for a reason that is not on the page. -->
-        <p class="hint" id="artScopeNote"></p>
-      </div>
-    </div>
-
     <div id="allTeamsTiles" class="tiles"></div>
 
     <!-- The four tiles above say where the train IS; this says where it has been.
@@ -2650,6 +2763,34 @@ main:focus { outline: none; }
       </div>
       <div class="note info" id="allTeamsNone" hidden></div>
     </div>
+  </section>
+
+  <!-- ══════════════════ THE SCORECARD ══════════════════
+       One train, three questions, one screen. The dashboard answers "how is
+       this team doing?" and All Teams answers "which of my teams needs me?";
+       this answers "how is the train doing, and which way is it moving?" —
+       which is the report an RTE is asked for once a month and which, before
+       this, meant reading four tiles off All Teams and holding last month's in
+       your head.
+
+       EVERY FIGURE ON IT ALREADY EXISTED. Each card is one field off the same
+       derive() the dashboard reads, pooled across the teams in scope exactly as
+       deriveTeams pools them, so a card here and a tile on All Teams cannot
+       disagree. What is new is the comparison, the three bands, and putting the
+       three of them side by side under the headings people actually group them
+       under. -->
+  <section class="panel" id="panel-scorecard" role="tabpanel" aria-labelledby="tab-scorecard" hidden>
+    <div class="card">
+      <div class="row spread">
+        <h2 id="scorecardHeading">The Train at a Glance <span class="hint" id="scorecardCount"></span></h2>
+      </div>
+      <p class="hint" id="scorecardIntro"></p>
+    </div>
+    <!-- Filled by renderScorecard. Empty markup on purpose: the three columns
+         are built from one table in the script, so a fourth measure later is a
+         data entry rather than a block of HTML to keep in step with it. -->
+    <div class="scorecard" id="scorecardCols"></div>
+    <div class="note info" id="scorecardNone" hidden></div>
   </section>
 
   <!-- ══════════════════ YOUR DATA ══════════════════ -->
@@ -3635,7 +3776,9 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     that changes nothing is worse than a missing one. Every one of them is shared by every team;
     the two figures a team sets for ITSELF are on its own row under Teams &amp; Stages.</p>
 
-  <!-- ── SIX SECTIONS, EACH INSIDE ITS OWN <section class="manage-sec"> ───────
+  <!-- ── SEVEN SECTIONS, EACH INSIDE ITS OWN <section class="manage-sec"> ─────
+       Six until 2026-09-10, when Grading was cut out of Aged Work — see the
+       comment on that section for why the three scales sit together.
        Reported by Charles on 2026-09-02: the window is "big and a bit hard to
        read". It held six unrelated settings under TWO headings, so everything
        between "Labels & Work Types" and "Work Type Filter List" — the two
@@ -3712,8 +3855,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <div class="row spread">
       <strong class="manage-head">Aged Work</strong>
     </div>
-    <p class="manage-note">How long something can sit unfinished before the app flags it, and how
-      much of a board may be flagged before that is worth acting on.</p>
+    <p class="manage-note">How long something can sit unfinished before the app flags it.</p>
     <div class="grid two pairs" style="margin-top:var(--sp-5)">
       <div>
         <label for="setAgedDays" id="setAgedDaysLabel">Count an in-progress item as aged after (days)</label>
@@ -3734,12 +3876,35 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       work items, and nothing here assumes it holds for features. Until you set a number, the
       Aged Work card in the feature view says so and shows what that team&rsquo;s finished
       features actually took, so the number you pick is measured against your own board.</p>
-    <!-- The second question this section answers, and the only two numbers in the
-         app that put a COLOUR on a figure. Both empty by default and both needed
-         before anything is graded — see the rag() block in the script for why one
-         on its own is not a scale. They sit here rather than in a section of their
-         own because they are read against the threshold above: what counts as
-         aged, then how much aged is too much. -->
+    <p class="hint" style="margin-top:var(--sp-3)">How much of a board may be aged before that
+      is worth acting on is a question about a <strong>line you draw</strong> rather than about
+      the threshold above, so it lives in <strong>Grading</strong> below, beside the other two
+      scales that put a colour on a figure.</p>
+  </section>
+
+  <!-- ── GRADING: the six numbers that put a COLOUR on a figure ──────────────
+       Three pairs, added to as a set on 2026-09-10 when the Scorecard arrived.
+       The aged share pair was in Aged Work above until then, described there as
+       "the only two numbers in this app that put a colour on a figure"; there
+       are six now, they are read the same way, and the same kind of setting in
+       three different sections would be three places to look for one answer.
+
+       WHAT THEY HAVE IN COMMON is the whole reason they sit together: each pair
+       is empty by default, each is read as a PAIR — one boundary is a pass/fail
+       and not a three-state scale — and each refuses to grade anything while the
+       green one is above the red. See the RAG_SCALES table in the script.
+
+       The third pair is a DURATION where the two above it are shares, which is
+       why its labels say days and its boxes take no max: a feature cycle time is
+       not a percentage of anything, and grading it in whole percents would be
+       the one arithmetic mistake this whole block exists to avoid. -->
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Grading</strong>
+    </div>
+    <p class="manage-note">The lines you draw, and the only place in this app that puts a colour
+      on a figure. All six boxes are empty until you fill them in.</p>
+
     <div class="grid two pairs" style="margin-top:var(--sp-5)">
       <div>
         <label for="setAgedShareGreen" id="setAgedShareGreenLabel">Aged share is on target at or below (%)</label>
@@ -3750,17 +3915,50 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         <input type="number" id="setAgedShareRed" style="--digits:3" step="1" min="0" max="100">
       </div>
     </div>
-    <!-- Spoken only when the pair is the wrong way round; see ragBounds for why
-         that is refused rather than swapped. -->
+    <!-- Spoken only when a pair is the wrong way round; see ragBounds for why
+         that is refused rather than swapped. One note per pair, directly under
+         the two boxes it is about — a single note for all six would name a
+         boundary the reader has to go looking for. -->
     <p class="note err" id="agedShareOrderNote" style="margin-top:var(--sp-3)" hidden></p>
-    <p class="hint" style="margin-top:var(--sp-3)">Both are <strong>empty by default, and nothing
-      is graded until both are set</strong> &mdash; with either box blank the Aged share tile and
-      its chart state the figure and leave the judgement to you, which is how every other figure
-      in this app behaves. Set them and the tile takes a colour, a symbol and a spelled-out
-      status, and the chart shades the bands behind its line. The first must be at or below the
-      second. They are your team&rsquo;s
-      boundaries, not the app&rsquo;s: there is no number here worth assuming, and one you had
-      not agreed to would be a finding you never made.</p>
+
+    <div class="grid two pairs" style="margin-top:var(--sp-5)">
+      <div>
+        <label for="setDefectShareGreen" id="setDefectShareGreenLabel">Defect share is on target at or below (%)</label>
+        <input type="number" id="setDefectShareGreen" style="--digits:5" step="0.1" min="0" max="100">
+      </div>
+      <div>
+        <label for="setDefectShareRed" id="setDefectShareRedLabel">Defect share is off target above (%)</label>
+        <input type="number" id="setDefectShareRed" style="--digits:5" step="0.1" min="0" max="100">
+      </div>
+    </div>
+    <p class="note err" id="defectShareOrderNote" style="margin-top:var(--sp-3)" hidden></p>
+
+    <div class="grid two pairs" style="margin-top:var(--sp-5)">
+      <div>
+        <label for="setFeatureCycleGreen" id="setFeatureCycleGreenLabel">Average feature cycle time is on target at or below (days)</label>
+        <input type="number" id="setFeatureCycleGreen" style="--digits:3" step="1" min="1">
+      </div>
+      <div>
+        <label for="setFeatureCycleRed" id="setFeatureCycleRedLabel">Average feature cycle time is off target above (days)</label>
+        <input type="number" id="setFeatureCycleRed" style="--digits:3" step="1" min="1">
+      </div>
+    </div>
+    <p class="note err" id="featureCycleOrderNote" style="margin-top:var(--sp-3)" hidden></p>
+
+    <p class="hint" style="margin-top:var(--sp-3)">Every pair is <strong>empty by default, and
+      nothing is graded until both of its boxes are set</strong> &mdash; with either blank the
+      figure is stated and the judgement is left to you, which is how every other figure in this
+      app behaves. Set a pair and its tile takes a colour, a symbol and a spelled-out status, the
+      <strong>Scorecard</strong> draws the three bands under the figure, and the aged share chart
+      shades your bands behind its line. <strong>The first must be at or below the second</strong>
+      &mdash; green above red is not a scale with its bands swapped, it is no scale, so nothing is
+      graded until they are the other way round.</p>
+    <p class="hint" style="margin-top:var(--sp-3)">These are <strong>your</strong> boundaries, not
+      the app&rsquo;s. There is no number here worth assuming &mdash; a platform team carrying long
+      spikes and a support team turning work over in a day would be handed the same verdict, and one
+      of them would be wrong &mdash; and a line you had not agreed to would be a finding you never
+      made. The two day boxes take the measure the <strong>Working Days</strong> switch below is
+      set to, like every other figure in this app that is counted in days.</p>
   </section>
 
   <!-- The feature layer's one switch. On its own line with room for a hint,
@@ -9897,14 +10095,75 @@ function derive(rows, settings, view, stages, statuses) {
      eight percentiles, and a "total" row built that way would be quietly wrong
      in its most-read column. Deriving over the concatenated rows gives the
      train the same treatment a team gets, from the same code. */
+/* Which of a team's two lists a run is about. PURE — it reads the view it was
+   handed rather than the app's, so the same rule serves the dashboard, a shared
+   link and a test, and nothing here has to reach for global state. */
+function teamListOf(t, view) {
+  return (view && view.unit === 'features') ? (t.features || []) : (t.rows || []);
+}
+
+/* EVERY TEAM'S ROWS AS ONE LIST — what "the train" means, in one place. Lifted
+   out of deriveTeams on 2026-09-10 so the Scorecard could pool the same way
+   without paying for the per-team rows it has nowhere to show. */
+function trainRowsOf(teams, view) {
+  const out = [];
+  for (const t of (Array.isArray(teams) ? teams : [])) out.push(...teamListOf(t, view));
+  return out;
+}
+
+/* The pooled derive on its own. deriveTeams below is this plus a row per team,
+   a shared date and the forecast's coverage end; a caller that needs none of
+   those — the Scorecard — pays one derive instead of one per team plus one. */
+function deriveTrain(teams, settings, view, stages, statuses) {
+  return derive(trainRowsOf(teams, view), settings, view, stages, statuses);
+}
+
+/* ── The window before this one ──────────────────────────────────────────────
+   The same length, ending the day before this one starts. It is the only
+   comparison this app makes between two periods, and it exists for one
+   sentence: "which way is this moving?"
+
+   SHIFTED BY DAYS, NOT BY CALENDAR MONTHS, deliberately. One rule then serves
+   every window the picker offers — three rolling months, a PI (84 days flat,
+   not three months rounded), and a pair of typed dates — and the sentence the
+   card says is true of all of them. A month-wise shift would have to answer
+   what "the month before a PI" is.
+
+   MEASURED OFF THE REQUESTED WINDOW (`startDate`/`endDate` as derive returned
+   them), so an export that stops mid-window shortens the comparison to match
+   what is actually on screen, rather than reading a full quarter against a part
+   one.
+
+   Null when there is nothing to shift: "All" has no start bound, so it has no
+   window before it — which is a real answer and not a missing one, and the
+   Scorecard says so rather than inventing a movement. */
+function priorWindowOf(d) {
+  if (!d || !d.startDate || !d.endDate) return null;
+  const days = diffDays(d.endDate, d.startDate) + 1;   /* inclusive of both ends */
+  if (!(days > 0)) return null;
+  const to = addDays(d.startDate, -1);
+  return { from: addDays(to, -(days - 1)), to, days };
+}
+
+/* That window as something derive() will actually read.
+
+   A CUSTOM WINDOW AND NOT `asOf`, and the difference is the whole trick.
+   `view.asOf` only ever moves the end date LATER (see derive) — by design, so a
+   caller cannot hide data by accident — while a custom `to` clamps it EARLIER,
+   which is what a past window needs. The aged share is a point-in-time reading
+   taken at the window's end, so a prior window read as of today would state
+   last quarter's completions beside this morning's board. Do not "simplify"
+   this back onto asOf. */
+function priorViewOf(base, prior) {
+  return Object.assign({}, base, {
+    months: 'custom', customFrom: isoOf(prior.from), customTo: isoOf(prior.to)
+  });
+}
+
 function deriveTeams(teams, settings, view, stages, statuses) {
   const list = Array.isArray(teams) ? teams : [];
-  /* Which of a team's two lists this run is about. PURE — it reads the view it
-     was handed rather than the app's, so the same rule serves the dashboard, a
-     shared link and a test, and nothing here has to reach for global state. */
-  const listOf = (t) => (view && view.unit === 'features' ? (t.features || []) : (t.rows || []));
-  const everything = [];
-  for (const t of list) everything.push(...listOf(t));
+  const listOf = (t) => teamListOf(t, view);
+  const everything = trainRowsOf(list, view);
   /* Derived twice when a forecast is wanted, and only then. The first pass is
      what it has always been and is what settles the shared date; the second
      re-runs the train with the coverage end that date makes computable. Two
@@ -10122,6 +10381,7 @@ window.TD = {
      was only testable by writing 520 out. */
   FORECAST_SEED, FORECAST_MAX_PERIODS, DEFAULT_FORECAST_ITEMS,
   cycleTimeOf, leadTimeOf, percentileOf, linearTrend, openCounts, agedCounts, derive, deriveTeams, utcDate,
+  teamListOf, trainRowsOf, deriveTrain, priorWindowOf, priorViewOf,
   /* The outlier fence on its own, so a test can hand it a sample it wrote and
      check the rule rather than only reading the answer back off derive(). A
      hoisted function declaration and three consts — the consts are declared
@@ -10304,6 +10564,28 @@ const DEFAULT_SETTINGS = {
      `featureAgedDays` use. */
   agedShareGreen: null,
   agedShareRed: null,
+
+  /* ── The other two scales, and why they are three pairs rather than one ───
+     The Scorecard grades three figures, and the aged share above is one of
+     them. These are the other two: the defect share of completions, and the
+     average time a feature takes. All six are null and all six are read the
+     same way — BOTH boundaries or nothing, green at or below red or nothing —
+     because a scale is a line the reader drew and half a line is not one.
+
+     The pair below is a DURATION, not a share, and that is the one real
+     difference between them: `rag()` grades a percent scale in whole percents
+     because that is what a percent tile prints, and grades this one to a tenth
+     of a day because that is what `num1` prints beside it. What is compared is
+     what is read, on both.
+
+     Zero survives on a percent boundary and does not on a day one, which is the
+     same split `agedShareGreen` and `featureAgedDays` already make above: a
+     team may honestly mean "nothing past the threshold, ever", and nobody means
+     "every feature finishes in no days at all". */
+  defectShareGreen: null,
+  defectShareRed: null,
+  featureCycleGreen: null,
+  featureCycleRed: null,
 
   /* TWO ROWS, and this trims a list of five. It used to ship Spikes, Stories and
      Tasks as well, on the reasoning that they are "the four types a Jira board
@@ -10975,7 +11257,7 @@ function normalizeSettings(raw) {
      Settings ride into a share link verbatim, so both of these arrive from
      somewhere else on somebody else's screen. The clamp here is the guard; the
      max= on the input is only a courtesy to whoever is typing. */
-  const clampPct = (v) => {
+  const clampPct = (v, dp) => {
     /* NULL AND EMPTY STRING FIRST, before Number() ever sees them: `Number(null)`
        is 0 and `Number('')` is 0, so a boundary that is simply not set would come
        back out of here as a real zero — and a zero is a legitimate target, so
@@ -10985,13 +11267,39 @@ function normalizeSettings(raw) {
        edge case. */
     if (v == null || v === '') return null;
     const n = Number(v);
-    /* A WHOLE percent, because that is what the tile shows and what rag()
-       compares: a boundary of 12.5 would be graded as 13 and named as 13, so
-       it is stored as 13 and the box says so. */
-    return Number.isFinite(n) && n >= 0 && n <= 100 ? Math.round(n) : null;
+    /* ROUNDED TO WHAT THE SCREEN WILL CALL IT, which is what `dp` carries. The
+       aged share is printed and graded in whole percents, so a boundary of 12.5
+       would be graded as 13 and named as 13 — it is stored as 13 and the box
+       says so. The defect share is printed with pct1, so its boundaries keep a
+       decimal for the same reason: a boundary the app would round is a boundary
+       the reader never typed. See RAG_SCALES for why `dp` is per scale. */
+    if (!(Number.isFinite(n) && n >= 0 && n <= 100)) return null;
+    const p = Math.pow(10, dp);
+    return Math.round(n * p) / p;
   };
-  s.agedShareGreen = clampPct(s.agedShareGreen);
-  s.agedShareRed = clampPct(s.agedShareRed);
+  s.agedShareGreen = clampPct(s.agedShareGreen, 0);
+  s.agedShareRed = clampPct(s.agedShareRed, 0);
+  /* The Scorecard's other percent pair, on the same clamp to a tenth. */
+  s.defectShareGreen = clampPct(s.defectShareGreen, 1);
+  s.defectShareRed = clampPct(s.defectShareRed, 1);
+  /* And its DAY pair, which takes the `featureAgedDays` shape above instead:
+     positive or null, never a default and never 0. A boundary of no days is not
+     a target anybody set, and a hand-edited backup saying "-1" or "22" as a
+     string must come out as "not set" rather than as a line on somebody's
+     screen. Fractions survive — half a day is a real cycle time, and the
+     same-day value above is 0.5 — so this is not rounded the way a whole
+     percent is. */
+  const clampDays = (v) => {
+    /* NULL AND EMPTY STRING FIRST, before Number() sees them, for the reason
+       spelled out on clampPct above: `Number(null)` is 0, and a 0 that reached
+       ragBounds as a finite boundary would grade every board in the app against
+       a line nobody drew. */
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  s.featureCycleGreen = clampDays(s.featureCycleGreen);
+  s.featureCycleRed = clampDays(s.featureCycleRed);
   /* A checkbox, so only the boolean true means on. A hand-edited backup saying
      "yes" or 1 must not switch the measure every figure is taken in — and it
      must be a real boolean either way: JSON.stringify drops an undefined
@@ -11027,7 +11335,10 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 15 added the two boundaries the aged share is graded against —
+/* SCHEMA 16 added the four boundaries the Scorecard's other two figures are
+   graded against — `defectShareGreen` and `defectShareRed` as whole percents,
+   `featureCycleGreen` and `featureCycleRed` in days — all four null by default
+   and each pair read only as a pair, exactly like the two below. 15 added the two boundaries the aged share is graded against —
    `agedShareGreen` and `agedShareRed`, whole percents, both null by default and
    read only as a pair, and the first settings in this app that put a COLOUR on a
    figure rather than a sentence under one. 14 added the status vocabulary — `state.statuses`, a `u` (status id) on
@@ -11056,7 +11367,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 15;
+const SCHEMA = 16;
 
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
@@ -11485,6 +11796,10 @@ const planningFeatureUnit = () => planningOn() && view.unit === 'features';
    window names a list the page is not showing. */
 const helpUnit = () => (featureUnit() ? 'Feature' : 'Item');
 const helpUnits = () => helpUnit() + 's';
+/* The reader's own word for a defect, Title Cased for a heading. A help entry's
+   head has to fit on one line — the suite pins that shape — and this is the one
+   title that has to say a word out of Settings. */
+const helpDefectWord = () => (state.settings.unplannedLabel || 'Defect');
 const unitRowsOf = (team) => !team ? []
   : (featureUnit() ? (team.features || []) : (team.rows || []));
 
@@ -13338,6 +13653,38 @@ const METRIC_HELP = {
       + 'altogether and names the knob to turn back first \u2014 stacked guesses reach a spread '
       + 'wide enough that the answer is no longer one.'],
   ] },
+  /* ── The Scorecard's two cards that are not a dashboard tile by another name ──
+     The aged share card reuses `agedShare` below: same heading, same figure, so
+     one explanation answers for both. These two have headings of their own and
+     so need answers of their own. */
+  scDefectShare: { title: () => helpDefectWord() + ' Share of Completions', body: () => [
+    ['Of everything the teams in scope finished in this window, ',
+      b('how much of it was ' + (state.settings.unplannedLabel || 'defect').toLowerCase()
+        + ' work'), '. The same figure the dashboard\u2019s '
+      + (state.settings.unplannedLabel || 'Defect').toLowerCase()
+      + ' rate states, pooled across the train.'],
+    ['It counts ', b('items, not effort'), '. Read as a stand-in for how much of the '
+      + 'train\u2019s capacity goes on fixing things it is only as good as your '
+      + 'items being roughly comparable in size \u2014 this app holds no story points or '
+      + 'hours, deliberately, so a true capacity share is not a figure it can offer.'],
+    ['Lower is better \u2014 but ', b('a rate near zero in a maturing team'), ' usually means '
+      + 'defects are being logged somewhere other than the board, not that there are none.'],
+  ] },
+  scFeatureCycle: { title: 'Average Feature Cycle Time', body: [
+    ['How long a ', b('feature'), ' takes from the day work starts on it to the day it '
+      + 'completes, averaged over every feature any team in scope finished in the window. '
+      + 'It is the one figure on this page counted in features rather than in work items.'],
+    ['A feature is closed when ', b('it'), ' has a completion date, which is not the same as '
+      + 'all of its items being done \u2014 integration, sign-off and a demo all happen after '
+      + 'the last story closes, so this measures the thing people plan in rather than the '
+      + 'thing they work on.'],
+    ['It is an ', b('average, not a percentile'), ', unlike the cycle time on the dashboard: '
+      + 'a train finishes far fewer features than items, and a percentile over a handful of '
+      + 'them is "the second-longest one", which is not a figure to run a train by.'],
+    [b('The feature ageing threshold does not reach this.'), ' That setting gates how many '
+      + 'features are counted as aged; this counts how long the finished ones took, and it '
+      + 'is stated whether a threshold is set or not.'],
+  ] },
   defectRate: { title: 'Defect Rate', body: [
     ['How much of what we finish is defect work? Plots items whose Type matches the defect '
       + 'text in Settings as ', b('a share of everything completed'), '.'],
@@ -13835,6 +14182,46 @@ const RAG_GLYPH = { green: '✓', yellow: '!', red: '✕', none: '' };
    its tint. 'none' has no status colour and borrows the muted pair. */
 const RAG_VAR = { green: '--green', yellow: '--amber', red: '--red' };
 
+/* ── The scales, and the two settings behind each ────────────────────────────
+   A TABLE rather than a branch per scale, since 2026-09-10: the comment above
+   promised a second graded figure would be "one entry in rag() and nothing
+   else", and three arrived at once with the Scorecard. Every rule the aged
+   share was reading is now read the same way for all three, which is the point
+   — three copies of the null guard is three places for it to be got wrong.
+
+   `unit` is the arithmetic difference. A 'pct' boundary is a percentage the
+   reader typed against a figure that is a fraction, so it is divided by 100; a
+   'days' boundary is already in the figure's own units and is divided by
+   nothing.
+
+   `dp` IS THE OTHER HALF OF "GRADED AS SHOWN", and it is per scale rather than
+   per unit because it follows what the SCREEN prints, not what kind of number
+   it is. The aged share is printed with pct0 everywhere it appears, so it is
+   graded in whole percents — character for character what rag() did before this
+   table existed. The defect share is printed with pct1 on its dashboard tile,
+   so it is graded to a tenth: at 0 decimals a board reading 7.6% on one screen
+   would be graded against 8 on another, and the two screens would disagree
+   about one figure — which is the exact fault the 2026-09-04 audit found the
+   first time round, one rounding out. The feature cycle time is printed with
+   num1, so it is graded to a tenth too.
+
+   `noun` is what a verdict sentence puts after a boundary. The day scale's is
+   overridden by the caller with the derive's own `dayNoun`, because the
+   working-days switch changes what a day means and a boundary label reading
+   "days" beside a working-days figure would be the one place the two measures
+   read as coexisting. */
+const RAG_SCALES = {
+  agedShare:    { green: 'agedShareGreen',    red: 'agedShareRed',
+                  unit: 'pct',  dp: 0, noun: '%',      note: 'agedShareOrderNote',
+                  what: 'The aged share' },
+  defectShare:  { green: 'defectShareGreen',  red: 'defectShareRed',
+                  unit: 'pct',  dp: 1, noun: '%',      note: 'defectShareOrderNote',
+                  what: 'The defect share' },
+  featureCycle: { green: 'featureCycleGreen', red: 'featureCycleRed',
+                  unit: 'days', dp: 1, noun: ' days', note: 'featureCycleOrderNote',
+                  what: 'The average feature cycle time' }
+};
+
 /* Which way each scale runs, and the only place in the app that knows. Guarded
    for `state` the way the sibling's `tgt()` is: nothing on the load path grades a
    figure today, and the guard is so that adding one is not a crash. */
@@ -13842,57 +14229,90 @@ function ragBounds(scale) {
   let s = null;
   try { s = state && state.settings; } catch (e) { s = null; }
   if (!s) return null;
-  if (scale === 'agedShare') {
-    /* NULL IS TESTED BEFORE Number() EVER SEES IT, and this is the second place
-       that mattered — `Number(null)` is 0 and `Number.isFinite(0)` is true, so a
-       pair of unset boundaries read as a perfectly valid 0/0 scale and every
-       board in the app came out RED, off target above 0%, against a line nobody
-       had drawn. The settings boundary has the same guard for the same reason;
-       fixing one and not the other left the defaults correct in storage and
-       wrong on screen, which is the harder half to notice. Any future scale here
-       must test the raw value, not its Number(). */
-    const gRaw = s.agedShareGreen, rRaw = s.agedShareRed;
-    if (gRaw == null || rRaw == null || gRaw === '' || rRaw === '') return null;
-    const g = Number(gRaw), r = Number(rRaw);
-    /* BOTH, or nothing. One boundary on its own is not a three-state scale, and
-       guessing the other would be the app drawing a line nobody agreed to. */
-    if (!Number.isFinite(g) || !Number.isFinite(r)) return null;
-    /* IN ORDER, or nothing (2026-09-04, from the evening audit). A green
-       boundary above the red one is not a scale with the bands swapped, it is
-       no scale: graded as typed, a 33% board read "on target, at or below 40%"
-       while its neighbour at 67% read "off target — above 20%", the watch band
-       vanished, and the chart drew both chips inside one green wash. Equal is
-       allowed — a reader may mean "at or below 30 is fine and anything over is
-       not", a scale with no watch band by choice. Above is refused, and the
-       settings window says so under the boxes (renderAgedShareOrderNote). */
-    if (g > r) return null;
-    return { green: g / 100, red: r / 100 };
-  }
-  return null;
+  const def = RAG_SCALES[scale];
+  if (!def) return null;
+  /* NULL IS TESTED BEFORE Number() EVER SEES IT, and this is the second place
+     that mattered — `Number(null)` is 0 and `Number.isFinite(0)` is true, so a
+     pair of unset boundaries read as a perfectly valid 0/0 scale and every
+     board in the app came out RED, off target above 0%, against a line nobody
+     had drawn. The settings boundary has the same guard for the same reason;
+     fixing one and not the other left the defaults correct in storage and
+     wrong on screen, which is the harder half to notice. Any future scale here
+     must test the raw value, not its Number() — which is now automatic, and is
+     half the reason this is a table. */
+  const gRaw = s[def.green], rRaw = s[def.red];
+  if (gRaw == null || rRaw == null || gRaw === '' || rRaw === '') return null;
+  const g = Number(gRaw), r = Number(rRaw);
+  /* BOTH, or nothing. One boundary on its own is not a three-state scale, and
+     guessing the other would be the app drawing a line nobody agreed to. */
+  if (!Number.isFinite(g) || !Number.isFinite(r)) return null;
+  /* IN ORDER, or nothing (2026-09-04, from the evening audit). A green
+     boundary above the red one is not a scale with the bands swapped, it is
+     no scale: graded as typed, a 33% board read "on target, at or below 40%"
+     while its neighbour at 67% read "off target — above 20%", the watch band
+     vanished, and the chart drew both chips inside one green wash. Equal is
+     allowed — a reader may mean "at or below 30 is fine and anything over is
+     not", a scale with no watch band by choice. Above is refused, and the
+     settings window says so under the boxes (renderBandOrderNotes). */
+  if (g > r) return null;
+  /* A percent boundary is typed as a whole percent against a figure that is a
+     fraction; a day boundary is already in the figure's units. This division is
+     the only arithmetic difference between the three scales. */
+  const div = def.unit === 'pct' ? 100 : 1;
+  return { green: g / div, red: r / div, unit: def.unit, dp: def.dp, noun: def.noun };
 }
 
-/* The one sentence the settings window adds when the two boundaries are the
+/* What a scale's figure is ROUNDED TO before it is compared, and it is whatever
+   the screen prints beside it. See rag() for the fault this fixes.
+
+   A percent is scaled to the percentage the reader sees first and rounded
+   there; a duration is rounded where it stands. At `dp: 0` the percent branch
+   is `Math.round(value * 100)` — the expression rag() carried before there were
+   three scales, so the aged share cannot have moved. */
+function ragShown(value, scale) {
+  const def = RAG_SCALES[scale];
+  if (!def) return value;
+  const n = def.unit === 'pct' ? value * 100 : value;
+  const p = Math.pow(10, def.dp);
+  return Math.round(n * p) / p;
+}
+
+/* The one sentence the settings window adds when a pair of boundaries is the
    wrong way round. Drawn from the stored pair rather than from the boxes, so it
    says what the app is actually reading; hidden whenever there is nothing to
    say, which is every state ragBounds accepts and every state with a box empty
-   (the hint beside the boxes already covers "both, or nothing"). */
-function renderAgedShareOrderNote() {
-  const el = $('agedShareOrderNote');
-  if (!el) return;
-  const g = state.settings.agedShareGreen, r = state.settings.agedShareRed;
-  const inverted = g != null && r != null && Number(g) > Number(r);
-  el.hidden = !inverted;
-  el.textContent = inverted
-    ? 'The on-target boundary (' + g + '%) is above the off-target one (' + r
-      + '%), so nothing is graded until they are the other way round: on target at or '
-      + 'below the smaller number, off target above the larger.'
-    : '';
+   (the hint beside the boxes already covers "both, or nothing").
+
+   ONE NOTE PER PAIR, directly under the two boxes it is about. A single
+   sentence covering all three scales would name a boundary the reader then has
+   to go looking for, in a section holding six numbers. */
+function renderBandOrderNotes() {
+  Object.keys(RAG_SCALES).forEach(scale => {
+    const def = RAG_SCALES[scale];
+    const el = $(def.note);
+    if (!el) return;
+    const g = state.settings[def.green], r = state.settings[def.red];
+    const inverted = g != null && r != null && g !== '' && r !== ''
+      && Number(g) > Number(r);
+    el.hidden = !inverted;
+    el.textContent = inverted
+      ? def.what + '\u2019s on-target boundary (' + g + def.noun
+        + ') is above its off-target one (' + r + def.noun
+        + '), so nothing is graded until they are the other way round: on target at or '
+        + 'below the smaller number, off target above the larger.'
+      : '';
+  });
 }
 
-/* 'agedShare' is lower-is-better, the sibling's `churn` scale: at or below the
-   green boundary green, at or below the red one amber, above it red. Written out
-   rather than left to the wording, because "at or below" and "below" are a whole
-   band apart and the sibling learnt that the expensive way. */
+/* EVERY scale here is lower-is-better, the sibling's `churn` scale: at or below
+   the green boundary green, at or below the red one amber, above it red. Written
+   out rather than left to the wording, because "at or below" and "below" are a
+   whole band apart and the sibling learnt that the expensive way.
+
+   All three of this app's scales run that way and none of them is a two-sided
+   band — unlike the sibling's PI predictability, which is the one measure in
+   the family that can be wrong in both directions. If a higher-is-better figure
+   is ever graded here it needs its own branch, not a swapped pair of boxes. */
 function rag(value, scale) {
   if (value === null || value === undefined || !isFinite(value)) return 'none';
   const b = ragBounds(scale);
@@ -13901,10 +14321,11 @@ function rag(value, scale) {
      share to a whole percent and the boundaries ARE whole percents, so the
      comparison is made in whole percents too — a raw 1/3 graded against 33
      read "33% — watch — above 33%", the figure and its verdict on one line,
-     each true of a different number. Rounded exactly the way `pct0` rounds
-     the figure, so what is compared is what is read. */
-  const shown = Math.round(value * 100);
-  const g = Math.round(b.green * 100), r = Math.round(b.red * 100);
+     each true of a different number. Rounded exactly the way the screen rounds
+     the figure — `pct0` for a share, `num1` for a duration — so what is
+     compared is what is read. */
+  const shown = ragShown(value, scale);
+  const g = ragShown(b.green, scale), r = ragShown(b.red, scale);
   return shown <= g ? 'green' : shown <= r ? 'yellow' : 'red';
 }
 
@@ -13914,15 +14335,18 @@ function rag(value, scale) {
    the state, because "off target" without a number is a judgement with its
    working hidden. Empty string when nothing is graded, so the caller can append
    it unconditionally. */
-function agedShareVerdict(value) {
-  const b = ragBounds('agedShare');
+function ragVerdict(value, scale, nounOverride) {
+  const b = ragBounds(scale);
   if (!b || value == null) return '';
-  const g = Math.round(b.green * 100), r = Math.round(b.red * 100);
-  const k = rag(value, 'agedShare');
-  return k === 'green' ? 'on target, at or below ' + g + '%'
-    : k === 'yellow' ? 'watch — above ' + g + '%, at or below ' + r + '%'
-    : 'off target — above ' + r + '%';
+  const n = nounOverride || b.noun;
+  const g = ragShown(b.green, scale), r = ragShown(b.red, scale);
+  const k = rag(value, scale);
+  return k === 'green' ? 'on target, at or below ' + g + n
+    : k === 'yellow' ? 'watch \u2014 above ' + g + n + ', at or below ' + r + n
+    : 'off target \u2014 above ' + r + n;
 }
+/* The name every existing aged-share caller already uses. */
+function agedShareVerdict(value) { return ragVerdict(value, 'agedShare'); }
 
 const ragVar = (value, scale, suffix) => {
   const key = rag(value, scale);
@@ -16078,8 +16502,13 @@ function artScopeWords(scope) {
 
 function renderArtScope(scope) {
   const box = $('artScope');
-  box.hidden = !state.arts.length;
-  if (!state.arts.length) { closeArtMenu(); return; }
+  /* Two gates: there has to be a train to pick, and the view has to be one the
+     picker governs. The card sits above the panels now — it is shared by All
+     Teams and the Scorecard — so being on the page is no longer the same
+     question as being in the right panel. */
+  const offered = state.arts.length > 0 && SCOPE_TABS.includes(activeTab);
+  box.hidden = !offered;
+  if (!offered) { closeArtMenu(); return; }
   const on = new Set(scope);
   /* Every option carries the number of teams behind it, which is the figure the
      tick is actually about — a train with nobody on it is still worth showing
@@ -16537,12 +16966,343 @@ function renderAllTeams() {
   table.innerHTML = head + body + foot;
 }
 
-/* The two views the shared control strip drives. A function declaration, not a
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE SCORECARD — one train, three figures, and which way each is moving
+   ═══════════════════════════════════════════════════════════════════════════
+
+   The three questions a leadership team asks about a train, in the order they
+   are usually asked: is the work predictable, is it any good, and how fast does
+   it move. Every figure here already existed — each is one field off the same
+   derive() the dashboard reads, pooled over the teams in scope exactly as the
+   All Teams train row is pooled — so a card here and a tile there cannot
+   disagree. What is new is the comparison with the window before, the three
+   bands, and putting them side by side.
+
+   THE TWO TABS THAT FOLLOW THE TRAIN PICKER. Everything scoped by an ART is on
+   one of these two. */
+const SCOPE_TABS = ['allteams', 'scorecard'];
+
+/* The three cards, as data rather than as three blocks of markup. A fourth
+   measure later is an entry in this list; nothing below it names a metric.
+
+   `unit` is which of a team's two lists the card is derived over, and it is the
+   reason this view runs two derives rather than one: the first two cards are
+   about work items and the third is about features. That is also why the
+   Scorecard ignores the Count switch — it states both at once.
+
+   `dir` is which way the figure is moving in words. Every scale here is
+   lower-is-better, but "higher" and "longer" are not the same word, and a
+   sentence about a duration that said "higher" would read as a mistake. */
+const SCORECARD_CARDS = [
+  {
+    key: 'aged', cat: 'Predictability', unit: 'items',
+    scale: 'agedShare', help: 'agedShare',
+    name: 'Aged Share of WIP',
+    sub: (d) => d.agedDays == null
+      ? 'no ageing threshold set'
+      : 'open longer than ' + d.agedDays + ' ' + d.dayNoun,
+    get: (d) => d.summary.agedShareNow,
+    fmt: (v) => pct0(v),
+    dir: ['higher', 'lower'], moveNoun: 'points',
+    /* WHY THERE IS NO FIGURE, when there is none. A dash on its own is the app
+       declining to say whether that is a setting nobody set or a board with
+       nothing on it, and they are opposite findings. */
+    why: (d) => d.agedDays == null
+      ? 'No ageing threshold is set, so nothing is being read against one — set '
+        + '“Count an in-progress item as aged after” in Settings.'
+      : 'Nothing is open across the teams in scope, and no items open is not a share of nought.'
+  },
+  {
+    key: 'defect', cat: 'Quality', unit: 'items',
+    scale: 'defectShare', help: 'scDefectShare',
+    name: null,   /* named off the settings label; see scorecardCardName */
+    sub: () => 'of everything completed in the window',
+    get: (d) => d.summary.unplannedShare,
+    fmt: (v) => pct1(v),
+    dir: ['higher', 'lower'], moveNoun: 'points',
+    why: () => 'Nothing was completed across the teams in scope, so there is no share to state.'
+  },
+  {
+    key: 'cycle', cat: 'Flow', unit: 'features',
+    scale: 'featureCycle', help: 'scFeatureCycle',
+    name: 'Average Feature Cycle Time',
+    sub: (d) => 'in ' + d.dayNoun + ', from start to completion',
+    get: (d) => d.summary.avgCycleTime,
+    fmt: (v) => num1(v),
+    dir: ['longer', 'shorter'], moveNoun: 'days',
+    why: (d, ctx) => ctx.anyFeatures
+      ? 'No feature finished in this window across the teams in scope.'
+      : 'No team in scope has any features yet — set which work types mean a feature in '
+        + 'Settings, and paste an export with a Parent key column.'
+  }
+];
+
+/* The defect card takes its name from the word the reader chose for a defect,
+   the way every other surface that states this figure does. */
+function scorecardCardName(card) {
+  return card.name
+    || ((state.settings.unplannedLabel || 'Defect') + ' Share of Completions');
+}
+
+/* What a boundary is written as inside a band label. A share carries its %; a
+   duration carries nothing, because three labels each ending in " working days"
+   is a strip nobody can read and the card has already said which days it means
+   twice. The VERDICT sentence under the strip still names the unit in full. */
+function scorecardBandNoun(scale) {
+  return (RAG_SCALES[scale] || {}).unit === 'pct' ? '%' : '';
+}
+
+/* ── The band strip ──────────────────────────────────────────────────────────
+   The three ranges the figure is being read against, in words, with the one it
+   falls in marked. It exists because a colour on its own states a verdict and
+   hides the scale: a reader looking at a red 72% cannot tell whether the line
+   was drawn at 25 or at 70, and the line is the one thing they will want to
+   argue with.
+
+   THE LABELS ARE GENERATED FROM THE BOUNDARIES, never typed, so they cannot
+   overlap or contradict what rag() actually does. The printed scorecard this
+   was built from read "16-25" beside ">=25" and claimed 25 twice.
+
+   AT MOST THREE, AND SOMETIMES TWO. Equal boundaries are allowed — a reader may
+   mean "at or below 30 is fine and anything over is not" — and a watch band
+   drawn between two identical numbers would be a range containing nothing.
+
+   Returns '' when nothing is graded; the caller says which setting to fill in
+   rather than drawing an empty scale. */
+function scorecardBands(value, scale) {
+  const b = ragBounds(scale);
+  if (!b) return '';
+  const n = scorecardBandNoun(scale);
+  const g = ragShown(b.green, scale), r = ragShown(b.red, scale);
+  /* The first number ABOVE the green boundary, at the precision this scale is
+     graded in — so the amber band starts exactly where green stops and there is
+     no number between them belonging to neither. */
+  const step = Math.pow(10, -(RAG_SCALES[scale].dp || 0));
+  const nextUp = Math.round((g + step) * 1e6) / 1e6;
+  const bands = g === r
+    ? [{ k: 'green', t: '≤' + g + n }, { k: 'red', t: '>' + r + n }]
+    : [{ k: 'green', t: '≤' + g + n },
+       { k: 'yellow', t: nextUp + '–' + r + n },
+       { k: 'red', t: '>' + r + n }];
+  const here = rag(value, scale);
+  /* A ROW OF COLOURED BOXES GIVES A SCREEN READER NOTHING, and gives a reader
+     with red-green deficiency very little more. The strip is one image with one
+     label naming every range and which one the figure is in; on screen the
+     marked band is told apart by weight, by an inset ring and by a marker
+     glyph, none of which is a colour. */
+  const spoken = bands.map(x => x.t.replace(/≤/g, 'at or below ')
+    .replace(/^>/, 'above ').replace(/–/g, ' to ')).join(', ');
+  return '<div class="sc-bands" role="img" aria-label="'
+    + escapeHtml('Bands: ' + spoken + '. This figure is in the '
+      + (here === 'none' ? 'ungraded' : RAG_TEXT[here].toLowerCase()) + ' band.') + '">'
+    + bands.map(x => '<span class="sc-band ' + x.k + (x.k === here ? ' is-here' : '') + '">'
+        + (x.k === here ? '<span class="sc-here-mark" aria-hidden="true">▸</span>' : '')
+        + escapeHtml(x.t) + '</span>').join('')
+    + '</div>';
+}
+
+/* ── What it means ───────────────────────────────────────────────────────────
+   The movement against the window before this one, computed rather than typed —
+   this app stores no free text, and a note somebody typed in March would go on
+   describing March for ever.
+
+   PERCENT SCALES MOVE IN POINTS, never in percent. A share going from 20% to
+   10% has not fallen by 10%, and "20% increase" on a figure that is itself a
+   percentage is the ambiguity this wording exists to remove.
+
+   COMPARED AT THE PRECISION BOTH ARE SHOWN AT, so a card never reports a
+   movement too small to see in the two figures it is drawn from. */
+function scorecardMeans(card, now, prior, priorD, dNow) {
+  const label = prior ? 'the previous ' + prior.days + ' days' : '';
+  /* Three reasons there is no comparison, kept apart because they are three
+     different findings and only one of them is about the data being short. */
+  /* SHORT, because this one is true of the whole page rather than of this card,
+     so it is about to be said three times. What to do about it is said ONCE, in
+     the line above the cards — three copies of a sentence of advice reads as
+     noise and pushes the figures off a laptop screen. */
+  if (!prior) return 'No window before this one to compare with.';
+  if (!priorD || priorD.empty) {
+    return 'Your data does not reach back another ' + prior.days
+      + ' days, so there is nothing to compare ' + label.replace('the previous', 'the previous') + ' with.';
+  }
+  const then = card.get(priorD);
+  if (then == null || now == null) {
+    return 'No figure for ' + label + ', so there is nothing to compare with.';
+  }
+  const scale = card.scale;
+  const a = ragShown(now, scale), b = ragShown(then, scale);
+  const was = card.fmt(then);
+  if (a === b) return 'Level with ' + label + ' (' + was + ').';
+  /* The gap is taken between the two SHOWN figures, so it is the movement a
+     reader can check by subtracting what is on the two screens. */
+  const gap = Math.round(Math.abs(a - b) * 1e6) / 1e6;
+  const word = a > b ? card.dir[0] : card.dir[1];
+  const noun = card.moveNoun === 'points'
+    ? (gap === 1 ? ' point' : ' points')
+    : (gap === 1 ? ' day' : ' days');
+  return gap + noun + ' ' + word + ' than ' + label + ' (' + was + ').';
+}
+
+/* One card. */
+function scorecardCard(card, dNow, priorD, prior, ctx) {
+  const value = dNow.empty ? null : card.get(dNow);
+  const state_ = rag(value, card.scale);
+  const graded = state_ !== 'none';
+  const name = scorecardCardName(card);
+  const bands = value == null ? '' : scorecardBands(value, card.scale);
+  /* The day scale names the measure the working-days switch is set to, so a
+     verdict can never say "days" beside a figure counted in working days. */
+  const noun = RAG_SCALES[card.scale].unit === 'days' ? ' ' + dNow.dayNoun : null;
+  const verdict = value == null ? '' : ragVerdict(value, card.scale, noun);
+  const glyph = graded
+    ? '<span class="glyph" aria-hidden="true">' + RAG_GLYPH[state_] + '</span>'
+      + '<span class="sr-only"> — ' + RAG_TEXT[state_] + '</span>'
+    : '';
+  return '<section class="sc-col">'
+    + '<h3 class="sc-cat">' + escapeHtml(card.cat) + '</h3>'
+    + '<div class="card sc-card' + (graded ? ' ' + state_ : '') + '">'
+    + '<div class="sc-name">' + escapeHtml(name) + helpBtn(card.help, name) + '</div>'
+    + '<div class="sc-sub">' + escapeHtml(dNow.empty ? '' : card.sub(dNow, ctx)) + '</div>'
+    + '<div class="sc-value">' + (value == null ? '&mdash;' : card.fmt(value)) + glyph + '</div>'
+    + bands
+    + '<p class="sc-verdict">'
+    + escapeHtml(value == null ? card.why(dNow, ctx)
+        : verdict ? verdict[0].toUpperCase() + verdict.slice(1) + '.'
+        : 'Not graded — set both boundaries for this figure under Grading in Settings.')
+    + '</p>'
+    + '<div class="sc-means"><div class="sc-means-h">What It Means</div><p>'
+    + escapeHtml(scorecardMeans(card, value, prior, priorD, dNow))
+    + '</p></div>'
+    + '</div></section>';
+}
+
+function renderScorecard() {
+  /* Built only while it is the view on screen, the rule renderAllTeams follows
+     and for the same reason: four pooled derives behind a hidden panel would be
+     four derives per keystroke anywhere else in the app. */
+  if (activeTab !== 'scorecard') return;
+
+  const scope = currentArtScope();
+  renderArtScope(scope);
+  const inScope = teamsInArts(state.teams, scope);
+  const words = artScopeWords(scope);
+
+  /* ── The one view every card is derived under ──────────────────────────────
+     EVERY WORK TYPE, ALWAYS. `filterValue` is empty on purpose and the strip's
+     filter is taken away on this tab: the Quality card's denominator is
+     everything completed, so a filter left on Defects two tabs ago would make
+     it read 100% and a filter on anything else would make it read 0% — a figure
+     moving for a reason that is not on the page, which is the one thing this
+     app will not do.
+
+     WEEK-ALIGNED, ALWAYS. derive() starts its axis at the bucket containing the
+     window's first day, so Group by Month silently widens the left edge by up
+     to a month — which is survivable on one screen and is not survivable when
+     two windows are being compared, because it moves both figures AND the
+     movement between them. A week alignment caps that at six days, and the note
+     under the strip says so. The picker is taken away here for the same reason
+     the filter is.
+
+     NO FORECAST. There is no forecast surface on this tab, so every simulation
+     run would be work nobody can see. */
+  const base = { filterValue: '', months: view.months, bucket: 'week',
+    customFrom: view.customFrom, customTo: view.customTo, forecastMode: 'off' };
+  const derived = {};
+  ['items', 'features'].forEach(u => {
+    const d = deriveTrain(inScope, state.settings, Object.assign({}, base, { unit: u }),
+      state.stages, state.statuses);
+    const prior = priorWindowOf(d);
+    /* The prior derive is skipped entirely when there is no window before this
+       one — "All" has none — rather than derived and thrown away. */
+    const priorD = prior ? deriveTrain(inScope, state.settings,
+      priorViewOf(Object.assign({}, base, { unit: u }), prior), state.stages, state.statuses) : null;
+    derived[u] = { d, prior, priorD };
+  });
+  const itemsD = derived.items.d, featD = derived.features.d;
+
+  $('scorecardCount').textContent = scope.length
+    ? '(' + inScope.length + ' of ' + state.teams.length + ' teams)'
+    : '(' + inScope.length + ' team' + (inScope.length === 1 ? '' : 's') + ')';
+  $('scorecardHeading').firstChild.textContent = scope.length
+    ? 'The Train ' + words.heading + ', at a Glance '
+    : 'Every Team, at a Glance ';
+
+  const cols = $('scorecardCols'), none = $('scorecardNone');
+
+  /* Nothing anywhere, so there is no window and no figure — and the reason is
+     worth separating, because a train nobody is on is a setting away from
+     working while an empty paste box is not. The same three sentences All Teams
+     distinguishes. */
+  if (itemsD.empty && featD.empty) {
+    cols.innerHTML = '';
+    none.hidden = false;
+    const where = scope.length ? ' ' + words.phrase : '';
+    none.textContent = (scope.length && !inScope.length)
+      ? 'No team is ' + words.phrase + ' yet. Open Teams & Stages in the header and set a '
+        + 'team’s ART to put it on ' + (scope.length === 1 ? 'this train' : 'one of them') + '.'
+      : inScope.some(t => t.rows.length)
+        ? 'No team' + where + ' finished anything in the window above, so there is nothing to '
+          + 'score. Widen the dates and the three figures appear.'
+        : 'No team' + where + ' has any work items yet. Paste an export on the Your Data tab, '
+          + 'or add items by hand there.';
+    $('windowNote').innerHTML = '';
+    printHead('every team' + where, itemsD);
+    return;
+  }
+  none.hidden = true;
+
+  const ctx = { anyFeatures: inScope.some(t => (t.features || []).length) };
+  /* The one sentence that says what the reader is looking at and what it does
+     NOT follow. Both halves matter: three figures with no unit named is a
+     scorecard nobody can argue with, and a reader arriving from the dashboard
+     with a work-type filter on needs to know it was not carried over. */
+  $('scorecardIntro').textContent =
+    'Three questions about the whole train, over the window above and against the window '
+    + 'before it. Every work type counts, whatever the filter on the other tabs is set to, '
+    + 'and the first two figures are about work items while the third is about features — '
+    + 'so the Count switch does not reach this page either.'
+    /* Said once, here, rather than three times down the cards. */
+    + (derived.items.prior ? ''
+      : ' There is no window before “All”, so nothing is being compared — choose a rolling '
+        + 'window or a pair of dates above to see which way these are moving.');
+
+  cols.innerHTML = SCORECARD_CARDS.map(c => {
+    const x = derived[c.unit];
+    return scorecardCard(c, x.d, x.priorD, x.prior, ctx);
+  }).join('');
+
+  /* The sentence under the shared strip, owned by whichever view is up. It says
+     the two things this page cannot be read without: which window these figures
+     are, and which window they are being compared against. */
+  const span = itemsD.startDate
+    ? 'Showing <strong>' + prettyDate(itemsD.startDate) + '</strong> to <strong>'
+      + prettyDate(itemsD.endDate) + '</strong>'
+    : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(itemsD.endDate) + '</strong>';
+  const p = derived.items.prior;
+  printHead('every team' + (words.phrase ? ' ' + words.phrase : ''), itemsD);
+  $('windowNote').innerHTML = span + customNote(itemsD) +
+    '<br>' + (p
+      ? 'against <strong>' + prettyDate(p.from) + '</strong> to <strong>'
+        + prettyDate(p.to) + '</strong>, the ' + p.days + ' days before'
+      : 'no window before this one to compare against') +
+    '<br>every work type, across ' + inScope.length + ' team'
+      + (inScope.length === 1 ? '' : 's') +
+    '<br>windows aligned to whole weeks';
+}
+
+
+/* The three views the shared control strip drives. A function declaration, not a
    const: selectTab calls it, and selectTab runs during boot — before anything
-   declared further down the file has been assigned. renderAllTeams returns
-   immediately unless it is the view on screen, so this costs nothing when the
-   dashboard is up. */
-function renderViews() { renderDashboard(); renderAllTeams(); }
+   declared further down the file has been assigned. Each of the two roll-ups
+   returns immediately unless it is the view on screen, so this costs nothing
+   when the dashboard is up. */
+function renderViews() { renderDashboard(); renderScoped(); }
+
+/* The two views the train picker governs. Called by the picker's own handlers
+   rather than renderViews: ticking a train must not rebuild every chart on a
+   dashboard nobody is looking at. */
+function renderScoped() { renderAllTeams(); renderScorecard(); }
 
 function renderDataTable() {
   /* Follows the unit switch, so the list on this tab is the list the dashboard
@@ -16844,7 +17604,16 @@ function renderSettingsForm() {
     ? '' : state.settings.agedShareGreen;
   $('setAgedShareRed').value = state.settings.agedShareRed == null
     ? '' : state.settings.agedShareRed;
-  renderAgedShareOrderNote();
+  /* The other two scales, on the same rule: null is an EMPTY box, never a 0. */
+  $('setDefectShareGreen').value = state.settings.defectShareGreen == null
+    ? '' : state.settings.defectShareGreen;
+  $('setDefectShareRed').value = state.settings.defectShareRed == null
+    ? '' : state.settings.defectShareRed;
+  $('setFeatureCycleGreen').value = state.settings.featureCycleGreen == null
+    ? '' : state.settings.featureCycleGreen;
+  $('setFeatureCycleRed').value = state.settings.featureCycleRed == null
+    ? '' : state.settings.featureCycleRed;
+  renderBandOrderNotes();
   $('setUnplannedLabel').value = state.settings.unplannedLabel;
   $('setWorkingDays').checked  = state.settings.workingDays === true;
   /* The ageing threshold is counted in whichever days the toggle says, so its
@@ -16900,6 +17669,11 @@ function renderEmptyState() {
      up with no tab selected. */
   $('tab-allteams').hidden = state.teams.length < 2;
   if (activeTab === 'allteams' && $('tab-allteams').hidden) selectTab('dashboard');
+  /* The Scorecard goes on the same threshold and for a version of the same
+     reason: it is a roll-up, and a roll-up of one team is that team's own
+     dashboard with three of its tiles on it. */
+  $('tab-scorecard').hidden = state.teams.length < 2;
+  if (activeTab === 'scorecard' && $('tab-scorecard').hidden) selectTab('dashboard');
   /* ── The dashboard goes the same way, until something has data ─────────────
      It was the last of the four controls in this function still offering
      something with nothing behind it: a first run showed a Dashboard tab whose
@@ -16996,7 +17770,10 @@ function renderUnitControl() {
      situation — but the reader is saying what they are ABOUT to build, and a
      scope of eight features is as ordinary a thing to plan as forty items. */
   const offered = anyFeatures() || planningOn();
-  $('unitField').hidden = !offered;
+  /* Whether the box is on SCREEN is the two questions above ANDed together, and
+     syncStrip is the one place that answers both — see it for why the Scorecard
+     takes this control away even when a team has features. */
+  syncStrip(activeTab);
   /* The Your Data copy follows the same gate, so the two appear and disappear
      together: a switch offered on one tab and missing on the other would be the
      app disagreeing with itself about whether this team has two lists. */
@@ -17024,7 +17801,7 @@ function renderAll() {
   renderDataTable();
   renderEmptyState();
   renderDashboard();
-  renderAllTeams();
+  renderScoped();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -17033,14 +17810,60 @@ function renderAll() {
 
 /* tabs — roving tabindex plus arrow keys, the sibling app's tablist manners:
    one stop in the tab order, ArrowLeft/Right/Home/End move along the row. */
-/* THREE, not four: Settings moved into the header as a window on 2026-08-22.
-   A saved `activeTab` of 'settings' outlives that change, and selectTab already
-   refuses a name that is not in this list — which is why nothing else had to
-   move for it. */
-const TABS = ['dashboard', 'allteams', 'data'];
-/* The two views that read the numbers, and so the two that share the control
-   strip above them and take turns owning the sentence inside it. */
-const NUMBER_TABS = ['dashboard', 'allteams'];
+/* Settings is NOT one of them: it moved into the header as a window on
+   2026-08-22. A saved `activeTab` of 'settings' outlives that change, and
+   selectTab already refuses a name that is not in this list — which is why
+   nothing else had to move for it.
+
+   The three reading views come first and Your Data last: they ask the same
+   question at widening scope — one team, every team, the whole train — and the
+   raw list is what they are all read off. */
+const TABS = ['dashboard', 'allteams', 'scorecard', 'data'];
+/* The views that read the numbers, and so the ones that share the control strip
+   above them and take turns owning the sentence inside it. Not all of the strip
+   reaches all of them — see stripFor. */
+const NUMBER_TABS = ['dashboard', 'allteams', 'scorecard'];
+/* WHICH CONTROLS EACH VIEW ACTUALLY OBEYS, since the Scorecard arrived. It was
+   all-or-nothing until then, which was right while both number tabs read every
+   control the same way.
+
+   The Scorecard obeys the date window and nothing else, and each omission is a
+   figure it would otherwise state wrongly rather than a tidying-up: it counts
+   BOTH units so the Count switch has no position that fits it; its quality
+   figure is a share of everything completed so a work-type filter would make it
+   read 100% or 0%; and it compares two windows, which a month-aligned bucket
+   silently widens at the left edge. renderScorecard says all three again where
+   it passes the view in.
+
+   A control that is taken away is never merely ignored — an orphaned field the
+   reader can set and watch do nothing is the fault this avoids. */
+const STRIP_CONTROLS = { unit: 'unitField', filter: 'filterField',
+  months: 'monthsField', bucket: 'bucketField' };
+const STRIP_FOR = {
+  dashboard: ['unit', 'filter', 'months', 'bucket'],
+  allteams:  ['unit', 'filter', 'months', 'bucket'],
+  scorecard: ['months']
+};
+/* The custom window's two date boxes are deliberately not in that table:
+   syncCustomRange owns them, they follow the window picker rather than the tab,
+   and the window picker is on every view here.
+
+   Whether the Count switch is on offer AT ALL is a second, older question —
+   some team has to have features — so the two gates are ANDed rather than one
+   overwriting the other. renderUnitControl asks the first, this asks the
+   second, and neither writes `hidden` behind the other's back. */
+function syncStrip(name) {
+  /* A tab with no entry keeps the dashboard's set. Your Data has the whole strip
+     taken away by `#viewControls` above these boxes, so what each field says
+     about itself there changes nothing on screen — and leaving them as the
+     dashboard would have them means arriving back on it never flickers. */
+  const want = new Set(STRIP_FOR[name] || STRIP_FOR.dashboard);
+  Object.keys(STRIP_CONTROLS).forEach(k => {
+    const el = $(STRIP_CONTROLS[k]);
+    if (!el) return;
+    el.hidden = !(want.has(k) && (k !== 'unit' || anyFeatures() || planningOn()));
+  });
+}
 function selectTab(name) {
   /* A tab that is not on offer must never be landed on. All Teams is taken away
      below two teams, and a position saved while it was there outlives the team
@@ -17083,8 +17906,15 @@ function selectTab(name) {
       else if (t.right > b.right) bar.scrollLeft += t.right - b.right;
     }
   }
-  /* The strip belongs to the two views it means anything to. */
+  /* The strip belongs to the views it means anything to, and each of those
+     takes only the controls it obeys — see STRIP_FOR. */
   $('viewControls').hidden = !NUMBER_TABS.includes(name);
+  syncStrip(name);
+  /* The train picker sits above the panels and belongs to the two scoped views.
+     Hidden rather than re-rendered on the other two: there is nothing to
+     rebuild, and an open menu left behind a tab press would sit over whatever
+     the new view puts under it. */
+  if (!SCOPE_TABS.includes(name)) { $('artScope').hidden = true; closeArtMenu(); }
   /* The pinned band just got shorter or taller by the height of that strip, and
      `--pin-clear` is written from its box. The ResizeObserver in applyPin sees
      this too; the call is here as well because an observer is delivered with the
@@ -17813,13 +18643,15 @@ $('artFilterMenu').addEventListener('change', (e) => {
      picker that shuts after every tick would make the two-train case four
      presses instead of two. It closes on Escape, on a press outside it, or on
      the button — all three of which are the reader saying they are done. */
-  renderAllTeams();
+  /* Both scoped views, not renderViews: ticking a train has no bearing on the
+     dashboard, and rebuilding every chart on it would be work nobody can see. */
+  renderScoped();
 });
 $('artFilterMenu').addEventListener('click', (e) => {
   if (!e.target.closest || !e.target.closest('#artFilterAll')) return;
   view.artFilter = [];
   saveView();
-  renderAllTeams();
+  renderScoped();
   /* This one DOES close: "All trains" is a whole answer, not a step towards
      one, and the button it was pressed on has just been rebuilt underneath it —
      leaving the keyboard on a removed node drops focus to <body>. */
@@ -18182,6 +19014,7 @@ function closeOnBackdropClick(dlg) {
    — it adds no field and stores nothing. */
 const SEARCH_CAP = 80;
 const SEARCH_VIEW_LABEL = { dashboard: 'Dashboard', allteams: 'All Teams',
+  scorecard: 'Scorecard',
   data: 'Your Data', stage: 'Teams & Stages' };
 function searchApp(st, query) {
   const q = String(query || '').trim().toLowerCase();
@@ -19543,7 +20376,7 @@ $('artRows').addEventListener('input', e => {
   /* Not renderArtRows() — that would replace the input being typed in. The team
      pickers above carry this name, so they are the ones redrawn. */
   renderTeamRows();
-  renderAllTeams();
+  renderScoped();
 });
 
 $('artRows').addEventListener('click', e => {
@@ -20122,7 +20955,8 @@ $('scReset').addEventListener('click', () => {
 /* Coerced to a non-negative number on the way in; everything else is a capped
    label, never free text. */
 const NUMERIC_SETTINGS = new Set(['sameDayValue', 'agedDays', 'outlierDays', 'featureAgedDays',
-  'agedShareGreen', 'agedShareRed']);
+  'agedShareGreen', 'agedShareRed', 'defectShareGreen', 'defectShareRed',
+  'featureCycleGreen', 'featureCycleRed']);
 /* Emptying the box is "no cutoff", not "a cutoff of zero" — the one numeric
    setting here where a blank is a meaningful value rather than a half-typed
    one, because the mode above it can legitimately be on 'days' before a number
@@ -20131,20 +20965,42 @@ const NUMERIC_SETTINGS = new Set(['sameDayValue', 'agedDays', 'outlierDays', 'fe
    blank there is not a half-typed number, it is the state this setting SHIPS in
    and the state a reader returns it to when they decide features should not be
    aged at all. */
-const NULLABLE_SETTINGS = new Set(['outlierDays', 'featureAgedDays']);
+/* The Scorecard's DAY pair joins them on the featureAgedDays argument exactly:
+   blank is off, and a boundary of nought days is not a target anybody set. The
+   percent pairs below cannot borrow this branch, and that is the whole reason
+   the two sets exist. */
+const NULLABLE_SETTINGS = new Set(['outlierDays', 'featureAgedDays',
+  'featureCycleGreen', 'featureCycleRed']);
 /* Nullable too, but on their OWN rule: blank is off and zero is a number. The
    set above collapses both to null because a cutoff or a threshold of nought
    days is meaningless — a share of 0% is not, it is a team saying "nothing past
    the threshold, ever", so these cannot borrow that branch. Clamped to 0-100
    here as well as in normalizeSettings, because save() serialises this live
    object straight out and a typed 400 must not reach a share link. */
-const PERCENT_SETTINGS = new Set(['agedShareGreen', 'agedShareRed']);
+const PERCENT_SETTINGS = new Set(['agedShareGreen', 'agedShareRed',
+  'defectShareGreen', 'defectShareRed']);
+/* How many decimals each percent boundary is stored to, and it is the same
+   answer RAG_SCALES gives for grading: what the screen prints. Read from there
+   rather than repeated, so a scale whose tile changes precision cannot end up
+   with boundaries rounded to something else. */
+const percentSettingDp = (key) => {
+  const scale = Object.keys(RAG_SCALES).find(k => RAG_SCALES[k].green === key
+    || RAG_SCALES[k].red === key);
+  return scale ? RAG_SCALES[scale].dp : 0;
+};
+/* Every box that draws half of a grading scale, percent or day. The order note
+   under each pair is refreshed from any of them, so a reader typing the green
+   one first — above a red they have yet to lower — sees the sentence appear and
+   then go, on whichever pair they are in. */
+const BAND_SETTINGS = new Set([...PERCENT_SETTINGS, 'featureCycleGreen', 'featureCycleRed']);
 const SETTING_INPUTS = {
   setCycleLabel: 'cycleTimeLabel', setUnplannedType: 'unplannedType',
   setSameDay: 'sameDayValue', setUnplannedLabel: 'unplannedLabel',
   setAgedDays: 'agedDays', setOutlierDays: 'outlierDays',
   setFeatureAgedDays: 'featureAgedDays',
-  setAgedShareGreen: 'agedShareGreen', setAgedShareRed: 'agedShareRed'
+  setAgedShareGreen: 'agedShareGreen', setAgedShareRed: 'agedShareRed',
+  setDefectShareGreen: 'defectShareGreen', setDefectShareRed: 'defectShareRed',
+  setFeatureCycleGreen: 'featureCycleGreen', setFeatureCycleRed: 'featureCycleRed'
 };
 
 /* Every keystroke here tears down and rebuilds every chart. That was tolerable
@@ -20161,7 +21017,10 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
        — without the floor the box could say 0 while the charts say 14. */
     state.settings[key] = PERCENT_SETTINGS.has(key)
       ? (e.target.value.trim() === '' ? null
-        : Math.round(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))))
+        : (() => {
+            const p = Math.pow(10, percentSettingDp(key));
+            return Math.round(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)) * p) / p;
+          })())
       : NULLABLE_SETTINGS.has(key)
       /* Blank, junk or zero all mean the same thing: no cutoff. Null rather
          than 0 so it matches what normalizeSettings would make of it, and so
@@ -20176,7 +21035,7 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
     /* The order note answers the stored pair, so it is refreshed on every
        keystroke into either box — a reader typing the green one first, above
        a red they have yet to lower, sees the sentence appear and then go. */
-    if (PERCENT_SETTINGS.has(key)) renderAgedShareOrderNote();
+    if (BAND_SETTINGS.has(key)) renderBandOrderNotes();
     scheduleSettingsRedraw();
   });
   /* WHAT WAS STORED IS WHAT THE BOX SAYS (2026-09-04, from the evening audit).
@@ -20245,7 +21104,14 @@ $('setWorkingDays').addEventListener('change', e => {
   save();
   renderSettingsForm();
   renderDataTable();
-  renderDashboard();
+  /* renderViews, not renderDashboard — the same correction the outlier-mode
+     listener below already carries, and this box had missed it. Settings is a
+     dialog that opens over whatever tab you are on, and this switch changes the
+     measure EVERY duration in the app is taken in: a reader who threw it while
+     standing on All Teams or the Scorecard was left looking at figures taken
+     under the old rule, with the labels beside them still naming the old one.
+     Found 2026-09-10 while wiring the Scorecard, which states a duration. */
+  renderViews();
 });
 
 /* The other control that isn't text or a number, and it renders the form again
@@ -22120,6 +22986,22 @@ const DEMO_FEATURE_AGED = 30;
 const DEMO_AGED_SHARE_GREEN = 20;
 const DEMO_AGED_SHARE_RED = 40;
 
+/* The Scorecard's other two scales, chosen the same way and for the same
+   reason: so a reader who loads the demo and opens that tab sees the three
+   states AT ONCE rather than three green cards. Against the demo's own boards
+   the train reads an aged share in the forties (red), a defect share around a
+   sixth (watch) and features averaging about 26 days (on target) — one of each,
+   whether the picker is on all three teams or on Delivery ART.
+
+   Constants of the demo, never of the app: all four DEFAULT_SETTINGS entries
+   are null and must stay null. 30 and 45 days are the same pair of numbers the
+   feature ageing threshold uses for its lower bound, which is not a coincidence
+   — a feature past 30 days is the one the aged card is already flagging. */
+const DEMO_DEFECT_SHARE_GREEN = 10;
+const DEMO_DEFECT_SHARE_RED = 20;
+const DEMO_FEATURE_CYCLE_GREEN = 30;
+const DEMO_FEATURE_CYCLE_RED = 45;
+
 /* Counted off the profile rather than written out, like DEMO_AGED above it, so
    the confirm dialog can never claim a figure the demo does not produce. */
 const demoAgedShare = (name) => {
@@ -22143,10 +23025,19 @@ function demoGradingSentence() {
     + '%, Team Bare Export ' + demoAgedShare('Team Bare Export') + '% and Team Long Tail '
     + demoAgedShare('Team Long Tail') + '%';
   const demoPair = DEMO_AGED_SHARE_GREEN + '% and ' + DEMO_AGED_SHARE_RED + '%';
+  /* The other two scales are set by the same block in loadSample and are named
+     here in one clause rather than a paragraph each: they grade the Scorecard
+     and nothing on the dashboard, so the reader meets them when they open that
+     tab. What matters in this dialog is that the demo drew three lines their
+     own browser starts without. */
+  const others = ' The Scorecard\u2019s other two scales are set here too \u2014 a defect '
+    + 'share of ' + DEMO_DEFECT_SHARE_GREEN + '% and ' + DEMO_DEFECT_SHARE_RED
+    + '%, and an average feature cycle time of ' + DEMO_FEATURE_CYCLE_GREEN + ' and '
+    + DEMO_FEATURE_CYCLE_RED + ' days \u2014 so that tab shows one card of each state.';
   if (g == null && r == null) {
     return 'The aged share is graded here, at ' + demoPair + ', so you can see what that '
       + 'looks like: ' + readings + ' \u2014 one team on each of the three states. Your own '
-      + 'browser starts with both boxes empty and nothing graded.';
+      + 'browser starts with both boxes empty and nothing graded.' + others;
   }
   if (g != null && r != null) {
     return 'Your own aged-share boundaries \u2014 ' + g + '% and ' + r + '% \u2014 are kept, '
@@ -22303,6 +23194,18 @@ function loadSample() {
   if (state.settings.agedShareGreen == null && state.settings.agedShareRed == null) {
     state.settings.agedShareGreen = DEMO_AGED_SHARE_GREEN;
     state.settings.agedShareRed = DEMO_AGED_SHARE_RED;
+  }
+  /* The Scorecard's other two scales, pair by pair on exactly the same rule —
+     both boxes of a pair empty, or that pair is left alone. Three separate
+     tests rather than one, so a reader who has drawn one of the three lines
+     keeps it and still gets the other two demonstrated. */
+  if (state.settings.defectShareGreen == null && state.settings.defectShareRed == null) {
+    state.settings.defectShareGreen = DEMO_DEFECT_SHARE_GREEN;
+    state.settings.defectShareRed = DEMO_DEFECT_SHARE_RED;
+  }
+  if (state.settings.featureCycleGreen == null && state.settings.featureCycleRed == null) {
+    state.settings.featureCycleGreen = DEMO_FEATURE_CYCLE_GREEN;
+    state.settings.featureCycleRed = DEMO_FEATURE_CYCLE_RED;
   }
 
   let landOn = null;

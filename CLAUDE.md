@@ -238,6 +238,23 @@ drew the line.** Both halves of the original argument were put to Charles and he
 - **This is ADOPTION, not local invention.** `rag()`, `RAG_TEXT`, `RAG_GLYPH`, `RAG_VAR` and
   `ragVar()` are Sprint Predictability's, names and all, so a second graded figure later is one
   entry in `rag()` and nothing else. No colour was invented here and the theme pack is untouched.
+  **That promise came due on 2026-09-10** and is now kept by `RAG_SCALES`: adding a scale is one
+  row in that table plus two settings, and every guard below is inherited rather than copied. Read
+  the table's own comment before adding one — two of its three columns are traps:
+  - **`unit`** is `'pct'` or `'days'`. A percent boundary is typed as a percentage against a
+    figure that is a fraction, so it is divided by 100; a duration is not divided at all.
+  - **`dp` is what the SCREEN prints, not what the unit is.** "Graded as shown" is the 2026-09-04
+    rule and this is the other half of it: the aged share is printed with `pct0` so it grades in
+    whole percents, the defect share with `pct1` so it grades to a tenth, the feature cycle time
+    with `num1` so it does too. Get this wrong and a board reading 7.6% on one screen is graded
+    against 8 on another — two screens disagreeing about one figure, which is the exact fault the
+    original rounding fix was for, one rounding out.
+  - **Every scale here is LOWER IS BETTER.** That is a property of the three figures, not a
+    convenience. A higher-is-better figure needs its own branch in `rag()`, not a swapped pair of
+    boxes — and a two-sided band, like the sibling's PI predictability, needs more than that.
+  - **`clampPct` takes a `dp` and `clampDays` is a different function.** Zero is a real target on
+    a share ("nothing past the threshold, ever") and is not one on a duration, so the day pair
+    takes the `featureAgedDays` shape: positive or null, never a default and never 0.
 - **OPT IN, and that is what keeps the reversal narrow.** `ragBounds` returns nothing unless BOTH
   boundaries are typed, so a fresh browser grades nothing and the app still just states figures.
   One boundary on its own is a pass/fail, not a three-state scale, and inferring the second would
@@ -245,6 +262,18 @@ drew the line.** Both halves of the original argument were put to Charles and he
 - **Colour is never the only signal, in three places at once**: the glyph, the `sr-only` status,
   and the verdict written out in the tile's foot whether the tile is coloured or not. A reader who
   sees no colour at all loses nothing — which is the test, because that reader is who this is for.
+- **A graded CARD is not a graded tile, and the Scorecard's are the one divergence.** `.tile.green`
+  carries a tint FILL because a tile is small and a 6px rule plus coloured digits is a thin thing
+  to judge a hue on — two sighted reviewers and one colourblind one reported that. `.sc-card` does
+  not, because the thing it has instead is the band strip: three filled panels of which the marked
+  one is a large flat area of exactly that hue, directly under the figure. Tint the card and the
+  marked band becomes the same colour as what is behind it, so the fill would remove the signal it
+  was added to provide. Everything else the rule asks for is on the card twice over. **Do not
+  "restore" the tint.**
+- **A BAND LABEL IS GENERATED FROM THE BOUNDARIES, never typed.** `≤20%`, `21–40%`, `>40%` come
+  out of the two stored numbers at the scale's own `dp`, so they cannot overlap or contradict what
+  `rag()` does. The printed scorecard the feature was built from read *16-25* beside *>=25* and
+  claimed 25 twice; that is the fault this rule exists to make impossible.
 
 ### The chart, and the one thing the drawing had to teach
 
