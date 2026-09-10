@@ -17443,6 +17443,11 @@ const SCORECARD_CARDS = [
        over — so a train whose data covers half the window says so here. */
     sub: (d) => d.agedDays == null
       ? 'no ageing threshold set'
+      /* "averaged over 0 weeks" over a dash is a claim about an average that
+         does not exist (2026-09-10, evening audit); with no period to average
+         the line stops at the threshold. */
+      : !d.summary.agedSharePeriods
+      ? 'open longer than ' + d.agedDays + ' ' + d.dayNoun
       : 'open longer than ' + d.agedDays + ' ' + d.dayNoun + ', averaged over '
         + d.summary.agedSharePeriods + ' '
         + (d.summary.agedSharePeriods === 1 ? d.bucketNoun : d.bucketNounPlural),
@@ -17570,7 +17575,7 @@ function scorecardBandNoun(scale) {
 
    Returns '' when nothing is graded; the caller says which setting to fill in
    rather than drawing an empty scale. */
-function scorecardBands(value, scale) {
+function scorecardBands(value, scale, unitWord) {
   const b = ragBounds(scale);
   if (!b) return '';
   const n = scorecardBandNoun(scale);
@@ -17591,8 +17596,12 @@ function scorecardBands(value, scale) {
      label naming every range and which one the figure is in; on screen the
      marked band is told apart by weight, by an inset ring and by a marker
      glyph, none of which is a colour. */
+  /* The unit is spoken where the strip does not print it (2026-09-10, evening
+     audit): "at or below 30, 30.1 to 45, above 45" told a screen reader nothing
+     about what was being counted. `unitWord` is the measure the card's verdict
+     already names, so working days are never called days here either. */
   const spoken = bands.map(x => x.t.replace(/≤/g, 'at or below ')
-    .replace(/^>/, 'above ').replace(/–/g, ' to ')).join(', ');
+    .replace(/^>/, 'above ').replace(/–/g, ' to ') + (unitWord || '')).join(', ');
   return '<div class="sc-bands" role="img" aria-label="'
     + escapeHtml('Bands: ' + spoken + '. This figure is in the '
       + (here === 'none' ? 'ungraded' : RAG_TEXT[here].toLowerCase()) + ' band.') + '">'
@@ -17650,10 +17659,10 @@ function scorecardCard(card, dNow, priorD, prior, ctx) {
   const state_ = rag(value, card.scale);
   const graded = state_ !== 'none';
   const name = scorecardCardName(card);
-  const bands = value == null ? '' : scorecardBands(value, card.scale);
   /* The day scale names the measure the working-days switch is set to, so a
      verdict can never say "days" beside a figure counted in working days. */
   const noun = RAG_SCALES[card.scale].unit === 'days' ? ' ' + dNow.dayNoun : null;
+  const bands = value == null ? '' : scorecardBands(value, card.scale, noun);
   const verdict = value == null ? '' : ragVerdict(value, card.scale, noun);
   const glyph = graded
     ? '<span class="glyph" aria-hidden="true">' + RAG_GLYPH[state_] + '</span>'

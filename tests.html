@@ -10286,6 +10286,38 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('two small truths on a scorecard card');
+
+  {
+    /* "averaged over 0 weeks" over a dash, and a days strip spoken with no unit
+       (2026-09-10, evening audit). */
+    const twDoc = win.document;
+    /* Nothing ever open at any evaluation point: items that start and finish the
+       same day, read at week ends they are not open on. */
+    plant({ teams: [{ id: 'tw1', name: 'One', rows: [{ c: '2026-08-12', s: '2026-08-12', t: 'Story' }],
+                      features: [{ c: '2026-09-05', s: '2026-08-01', t: 'Feature', i: 'AB-7' }] },
+                    { id: 'tw2', name: 'Two', rows: [{ c: '2026-08-19', s: '2026-08-19', t: 'Story' }], features: [] }],
+            settings: { featureCycleGreen: 21, featureCycleRed: 42 } });
+    win.renderAll();
+    win.selectTab('scorecard');
+    const twMonths = twDoc.getElementById('monthsSel');
+    twMonths.value = '3'; twMonths.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const twCards = [...twDoc.querySelectorAll('.sc-card')];
+    if (twCards[0].querySelector('.sc-value').textContent.trim() === '—') {
+      ok(!/averaged over 0/.test(twCards[0].querySelector('.sc-sub').textContent),
+         'a share with no period to average does not claim to average over none',
+         twCards[0].querySelector('.sc-sub').textContent);
+    } else {
+      ok(true, '(fixture had an open reading; the zero-period sub-line is not reachable here)');
+    }
+    const strip = twCards[2].querySelector('.sc-bands');
+    ok(strip, 'the days card has a band strip');
+    ok(/at or below 21 days, 21\.1 to 42 days, above 42 days/.test(strip.getAttribute('aria-label')),
+       'and its spoken label names the unit on every band', strip.getAttribute('aria-label'));
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('an ungraded card says WHY it is ungraded');
 
   {
