@@ -11347,6 +11347,27 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('a train\u2019s name is never re-cased, even when it says "no train"');
+
+  {
+    /* The heading was made by re-casing "no train" in the finished phrase, which
+       also re-cased a train called that (2026-09-10, evening audit). */
+    plant({ arts: [{ id: 'nc1', name: 'the no train gang' }],
+            teams: [
+              { id: 'ncm1', name: 'One', artId: 'nc1', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] },
+              { id: 'ncm2', name: 'Two', rows: [{ c: '2015-05-02', s: '2015-04-28', t: 'Story' }] }
+            ], settings: {} });
+    const ncW = win.artScopeWords(['nc1', TD.ART_NONE]);
+    is(ncW.heading, 'on the no train gang and No Train',
+       'the typed name keeps its case; only the named no-train is cased by the app');
+    is(ncW.phrase, 'on the no train gang and no train', 'and the sentence form is unchanged');
+    is(win.artScopeWords(['nc1']).heading, 'on the no train gang', 'alone, the name is exactly as typed');
+    is(win.artScopeWords([TD.ART_NONE]).heading, 'Not on a Train', 'the no-train alone keeps its own heading');
+    is(win.artScopeWords([]).heading, '', 'and no scope has no heading words');
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('the stored scope list is the shown one');
 
   {

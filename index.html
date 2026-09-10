@@ -16893,8 +16893,16 @@ function artScopeWords(scope) {
   /* The heading takes the same phrase in Title Case, because every heading in
      this app is — minor words stay lowercase unless they lead, so "on" and "a"
      do and "Not" and "Train" don't. */
-  const heading = (list.length === 1 && list[0] === ART_NONE) ? 'Not on a Train'
-    : phrase.replace(/\bno train\b/g, 'No Train');
+  /* Built from the list, not by re-casing the phrase (2026-09-10, evening
+     audit): a `replace(/no train/)` over the finished sentence re-cased a
+     train somebody had called "the no train gang", and the rule one paragraph
+     up is that a name is dropped in exactly as typed. Only the named no-train
+     is this file's word to case. */
+  const headNames = list.map(id => id === ART_NONE
+    ? 'No Train' : ((state.arts.find(a => a.id === id) || {}).name || ''));
+  const heading = !list.length ? ''
+    : (list.length === 1 && list[0] === ART_NONE) ? 'Not on a Train'
+    : 'on ' + join(headNames);
   return { names, phrase, heading, join: join(names) };
 }
 

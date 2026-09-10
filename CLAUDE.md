@@ -104,6 +104,9 @@ taking all fifteen teams and reading past the ones you had not asked about.
   to be made. `ART_NONE` is "No ART" on the picker, where it is one option beside the names, and
   "no train" in a sentence — "All teams on No ART" reads as the name of a train somebody called
   No ART.
+  The heading is BUILT from the list with the no-train cased, never by re-casing the finished
+  phrase: `replace(/no train/)` re-cased a train somebody had called "the no train gang"
+  (2026-09-10, evening audit), against the rule that a name is dropped in exactly as typed.
 - **The sibling app followed the next day, after asking.** Sprint Velocity has the same picker
   but keeps `artFilter` in `settings` — saved, shared, and crossing `sanitizeIds()` — so the
   same change there was a boundary question rather than a view field widening, and it was put
