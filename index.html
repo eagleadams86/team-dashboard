@@ -3936,11 +3936,11 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <div class="grid two pairs" style="margin-top:var(--sp-5)">
       <div>
         <label for="setFeatureCycleGreen" id="setFeatureCycleGreenLabel">Average feature cycle time is on target at or below (days)</label>
-        <input type="number" id="setFeatureCycleGreen" style="--digits:3" step="1" min="1">
+        <input type="number" id="setFeatureCycleGreen" style="--digits:3" step="any" min="0">
       </div>
       <div>
         <label for="setFeatureCycleRed" id="setFeatureCycleRedLabel">Average feature cycle time is off target above (days)</label>
-        <input type="number" id="setFeatureCycleRed" style="--digits:3" step="1" min="1">
+        <input type="number" id="setFeatureCycleRed" style="--digits:3" step="any" min="0">
       </div>
     </div>
     <p class="note err" id="featureCycleOrderNote" style="margin-top:var(--sp-3)" hidden></p>
@@ -21675,7 +21675,12 @@ Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
      "120" is not corrected mid-word; the tile is already grading the stored
      value from the first keystroke. Money Map's percent boxes reformat on blur
      for the same reason. */
-  if (PERCENT_SETTINGS.has(key)) {
+  /* Every grading box, not only the percent ones (2026-09-10, evening audit):
+     the day pair stored null for a typed -3 and the box went on saying -3 —
+     the same fault, one set of boxes along. The two day boxes also declare
+     `step="any" min="0"`, because they deliberately accept and store 0.5 and
+     the old `step="1" min="1"` had the browser flagging a value the app kept. */
+  if (BAND_SETTINGS.has(key)) {
     $(id).addEventListener('change', e => {
       const v = state.settings[key];
       e.target.value = v == null ? '' : String(v);

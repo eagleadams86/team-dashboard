@@ -10286,6 +10286,38 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('a day boundary box shows the number that was stored, too');
+
+  {
+    /* The percent boxes were corrected on 2026-09-04; the day pair was not
+       (2026-09-10, evening audit): a typed -3 stored null and the box kept -3,
+       and step="1" min="1" had the browser flagging the 0.5 the app keeps. */
+    plant({ teams: [], settings: {} });
+    win.renderSettingsForm();
+    const dayBox = win.document.getElementById('setFeatureCycleGreen');
+    const storedDay = () => JSON.parse(localStorage.getItem('td-state')).settings.featureCycleGreen;
+    const typeDay = (text) => {
+      dayBox.value = text;
+      dayBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+      dayBox.dispatchEvent(new win.Event('change', { bubbles: true }));
+    };
+    typeDay('-3');
+    is(storedDay(), null, 'a typed minus stores nothing on the day scale');
+    is(dayBox.value, '', 'and the box is emptied once it is left');
+    typeDay('0.5');
+    is(storedDay(), 0.5, 'half a day is stored');
+    is(dayBox.value, '0.5', 'and shown');
+    ok(dayBox.checkValidity(), 'and the browser does not flag a value the app keeps');
+    typeDay('0');
+    is(storedDay(), null, 'zero days is not a target, so it is off');
+    is(dayBox.value, '', 'and the box says so');
+    typeDay('21');
+    is(dayBox.value, '21', 'a whole number is left exactly as typed');
+    typeDay('');
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('two small truths on a scorecard card');
 
   {
