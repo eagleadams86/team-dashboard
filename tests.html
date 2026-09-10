@@ -10207,6 +10207,44 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('the scorecard heading names the scope the way All Teams does');
+
+  {
+    /* "The Train Not on a Train, at a Glance" and "The Train on Payments and
+       Retail" (2026-09-10, evening audit): one function puts the scope into
+       words, and this heading was the one consumer wrapping them wrongly. */
+    plant({ arts: [{ id: 'sh1', name: 'Payments' }, { id: 'sh2', name: 'Retail' }],
+            teams: [
+              { id: 'shm1', name: 'One', artId: 'sh1', rows: [{ c: '2026-09-01', s: '2026-08-20', t: 'Story' }] },
+              { id: 'shm2', name: 'Two', artId: 'sh2', rows: [{ c: '2026-09-02', s: '2026-08-21', t: 'Story' }] },
+              { id: 'shm3', name: 'Three', rows: [{ c: '2026-09-02', s: '2026-08-21', t: 'Story' }] }
+            ], settings: {} });
+    const shDoc = win.document;
+    win.renderAll();
+    win.selectTab('scorecard');
+    shDoc.getElementById('artFilterBtn').click();
+    shDoc.getElementById('artFilterAll').click();
+    shDoc.getElementById('artFilterBtn').click();
+    const shTick = (id, on) => {
+      const b = [...shDoc.querySelectorAll('input[data-art-pick]')].find(x => x.dataset.artPick === id);
+      b.checked = on;
+      b.dispatchEvent(new win.Event('change', { bubbles: true }));
+    };
+    const shHead = () => shDoc.getElementById('scorecardHeading').firstChild.textContent.trim();
+    is(shHead(), 'Every Team, at a Glance', 'no scope is every team');
+    shTick('sh1', true);
+    is(shHead(), 'Every Team on Payments, at a Glance', 'one train is named, as All Teams names it');
+    shTick('sh2', true);
+    is(shHead(), 'Every Team on Payments and Retail, at a Glance',
+       'two trains are two trains, not "The Train"');
+    shTick('sh1', false); shTick('sh2', false);
+    shTick(TD.ART_NONE, true);
+    is(shHead(), 'Every Team Not on a Train, at a Glance', 'and the teams on none are not "The Train Not on a Train"');
+    shDoc.getElementById('artFilterAll').click();
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('an ungraded card says WHY it is ungraded');
 
   {

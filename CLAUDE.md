@@ -85,7 +85,10 @@ taking all fifteen teams and reading past the ones you had not asked about.
   Sprint Predictability. **A `!x` guard that survives a widening from a value to a list is
   the shape to look for** — it does not throw and it does not warn, it silently picks one branch
   forever.
-- **One `artScopeWords()`, four sentences.** The heading, the note, the print line and the empty
+- **One `artScopeWords()`, four sentences — FIVE with the Scorecard's heading, which takes the
+  All Teams shape "Every Team on Payments, at a Glance" (2026-09-10, evening audit).** It wrapped
+  the words as "The Train …" for a day: two ticks read as one train and No ART alone read "The
+  Train Not on a Train". The heading, the note, the print line and the empty
   state all read from it, the way one `scopePhrase` already kept them together. Joined with
   "and", not "or": both trains' teams are on screen at once, so "or" would read as a choice still
   to be made. `ART_NONE` is "No ART" on the picker, where it is one option beside the names, and

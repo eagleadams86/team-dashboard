@@ -17730,8 +17730,11 @@ function renderScorecard() {
   $('scorecardCount').textContent = scope.length
     ? '(' + inScope.length + ' of ' + state.teams.length + ' teams)'
     : '(' + inScope.length + ' team' + (inScope.length === 1 ? '' : 's') + ')';
+  /* "Every Team on Payments", the All Teams heading's own shape — not "The
+     Train on Payments", which with two ticks named two trains as one and with
+     No ART alone read "The Train Not on a Train" (2026-09-10, evening audit). */
   $('scorecardHeading').firstChild.textContent = scope.length
-    ? 'The Train ' + words.heading + ', at a Glance '
+    ? 'Every Team ' + words.heading + ', at a Glance '
     : 'Every Team, at a Glance ';
 
   const cols = $('scorecardCols'), none = $('scorecardNone');
