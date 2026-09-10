@@ -2179,6 +2179,11 @@ date picker says it is there**: *1 feature dated after today — the window stop
 On the Scorecard the note reads both lists, because the row that caused this was in the one that
 page does not show.
 
+A completion dated after today is not a completion yet: the item counts as **still open** until
+that day arrives, and a board whose only completions are planned ones reads as *Nothing Finished
+Yet* — with the note saying how many rows are planned and how many are in progress — rather than
+as a filter problem.
+
 ## Aged Share of WIP: the Count in Proportion
 
 The **Aged work** tile counts the items that have been open too long. This one says what

@@ -268,6 +268,15 @@ before a line was changed; the repro is now a test.
   fixture ran a 400-day item from January 2026 and landed in February 2027; five checks went red
   because there was no longer anything for the fence to catch. Its base is 2024 now, and the
   comment says why.
+- **`finished` IS GATED BY `arrived()` TOO (2026-09-10, evening audit).** For a day only the two
+  date scans were. A team whose every completion was dated next year then had a `finished` list
+  and no `endDate`, walked past the "nothing finished" return, and threw on `edate(null)` — every
+  tab died, and a reload with that team active died again at boot. A completion that has not
+  happened is counted as OPEN, which is what every evaluation point already read. The second
+  empty return (axis walked to nothing) carries `futureRows` now as well, and the dashboard's
+  not-plottable branch reads only arrived completions — a board of planned completions is
+  "Nothing Finished Yet", saying how many are planned and how many open, with the future-row
+  note kept under the picker instead of cleared. Pinned on every window kind.
 
 ## Aged Share of WIP (2026-09-04) — SCHEMA 14 → 15
 

@@ -3876,6 +3876,70 @@ async function run(TD, win) {
     ok(/1 feature dated after today/.test(note), 'the note names the count and the unit', note);
     ok(/window stops at/.test(note), 'and the date the window was held at instead', note);
     is(win.futureNote(di), '', 'and it is silent on a board with nothing to say');
+
+    /* EVERY COMPLETION IN THE FUTURE (found 2026-09-10, the evening audit). The
+       date scans refused the dates and the `finished` list did not, so this
+       shape walked past the "nothing finished" return with no end date and
+       threw inside the window arithmetic — on every window kind, on every tab,
+       and again at boot with that team active. A paste is never held to the
+       item form's future-date rule, so it is one export away. */
+    const planned = [
+      { started: fwd(5), completed: fwd(9), type: 'Story' },
+      { started: back(10), completed: null, type: 'Story' }
+    ];
+    let allFuture = null, threw = null;
+    try { allFuture = TD.derive(planned, S14, V); } catch (e) { threw = e; }
+    ok(!threw, 'a list whose every completion is dated after today derives without throwing',
+       threw && threw.message);
+    ok(allFuture && allFuture.empty, 'and comes back as the empty shape — nothing has finished');
+    is(allFuture && allFuture.futureRows, 1, 'carrying the count of rows dated after today');
+    is(allFuture && allFuture.inProgressCount, 2,
+       'and counting the planned completion as still open, the reading every evaluation point takes');
+    /* The throw itself needs NOTHING that has arrived: an open row started last
+       week gives the date scan an end, and the fault then takes the other empty
+       return. Only planned rows, and every window kind. */
+    const onlyPlanned = [{ started: fwd(5), completed: fwd(9), type: 'Story' }];
+    for (const w of [{ months: '1' }, { months: 'all' }, { months: 'pi' },
+                     { months: 'custom', customFrom: back(30).toISOString().slice(0, 10),
+                       customTo: back(1).toISOString().slice(0, 10) }]) {
+      let bad = null, got = null;
+      try { got = TD.derive(onlyPlanned, S14, Object.assign({}, V, w)); } catch (e) { bad = e; }
+      ok(!bad, 'a list of ONLY planned completions does not throw on the ' + w.months + ' window',
+         bad && bad.message);
+      ok(got && got.empty && got.futureRows === 1,
+         'and is the empty shape with its one future row counted, on ' + w.months,
+         got && JSON.stringify({ empty: got.empty, futureRows: got.futureRows }));
+    }
+    /* The other empty return — an axis walked to nothing — has to carry the
+       count too, or the note is silent on exactly the board it was written for:
+       a typed window that reaches past the data, emptied by a planned date. */
+    const walked = TD.derive([{ started: back(60), completed: back(50), type: 'Story' },
+                              { started: fwd(30), completed: null, type: 'Story' }],
+      S14, { filterValue: '', months: 'custom', bucket: 'week',
+             customFrom: back(20).toISOString().slice(0, 10),
+             customTo: back(1).toISOString().slice(0, 10) });
+    ok(walked.empty, 'a typed window after the last completion is the empty shape', walked.weeks);
+    is(walked.futureRows, 1, 'and it too says how many rows are dated after today');
+    ok(/1 row dated after today/.test(win.futureNote(walked)),
+       'so the note can say so', win.futureNote(walked));
+
+    /* AND THE SCREEN. The dashboard used to call this board "No Items Match
+       This Filter" with no filter set, and cleared the one note that said why. */
+    plant({ teams: [{ id: 'fut1', name: 'Planned', rows: [
+      { s: fwd(5).toISOString().slice(0, 10), c: fwd(9).toISOString().slice(0, 10), t: 'Story' },
+      { s: back(10).toISOString().slice(0, 10), t: 'Story' } ] }], settings: {} });
+    win.renderAll();
+    win.selectTab('dashboard');
+    is(win.document.getElementById('dashNothingTitle').textContent, 'Nothing Finished Yet',
+       'the dashboard calls a board of planned completions unfinished, not filtered');
+    ok(/1 item is dated after today and 1 is in progress/.test(
+         win.document.getElementById('dashNothingBody').textContent),
+       'and says which rows are planned and which are open',
+       win.document.getElementById('dashNothingBody').textContent);
+    ok(/1 row dated after today/.test(win.document.getElementById('windowNote').textContent),
+       'with the future-row note kept under the picker rather than cleared',
+       win.document.getElementById('windowNote').textContent);
+    plant({ teams: [], settings: {} });
   }
 
   /* The coaching ratio: work in progress against a month of throughput. */

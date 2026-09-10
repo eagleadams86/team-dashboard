@@ -9043,8 +9043,17 @@ function derive(rows, settings, view, stages, statuses) {
   /* Items still in progress. They contribute nothing to throughput, quality or
      cycle time — all three key off a completion — but they DO count as work
      started, so they move net flow: the started tally counts start dates with
-     no reference to completion at all. */
-  const finished = items.filter(r => r.completed);
+     no reference to completion at all.
+
+     ARRIVED COMPLETIONS ONLY (2026-09-10). `arrived()` gates the two date scans
+     below, and for a day this list was not gated with them — so a team whose
+     every completion was dated next year had a `finished` list and no
+     `endDate`, walked past the empty return under it, and threw on
+     `edate(null)` inside the window arithmetic. The dashboard died with it on
+     every tab, and a reload with that team active died again at boot. A
+     completion that has not happened is not a completion: it is counted as
+     open, which is what every reading at an evaluation point already said. */
+  const finished = items.filter(r => arrived(r.completed));
 
   const isUnplanned = r => String(r.type || '').trim().toLowerCase() === unplannedStr;
 
@@ -9178,7 +9187,7 @@ function derive(rows, settings, view, stages, statuses) {
      message; All Teams says the same thing about a train. */
   if (!weekStarts.length) return {
     empty: true, weeks: [], startDate, endDate,
-    dataEnd, inProgressCount: items.length - finished.length,
+    dataEnd, futureRows, inProgressCount: items.length - finished.length,
     customUsed: !!custom
   };
 
@@ -15188,12 +15197,21 @@ function renderDashboard() {
   if (planning) selectChartTab('forecast');
 
   if (!plottable) {
-    if (rows.length && !rows.some(r => r.completed)) {
+    /* A completion dated after today has not happened, which is the reading
+       derive() takes of it — so a board whose only completions are planned ones
+       is a board with nothing finished, and not a filter problem. Without this
+       gate it fell through to "No Items Match This Filter" with no filter on. */
+    const todayUTC = new Date(todayLocalISO() + 'T00:00:00Z');
+    if (rows.length && !rows.some(r => r.completed && r.completed <= todayUTC)) {
       /* Every metric keys off a completion, so all-in-progress data has no week
          axis yet — that is not a filter problem and must not be blamed on one. */
+      const open = rows.length - (d.futureRows || 0);
       $('dashNothingTitle').textContent = 'Nothing Finished Yet';
-      $('dashNothingBody').textContent = rows.length + ' item' + (rows.length === 1 ? ' is' : 's are')
-        + ' in progress. Every chart keys off a completion, so the dashboard'
+      $('dashNothingBody').textContent = (d.futureRows
+        ? d.futureRows + ' item' + (d.futureRows === 1 ? ' is' : 's are') + ' dated after today'
+          + (open > 0 ? ' and ' + open + (open === 1 ? ' is' : ' are') + ' in progress' : '')
+        : rows.length + ' item' + (rows.length === 1 ? ' is' : 's are') + ' in progress')
+        + '. Every chart keys off a completion, so the dashboard'
         + ' starts with the first item that finishes.';
     } else if (rows.length && view.months === 'custom'
                && customWindow(view.customFrom, view.customTo)) {
@@ -15212,7 +15230,11 @@ function renderDashboard() {
       $('dashNothingBody').textContent = 'Nothing completed matches the '
         + view.filterDisplay + ' work type filter. Pick another type — or All — above.';
     }
-    if (activeTab === 'dashboard') $('windowNote').innerHTML = '';
+    /* Nothing to say about a window there is not — except the one sentence that
+       explains why there is not: the future-dated rows, if any. futureNote()
+       leads with a line break for the notes it usually follows; here it is the
+       whole note. */
+    if (activeTab === 'dashboard') $('windowNote').innerHTML = futureNote(d).replace(/^<br>/, '');
     Object.keys(charts).forEach(k => { charts[k].destroy(); delete charts[k]; });
     /* Nothing plots, so nothing can be maximised — and if something was, this is
        what brings the window back down rather than leaving a dead canvas up. */
