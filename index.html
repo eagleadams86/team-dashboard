@@ -17462,6 +17462,22 @@ const SCORECARD_CARDS = [
           + 'A feature routinely runs for weeks, so a short window often catches none — widen '
           + 'the window above.';
       }
+      /* COMPLETED WITH A START DATE, BUT EVERY DURATION IS OVER THE OUTLIER
+         FENCE (2026-09-10, evening audit). The pool the average is taken over
+         is the pool AFTER the exclusion, so a cutoff tuned for items — 30 days
+         says nothing about a feature — can empty it with every start date
+         present. The first version of this card inferred "no start date" from
+         the empty average and sent the reader to fix an export that was fine.
+         `outlierCount` is only ever non-zero when a duration was measured and
+         thrown out, so it is the check, not a guess. */
+      if (d.outlierCount) {
+        const cut = Number.isInteger(d.outlierCutoff) ? String(d.outlierCutoff) : num1(d.outlierCutoff);
+        return done + ' feature' + (done === 1 ? '' : 's') + ' completed in this window, but '
+          + (d.outlierCount === 1 ? 'the one that carries a start date' : 'every one that carries a start date')
+          + ' ran past the outlier cutoff of ' + cut + ' ' + d.dayNoun + ' and is being ignored, so '
+          + 'there is nothing left to average. Raise “Ignore items over” in Settings, or turn the '
+          + 'rule off: a fence set for work items is too low for features.';
+      }
       /* Completed, but no duration: the one case that is about the EXPORT
          rather than about the board, and the one nobody would guess at. */
       return done + ' feature' + (done === 1 ? '' : 's') + ' completed in this window, but '

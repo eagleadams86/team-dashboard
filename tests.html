@@ -10156,6 +10156,52 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('the flow card does not blame the export for an outlier fence');
+
+  {
+    /* A feature WITH a start date, completed inside the window, whose duration
+       is over a days cutoff tuned for work items (2026-09-10, evening audit).
+       The average is taken over the pool after the exclusion, so it is null,
+       and the card inferred "no start date" from that — a wrong reassurance
+       sending the reader to fix an export that was fine. */
+    const ofRows = [{ c: '2026-09-01', s: '2026-08-20', t: 'Story' },
+                    { c: '2026-09-02', s: '2026-08-21', t: 'Bug' }];
+    const longFeat = [{ c: '2026-09-05', s: '2026-06-01', t: 'Feature', i: 'AB-9' }];
+    const ofDoc = win.document;
+    const flowSays = (settings) => {
+      /* Two teams: the Scorecard is not offered below two. */
+      plant({ teams: [{ id: 'of1', name: 'One', rows: ofRows, features: longFeat },
+                      { id: 'of2', name: 'Two', rows: ofRows, features: [] }],
+              settings });
+      win.renderAll();
+      win.selectTab('scorecard');
+      const card = [...ofDoc.querySelectorAll('.sc-card')][2];
+      return { value: card.querySelector('.sc-value').textContent.trim(),
+               why: card.querySelector('.sc-verdict').textContent };
+    };
+    const fenced = flowSays({ outlierMode: 'days', outlierDays: 30 });
+    is(fenced.value, '—', 'a feature over the cutoff leaves no average to state');
+    ok(!/no start date/.test(fenced.why),
+       'and the card does NOT say the feature has no start date — it has one', fenced.why);
+    ok(/outlier cutoff of 30 days/.test(fenced.why),
+       'it names the fence that emptied the pool', fenced.why);
+    ok(/Ignore items over/.test(fenced.why), 'and the setting that moves it', fenced.why);
+    /* The proof it was the fence: the same feature with the rule off has a figure. */
+    const open_ = flowSays({ outlierMode: 'off' });
+    is(open_.value, '96.0', 'with the rule off the same feature averages 96 days');
+    /* And the export case is still the export case. */
+    plant({ teams: [{ id: 'of3', name: 'One', rows: ofRows,
+                      features: [{ c: '2026-09-05', t: 'Feature', i: 'AB-8' }] },
+                    { id: 'of4', name: 'Two', rows: ofRows, features: [] }],
+            settings: { outlierMode: 'days', outlierDays: 30 } });
+    win.renderAll();
+    win.selectTab('scorecard');
+    ok(/no start date/.test([...ofDoc.querySelectorAll('.sc-card')][2].querySelector('.sc-verdict').textContent),
+       'a feature that really has no start date is still called out as one');
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('the scorecard describes whichever list has a window');
 
   {

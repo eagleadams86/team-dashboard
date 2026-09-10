@@ -659,14 +659,15 @@ window ending in June while the note above it named September, and nothing on sc
 so. The two are pinned to the **later** of the two end dates, exactly as All Teams pins every
 team to one shared date, so *the last month* means the same month in all three cards.
 
-The Flow card's empty state then tells you **which** of four things is going on, because they are
-four different findings and only one of them is about this month's delivery:
+The Flow card's empty state then tells you **which** of five things is going on, because they are
+five different findings and only one of them is about this month's delivery:
 
 | What the card says | What to do |
 |---|---|
 | No team in scope has any features | Check *Work types that mean a feature* in Settings — the parse report on Your Data names the types your export actually carried |
 | None of the *N* features has completed yet | Nothing; they are all still open, and widening the window will not help |
 | None completed *in this window* | Widen the window — a feature routinely runs for weeks, so a one-month window often catches none |
+| *N* completed, but every one with a start date ran past the **outlier cutoff** | Raise *Ignore items over* in Settings, or turn the rule off — a fence set for work items is too low for features |
 | *N* completed but none carries a **start date** | Fix the export: a feature needs a start date as well as a completion date, the same two a work item needs |
 
 ### The Bands Are Generated, Not Typed

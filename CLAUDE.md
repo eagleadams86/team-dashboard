@@ -415,11 +415,17 @@ drew the line.** Both halves of the original argument were put to Charles and he
   The Predictability card checks `d.empty` BEFORE `d.agedDays == null`: the empty shape carries
   no threshold because it carries no window, and the card was telling a reader with the default
   14 days in force that no threshold was set.
-- **AN EMPTY FLOW CARD HAS FOUR CAUSES AND MUST NAME THE ONE IT HAS.** No feature layer set up /
-  every feature still open / none completed inside the window / completed but carrying no start
-  date. Three of those are fixable in a minute, only one is about delivery, and the first version
-  of the card asserted the third about all four. A wrong reassurance is a wrong number, and the
-  "still open" case must NOT be given the widen-the-window advice, which would not work.
+- **AN EMPTY FLOW CARD HAS FIVE CAUSES AND MUST NAME THE ONE IT HAS.** No feature layer set up /
+  every feature still open / none completed inside the window / every completed one over the
+  outlier fence / completed but carrying no start date. Four of those are fixable in a minute,
+  only one is about delivery, and the first version of the card asserted the third about all of
+  them. A wrong reassurance is a wrong number, and the "still open" case must NOT be given the
+  widen-the-window advice, which would not work. **The fence case was the fifth, found 2026-09-10
+  (evening audit):** the average is taken over the pool AFTER the exclusion, so a days cutoff tuned
+  for items empties it with every start date present, and the card INFERRED "no start date" from
+  the empty average — sending the reader to fix an export that was fine. `d.outlierCount` is the
+  check: it is only ever non-zero when a duration was measured and thrown out. Test the fact,
+  never infer it from the figure it produces.
 - **A BAND LABEL IS GENERATED FROM THE BOUNDARIES, never typed.** `≤20%`, `21–40%`, `>40%` come
   out of the two stored numbers at the scale's own `dp`, so they cannot overlap or contradict what
   `rag()` does. The printed scorecard the feature was built from read *16-25* beside *>=25* and
