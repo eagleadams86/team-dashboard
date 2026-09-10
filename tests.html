@@ -390,7 +390,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    up. The pair asserting which columns draw a trace is the one to keep: the data
    for three more exists and drawing it would be wrong, so a fourth has to be a
    deliberate act rather than an easy one. */
-const EXPECTED = 3558;
+const EXPECTED = 3570;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3620,7 +3620,33 @@ async function run(TD, win) {
          : Math.abs(v - dS.agedCount[i] / dS.wip[i]) < 1e-9),
        'and every point IS aged over work in progress, at that same point');
     is(dS.summary.agedShareNow, dS.agedShare[dS.agedShare.length - 1],
-       'the tile reads the last point of the series, not a second calculation');
+       'the last point of the series is kept for the tile’s foot to state');
+
+    /* ── The window's own figure (2026-09-10) ──────────────────────────────
+       POOLED, NOT MEANED, and this is the assertion that says so: the two are
+       computed here from the series by both definitions and the app has to
+       agree with the first and differ from the second. A build that quietly
+       averaged the percentages would pass every null rule below it. */
+    {
+      const pairs = dS.agedShare.map((v, i) => v == null ? null : [dS.agedCount[i], dS.wip[i]])
+        .filter(Boolean);
+      const pooled = pairs.reduce((n, x) => n + x[0], 0) / pairs.reduce((n, x) => n + x[1], 0);
+      const meaned = dS.agedShare.filter(v => v != null)
+        .reduce((n, v, _, a) => n + v / a.length, 0);
+      ok(Math.abs(dS.summary.agedShareAvg - pooled) < 1e-9,
+         'the window figure is the aged readings summed over the open readings summed',
+         dS.summary.agedShareAvg + ' vs ' + pooled);
+      ok(Math.abs(dS.summary.agedShareAvg - meaned) > 1e-6,
+         'and is NOT the mean of the plotted percentages — the demo tells them apart',
+         dS.summary.agedShareAvg + ' vs ' + meaned);
+      is(dS.summary.agedSharePeriods, pairs.length,
+         'it counts the periods that have a share, not the periods in the window');
+      ok(dS.summary.agedSharePeriods < dS.agedShare.length
+           || dS.agedShare.every(v => v != null),
+         'so a window with blank periods averages over fewer than it holds');
+      ok(dS.summary.agedShareAvg >= 0 && dS.summary.agedShareAvg <= 1,
+         'and it can no more pass 100% than a single period can, being the same division');
+    }
 
     /* Zero open is NO ratio, never 0% and never 100%. A board that has stopped
        must not read as a board with nothing stale. */
@@ -3629,7 +3655,10 @@ async function run(TD, win) {
     ok(dEmpty.agedShare.every((v, i) => dEmpty.wip[i] !== 0 || v === null),
        'a period with nothing open has no share at all');
     is(dEmpty.summary.agedShareNow, null,
-       'and the tile says so with a dash rather than a reassuring nought');
+       'and the newest reading says so with a dash rather than a reassuring nought');
+    is(dEmpty.summary.agedShareAvg, null,
+       'so does the window figure — no period had anything open to take a share of');
+    is(dEmpty.summary.agedSharePeriods, 0, 'and it averaged over no periods at all');
 
     /* No threshold, no numerator, so no share — the feature view. The series
        still keeps its length, the way agedCount does. */
@@ -3639,7 +3668,10 @@ async function run(TD, win) {
     is(dNoT.agedDays, null, 'the feature view with no threshold set has none');
     ok(dNoT.agedShare.every(v => v === null), 'so every point of the share is null');
     is(dNoT.agedShare.length, dNoT.wip.length, 'and the series still keeps its length');
-    is(dNoT.summary.agedShareNow, null, 'with the tile reading a dash');
+    is(dNoT.summary.agedShareNow, null, 'with the newest reading a dash');
+    is(dNoT.summary.agedShareAvg, null, 'and the window figure a dash, so the tile is one too');
+    is(dNoT.summary.agedSharePeriods, 0,
+       'no threshold means no period has a share, however much was open');
     ok(!/null/.test(dNoT.titles.agedShare) && !/null/.test(dNoT.axisTitles.agedShare),
        'and neither the title nor the axis says the word null', dNoT.titles.agedShare);
     ok(!!dNoT.names.agedShare && !!dNoT.titles.agedShare && !!dNoT.axisTitles.agedShare,
@@ -8789,10 +8821,29 @@ group('ARTs — the grouping, and the boundary it crosses');
   const bareExport = settle(demoOf(demo, 'Team Bare Export').rows);
   const agedPctOf = (d) => Math.round(d.summary.agedShareNow * 100);
   is([agedPctOf(healthy), agedPctOf(bareExport), agedPctOf(longTail)], [0, 33, 67],
-     'the demo’s three teams land on three different aged shares');
-  ok(agedPctOf(healthy) <= 20 && agedPctOf(bareExport) > 20 && agedPctOf(bareExport) <= 40
-       && agedPctOf(longTail) > 40,
-     'one on each side of the 20/40 boundaries the demo seeds — green, amber and red');
+     'the three boards read 0, a third and two thirds on their newest day — the tile’s foot');
+
+  /* THE TILE STATES THE WINDOW'S AVERAGE (2026-09-10), so the three states have
+     to survive the DATE PICKER and not merely the newest day. A snapshot reads
+     the same however wide the window is; an average does not, and the demo's
+     spread collapsed to two greens under the 20/40 pair that had served the
+     snapshot. Walked over every window the picker offers rather than at the
+     default alone — the boundaries are read back off the seeded settings, so
+     this cannot drift from DEMO_AGED_SHARE_GREEN and _RED the way the confirm
+     dialog's sentence once did. */
+  const seeded = win.tdGet().settings;
+  is([seeded.agedShareGreen, seeded.agedShareRed], [1, 20],
+     'the demo seeds the pair the averages are spread against');
+  const teamsByName = ['Team Healthy Flow', 'Team Bare Export', 'Team Long Tail']
+    .map(n => demoOf(demo, n));
+  ['all', 3, 6, 12].forEach(m => {
+    const got = teamsByName.map(t => Math.round(settle(t.rows, m).summary.agedShareAvg * 100));
+    ok(got[0] <= seeded.agedShareGreen
+         && got[1] > seeded.agedShareGreen && got[1] <= seeded.agedShareRed
+         && got[2] > seeded.agedShareRed,
+       'over ' + m + ' the three window averages are still green, amber and red',
+       got.join(', '));
+  });
 
   /* THE DIALOG THAT OFFERS THE DEMO HAS TO DESCRIBE IT. It said "five items aged
      past the threshold" for as long as Team Long Tail's `wip` list had six of them past
@@ -9922,21 +9973,33 @@ group('ARTs — the grouping, and the boundary it crosses');
     return said;
   };
   const demoFresh = askDemo({});
-  ok(/graded here, at 20% and 40%/.test(demoFresh), 'a fresh browser is told the demo grades at 20% and 40%');
+  ok(/graded here, at 1% and 20%/.test(demoFresh), 'a fresh browser is told the demo grades at 1% and 20%');
   ok(/one team on each of the three states/.test(demoFresh), 'and that it will see all three states');
+  /* IT NAMES THE STATES AND QUOTES NO FIGURES (2026-09-10). It read "Team Long
+     Tail 67%" — the newest day's share, which is what the tile showed then and
+     is not what it shows now. A percentage in this sentence would move with the
+     reader's date picker, so there is none. */
+  ok(/Team Long Tail off target/.test(demoFresh), 'and which team lands where', demoFresh);
+  ok(!/reads \d+%/.test(demoFresh),
+     'without quoting a share that moves with the date picker', demoFresh);
   ok(!/will differ/.test(demoFresh), 'with nothing about its figures differing — the threshold is the default');
   const half = askDemo({ agedShareGreen: 10 });
   ok(!/one team on each/.test(half), 'a browser with one boundary set is NOT promised three states', half);
   ok(/nothing is graded until you fill it in/.test(half), 'it is told nothing is graded until the other box is filled');
   const demoBoth = askDemo({ agedShareGreen: 10, agedShareRed: 15 });
   ok(/10% and 15% — are kept/.test(demoBoth), 'a browser with both set is told its own pair is kept', demoBoth);
-  ok(!/graded here, at 20%/.test(demoBoth), 'and not that the demo grades at 20% and 40%');
+  ok(!/graded here, at 1%/.test(demoBoth), 'and not that the demo grades at 1% and 20%');
+  ok(!/lands on target/.test(demoBoth),
+     'and is promised no colours at all — at its own boundaries they are not ours to name',
+     demoBoth);
   const swapped = askDemo({ agedShareGreen: 40, agedShareRed: 20 });
   ok(/wrong way round/.test(swapped), 'a pair the wrong way round is told nothing is graded until swapped', swapped);
   const thirty = askDemo({ agedDays: 30, workingDays: true });
   ok(/yours is 30 working days, so the figures on your screen will differ/.test(thirty),
      'a browser on a different threshold is told the screen will differ', thirty);
   ok(/demo’s 14-day threshold/.test(thirty), 'and which threshold the counts were taken at');
+  ok(/aged share the three states are read off/.test(thirty),
+     'naming the share as well as the counts, since the states are read off it', thirty);
   plant({ teams: [], settings: {} });
 
   /* ────────────────────────────────────────────────────────── */
@@ -9960,7 +10023,17 @@ group('ARTs — the grouping, and the boundary it crosses');
   ok(shareChips.every(c => c.align === 'left' && c.x < shareChart.chartArea.left + 12),
      'both at the LEFT edge of the plot', JSON.stringify(shareChips));
   ok(shareChart.options.plugins.refLabels.lines.every(l => l.align === 'left'),
-     'because both lines ask for it');
+     'because every line on this chart asks for it');
+  /* THE THIRD CHIP (2026-09-10) is the figure the tile states, and it is on this
+     chart because the tile no longer states the line's last point. A reader
+     looking from one to the other has to land somewhere. */
+  const avgChips = chipXs(shareChart, /^average /);
+  is(avgChips.length, 1, 'and a third chip for the window average the tile states');
+  ok(avgChips.every(c => c.align === 'left'), 'at the left with the other two');
+  ok(shareChart.data.datasets.some(ds => ds.label === 'Average'
+       && new Set(ds.data).size === 1),
+     'drawn flat across the plot as well, so it is not chip-only',
+     shareChart.data.datasets.map(ds => ds.label).join(','));
   win.document.getElementById('stab-health').click();
   const ageChart = win.tdCharts().chartItemAge;
   const ageChips = ageChart ? chipXs(ageChart, /aged after|target/) : [];

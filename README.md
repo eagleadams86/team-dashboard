@@ -382,7 +382,7 @@ people actually scan for:
 | **Throughput trend** | Which team is *changing*? |
 | **85th cycle time** / **85th lead time** | Who is slow at *doing* the work, who is slow at *responding* — and the gap between the two is their queue |
 | **In progress** | Who is overloaded — and is their board filling or draining? |
-| **Aged** / **Aged %** | Who has work going stale — and how much of their board is it? |
+| **Aged** / **Avg aged %** | Who has work going stale — and how much of their board is it, averaged across the window? |
 | **Defect rate** | Who has a quality problem? — empty in the feature view, and the note under the table says why |
 | **Data to** | …and whose figures are worth trusting at all |
 
@@ -395,7 +395,7 @@ rule stays even though the third circle has gone: it is what keeps the two-word 
 setting the column widths.
 
 **Completed** and **WIP vs month** were columns here until September 2026, when they were dropped
-to make room for **Aged %**. Both figures are still on the dashboard. *Per week* is the same
+to make room for **Avg aged %**. Both figures are still on the dashboard. *Per week* is the same
 measure as *Completed* normalised to the window, and it is the more useful of the two here — an
 absolute count over a shared window mostly ranks teams by size. What is genuinely gone from this
 table, and from its CSV export, is the roll-up's only absolute volume figure. *WIP vs month*'s
@@ -418,11 +418,17 @@ view. *Data to* is the column that explains patchy data. It carries no ⓘ, unde
 its note opens from the 85th percentile lead time tile on the dashboard, which is named for the
 same heading.
 
-**Aged %** is the ageing column worth sorting on, because it is the one that compares. Six aged
-items is a tail on a board of thirty and a stop on a board of six; the count beside it ranks
+**Avg aged %** is the ageing column worth sorting on, because it is the one that compares. Six
+aged items is a tail on a board of thirty and a stop on a board of six; the count beside it ranks
 teams by size, and this one ranks them by trouble. It carries no ⓘ, under the rule above — its
 note opens from the **Aged share** tile on the dashboard, which is named for the same heading.
 The cells are plain text whatever the figure: the tile grades, the comparison table states.
+
+**The two do not divide, and the heading says so.** **Aged** is the count open on the shared end
+date; **Avg aged %** is the share averaged over every period of the window, so a row reading 6
+and 38% is not an arithmetic slip. The note under the table says it a second time, because a
+heading can name a shape but not what it is a shape of. The word costs the table no width — a
+header cell is as wide as its longest word, and that is still *aged*.
 
 **Throughput trend** deserves its own paragraph, because it answers something none of the other
 columns can.
@@ -456,8 +462,8 @@ divided by throughput, so a board filling while the pace stays flat is a cycle t
 has not landed in the percentile column yet — work is arriving faster than it leaves. A board
 rising *alongside* throughput is a team taking on more and finishing more, which is a different
 thing entirely. In the demo, Team Long Tail reads 4.2 per week with a trend of −0.9 and a board
-that has filled by +6.3: delivery slowing while the board grows, and its 23.0 cycle time and 67%
-aged share are what that has already cost.
+that has filled by +6.3: delivery slowing while the board grows, and its 23.0 cycle time and 38%
+average aged share are what that has already cost.
 
 **Only two columns on this table draw a trace, and that is a judgement rather than a limit of
 the data.** A per-period series exists for the cycle time percentile, the lead time percentile
@@ -601,7 +607,7 @@ Three columns, one per thing a leadership team asks about:
 
 | Column | The figure | Read over |
 |---|---|---|
-| **Predictability** | **Aged share of WIP** — how much of the board has been open past your ageing threshold | work items |
+| **Predictability** | **Aged share of WIP** — how much of the board has been open past your ageing threshold, averaged across the window | work items |
 | **Quality** | **Defect share of completions** — how much of what finished was defect work | work items |
 | **Flow** | **Average feature cycle time** — how long a finished feature took, start to completion | **features** |
 
@@ -625,9 +631,9 @@ days before it; a pair of typed dates against the same span immediately before t
 is by **days, not calendar months**, so one rule serves every option the picker offers — there
 is no honest answer to "the month before a PI".
 
-It is read **as of its own end**, which matters more than it sounds. The aged share is a
-point-in-time reading taken at the window's end, so a prior window read as of *today* would put
-last quarter's completions beside this morning's board. The two windows are named in full under
+It is read **as of its own end**, which matters more than it sounds. Each window's figures are
+taken over that window's own periods, so a prior window read as of *today* would put last
+quarter's completions beside this morning's board. The two windows are named in full under
 the date picker, so you can always check what is being compared with what.
 
 **A percent moves in points, never in percent.** A share going from 20% to 10% has not fallen by
@@ -710,12 +716,19 @@ scope.
 
 ### On the Demo
 
-Loading the sample data sets all three pairs — 20% and 40% for the aged share, 10% and 20% for
+Loading the sample data sets all three pairs — 1% and 20% for the aged share, 10% and 20% for
 the defect share, 30 and 45 days for the feature cycle time — chosen so the demo train reads
-**one card of each state**: an aged share in the forties (off target), a defect share around a
-sixth (watch) and features averaging about 26 days (on target). A demo where every card came out
-green would ship the feature invisibly. Your own browser starts with all six boxes empty and
+**one card of each state**: an aged share in the low twenties (off target), a defect share around
+a sixth (watch) and features averaging about 26 days (on target). A demo where every card came
+out green would ship the feature invisibly. Your own browser starts with all six boxes empty and
 nothing graded.
+
+The aged-share pair was 20% and 40% until the figure became the window's average in September
+2026. The demo's three boards read 0%, a third and two thirds *on their newest day*, which those
+two numbers separated neatly; averaged across the window they read about 0%, 2% and 34%, and two
+of the three came out green. 1% and 20% separate the averages at every window the picker offers,
+and a test walks all four rather than trusting the default. The pair is not advice and was never
+meant to be — what it is for is showing you what the colours do.
 
 
 ## Teams
@@ -825,8 +838,8 @@ built from** (`KFR` and `HRN`), so [pasting several teams at once](#pasting-seve
 works straight off the demo rather than only after three ids are typed in — and Team Bare
 Export, with no keys, is the team the split's *takes nothing* line is about.
 
-The demo also sets **all three [grading scales](#the-bands-are-generated-not-typed)** — 20% and
-40% for the aged share, 10% and 20% for the defect share, 30 and 45 days for the average feature
+The demo also sets **all three [grading scales](#the-bands-are-generated-not-typed)** — 1% and
+20% for the aged share, 10% and 20% for the defect share, 30 and 45 days for the average feature
 cycle time — chosen so the Scorecard reads **one card of each state** rather than three green
 ones. Each pair is written only when *both* of its boxes are empty, so a line you have drawn
 yourself is never finished off for you.
@@ -1562,8 +1575,9 @@ worth knowing:
   is the same statement that setting always makes. The ageing threshold moves with it: 14
   working days is nearly three calendar weeks, so items age later and the Aged work count drops.
 - **A share is null when it has no denominator, never nought.** The
-  [aged share](#aged-share-of-wip-the-count-in-proportion) divides the aged count by the work in
-  progress count, so a period with nothing open has no share to state — the same reading *WIP vs
+  [aged share](#aged-share-of-wip-the-count-in-proportion) divides aged counts by work in
+  progress counts, so a period with nothing open has no share to state — and is left out of the
+  window's average rather than averaged in as a nought — the same reading *WIP vs
   throughput* takes of a month that finished nothing, where "∞×" is not a figure anyone can act
   on. A zero would say the board was clean when it had simply stopped.
 - **A duration can be left out of the pool without the item leaving the count.** With
@@ -2126,8 +2140,8 @@ since.
 ## Aged Share of WIP: the Count in Proportion
 
 The **Aged work** tile counts the items that have been open too long. This one says what
-proportion of the board they are — **the aged count divided by the work in progress count**, the
-two tiles beside it, at the same moment and over the same window.
+proportion of the board they are — the aged count over the work in progress count — **averaged
+across the whole window**.
 
 It exists because the count on its own does not travel. **Six aged items is a tail on a board of
 thirty and a stop on a board of six**, and the raw count ranks teams by size rather than by
@@ -2135,12 +2149,40 @@ trouble. That is why it is also a column in All Teams, and the ageing column wor
 
 It is a division of two series the app already had rather than a third count of its own, which is
 what makes it safe to state: the aged count is worked out by subtracting from the work in
-progress count, so the numerator can never exceed the denominator and the tile can never
-contradict the two tiles beside it.
+progress count, so the numerator can never exceed the denominator, and summing both across the
+window cannot break that.
 
 **A dash means there is nothing to state, not that nothing is wrong.** Either no ageing threshold
-is set — the feature view ships without one — or nothing is open at all, and no items open is not
-a share of nought. A zero here would draw a healthy floor across a board that had simply stopped.
+is set — the feature view ships without one — or nothing was open at any point in the window, and
+no items open is not a share of nought. Periods with nothing open are left out of the average for
+the same reason, and the card says how many periods it actually averaged over. A zero here would
+draw a healthy floor across a board that had simply stopped.
+
+### It Is the Window's Figure, Not Today's
+
+This changed on **10 September 2026**. Until then the tile, the All Teams column and the
+Scorecard card all stated **the last point of the chart** — the board as it stood on the newest
+day in your data. That is a true reading of one day, and it was being read as a verdict on a
+quarter: a release that cleared the board on the Friday made the quarter look healthy, and a
+board that filled on the Monday made it look worse than it had been all year.
+
+The figure is now what those weekly readings come to together. **It is pooled, not meaned** —
+add up the aged readings, add up the open readings, divide — so a week with thirty items open
+counts thirty times as hard as a week with one. Averaging the percentages on the chart would let
+a quiet fortnight when the board was nearly empty swing the figure as far as a full one, and it
+will not give the same answer. It is the same pooling the defect rate chart calls its *overall*
+figure.
+
+**Nothing was lost.** The chart still plots every period, with the average drawn flat across it
+and named in the chart's title, so you can see the window the figure came from. And the tile's
+foot states today's reading beside the average — *67% right now, 6 of 9 open items* — in the
+same counts the **Aged work** and **Work in progress** tiles are showing. Those two tiles and
+this one no longer divide into each other, which is exactly why the foot spells it out: a reader
+who takes 6 over 9 and gets two thirds is meant to arrive somewhere.
+
+One consequence worth knowing: **the figure now moves when you change the date picker**, where a
+point-in-time reading did not. A wider window is a different question, not a longer look at the
+same one.
 
 ### The First Figure That Took a Colour
 

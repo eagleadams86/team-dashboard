@@ -224,6 +224,58 @@ configurable RAG for this metric if possible."* All four landed. What must not r
   column.** Six aged is a tail on a board of thirty and a stop on a board of six. The raw count
   ranks teams by size; this one compares them.
 
+### It became the WINDOW's figure on 2026-09-10 — asked for by Charles
+
+*"in flow metrics, on the scorecard is aged share for wip the average of the %s across the teams
+at the end of each week for the duration or is it just the current work that is open right now?"*
+It was the latter, on all three surfaces; he chose to make it the former, pooled. What must not
+regress:
+
+- **POOLED, NEVER MEANED.** `agedShareAvg` is the aged readings summed over the open readings
+  summed — Σ`agedCount[k]` ÷ Σ`wip[k]` — so a period with thirty items open counts thirty times
+  as hard as a period with one. The plain mean of `agedShare`'s points would let a quiet
+  fortnight swing the figure as far as a full one, which is the fault `unplannedShare` is pooled
+  to avoid one card along. **A test computes both definitions off the series and asserts the app
+  matches the first and differs from the second** — a build that quietly meaned would pass every
+  null rule in the block.
+- **STILL A DIVISION OF THE SAME TWO SERIES**, so the rule above survives untouched: the sums
+  inherit `agedCount[k] <= wip[k]`, and the figure can no more print above 100% than a point can.
+  The gate on the loop is the SERIES' OWN NULL, so the drawn line and the figure can never be
+  taken over different sets.
+- **`agedShareNow` IS KEPT AND HAS EXACTLY ONE READER** — the tile's foot, which states today's
+  reading beside the window's. Do not delete it as dead: the two count tiles above the tile are
+  no longer its numerator and denominator, and the foot is where that is paid for.
+- **THREE SURFACES MOVED TOGETHER** — the dashboard tile, the All Teams `agedPct` column and the
+  Scorecard's Predictability card. They share one ⓘ note because they are one figure; a build
+  where only one of them averages is two screens disagreeing, which is the fault this whole file
+  argues hardest against. `key: 'agedPct'` is unchanged, so a saved sort still resolves.
+- **THE ALL TEAMS HEADING IS `Avg aged %` AND COSTS NO WIDTH.** A header cell's min-content is
+  its longest word and that is still "aged" — **measured at 953px with the demo loaded, identical
+  either way**, against the same 1030px of table at 1100 the trace column was argued at. The
+  `Aged` column beside it is still the count open on the shared end date, so the two no longer
+  divide; the heading says so and the note under the table says so again.
+- **THE CHART DRAWS THE FIGURE AND THE TITLE NAMES IT.** "the tile and the right-hand end of this
+  line are one number read once" was true until this change and is the thing that stopped being
+  true, so the average is a flat dataset plus a third `refLabels` chip, and the title carries
+  `(Average: N%)` the way the defect rate's carries `(Overall: …)`. Told apart from the trend
+  line by BOTH colour and dash, the age chart's rule. **A reader looking from the tile to the
+  last point must land somewhere.**
+- **"Average" here, "Overall" one card along, and both are the same operation.** The defect rate's
+  title is warning a reader off the mean of its own points; this one matches the four surfaces
+  that say "averaged over N weeks" in words. If that ever reads as a wobble, move the defect rate
+  — do not move this one away from the tile, the column and the card.
+- **THE DEMO'S GRADING PAIR MOVED, 20/40 → 1/20, and it had to.** The three demo boards read 0%,
+  a third and two thirds on their newest day, which 20 and 40 separated; averaged they read 0%,
+  2–3% and 31–38%, and **two of the three came out green** — the sample-data rule's exact
+  failure. The test walks `'all'`, 3, 6 and 12 months and reads the pair back off the seeded
+  settings, so it cannot drift from the constants. **The demo's spread is now window-dependent
+  where a snapshot's was not**, which is inherent to the figure; the Scorecard card is red at the
+  picker's default and amber at six months, and the comment on the constants says so.
+- **THE CONFIRM DIALOG NAMES THE STATES AND QUOTES NO FIGURES.** It said "Team Long Tail 67%",
+  counted off the profiles by `demoAgedShare` — a helper that is now DELETED, because any figure
+  it produced moves with the reader's date picker. "Team Long Tail off target" cannot drift. A
+  browser with its own boundaries is promised no colours at all.
+
 ### NOTHING TURNS A COLOUR — amended, decided with Charles
 
 The rule at *The Limit and the Target* said the verdict is a sentence and the bars over a limit

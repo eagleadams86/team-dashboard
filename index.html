@@ -9262,6 +9262,41 @@ function derive(rows, settings, view, stages, statuses) {
      draw a healthy floor across a board that had simply stopped. */
   const agedShare = agedCount.map((a, k) => (a == null || !wip[k]) ? null : a / wip[k]);
 
+  /* ── What the window as a whole came to ───────────────────────────────────
+     The series above is the reading period by period; this is the one figure
+     the window comes to, and as of 2026-09-10 it is what the tile, the All
+     Teams column and the Scorecard's Predictability card all state. They stated
+     the last point of the series until then — the board as it stood on the
+     newest day of data — which is a true reading of one day and was being read
+     as a verdict on a quarter.
+
+     POOLED, NOT MEANED, and that is the half worth guarding. It is the aged
+     readings summed over the open readings summed, so a period with thirty
+     items open counts thirty times as hard as a period with one. The plain mean
+     of the plotted percentages would let a fortnight when the board was nearly
+     empty swing the figure as far as a fortnight when it was full, which is
+     exactly the fault `unplannedShare` is pooled to avoid one card along.
+     ANYTHING THAT AVERAGES THE PERCENTAGES IS A BUG, however close its answer.
+
+     STILL A DIVISION OF THE SAME TWO SERIES and never a third count, so the
+     rule the share was built on survives intact: `agedCount[k] <= wip[k]` holds
+     at every point, so it holds over the sums, so this can no more print above
+     100% than the series can.
+
+     The periods that count are exactly the periods that HAVE a share — the
+     gate is the series' own null — so the drawn line and this figure can never
+     be taken over different sets. How many contributed is carried beside it,
+     because a window half of which a team has no data for must say so rather
+     than quietly averaging over the blanks. */
+  let agedOpenSum = 0, agedPastSum = 0, agedSharePeriods = 0;
+  for (let k = 0; k < agedShare.length; k++) {
+    if (agedShare[k] == null) continue;
+    agedPastSum += agedCount[k];
+    agedOpenSum += wip[k];
+    agedSharePeriods++;
+  }
+  const agedShareAvg = agedOpenSum ? agedPastSum / agedOpenSum : null;
+
   /* ── The cumulative flow diagram ───────────────────────────────────────────
      Three cumulative counts read at the same points work in progress is read
      at: how much had been raised by then, how much had been started, and how
@@ -9917,10 +9952,23 @@ function derive(rows, settings, view, stages, statuses) {
          that nothing has aged on a board it never measured. */
       agedNow: agedDays == null ? null
         : (agedCount.length ? agedCount[agedCount.length - 1] : 0),
-      /* The last point of the share series, so the tile and the right-hand end
-         of the chart are the same number read once. Null when there is no
-         threshold and null when nothing is open — see the series itself. */
+      /* The last point of the share series — the board as it stood on the newest
+         day of data, which is the right-hand end of the chart read once. It was
+         the figure every surface stated until 2026-09-10 and is now the second
+         clause of the tile's foot. Null when there is no threshold and null when
+         nothing is open — see the series itself. */
       agedShareNow: agedShare.length ? agedShare[agedShare.length - 1] : null,
+      /* The window's figure, and the one every surface prints. Read the block
+         beside the series for why it is pooled rather than meaned.
+
+         `agedShareNow` above is kept and still has one reader: the tile's foot
+         states what the board reads TODAY beside what the window came to, so a
+         team whose figure is falling can see that it is. */
+      agedShareAvg,
+      /* How many periods the figure was taken over, never how many the window
+         holds. The two differ by every period this team had nothing open, and
+         the difference is the reader's to know. */
+      agedSharePeriods,
       asOf: endDate,
       monthlyThroughput,
       /* Null rather than Infinity when nothing was finished in the last month —
@@ -10017,10 +10065,23 @@ function derive(rows, settings, view, stages, statuses) {
       agedWork: agedDays == null
         ? Units + ' in Progress Too Long — No Threshold Set'
         : Units + ' in Progress Longer Than ' + agedDays + ' ' + DayNoun,
+      /* THE FIGURE IN THE TITLE, the way the defect rate states its own one card
+         along — because the tile beside this chart no longer states the line's
+         last point, and a card whose face and whose plot disagree has to say
+         where the face came from. It is drawn on the plot as well; the title is
+         for a screenshot, where the chip may have been cropped.
+
+         "Average" here where the defect rate's title says "Overall", and the
+         two are the same pooled operation. That title is warning a reader off
+         the mean of ITS plotted points; this one is naming what the tile, the
+         column and the Scorecard card all now call this figure in words, and
+         four surfaces agreeing about one metric is worth more than two titles
+         agreeing about a word. The ⓘ says which average it is. */
       agedShare: agedDays == null
         ? 'Share of Open ' + Units + ' Past the Ageing Threshold — No Threshold Set'
         : 'Share of Open ' + Units + ' Older Than ' + agedDays + ' ' + DayNoun
-          + ', at the End of Each ' + Noun,
+          + ', at the End of Each ' + Noun
+          + (agedShareAvg == null ? '' : ' (Average: ' + Math.round(agedShareAvg * 100) + '%)'),
       itemAge: 'Age of Every ' + Unit + ' Still in Progress on ' + prettyDate(endDate)
         + (ageing.byStage ? ', by Workflow Stage'
            : ageing.byStatus ? ', by Status' : ', by Work Type'),
@@ -10150,10 +10211,13 @@ function priorWindowOf(d) {
    A CUSTOM WINDOW AND NOT `asOf`, and the difference is the whole trick.
    `view.asOf` only ever moves the end date LATER (see derive) — by design, so a
    caller cannot hide data by accident — while a custom `to` clamps it EARLIER,
-   which is what a past window needs. The aged share is a point-in-time reading
-   taken at the window's end, so a prior window read as of today would state
-   last quarter's completions beside this morning's board. Do not "simplify"
-   this back onto asOf. */
+   which is what a past window needs. Work in progress and the aged count are
+   read at each period's END, so a prior window read as of today would take its
+   readings off this morning's board and state them beside last quarter's
+   completions — and since 2026-09-10 the aged share is averaged over EVERY one
+   of those readings rather than only the last, so the fault would run the whole
+   length of the window instead of sitting on one point. Do not "simplify" this
+   back onto asOf. */
 function priorViewOf(base, prior) {
   return Object.assign({}, base, {
     months: 'custom', customFrom: isoOf(prior.from), customTo: isoOf(prior.to)
@@ -13098,10 +13162,14 @@ function drawCharts(d) {
   if (!hasShare) {
     if (charts.chartAgedShare) { charts.chartAgedShare.destroy(); delete charts.chartAgedShare; }
   } else {
-  /* Whole percents in the tooltip as well as on the axis: the tile and the
-     right-hand end of this line are one number read once, and it is graded as a
-     whole percent, so a tooltip saying 33.3% beside a tile saying 33% would be
-     the chart stating a precision the verdict does not use. */
+  /* Whole percents in the tooltip as well as on the axis: the figure this card
+     states is graded as a whole percent, so a tooltip saying 33.3% beside a tile
+     saying 33% would be the chart stating a precision the verdict does not use.
+
+     It said "the tile and the right-hand end of this line are one number read
+     once" until 2026-09-10, and that is exactly what stopped being true — which
+     is why the average is now drawn flat across the plot and named in the title.
+     A reader who looks from the tile to the last point must land somewhere. */
   const shareOpts = baseOptions(d.axisTitles.agedShare, pct0, pct0, d.axisTitles.x, d.partial);
   shareOpts.scales.y.beginAtZero = true;
   /* Pinned to the whole scale rather than fitted to the data. A share is read
@@ -13110,6 +13178,10 @@ function drawCharts(d) {
      bands under the line every time the data did. */
   shareOpts.scales.y.max = 1;
   const shareBounds = ragBounds('agedShare');
+  /* Every horizontal reference this card draws, collected before any of them is
+     placed: the two boundaries are optional and the average is not, so building
+     the list first is what lets the chips exist on an ungraded board. */
+  const shareRefs = [];
   if (shareBounds) {
     shareOpts.plugins.ragBands = { bounds: shareBounds };
     /* The bands are named where they are drawn, by the same plugin the age chart
@@ -13118,13 +13190,30 @@ function drawCharts(d) {
        the words sit together. */
     /* At the LEFT end, over the oldest points: the right end is the newest
        weeks, the ones the tile states, and the chips hid them. */
-    shareOpts.plugins.refLabels = { lines: [
+    shareRefs.push(
       { value: shareBounds.green, text: 'on target ≤ ' + Math.round(shareBounds.green * 100) + '%',
         colour: token('--green'), align: 'left' },
       { value: shareBounds.red, text: 'off target > ' + Math.round(shareBounds.red * 100) + '%',
-        colour: token('--red'), align: 'left' }
-    ] };
+        colour: token('--red'), align: 'left' });
   }
+  /* THE FIGURE THE CARD STATES, drawn on the chart it is taken from. The tile,
+     the All Teams column and the Scorecard all read the window's average now,
+     and without this line a reader would see a plot ending at 67% beside a tile
+     reading 34% with nothing on screen reconciling them. Flat by definition —
+     one figure, held across every period it was taken over.
+
+     TOLD APART FROM THE TREND LINE BY BOTH COLOUR AND DASH, which is the rule
+     the age chart's three reference lines already follow: the trend is muted
+     with a long dash, this is secondary with a short one, so the two stay
+     distinguishable printed and to somebody who reads one of them as grey.
+     Also on the LEFT with the boundary chips, over the oldest points, for the
+     reason those two moved there: the right-hand end is the newest periods, and
+     a chip parked on them covers the part of the line people read. */
+  const shareAvg = d.summary.agedShareAvg;
+  if (shareAvg != null) shareRefs.push({ value: shareAvg,
+    text: 'average ' + Math.round(shareAvg * 100) + '%',
+    colour: token('--text-secondary'), align: 'left' });
+  if (shareRefs.length) shareOpts.plugins.refLabels = { lines: shareRefs };
   renderChart('chartAgedShare', {
     type: 'line',
     data: {
@@ -13143,7 +13232,25 @@ function drawCharts(d) {
         spanGaps: false,
         fill: false,
         order: 1
-      }, trendDataset(d.agedShare)]
+      }, trendDataset(d.agedShare)].concat(shareAvg == null ? [] : [{
+        label: 'Average',
+        type: 'line',
+        data: d.agedShare.map(() => shareAvg),
+        borderColor: token('--text-secondary'),
+        borderWidth: 1.5,
+        borderDash: [2, 3],
+        pointRadius: 0,
+        pointHitRadius: 0,
+        fill: false,
+        tension: 0,
+        order: 0
+        /* NO `pointStyle: 'line'` here, where the age chart's reference lines
+           carry one: that chart draws a legend and this card's baseOptions
+           turns the legend off, so there is nothing for it to fix. The chip
+           names this line, and the tooltip names it again on every column —
+           index mode, so a hover states the reading, the trend and the average
+           together. */
+      }])
     },
     options: shareOpts
   });
@@ -13965,17 +14072,33 @@ const METRIC_HELP = {
       + 'pick is measured against your own board rather than guessed.'],
   ] },
   agedShare: { title: 'Aged Share of WIP', body: [
-    ['What proportion of the work currently open has been open too long. It is ',
-      b('the aged work count divided by the work in progress count'), ' — the two tiles beside '
-      + 'this one, at the same moment, over the same window — so the three can never disagree. '
-      + 'Read as of the newest date in your data, not today.'],
+    ['What proportion of the open work has been open too long — ',
+      b('averaged across the whole window'), ', not read off today’s board. Every point on '
+      + 'the chart is that period’s aged count divided by its work in progress count, and '
+      + 'this figure is what all of those readings come to together. It is drawn flat across '
+      + 'the chart and named in its title, so you can see the window it came from.'],
+    ['It is ', b('weighted by how much was open'), ', which is not the same as averaging the '
+      + 'percentages on the chart and will not give the same answer. Add up the aged readings, '
+      + 'add up the open readings, divide. A period with thirty items open counts thirty times '
+      + 'as hard as a period with one — otherwise a quiet fortnight when the board was nearly '
+      + 'empty would swing the figure as far as a full one. It is the same pooling the '
+      + 'defect rate chart calls its overall figure, and it can no more pass 100% than a '
+      + 'single period can.'],
+    ['This changed on 10 September 2026. It stated ', b('the newest day in your data'),
+      ' until then — one true reading of one day, being read as a verdict on a quarter, and '
+      + 'a figure that jumped every time a release cleared the board. Today’s reading has not '
+      + 'gone: the tile’s foot states it beside the average, in the same counts the Aged work '
+      + 'and Work in progress tiles are showing.'],
     ['The count on its own does not travel between teams, and that is what this is for. ',
       b('Six aged items is a different board on a team of thirty than on a team of six'),
       ': the first has a tail, the second has stopped. On All Teams it is the ageing column '
-      + 'worth sorting on, because it is the one that compares.'],
+      + 'worth sorting on, because it is the one that compares — the Aged column beside it '
+      + 'is the count open on the shared end date, so the two are not meant to divide.'],
     ['A dash means there is nothing to state rather than nothing wrong. Either no ageing '
       + 'threshold is set — the feature view ships without one — or ',
-      b('nothing is open at all'), ', and no items open is not a share of nought.'],
+      b('nothing was open at any point in the window'), ', and no items open is not a share '
+      + 'of nought. Periods with nothing open are left out of the average for the same reason, '
+      + 'and the card says how many periods it actually averaged over.'],
     ['This is ', b('the only figure in this app that takes a colour'), ', and only once you '
       + 'have typed both boundaries under Aged Work in Settings: at or below the first is on '
       + 'target, above the second is off target, between them is worth watching. Leave either '
@@ -15087,22 +15210,35 @@ function renderDashboard() {
        this team's finished work actually took. */
     /* The aged-work tile in the headline row counts the stale items; this states
        what share of the board they are, which is the half that means anything
-       across two teams of different sizes. It is a DIVISION of the two tiles
-       above it and never a third count, so the three can never disagree — see
-       the series in derive().
+       across two teams of different sizes.
+
+       IT IS THE WINDOW'S FIGURE AND NOT THE BOARD'S, since 2026-09-10, and the
+       foot is where that is paid for. It stated the last point of the share
+       series until then — a true reading of the newest day of data, being read
+       as a verdict on a quarter — so the two tiles above it were its numerator
+       and denominator and the three could be checked against each other by eye.
+       They no longer divide, which is precisely why the foot now says BOTH: the
+       window's figure is the face, and today's reading is spelled out beneath it
+       in the counts the tiles above are showing. A reader who subtracts is meant
+       to arrive somewhere, and this is where.
 
        The only graded tile in the app, and only once both boundaries are typed.
        Its foot states the verdict in words either way. */
     tile('Aged share',
-      s.agedShareNow == null ? '—' : pct0(s.agedShareNow),
+      s.agedShareAvg == null ? '—' : pct0(s.agedShareAvg),
       s.agedNow == null
         ? 'no threshold set for features — set one in Settings'
-        : s.currentWip === 0
-          ? 'nothing is in progress, so there is no share to state'
-          : s.agedNow + ' of ' + s.currentWip + ' open ' + d.unitMany
-            + ' over ' + d.agedDays + ' ' + d.dayNoun
-            + (agedShareVerdict(s.agedShareNow) ? '; ' + agedShareVerdict(s.agedShareNow) : ''),
-      'agedShare', rag(s.agedShareNow, 'agedShare')) +
+        : s.agedSharePeriods === 0
+          ? 'nothing has been in progress in this window, so there is no share to state'
+          : 'averaged over ' + s.agedSharePeriods + ' '
+            + (s.agedSharePeriods === 1 ? d.bucketNoun : d.bucketNounPlural)
+            + ', past ' + d.agedDays + ' ' + d.dayNoun + '; '
+            + (s.agedShareNow == null
+                ? 'nothing open right now'
+                : pct0(s.agedShareNow) + ' right now, ' + s.agedNow + ' of '
+                  + s.currentWip + ' open ' + d.unitMany)
+            + (agedShareVerdict(s.agedShareAvg) ? '; ' + agedShareVerdict(s.agedShareAvg) : ''),
+      'agedShare', rag(s.agedShareAvg, 'agedShare')) +
     tile('Oldest in progress', ag.oldest == null ? '—' : String(ag.oldest),
       ag.oldest == null ? 'nothing is in progress'
         : ag.median == null ? d.dayNoun + ' so far'
@@ -16362,9 +16498,23 @@ function teamColumns(train) {
        six, and this is the column that says which. NO ⓘ, under the rule above —
        its note opens from the Aged share tile on the dashboard, which is named
        for this same heading. Plain text like every other cell: the tile grades,
-       the comparison table states. */
-    { key: 'agedPct', label: 'Aged %', desc: true,
-      get: (d) => d.summary.agedShareNow, fmt: (v) => or(v, pct0) },
+       the comparison table states.
+
+       "Avg", and the word is doing work rather than decorating the heading. The
+       cell to its LEFT is a count open right now and this is the share averaged
+       over the whole window, so the two no longer divide — a reader who takes 6
+       over 30 and gets a third will not find a third here, and the only place a
+       table can say so is the heading and the note under it. Both say it.
+
+       IT COSTS THE TABLE NO WIDTH, which is why the heading carries it rather
+       than the note alone: a header cell's min-content is its LONGEST WORD, and
+       that is still "aged" — measured at 953px with the demo loaded, unchanged
+       from the day the trace column was argued for at that number.
+
+       The sort key is untouched, so a sort saved on `agedPct` before today still
+       means what it did, on a figure that has moved under it. */
+    { key: 'agedPct', label: 'Avg aged %', desc: true,
+      get: (d) => d.summary.agedShareAvg, fmt: (v) => or(v, pct0) },
     /* NO UNIT GUARD HERE, and that is the point rather than an omission:
        `unplannedShare` is null over features at source, so `or` renders this
        table's own em dash for the same reason it does in every other
@@ -16794,6 +16944,13 @@ function renderAllTeams() {
        and its cell says so on hover. */
     (teamOutliers ? '<br>each team ignoring its own outliers &mdash; '
       + teamOutliers + ' item' + (teamOutliers === 1 ? '' : 's') + ' in total' : '') +
+    /* WHY TWO NEIGHBOURING CELLS DO NOT DIVIDE. Aged is the count open at the
+       shared end date; Avg aged % is the share over every period of the window,
+       so a row reading 6 and 34% is not an arithmetic slip. The heading says
+       "Avg" for the same reason and neither is enough on its own — the heading
+       names the shape and this names what it is a shape OF. */
+    '<br>Aged is the count open on that date; Avg aged % is the share over every '
+      + train.bucketNoun + ' of the window' +
     /* WHY ONE COLUMN IS ALL DASHES. A tile can carry its own reason on its foot
        and a card can carry one on its face; a table cell has nowhere to put a
        sentence, and an ⓘ on the heading is ruled out three comments up — nine
@@ -16999,10 +17156,17 @@ const SCORECARD_CARDS = [
     key: 'aged', cat: 'Predictability', unit: 'items',
     scale: 'agedShare', help: 'agedShare',
     name: 'Aged Share of WIP',
+    /* THE SUB-LINE NAMES THE AVERAGING, and it is not decoration: this figure is
+       the window's, not the board's, and a card that said only "open longer than
+       14 days" over a number would be read as today's. The period count is the
+       real one — periods with nothing open have no share and are not averaged
+       over — so a train whose data covers half the window says so here. */
     sub: (d) => d.agedDays == null
       ? 'no ageing threshold set'
-      : 'open longer than ' + d.agedDays + ' ' + d.dayNoun,
-    get: (d) => d.summary.agedShareNow,
+      : 'open longer than ' + d.agedDays + ' ' + d.dayNoun + ', averaged over '
+        + d.summary.agedSharePeriods + ' '
+        + (d.summary.agedSharePeriods === 1 ? d.bucketNoun : d.bucketNounPlural),
+    get: (d) => d.summary.agedShareAvg,
     fmt: (v) => pct0(v),
     dir: ['higher', 'lower'], moveNoun: 'points',
     /* WHY THERE IS NO FIGURE, when there is none. A dash on its own is the app
@@ -17011,7 +17175,8 @@ const SCORECARD_CARDS = [
     why: (d) => d.agedDays == null
       ? 'No ageing threshold is set, so nothing is being read against one — set '
         + '“Count an in-progress item as aged after” in Settings.'
-      : 'Nothing is open across the teams in scope, and no items open is not a share of nought.'
+      : 'Nothing was open across the teams in scope at any point in this window, and no '
+        + 'items open is not a share of nought.'
   },
   {
     key: 'defect', cat: 'Quality', unit: 'items',
@@ -23046,20 +23211,40 @@ const DEMO_FEATURE_AGED = 30;
 /* The demo's two grading boundaries, and the same rule applies: constants of the
    demo, never of the app — both DEFAULT_SETTINGS entries are null and must stay
    null. Chosen so the three teams land on THREE DIFFERENT STATES rather than to
-   be advice: Team Healthy Flow reads 0%, Team Bare Export a third and Team Long
-   Tail two thirds, so a reader loading the demo sees green, amber and red at
-   once and can tell what the colour is doing. A demo where every team was green
-   would ship the feature invisibly, which is the one thing the sample data rule
-   exists to stop. */
-const DEMO_AGED_SHARE_GREEN = 20;
-const DEMO_AGED_SHARE_RED = 40;
+   be advice: a demo where every team was green would ship the feature invisibly,
+   which is the one thing the sample data rule exists to stop.
+
+   THEY MOVED ON 2026-09-10, from 20 and 40, and the pair is the price of the
+   figure becoming the window's average rather than the newest day's reading.
+   Against the demo's boards the three teams read 0%, a third and two thirds on
+   the last day — which 20 and 40 separated neatly — and 0%, 2-3% and 31-38%
+   averaged over the window, which they do not: two of the three came out green.
+   1 and 20 separate the averages at every window the picker offers (three
+   months, six, twelve and All), and the test beside the demo profiles walks all
+   four rather than trusting one. A pair this tight is not advice and was never
+   meant to be; what it is for is showing a reader what the colours do.
+
+   THE DEMO'S SPREAD IS NOW WINDOW-DEPENDENT, which the old pair was not — a
+   snapshot reads the same however wide the window is, and an average does not.
+   That is inherent to the figure rather than to these two numbers, and it is why
+   the test walks the picker. */
+const DEMO_AGED_SHARE_GREEN = 1;
+const DEMO_AGED_SHARE_RED = 20;
 
 /* The Scorecard's other two scales, chosen the same way and for the same
    reason: so a reader who loads the demo and opens that tab sees the three
    states AT ONCE rather than three green cards. Against the demo's own boards
-   the train reads an aged share in the forties (red), a defect share around a
-   sixth (watch) and features averaging about 26 days (on target) — one of each,
-   whether the picker is on all three teams or on Delivery ART.
+   the train reads an aged share in the low twenties (red, past the 20 above), a
+   defect share around a sixth (watch) and features averaging about 26 days (on
+   target) — one of each, whether the picker is on all three teams or on Delivery
+   ART.
+
+   THE FIRST OF THE THREE IS THE ONE THAT MOVES. It was in the forties at every
+   window while it was the newest day's reading; as the window's average it runs
+   from about 17% over six months to about 22% over three, so the card is red at
+   the picker's default and amber at one of its settings. Stated rather than
+   tuned away: the demo cannot promise a colour at every window without the
+   profiles being built for it, and the pair above is chosen at the default.
 
    Constants of the demo, never of the app: all four DEFAULT_SETTINGS entries
    are null and must stay null. 30 and 45 days are the same pair of numbers the
@@ -23069,14 +23254,6 @@ const DEMO_DEFECT_SHARE_GREEN = 10;
 const DEMO_DEFECT_SHARE_RED = 20;
 const DEMO_FEATURE_CYCLE_GREEN = 30;
 const DEMO_FEATURE_CYCLE_RED = 45;
-
-/* Counted off the profile rather than written out, like DEMO_AGED above it, so
-   the confirm dialog can never claim a figure the demo does not produce. */
-const demoAgedShare = (name) => {
-  const p = DEMO_TEAMS.find(t => t.name === name);
-  if (!p || !p.wip.length) return null;
-  return Math.round(100 * p.wip.filter(a => a > DEFAULT_SETTINGS.agedDays).length / p.wip.length);
-};
 
 /* THE GRADING SENTENCE IS SAID FOR THIS BROWSER (2026-09-04, from the evening
    audit). The dialog promised "graded here, at 20% and 40% … one team on each
@@ -23089,9 +23266,21 @@ const demoAgedShare = (name) => {
    this browser's threshold will make the screen differ. */
 function demoGradingSentence() {
   const g = state.settings.agedShareGreen, r = state.settings.agedShareRed;
-  const readings = 'Team Healthy Flow reads ' + demoAgedShare('Team Healthy Flow')
-    + '%, Team Bare Export ' + demoAgedShare('Team Bare Export') + '% and Team Long Tail '
-    + demoAgedShare('Team Long Tail') + '%';
+  /* IT NAMES THE STATES AND NO LONGER QUOTES THE FIGURES (2026-09-10). It read
+     "Team Healthy Flow reads 0%, Team Bare Export 33% and Team Long Tail 67%",
+     counted off the profiles' own `wip` ages — which was exactly what the tile
+     showed while the tile showed the newest day. The tile states the window's
+     average now, so those three numbers move with the date picker and a dialog
+     that quoted one of them would be sending a reader to look for a figure that
+     is only on screen at one setting. Naming which team lands where cannot
+     drift, and it is the thing the sentence was for.
+
+     Only ever said where the demo's own boundaries are the ones in force. A
+     browser with its own pair is told what is kept and nothing about which
+     colours it will see, because at somebody else's boundaries that is not
+     ours to promise. */
+  const readings = 'Team Healthy Flow lands on target, Team Bare Export in the middle '
+    + 'and Team Long Tail off target';
   const demoPair = DEMO_AGED_SHARE_GREEN + '% and ' + DEMO_AGED_SHARE_RED + '%';
   /* The other two scales are set by the same block in loadSample and are named
      here in one clause rather than a paragraph each: they grade the Scorecard
@@ -23112,11 +23301,11 @@ function demoGradingSentence() {
       + (Number(g) > Number(r)
           ? 'but they are the wrong way round, so nothing is graded until you swap them'
           : 'so the grading you see is against them, not the demo\u2019s ' + demoPair)
-      + ': ' + readings + '.';
+      + '.';
   }
   return 'One of your aged-share boundaries is set and the other box is empty, so nothing is '
     + 'graded until you fill it in \u2014 the demo\u2019s own ' + demoPair + ' are written only '
-    + 'when both are empty. ' + readings + '.';
+    + 'when both are empty.';
 }
 
 /* The counts in the dialog are at the demo's threshold, in calendar days —
@@ -23127,8 +23316,9 @@ function demoGradingSentence() {
 function demoThresholdCaveat() {
   const d = state.settings.agedDays, wd = state.settings.workingDays === true;
   if (d === DEFAULT_SETTINGS.agedDays && !wd) return '';
-  return ' Those counts, and the ' + DEMO_AGED + ' items above, are at the demo\u2019s '
-    + DEFAULT_SETTINGS.agedDays + '-day threshold; yours is ' + d + (wd ? ' working' : '')
+  return ' The ' + DEMO_AGED + ' items above are counted at the demo\u2019s '
+    + DEFAULT_SETTINGS.agedDays + '-day threshold, and so is the aged share the three states '
+    + 'are read off; yours is ' + d + (wd ? ' working' : '')
     + ' day' + (d === 1 ? '' : 's') + ', so the figures on your screen will differ.';
 }
 
