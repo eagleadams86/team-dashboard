@@ -10286,6 +10286,21 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('a trend figure is signed whenever it is not 0.0');
+
+  {
+    /* The sign switched at > 0.05 while num1 rounds 0.05 up, so exactly ±0.05
+       printed an unsigned "0.1" (2026-09-10, evening audit). */
+    is(win.trendFigure({ change: 0.05 }), '+0.1', 'a rise that rounds to 0.1 carries its plus');
+    is(win.trendFigure({ change: -0.05 }), '-0.1', 'and a fall that rounds to 0.1 carries its minus');
+    is(win.trendFigure({ change: 0.04 }), '0.0', 'while a change that rounds to nothing is unsigned');
+    is(win.trendFigure({ change: -0.04 }), '0.0', 'in either direction');
+    is(win.trendFigure({ change: 0 }), '0.0', 'and a flat run is the plain figure');
+    is(win.trendFigure({ change: 3.25 }), '+3.3', 'an ordinary rise');
+    is(win.trendFigure({ change: -1.8 }), '-1.8', 'an ordinary fall');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('a day boundary box shows the number that was stored, too');
 
   {

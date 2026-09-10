@@ -12666,8 +12666,13 @@ function sparkSvg(values) {
    than `±0.0` — which says the same thing and says it as a number. The trace
    beside it is what makes the direction readable at a glance either way. */
 function trendFigure(t) {
-  const sign = t.change > 0.05 ? '+' : (t.change < -0.05 ? '-' : '');
-  return escapeHtml(sign + num1(Math.abs(t.change)));
+  /* Signed whenever the ROUNDED figure is not 0.0 (2026-09-10, evening audit):
+     the sign used to switch at > 0.05 while num1 rounds 0.05 up, so a change of
+     exactly ±0.05 printed an unsigned "0.1" — the unsigned form is for a flat
+     run, and a fall printed as a bare magnitude read as a rise-less rise. */
+  const shown = num1(Math.abs(t.change));
+  const sign = shown === '0.0' ? '' : (t.change > 0 ? '+' : '-');
+  return escapeHtml(sign + shown);
 }
 
 function sparkCell(d) {
