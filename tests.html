@@ -9852,6 +9852,47 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('the window before this one shares no bucket with it');
+
+  {
+    /* derive() starts its axis at the bucket holding the window's first day, so
+       the window on screen counts completions from that bucket's start. A prior
+       window cut at startDate - 1 ended inside the same bucket, and completions
+       there were in BOTH totals (2026-09-10, evening audit, from the demo: three
+       items done on 7-8 June counted twice at the 3-month default). */
+    const ovRows = [{ c: '2026-06-08', s: '2026-06-01', t: 'Story' },   /* Mon, in the first bucket */
+                    { c: '2026-08-01', s: '2026-07-20', t: 'Story' }];
+    const ovTeams = [{ id: 'ov1', name: 'Overlap', rows: win.TDState.hydrateRows(ovRows) }];
+    const ovBase = { filterValue: '', bucket: 'week', forecastMode: 'off', unit: 'items' };
+    const both = (ws) => {
+      const st = win.TDState.normalizeSettings({ weekStart: ws });
+      const now = TD.deriveTrain(ovTeams, st,
+        Object.assign({}, ovBase, { months: 'custom', customFrom: '2026-06-09', customTo: '2026-09-09' }), [], []);
+      const prior = TD.priorWindowOf(now);
+      const then = TD.deriveTrain(ovTeams, st, TD.priorViewOf(ovBase, prior), [], []);
+      /* An empty prior derive has no summary: nothing completed in it is a 0. */
+      const thenDone = then.summary ? then.summary.completedTotal : 0;
+      return { now, prior, then, thenDone };
+    };
+    const sun = both(0);
+    is(sun.now.summary.completedTotal, 2,
+       'a Tuesday window counts the Monday before it — its first whole week starts on the Sunday');
+    is(iso(sun.prior.to), '2026-06-06', 'so the window before ends the day before THAT Sunday');
+    is(sun.thenDone, 0, 'and does not count the Monday again');
+    is(sun.now.summary.completedTotal + sun.thenDone, 2,
+       'every completion is in exactly one of the two windows');
+    /* 54, not 93: the length is measured off the window as derived, whose end is
+       clamped to the data (1 Aug), the rule priorWindowOf's own comment states. */
+    is(sun.prior.days, 54, 'the length is still the derived window\u2019s own, clamped to the data');
+    const wed = both(3);
+    is(iso(wed.prior.to), '2026-06-02', 'with weeks starting Wednesday the edge moves with them');
+    is(wed.now.summary.completedTotal + wed.thenDone, 2, 'and still nothing is counted twice');
+    /* A shape with no axis keeps the day-before rule. */
+    is(iso(TD.priorWindowOf({ startDate: D(2026, 6, 9), endDate: D(2026, 9, 9) }).to), '2026-06-08',
+       'a bare pair of dates, with no bucket to align to, still ends the day before');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('a previous window with nothing in it says which kind of nothing');
 
   {

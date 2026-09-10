@@ -424,6 +424,12 @@ drew the line.** Both halves of the original argument were put to Charles and he
   `asOf`. That is the ONE place on that page `asOf` is right — it moves an end date later, which
   is what a list that stops early needs, and is exactly why the window BEFORE this one cannot use
   it. Same argument as `deriveTeams`' shared date, one level along.
+- **THE WINDOW BEFORE ENDS THE DAY BEFORE THE FIRST WHOLE BUCKET (2026-09-10, evening audit).**
+  `derive()` starts its axis at the bucket holding `startDate`, so the window on screen already
+  counts from that bucket's start; `priorWindowOf` cut at `startDate - 1` ended inside the same
+  bucket and the demo's three completions of 7-8 June were in both totals at the 3-month default.
+  It aligns to `bucketStart(startDate, d.bucket, d.weekStartsOn)` now; a bare pair of dates with
+  no bucket keeps the day-before rule. The length is unchanged.
 - **THE NOTE, THE PRINT LINE AND THE COMPARISON FOLLOW WHICHEVER LIST HAS A WINDOW (2026-09-10,
   evening audit).** Pinning gives both lists one end date only when both HAVE one. A board whose
   rows are all still open while its features have completed hands the items derive the empty

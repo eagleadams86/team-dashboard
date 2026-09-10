@@ -10376,7 +10376,16 @@ function priorWindowOf(d) {
   if (!d || !d.startDate || !d.endDate) return null;
   const days = diffDays(d.endDate, d.startDate) + 1;   /* inclusive of both ends */
   if (!(days > 0)) return null;
-  const to = addDays(d.startDate, -1);
+  /* ENDS THE DAY BEFORE THE FIRST WHOLE BUCKET, not the day before startDate
+     (2026-09-10, evening audit). derive() starts its axis at the bucket holding
+     the window's first day, so the window on screen already counts completions
+     from that bucket's start; a prior window cut at startDate - 1 ended INSIDE
+     the same bucket and the three demo completions of 7-8 June sat in both
+     windows' totals at once. The Quality denominator and the Flow average both
+     moved. A shape with no bucket — the pure-date callers in the suite — keeps
+     the day-before rule, because it has no axis to align to. */
+  const edge = d.bucket ? bucketStart(d.startDate, d.bucket, d.weekStartsOn) : d.startDate;
+  const to = addDays(edge, -1);
   return { from: addDays(to, -(days - 1)), to, days };
 }
 

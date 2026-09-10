@@ -625,8 +625,9 @@ one team is that team's own dashboard with three of its tiles on it.
 
 ### The Window Before This One
 
-**The comparison window is this one shifted back by its own length**, ending the day before this
-one starts. A three-month window is read against the three months before it; a PI against the 84
+**The comparison window is this one shifted back by its own length**, ending the day before the
+first whole week of this one starts — the figures on screen are counted from the start of the week
+holding the window's first day, so the two windows never share a week and nothing is counted twice. A three-month window is read against the three months before it; a PI against the 84
 days before it; a pair of typed dates against the same span immediately before them. The shift
 is by **days, not calendar months**, so one rule serves every option the picker offers — there
 is no honest answer to "the month before a PI".
