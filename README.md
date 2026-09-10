@@ -14,9 +14,13 @@ The app is called **Flow Metrics** on screen. The repo, the Pages path and the
 any of those would break existing links and backups, so the rename is deliberately a
 display-only one.
 
-There are two ways to read the numbers: the **Dashboard**, which is one team in detail, and
+There are three ways to read the numbers: the **Dashboard**, which is one team in detail,
 **[All Teams](#all-teams-which-one-needs-you)**, which is every team side by side over one shared
-window. Both are driven by the same work type filter, date window and grouping.
+window, and the
+**[Scorecard](#the-scorecard-the-train-in-three-figures)**, which is the whole train in three
+figures with last window's beside them. The first two are driven by the same work type filter,
+date window and grouping; the Scorecard follows the date window only, and
+[says why](#what-it-deliberately-does-not-follow).
 
 On the Dashboard the charts are grouped into four tabs — **by what the data means**, so the
 measures that move together are read together:
@@ -322,7 +326,9 @@ none is perfectly normal, and nothing forces you to use the feature at all.
 and the All Teams view adds them up; grouping changes what you are looking at and never a single
 number. What it does change:
 
-- **All Teams gains a train picker, and you can tick more than one.** It lists each train by
+- **All Teams and the [Scorecard](#the-scorecard-the-train-in-three-figures) gain a train
+  picker, and you can tick more than one.** It is one picker shared by both views rather than a
+  copy each — it sits above the panels, so ticking a train moves both. It lists each train by
   name with the number of teams on it, plus *No ART* if any team is un-grouped, and **All
   trains** at the top to clear the lot. Tick two and you get both trains' teams together —
   everything below follows: the four tiles, the chart, every row, and the summary row at the foot
@@ -482,8 +488,8 @@ the newest period's count while *Per week* beside it is the mean over whole peri
 different figures that would read as one if they shared a cell.
 
 A reload puts you back on **whichever tab you were last using** — all four of them. A remembered
-tab that is no longer on offer (All Teams disappears below two teams) falls back to the dashboard,
-as does anything unrecognisable in a hand-edited copy.
+tab that is no longer on offer (All Teams and the Scorecard both disappear below two teams) falls
+back to the dashboard, as does anything unrecognisable in a hand-edited copy.
 
 The page also **holds still while it loads**. This app is one 560KB HTML file that the browser
 paints as it parses, with the script that fills it at the foot — so for about a tenth of a second
@@ -515,6 +521,9 @@ which landed you somewhere different every time. **The keyboard arrives with you
 *Dashboard* tab: the name you pressed is inside the panel the press takes away, so without that
 the focus fell to the top of the document and Tabbing carried on from nowhere. Find does the same
 thing with the result you open, for the same reason.
+
+The [Scorecard](#the-scorecard-the-train-in-three-figures) is the same scope read the other way:
+this table is who to go and see, that page is the three figures you report about the lot of them.
 
 If your teams are [grouped into ARTs](#grouping-teams-into-arts), a **train picker** appears
 above the tiles and everything on the page follows it — including the summary row, which becomes
@@ -581,6 +590,114 @@ what it can rather than showing a line of dashes. A team that has **started work
 none** in the window shows its work in progress and its export date, because "this team has
 stopped finishing things" is precisely what someone scanning this table is looking for. A team
 with no work items at all shows dashes throughout.
+
+## The Scorecard: the Train in Three Figures
+
+The Dashboard answers *how is this team doing?* and All Teams answers *which of my teams needs
+me?* The **Scorecard** answers the third question, the one an RTE is asked once a month:
+*how is the train doing, and which way is it moving?*
+
+Three columns, one per thing a leadership team asks about:
+
+| Column | The figure | Read over |
+|---|---|---|
+| **Predictability** | **Aged share of WIP** — how much of the board has been open past your ageing threshold | work items |
+| **Quality** | **Defect share of completions** — how much of what finished was defect work | work items |
+| **Flow** | **Average feature cycle time** — how long a finished feature took, start to completion | **features** |
+
+Each card carries the figure, a **band strip** stating the three ranges you are reading it
+against with the one it falls in marked, the verdict spelled out in words, and a **What It
+Means** line saying which way it has moved since the window before this one.
+
+**None of it is new arithmetic.** Every figure is one field off the same `derive()` the
+dashboard reads, pooled across the teams in scope exactly as the All Teams train row is pooled —
+so a card here and a tile there cannot disagree. What is new is the comparison, the bands, and
+putting the three side by side.
+
+The tab appears once you have a **second team**, the same rule All Teams follows: a roll-up of
+one team is that team's own dashboard with three of its tiles on it.
+
+### The Window Before This One
+
+**The comparison window is this one shifted back by its own length**, ending the day before this
+one starts. A three-month window is read against the three months before it; a PI against the 84
+days before it; a pair of typed dates against the same span immediately before them. The shift
+is by **days, not calendar months**, so one rule serves every option the picker offers — there
+is no honest answer to "the month before a PI".
+
+It is read **as of its own end**, which matters more than it sounds. The aged share is a
+point-in-time reading taken at the window's end, so a prior window read as of *today* would put
+last quarter's completions beside this morning's board. The two windows are named in full under
+the date picker, so you can always check what is being compared with what.
+
+**A percent moves in points, never in percent.** A share going from 20% to 10% has not fallen by
+10%, and "a 20% increase" said about a figure that is itself a percentage is an ambiguity, not a
+finding. The days figure moves in days.
+
+Three things it will not do:
+
+- **"All" has no window before it**, so nothing is compared and the page says so once, above the
+  cards, rather than three times down them.
+- **Data that does not reach back far enough** is said as exactly that — not as a movement of
+  nought.
+- **A window with the figure missing** (nothing finished, no feature closed) says which, per
+  card. Three figures fail in three different ways, and one shared dash would report a quality
+  problem where there is only an absence.
+
+### The Bands Are Generated, Not Typed
+
+Set a pair of boundaries under **Grading** in Settings and the card draws its scale: `≤20%`,
+`21–40%`, `>40%`, with a ▸ on the one the figure is in. **The labels come off the two numbers**,
+so they can never overlap or contradict the grading — a printed scorecard reading *16-25* beside
+*>=25* claims 25 twice, and this cannot.
+
+**Leave either box empty and the strip is not drawn at all.** Not greyed, not empty — a strip of
+three blank ranges is a scale nobody drew. The card states the figure, says which setting would
+grade it, and leaves the judgement to you, which is what every other figure in this app does.
+
+**Colour is never the only signal**, and here that matters more than on a tile: three coloured
+boxes side by side are precisely the picture a red-green reader cannot resolve. The marked band
+is told apart by weight, by an inset ring and by the ▸; the figure carries a ✓ / ! / ✕ and a
+status spelled out for a screen reader; the whole strip is one image whose label names every
+range and which one the figure is in; and the verdict is written out underneath in words, naming
+the boundary. A reader who sees no colour at all loses nothing.
+
+Unlike a graded tile, the card is **not tinted**. That fill exists because a tile is small — a
+label, a number and a caption — and a 6px rule with a line of coloured digits is a thin thing to
+judge a hue on. This card is not small, and the thing it has instead is the strip: three filled
+panels of which the marked one is a large flat area of exactly that hue. Tint the card and the
+marked band would be the same colour as what is behind it.
+
+### What It Deliberately Does Not Follow
+
+The Scorecard obeys the **train picker** and the **date window**. The other three controls are
+taken away on this tab rather than left standing doing nothing, and each omission is a figure
+that would otherwise be stated wrongly:
+
+- **The work type filter.** The Quality card's denominator is *everything completed*. Filter to
+  Defects and it reads 100%; filter to anything else and it reads 0%. A filter set on another tab
+  two minutes ago would be a figure moving for a reason that is not on the page.
+- **The Count switch.** The page states both units at once — two cards about work items and one
+  about features — so neither position of that switch fits it.
+- **Group by.** The charts' axis starts at the bucket containing the window's first day, so
+  grouping by month silently widens the left edge by up to a month. That is survivable on one
+  screen and is not survivable when two windows are being compared, because it moves both figures
+  *and* the movement between them. The Scorecard aligns to whole weeks, always, and the note
+  under the picker says so.
+
+**The train picker is shared with All Teams**, not copied: it sits above both panels now, so
+ticking a train moves both views and there is only ever one menu and one answer to what is in
+scope.
+
+### On the Demo
+
+Loading the sample data sets all three pairs — 20% and 40% for the aged share, 10% and 20% for
+the defect share, 30 and 45 days for the feature cycle time — chosen so the demo train reads
+**one card of each state**: an aged share in the forties (off target), a defect share around a
+sixth (watch) and features averaging about 26 days (on target). A demo where every card came out
+green would ship the feature invisibly. Your own browser starts with all six boxes empty and
+nothing graded.
+
 
 ## Teams
 
@@ -688,6 +805,12 @@ Team Healthy Flow and Team Long Tail also arrive with the **project ids their ow
 built from** (`KFR` and `HRN`), so [pasting several teams at once](#pasting-several-teams-at-once)
 works straight off the demo rather than only after three ids are typed in — and Team Bare
 Export, with no keys, is the team the split's *takes nothing* line is about.
+
+The demo also sets **all three [grading scales](#the-bands-are-generated-not-typed)** — 20% and
+40% for the aged share, 10% and 20% for the defect share, 30 and 45 days for the average feature
+cycle time — chosen so the Scorecard reads **one card of each state** rather than three green
+ones. Each pair is written only when *both* of its boxes are empty, so a line you have drawn
+yourself is never finished off for you.
 
 The demo also sets the **feature ageing threshold to 30 days**, which the app itself ships
 empty on purpose. Thirty is not a default the app holds — it is the number that fits *these two
@@ -1002,11 +1125,13 @@ buttons.
 Because it opens over the dashboard rather than replacing it, a change lands on the charts behind
 it — rename the defect word and the chart titles follow while the window is still open.
 
-**Six sections, each ruled off from the one above it** — *Labels & Work Types*, *Aged Work*,
-*Features*, *Working Days*, *Unusually Long Items* and *Work Type Filter List*. Until
+**Seven sections, each ruled off from the one above it** — *Labels & Work Types*, *Aged Work*,
+*Grading*, *Features*, *Working Days*, *Unusually Long Items* and *Work Type Filter List*. Until
 2 Sep 2026 the window had two headings covering six unrelated things, so everything from the
 ageing thresholds down read as one long column of prose with no way to see where a setting
-ended; the Teams & Stages window beside it is ruled off the same way.
+ended; the Teams & Stages window beside it is ruled off the same way. *Grading* was cut out of
+*Aged Work* in September 2026, when the Scorecard took the number of boundaries in this window
+from two to six.
 
 Everything the charts depend on, shared by all your teams:
 
@@ -1026,17 +1151,27 @@ Everything the charts depend on, shared by all your teams:
   guessed. While it is empty the feature view's Aged work card and tile say so and show what
   that team's finished features actually took, so the number you pick is measured against your
   own board. See [The ageing threshold is per unit](#the-ageing-threshold-is-per-unit).
-- **Aged share is on target at or below (%)** and **off target above (%)** — the two boundaries
-  the [aged share](#aged-share-of-wip-the-count-in-proportion) is graded against, and the only
-  two numbers in this app that put a colour on a figure. **Both empty by default, and nothing is
-  graded until both are set** — one boundary on its own is a pass/fail rather than a three-state
-  scale, and the app will not infer the other half of a line you have not drawn. The first must
-  be at or below the second; the wrong way round grades nothing, and a note under the boxes says
-  so. Zero is a real
-  value here, unlike the day thresholds above: a team may well mean *nothing past the threshold,
-  ever*. There is no number worth shipping — a platform team carrying long spikes and a support
+- **Grading** — its own section, holding **three pairs of boundaries**: the ones the
+  [aged share](#aged-share-of-wip-the-count-in-proportion) is graded against, and the two pairs
+  the [Scorecard](#the-scorecard-the-train-in-three-figures) adds for the defect share and the
+  average feature cycle time. These six are the only numbers in this app that put a colour on a
+  figure. They were in *Aged Work* until September 2026, described there as the only two — the
+  same kind of setting in three sections would be three places to look for one answer.
+  **Every pair is empty by default, and nothing is graded until both of its boxes are set** —
+  one boundary on its own is a pass/fail rather than a three-state scale, and the app will not
+  infer the other half of a line you have not drawn. The first must
+  be at or below the second; the wrong way round grades nothing, and a note under those two boxes
+  says so. Zero is a real
+  value on the two **share** pairs, unlike the day thresholds above: a team may well mean
+  *nothing past the threshold, ever*. It is **not** a value on the **days** pair, where a
+  boundary of no days at all is a half-typed box rather than a target. There is no number worth
+  shipping in any of them — a platform team carrying long spikes and a support
   team turning work over in a day would be handed the same verdict, and one of them would be
   wrong.
+  Each pair is stored to the precision its figure is *printed* at, and graded there too: the aged
+  share in whole percents, the defect share to a tenth of a percent (which is what its dashboard
+  tile shows), the feature cycle time to a tenth of a day. A boundary the app would round is a
+  boundary you never typed.
 - **Count working days only (Monday to Friday)** — off by default. On, cycle time, lead time
   and the ageing threshold skip weekends: an item started on a Friday and finished on the
   Monday takes one day, not three. It is one switch for all three, because a screen mixing the
@@ -1988,12 +2123,18 @@ contradict the two tiles beside it.
 is set — the feature view ships without one — or nothing is open at all, and no items open is not
 a share of nought. A zero here would draw a healthy floor across a board that had simply stopped.
 
-### The one figure that takes a colour
+### The First Figure That Took a Colour
 
 This app states figures and judges nothing. That is still true out of the box, and it stays true
 until *you* draw the line: set both boundaries in Settings and the tile takes a **green, amber or
 red** state, and the chart shades your bands behind its line. Leave either box empty and both
 behave exactly as they always did.
+
+This was the *only* graded figure until September 2026, when the
+[Scorecard](#the-scorecard-the-train-in-three-figures) added two more scales on exactly the same
+machinery — both boxes or nothing, green at or below red or nothing, the verdict written out in
+words whichever way the colour reads. Everything below is still true of the aged share; what
+changed is that it is no longer alone.
 
 **It is graded as the whole percent you read.** The tile states the share to a whole percent and
 the boundaries are whole percents, so the comparison is made in whole percents too: a board at 1
@@ -2137,6 +2278,13 @@ particular boards, and it says so in the confirmation.
 
 The switch **disappears entirely** when no team has features. A control with one usable position
 invites a press that does nothing.
+
+**One feature-level figure is stated outside the feature view**, and it is the only one: the
+[Scorecard](#the-scorecard-the-train-in-three-figures)'s Flow card, which is the average time a
+finished feature took. That page states both units at once and so does not follow the switch at
+all. It does **not** depend on the feature ageing threshold — that setting gates how many
+features are counted as *aged*, and this counts how long the finished ones took, so it is stated
+whether a threshold is set or not.
 
 ### Two Cards Only the Feature View Has
 
