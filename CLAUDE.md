@@ -405,6 +405,16 @@ drew the line.** Both halves of the original argument were put to Charles and he
   `asOf`. That is the ONE place on that page `asOf` is right — it moves an end date later, which
   is what a list that stops early needs, and is exactly why the window BEFORE this one cannot use
   it. Same argument as `deriveTeams`' shared date, one level along.
+- **THE NOTE, THE PRINT LINE AND THE COMPARISON FOLLOW WHICHEVER LIST HAS A WINDOW (2026-09-10,
+  evening audit).** Pinning gives both lists one end date only when both HAVE one. A board whose
+  rows are all still open while its features have completed hands the items derive the empty
+  shape — no dates, no window before it — and a note written off that alone read "Showing all
+  data up to —" and "no window before this one" over a Flow card comparing two real windows.
+  `lead` is items unless only the features derive has an end date; the sentence describes the
+  list the page is reading. Nothing finished in either says "nothing finished yet", never a dash.
+  The Predictability card checks `d.empty` BEFORE `d.agedDays == null`: the empty shape carries
+  no threshold because it carries no window, and the card was telling a reader with the default
+  14 days in force that no threshold was set.
 - **AN EMPTY FLOW CARD HAS FOUR CAUSES AND MUST NAME THE ONE IT HAS.** No feature layer set up /
   every feature still open / none completed inside the window / completed but carrying no start
   date. Three of those are fixable in a minute, only one is about delivery, and the first version

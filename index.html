@@ -17402,7 +17402,13 @@ const SCORECARD_CARDS = [
     /* WHY THERE IS NO FIGURE, when there is none. A dash on its own is the app
        declining to say whether that is a setting nobody set or a board with
        nothing on it, and they are opposite findings. */
-    why: (d) => d.agedDays == null
+    /* THE EMPTY SHAPE FIRST: it carries no threshold, because it carries no
+       window to read one over, and a card that read `agedDays == null` off it
+       told a reader with the default 14 days in force that no threshold was set. */
+    why: (d) => d.empty
+      ? 'None of the work items these teams hold has completed yet, so there is no window '
+        + 'to read the board over. The share appears with the first item that finishes.'
+      : d.agedDays == null
       ? 'No ageing threshold is set, so nothing is being read against one — set '
         + '“Count an in-progress item as aged after” in Settings.'
       : 'Nothing was open across the teams in scope at any point in this window, and no '
@@ -17726,7 +17732,7 @@ function renderScorecard() {
     + 'and the first two figures are about work items while the third is about features — '
     + 'so the Count switch does not reach this page either.'
     /* Said once, here, rather than three times down the cards. */
-    + (derived.items.prior ? ''
+    + (derived.items.prior || derived.features.prior ? ''
       : ' There is no window before “All”, so nothing is being compared — choose a rolling '
         + 'window or a pair of dates above to see which way these are moving.');
 
@@ -17738,17 +17744,29 @@ function renderScorecard() {
   /* The sentence under the shared strip, owned by whichever view is up. It says
      the two things this page cannot be read without: which window these figures
      are, and which window they are being compared against. */
-  const span = itemsD.startDate
-    ? 'Showing <strong>' + prettyDate(itemsD.startDate) + '</strong> to <strong>'
-      + prettyDate(itemsD.endDate) + '</strong>'
-    : 'Showing <strong>all data</strong> up to <strong>' + prettyDate(itemsD.endDate) + '</strong>';
-  const p = derived.items.prior;
-  printHead('every team' + (words.phrase ? ' ' + words.phrase : ''), itemsD);
+  /* WHICHEVER LIST HAS A WINDOW LEADS (2026-09-10, evening audit). The two
+     derives are pinned to one end date whenever both have one, so it is usually
+     no choice at all — but a board whose rows are all still open while its
+     features have completed gives the items derive the empty shape, with no
+     dates and no window before it, and a note written off that alone read
+     "Showing all data up to —" over a Flow card that was comparing two real
+     windows. The features derive is the one the page is then reading, so it is
+     the one the sentence describes. */
+  const lead = itemsD.endDate || !featD.endDate ? 'items' : 'features';
+  const leadD = derived[lead].d;
+  const span = leadD.startDate
+    ? 'Showing <strong>' + prettyDate(leadD.startDate) + '</strong> to <strong>'
+      + prettyDate(leadD.endDate) + '</strong>'
+    : leadD.endDate
+      ? 'Showing <strong>all data</strong> up to <strong>' + prettyDate(leadD.endDate) + '</strong>'
+      : 'Showing <strong>nothing finished yet</strong>';
+  const p = derived[lead].prior;
+  printHead('every team' + (words.phrase ? ' ' + words.phrase : ''), leadD);
   /* BOTH derives, and the reason is the fault this note was added for: the
      future-dated row that moved this page's window was a FEATURE, and a note
      written off the items derive alone would have been silent on the one screen
      that was wrong. */
-  $('windowNote').innerHTML = span + customNote(itemsD) + futureNote(itemsD, featD) +
+  $('windowNote').innerHTML = span + customNote(leadD) + futureNote(itemsD, featD) +
     '<br>' + (p
       ? 'against <strong>' + prettyDate(p.from) + '</strong> to <strong>'
         + prettyDate(p.to) + '</strong>, the ' + p.days + ' days before'

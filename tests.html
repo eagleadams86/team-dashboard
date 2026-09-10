@@ -10156,6 +10156,54 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('the scorecard describes whichever list has a window');
+
+  {
+    /* Rows all still open, features completed (2026-09-10, evening audit). The
+       items derive is the empty shape — no dates, no window before it — and a
+       note written off it alone read "Showing all data up to —" and "no window
+       before this one" over a Flow card that was comparing two real windows,
+       while the Predictability card blamed a missing ageing threshold with the
+       default 14 days in force. */
+    const openRows = [{ s: '2026-08-20', t: 'Story' }, { s: '2026-08-21', t: 'Bug' }];
+    const doneFeats = [{ c: '2026-08-20', s: '2026-07-01', t: 'Feature', i: 'AB-1' },
+                       { c: '2026-08-25', s: '2026-07-10', t: 'Feature', i: 'AB-2' }];
+    plant({ teams: [{ id: 'fo1', name: 'One', rows: openRows, features: doneFeats },
+                    { id: 'fo2', name: 'Two', rows: openRows, features: [] }], settings: {} });
+    const foDoc = win.document;
+    win.renderAll();
+    win.selectTab('scorecard');
+    const foMonths = foDoc.getElementById('monthsSel');
+    foMonths.value = '3';
+    foMonths.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const note = foDoc.getElementById('windowNote').textContent.replace(/\s+/g, ' ');
+    ok(!/up to —/.test(note), 'the note does not print a dash for a date', note);
+    ok(/Showing May 25, 2026 to Aug 25, 2026/.test(note),
+       'it names the window the features are read over — the list that has one', note);
+    ok(/against .*the 93 days before/.test(note),
+       'and the window before it, which the Flow card is comparing against', note);
+    ok(!/no window before this one/.test(note), 'rather than claiming there is none', note);
+    ok(!/There is no window before/.test(foDoc.getElementById('scorecardIntro').textContent),
+       'and the intro does not say so either');
+    ok(/May 25, 2026 to Aug 25, 2026/.test(foDoc.getElementById('printHead').textContent),
+       'the print line carries the same window', foDoc.getElementById('printHead').textContent);
+    const pred = [...foDoc.querySelectorAll('.sc-card')][0];
+    is(pred.querySelector('.sc-value').textContent.trim(), '—', 'the aged share states no figure');
+    ok(!/No ageing threshold/.test(pred.querySelector('.sc-verdict').textContent),
+       'and does NOT blame a threshold that is set', pred.querySelector('.sc-verdict').textContent);
+    ok(/has completed yet/.test(pred.querySelector('.sc-verdict').textContent),
+       'it says nothing has completed, which is the finding', pred.querySelector('.sc-verdict').textContent);
+    /* Nothing finished in EITHER list: the honest sentence, and still no dash. */
+    plant({ teams: [{ id: 'fo3', name: 'Open', rows: openRows, features: [{ s: '2026-08-01', t: 'Feature', i: 'AB-3' }] }], settings: {} });
+    win.renderAll();
+    win.selectTab('scorecard');
+    ok(!/—/.test(foDoc.getElementById('windowNote').textContent),
+       'with nothing finished anywhere the note still prints no dash',
+       foDoc.getElementById('windowNote').textContent);
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('the flow card says WHICH kind of empty it is');
 
   {

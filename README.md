@@ -710,6 +710,11 @@ that would otherwise be stated wrongly:
   *and* the movement between them. The Scorecard aligns to whole weeks, always, and the note
   under the picker says so.
 
+The note under the picker, the line a printout carries and the "against …" comparison all
+describe whichever list actually has a window. Usually that is no choice — both lists are held to
+one end date — but a board whose work items are all still open while its features have completed
+is read over the features' window, and the note says so rather than printing a dash.
+
 **The train picker is shared with All Teams**, not copied: it sits above both panels now, so
 ticking a train moves both views and there is only ever one menu and one answer to what is in
 scope.
