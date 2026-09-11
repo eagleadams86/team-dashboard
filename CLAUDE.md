@@ -62,6 +62,18 @@ Two changes, and the first is a model correction rather than a layout fix:
   **Do not pin dialog LAYOUT in tests**: the app runs in a hidden iframe a few dozen pixels wide,
   so `getBoundingClientRect` there answered "42 vs 42" and a 6267px-tall dialog. The suite pins
   the computed `max-width`, which is a CSS value and viewport-independent.
+- **Every managed list gains a SECOND Add button at its foot from six rows** (`ADD_FOOT_FROM`,
+  `syncAddFoot`). Charles with sixteen teams: adding one meant scrolling back to the top. A
+  DUPLICATE and not a move — the heading-row button says what the section adds before you have
+  read a row of it, it is where the sibling app puts its own, and a button above and below a
+  two-row table is silly. The earlier note above ("both Add buttons live in those headers") still
+  holds for where the FIRST one lives; what changed is that a list you cannot see the top of
+  earns a second. Both directions are pinned.
+  **`ADD_FOOT_FROM` is declared with the thresholds near the top, not beside its reader** — the
+  `TD` export object names it and is built partway down the file, so a `const` next to
+  `syncAddFoot` sat in the temporal dead zone and the app threw at boot. The suite reported
+  **no passes and no failures**, which is the shape that mistake always takes here; a red check
+  would have been the kinder outcome.
 - **Prose follows its control.** The five `.manage-note` paragraphs above the Teams table
   described four controls that had left; each now sits in the editor section that owns it, which
   also took five paragraphs of scrolling out from above the first team. The "85% ≤ is about work

@@ -402,7 +402,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. */
-const EXPECTED = 3910;
+const EXPECTED = 3918;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8754,6 +8754,52 @@ group('ARTs — the grouping, and the boundary it crosses');
      'nine sections, each headed by its name, like the window beside it');
   ok(sDoc.getElementById('btnAddFilter').closest('.row.spread'),
      'and the Add button in its section\u2019s heading row rather than under the table');
+
+  /* ── AND A SECOND ONE AT THE FOOT, ONCE THE LIST IS LONG ────────────────────
+     A DUPLICATE, not a move, which is why the pin above still stands. The
+     heading-row button says what the section adds before you have read a row of
+     it and is where the sibling app puts its own; what it stops doing on a long
+     list is being reachable, which is what Charles hit with sixteen teams
+     (2026-09-11) — adding one meant scrolling back to the top every time.
+
+     BOTH DIRECTIONS ARE PINNED. A second control on a two-row table is clutter,
+     so it has to stay away as firmly as it has to turn up. */
+  {
+    const fDoc = win.document;
+    plant({ teams: [{ id: 'f1', name: 'One', rows: [] }], settings: {} });
+    fDoc.getElementById('manageBtn').click();
+    is(fDoc.getElementById('btnAddTeamFootRow').hidden, true,
+       'one team does not earn a second Add button');
+    ok(!fDoc.getElementById('btnAddTeam').closest('#btnAddTeamFootRow'),
+       'and the heading-row one is still the heading-row one');
+
+    const many = [];
+    /* TD, not TDState — the threshold is exported on the pure-function object
+       beside the cleaners. Read off the wrong one it is `undefined`, the loop
+       below runs zero times, and the check then plants an EMPTY list and proves
+       the opposite of what it says. */
+    ok(typeof TD.ADD_FOOT_FROM === 'number', 'the threshold is exported', String(TD.ADD_FOOT_FROM));
+    for (let i = 0; i < TD.ADD_FOOT_FROM; i++) many.push({ id: 'f' + i, name: 'T' + i, rows: [] });
+    plant({ teams: many, settings: {} });
+    fDoc.getElementById('manageBtn').click();
+    is(fDoc.getElementById('btnAddTeamFootRow').hidden, false,
+       'a list at the threshold does — the top of it can no longer be seen from the bottom');
+    is(fDoc.getElementById('btnAddTeam').hidden, false,
+       'and the heading-row button is still there, because it is the one that names the section');
+
+    /* THE SAME ACTION, so they share a handler — two listeners with the same
+       body is how they come to disagree. */
+    const before = fDoc.querySelectorAll('#teamRows tr').length;
+    fDoc.getElementById('btnAddTeamFoot').click();
+    is(fDoc.querySelectorAll('#teamRows tr').length, before + 1,
+       'the foot button adds a team exactly as the heading one does');
+    /* And lands the cursor in the new row, which on a long list is the whole
+       point: the row it just made is beside the button you pressed. */
+    is(fDoc.activeElement && fDoc.activeElement.dataset.team,
+       win.tdGet().teams[win.tdGet().teams.length - 1].id,
+       'with the cursor in the name box of the row it just made');
+    fDoc.getElementById('manageDialog').close();
+  }
   /* Every heading is inside a section, and every section is separated from the
      one above it by a rule — the thing that was missing when the window was
      reported as hard to read. A heading with no `.manage-sec` around it is a

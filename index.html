@@ -3694,6 +3694,18 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <div class="table-scroll">
       <table class="manage" id="teamTable" aria-label="Teams"><tbody id="teamRows"></tbody></table>
     </div>
+    <!-- THE SAME BUTTON AGAIN, at the foot, once the list is long enough that the
+         one in the heading has scrolled off. Asked for by Charles with sixteen
+         teams (2026-09-11): adding one meant scrolling back to the top every
+         time. A DUPLICATE rather than a move, because the heading-row button is
+         not only a control — it is what tells you what the section adds before
+         you have read a row of it, it is where the sibling app puts its own, and
+         with two teams on screen a button above and below a two-row table is
+         silly. So it appears at 6 rows and not before: a second control is
+         earned by a list you cannot see the top of, not by every list. -->
+    <div class="row" id="btnAddTeamFootRow" hidden style="justify-content:flex-end;margin-top:10px">
+      <button class="btn small" id="btnAddTeamFoot" type="button">+ Add a Team</button>
+    </div>
     <!-- Two teams answering to one project id makes a split unanswerable, so it is
          said here as it happens rather than left for the paste to discover. -->
     <p class="note err" id="teamIdWarn" hidden style="margin-top:10px"></p>
@@ -3709,6 +3721,18 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <strong>All Teams</strong> gains a picker for it. Teams need not be on one.</p>
     <div class="table-scroll">
       <table class="manage" id="artTable" aria-label="Agile Release Trains"><tbody id="artRows"></tbody></table>
+    </div>
+    <!-- THE SAME BUTTON AGAIN, at the foot, once the list is long enough that the
+         one in the heading has scrolled off. Asked for by Charles with sixteen
+         teams (2026-09-11): adding one meant scrolling back to the top every
+         time. A DUPLICATE rather than a move, because the heading-row button is
+         not only a control — it is what tells you what the section adds before
+         you have read a row of it, it is where the sibling app puts its own, and
+         with two teams on screen a button above and below a two-row table is
+         silly. So it appears at 6 rows and not before: a second control is
+         earned by a list you cannot see the top of, not by every list. -->
+    <div class="row" id="btnAddArtFootRow" hidden style="justify-content:flex-end;margin-top:10px">
+      <button class="btn small" id="btnAddArtFoot" type="button">+ Add an ART</button>
     </div>
   </section>
 
@@ -3774,6 +3798,18 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       status the item is really in &mdash; neither is time spent in a stage.</p>
     <div class="table-scroll">
       <table class="manage" id="stageTable" aria-label="Workflow stages"><tbody id="stageRows"></tbody></table>
+    </div>
+    <!-- THE SAME BUTTON AGAIN, at the foot, once the list is long enough that the
+         one in the heading has scrolled off. Asked for by Charles with sixteen
+         teams (2026-09-11): adding one meant scrolling back to the top every
+         time. A DUPLICATE rather than a move, because the heading-row button is
+         not only a control — it is what tells you what the section adds before
+         you have read a row of it, it is where the sibling app puts its own, and
+         with two teams on screen a button above and below a two-row table is
+         silly. So it appears at 6 rows and not before: a second control is
+         earned by a list you cannot see the top of, not by every list. -->
+    <div class="row" id="btnAddStageFootRow" hidden style="justify-content:flex-end;margin-top:10px">
+      <button class="btn small" id="btnAddStageFoot" type="button">+ Add a Stage</button>
     </div>
     <!-- Two stages listing one status makes a column's destination unanswerable,
          so it is said here as it happens rather than left for a paste to
@@ -4203,6 +4239,18 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           <th scope="col" class="act"><span class="sr-only">Actions</span></th></tr></thead>
         <tbody id="filterRows"></tbody>
       </table>
+    </div>
+    <!-- THE SAME BUTTON AGAIN, at the foot, once the list is long enough that the
+         one in the heading has scrolled off. Asked for by Charles with sixteen
+         teams (2026-09-11): adding one meant scrolling back to the top every
+         time. A DUPLICATE rather than a move, because the heading-row button is
+         not only a control — it is what tells you what the section adds before
+         you have read a row of it, it is where the sibling app puts its own, and
+         with two teams on screen a button above and below a two-row table is
+         silly. So it appears at 6 rows and not before: a second control is
+         earned by a list you cannot see the top of, not by every list. -->
+    <div class="row" id="btnAddFilterFootRow" hidden style="justify-content:flex-end;margin-top:10px">
+      <button class="btn small" id="btnAddFilterFoot" type="button">+ Add a Type</button>
     </div>
   </section>
 
@@ -6209,6 +6257,26 @@ function cleanSleDays(v) {
    Eight weeks. Longer than any sprint anybody runs — SAFe caps at four — and
    past it the month bucket is the honest grouping rather than this one. A guard
    on a hand-edited copy, like TEAM_TARGET_MAX, not a real bound. */
+/* ── THE ADD BUTTON AT THE FOOT OF A LONG LIST ──────────────────────────────
+   Six rows. Below that the heading-row button is still on screen and a second
+   one is clutter; at or above it the list is tall enough that adding meant
+   scrolling back to the top, which is what Charles hit with sixteen teams
+   (2026-09-11). See syncAddFoot, far below, which is the only reader.
+
+   A row count rather than a measured height on purpose: a height would have to
+   be re-measured on every render, in a dialog that can be open while the window
+   behind it resizes, to answer a question a count answers well enough. The
+   stages table has the tallest rows, so if anything it earns its button sooner
+   than this — the harmless direction to be wrong in.
+
+   DECLARED UP HERE, beside the other thresholds, rather than beside the handler
+   that uses it: the TD export object names it, and that object is BUILT partway
+   down this file. A `const` does not hoist, so declaring it next to its reader
+   put it in the temporal dead zone at boot and the app threw before it rendered
+   anything — with the suite reporting no passes and no failures rather than a
+   red check, which is the shape that particular mistake always takes here. */
+const ADD_FOOT_FROM = 6;
+
 const SPRINT_DAYS_MAX = 56;
 
 /* WHOLE CALENDAR DAYS, and calendar is the load-bearing word: a ten-working-day
@@ -11092,6 +11160,8 @@ window.TD = {
      pinned without a dialog on screen. bucketFor especially: it is the one
      thing standing between BUCKET_NOUNS and an ungated 'sprint'. */
   cleanSprintDays, cleanSprintAnchor, SPRINT_DAYS_MAX,
+  /* The row count at which a long list earns a second Add button at its foot. */
+  ADD_FOOT_FROM,
   cadenceOf, cadenceFrom, pairCadence, sharedCadence, bucketFor, sprintStartOn,
   SPRINT_COMPANY, SPRINT_OWN,
   /* What counts as a usable pair of typed dates, and the local-calendar "today"
@@ -15491,6 +15561,7 @@ function renderTeamRows() {
       '<td>' + rowActs('team', t.id, t.name, i, state.teams.length, only) + '</td>';
     tb.appendChild(tr);
   });
+  syncAddFoot('btnAddTeamFootRow', state.teams.length);
   renderTeamIdWarning();
 }
 
@@ -15644,6 +15715,7 @@ function renderStageRows() {
       'a column per status \u2014 or type the days straight onto each work item, which is ' +
       'what the boxes on the Add a Work Item form are for.</td></tr>';
   }
+  syncAddFoot('btnAddStageFootRow', state.stages.length);
   renderStageAliasWarning();
 }
 
@@ -15748,6 +15820,7 @@ function renderArtRows() {
     tb.innerHTML = '<tr><td colspan="3" class="empty-row">' +
       'No trains yet. Add one and every team gets a picker in the table above.</td></tr>';
   }
+  syncAddFoot('btnAddArtFootRow', state.arts.length);
 }
 
 function renderFilterSelect() {
@@ -18866,6 +18939,7 @@ function renderFilterRows() {
         escapeHtml(name) + '">&times;</button>') + '</span></td>';
     tb.appendChild(tr);
   });
+  syncAddFoot('btnAddFilterFootRow', state.settings.filters.length);
 }
 
 /* Swap a filter one place along the list. The teams-and-ARTs mover next to
@@ -21790,7 +21864,14 @@ $('teamSel').addEventListener('change', e => {
 });
 
 /* ── ARTs ─────────────────────────────────────────────────────────────────── */
-$('btnAddArt').addEventListener('click', () => {
+function syncAddFoot(footRowId, count) {
+  const row = $(footRowId);
+  if (row) row.hidden = count < ADD_FOOT_FROM;
+}
+
+/* Both buttons do the same thing, so they share one handler rather than one
+   each: two listeners with the same body is how they come to disagree. */
+function onAddArt() {
   const art = { id: newId(), name: 'ART ' + (state.arts.length + 1) };
   state.arts.push(art);
   save();
@@ -21798,7 +21879,9 @@ $('btnAddArt').addEventListener('click', () => {
   /* Same landing as a new team: the only thing to do next is name it. */
   const input = $('artRows').querySelector('[data-art="' + art.id + '"]');
   if (input) { input.focus(); input.select(); }
-});
+}
+$('btnAddArt').addEventListener('click', onAddArt);
+$('btnAddArtFoot').addEventListener('click', onAddArt);
 
 $('artRows').addEventListener('input', e => {
   const id = e.target.dataset && e.target.dataset.art;
@@ -21844,7 +21927,7 @@ $('artRows').addEventListener('click', e => {
 });
 
 /* ── Workflow stages ──────────────────────────────────────────────────────── */
-$('btnAddStage').addEventListener('click', () => {
+function onAddStage() {
   const stage = { id: newId(), name: 'Stage ' + (state.stages.length + 1),
                   match: [], statuses: [] };
   state.stages.push(stage);
@@ -21853,7 +21936,9 @@ $('btnAddStage').addEventListener('click', () => {
   /* Same landing as a new team or a new ART: the only thing to do next is name it. */
   const input = $('stageRows').querySelector('[data-stage="' + stage.id + '"]');
   if (input) { input.focus(); input.select(); }
-});
+}
+$('btnAddStage').addEventListener('click', onAddStage);
+$('btnAddStageFoot').addEventListener('click', onAddStage);
 
 $('stageRows').addEventListener('input', e => {
   const d = e.target.dataset || {};
@@ -22024,7 +22109,7 @@ $('stageRows').addEventListener('click', e => {
   window.toast('Deleted ' + stage.name);
 });
 
-$('btnAddTeam').addEventListener('click', () => {
+function onAddTeam() {
   const team = { id: newId(), name: 'Team ' + (state.teams.length + 1),
                  artId: null, projectId: '', wipLimit: null, sleDays: null,
                  sprintDays: null, sprintAnchor: '', artPredictability: null,
@@ -22037,7 +22122,9 @@ $('btnAddTeam').addEventListener('click', () => {
   /* Land the cursor in the new team's name box — it's the only thing to do next. */
   const input = $('teamRows').querySelector('[data-team="' + team.id + '"]');
   if (input) { input.focus(); input.select(); }
-});
+}
+$('btnAddTeam').addEventListener('click', onAddTeam);
+$('btnAddTeamFoot').addEventListener('click', onAddTeam);
 
 $('teamRows').addEventListener('input', e => {
   /* The project id shares this listener with the name box beside it. Cleaned on
@@ -22756,13 +22843,15 @@ $('filterRows').addEventListener('click', e => {
   renderFilterSelect();
   renderDashboard();
 });
-$('btnAddFilter').addEventListener('click', () => {
+function onAddFilter() {
   state.settings.filters.push({ display: '', value: '' });
   save();
   /* The WHOLE table, not just the new row: the row that was last had its down
      arrow disabled and no longer should. */
   renderFilterRows();
-});
+}
+$('btnAddFilter').addEventListener('click', onAddFilter);
+$('btnAddFilterFoot').addEventListener('click', onAddFilter);
 $('btnResetSettings').addEventListener('click', () => {
   if (!confirm('Reset every setting back to its default?\n\nYour teams and their data are not touched.')) return;
   state.settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
