@@ -402,7 +402,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. */
-const EXPECTED = 3918;
+const EXPECTED = 3920;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -10355,6 +10355,19 @@ group('ARTs — the grouping, and the boundary it crosses');
     const then = TD.deriveTrain(teams, settings, TD.priorViewOf(base, prior), [], []);
     ok(then.empty, 'a window entirely before the data is empty, and the card says the data '
        + 'does not reach back that far');
+    /* AND SAYS THE SPAN ONCE. The sentence used to name it twice — "does not
+       reach back another 28 days, so there is nothing to compare the previous
+       28 days with" — with a `.replace()` sitting in the middle of it that
+       replaced a phrase with itself and so never trimmed anything. CodeQL
+       caught the dead replace; this catches the sentence it was there for, which
+       is the half a linter cannot see. */
+    /* `{}` for the card: this branch returns before it reads one, which is what
+       makes the check possible without exporting the card table. */
+    const meansTxt = TD.scorecardMeans({}, 0.2, prior, then, now);
+    is(meansTxt.split(String(prior.days)).length - 1, 1,
+       'the no-comparison sentence names the span once, not twice', meansTxt);
+    ok(/does not reach back/.test(meansTxt),
+       'and still says which way the data falls short', meansTxt);
     /* The three figures fail in three different ways over an empty window, and
        collapsing them into one dash would report a quality problem where there
        is only an absence. */

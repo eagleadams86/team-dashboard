@@ -11167,7 +11167,14 @@ window.TD = {
   /* What counts as a usable pair of typed dates, and the local-calendar "today"
      the boxes are capped at. Both are function declarations far below this line
      and are hoisted, which is why naming them here is safe — see issueSortKey. */
-  customWindow, todayLocalISO
+  customWindow, todayLocalISO,
+  /* The Scorecard's "What It Means" sentence. A function declaration, so naming
+     it here is safe — see issueSortKey. SCORECARD_CARDS deliberately is NOT
+     exported beside it: it is a `const` declared below this object, and naming a
+     const that has not been initialised yet is the temporal dead zone that took
+     the whole app down at boot once already (see ADD_FOOT_FROM). The empty-prior
+     branch returns before it touches the card at all, so a test can pass {}. */
+  scorecardMeans
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -15548,7 +15555,12 @@ function renderTeamRows() {
         '" aria-label="Name of team, row ' + (i + 1) + '"></td>' +
       projCell(t, i) +
       artCell(t, i) +
-      setupCell(t, i) +
+      /* NO ROW INDEX. Every other cell builder here takes one, because each
+         builds a positional accessible name ("...for team in row 3") for a
+         table that deliberately has no header row. This one states read-only
+         text with nothing to label, so it does not — passing `i` anyway was a
+         superfluous argument CodeQL was right to flag. */
+      setupCell(t) +
       /* Its own cell rather than a fifth glyph in rowacts: the arrows and the
          delete are about a team's PLACE in this list, and this is about the
          team. A word rather than a glyph because there is no header row to say
@@ -18364,8 +18376,15 @@ function scorecardMeans(card, now, prior, priorD, dNow) {
      noise and pushes the figures off a laptop screen. */
   if (!prior) return 'No window before this one to compare with.';
   if (!priorD || priorD.empty) {
+    /* "this window" rather than `label`, which is "the previous N days" — the
+       same span the first half of the sentence has just named as "another N
+       days". It used to say both: "does not reach back another 28 days, so
+       there is nothing to compare the previous 28 days with." A `.replace()`
+       sat here trying to trim the repetition and replaced the phrase with
+       ITSELF, so it never did anything; CodeQL flagged it as an identity
+       replacement, which is how the doubled sentence came to light. */
     return 'Your data does not reach back another ' + prior.days
-      + ' days, so there is nothing to compare ' + label.replace('the previous', 'the previous') + ' with.';
+      + ' days, so there is nothing to compare this window with.';
   }
   const then = card.get(priorD);
   if (then == null || now == null) {
