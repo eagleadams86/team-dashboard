@@ -11,6 +11,53 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## The Teams Window: Four Cells Out, One Editor In (2026-09-11) — SCHEMA 18 → 19
+
+Charles opened the Teams window on his thirteen real teams and the row scrolled sideways — with
+the scrollbar at the BOTTOM of the list, so from the top nothing said the row continued. Eight
+team names were truncated mid-word. **The cadence cells shipped the day before caused it**:
+measured, the row was 1296px in a 928px window, and the cadence cell alone was 325px (a native
+date input is fat) against a name box squeezed to 138px. Before them the row was 857px and fit.
+
+Two changes, and the first is a model correction rather than a layout fix:
+
+- **THE CADENCE MOVED TO SETTINGS** (`settings.sprintDays` / `settings.sprintAnchor`). Six of
+  Charles's thirteen teams are Scrum, on ONE synchronised cadence — which is what a train IS, so
+  the cadence is a fact about the company exactly as `weekStart` beside it is. Asking thirteen
+  boards to type the same fortnight is one question asked thirteen times with twelve chances to
+  disagree, and `sharedCadence` then withdraws the pooled Sprint option for a reason nobody can
+  see. A whole train on the company cadence now satisfies the phase check BY CONSTRUCTION.
+- **WHETHER a team runs sprints stayed on the team** (`usesSprints`), because only some of a real
+  estate do. Three answers, and **the mode is STORED, not inferred**: it was briefly derived from
+  "has an own pair", which made the middle answer unselectable — a team that had once typed an
+  override snapped straight back to "its own" every time the window re-rendered. `SPRINT_COMPANY`
+  = 1, `SPRINT_OWN` = 2, absent = none. An override is KEPT while unused, so trying the three
+  answers costs nobody the dates they typed.
+- **The four editable cells became one read-only summary plus Edit** (`setupCell` + `teamDialog`).
+  Row is 920px and fits with no scroll; the name box went 138px → 197px; nine teams are visible
+  where four were. The summary states only what is set, because Charles is mid-experiment with the
+  targets and which teams carry one has to stay scannable down the column.
+- **`cadenceOf(t, settings)` now takes settings.** Callers resolve team + settings to a cadence
+  and put the RESOLVED pair on the view — `derive()` still takes a question, never `state`.
+- **The `close` event on a `<dialog>` does not fire in the test environment** — verified on a bare
+  `document.createElement('dialog')` with nothing attached, so it is the engine. That makes
+  `close` a hook whose failure is INVISIBLE (the window shuts, the row keeps the old summary,
+  nothing errors) and untestable. `teamDialog` uses a MutationObserver on the `open` attribute
+  instead, which fires however the close came from. Its callback is a MICROTASK, so a test must
+  yield once before reading the row. `manageDialog` still uses `close` — long-standing, works in
+  real browsers, and not this change's business.
+- **hydrateState migrates SCHEMA 18 documents, VERSIONED rather than SHAPED.** For one day a
+  team's sprints were a bare pair with no mode; read literally by 19 that team runs no sprints
+  and quietly loses the option it was configured for. But "a pair with no mode" is also an
+  ORDINARY state under 19 — an override is kept when a team is switched off — so migrating on
+  shape would switch those back on at every load. Only `raw.schema === 18` is touched. Both
+  halves are pinned.
+- **Prose follows its control.** The five `.manage-note` paragraphs above the Teams table
+  described four controls that had left; each now sits in the editor section that owns it, which
+  also took five paragraphs of scrolling out from above the first team. The "85% ≤ is about work
+  that has FINISHED" note went with them — the suite pins it, for the reason Charles gave when he
+  asked whether it and the ageing threshold were duplicate settings.
+
 ## Per-Team Sprint Cadence, and the Aged-Share Opt-Out (2026-09-11) — SCHEMA 17 → 18
 
 Charles asked whether Flow Metrics is useful to Scrum teams, and whether a "Scrum team" flag

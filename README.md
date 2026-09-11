@@ -4,8 +4,9 @@ Kanban flow metrics for as many delivery teams as you like, from nothing but a l
 completed and started dates. Single page, no build step, nothing to install.
 
 Scrum teams too: nothing here asks how you plan, and a team that runs sprints can
-[group every period on its own sprint boundaries](#sprint-cadence-grouping-on-your-own-boundaries)
-rather than on a fortnight counted from a fixed date.
+[group every period on its real sprint boundaries](#sprint-cadence-grouping-on-your-own-boundaries)
+rather than on a fortnight counted from a fixed date. Mixed estates are the expected case — say
+once what a sprint is here, then tick the teams that run them.
 
 **Live:** https://eagleadams86.github.io/team-dashboard/
 
@@ -322,31 +323,54 @@ the card surface. It has a tile this app does not; the difference follows from t
 
 ## Sprint Cadence: Grouping on Your Own Boundaries
 
-Set a team's **Sprint** length in days and the date one sprint started — any one of them, the app
-counts the rest off it — in **Teams & Stages**, and *Group by* gains a **Sprint** option. Every
-period on the dashboard is then cut on that team's real sprint boundaries.
+Set **Our Sprint Cadence** in Settings — how long a sprint is, and the date one of them started
+(any one; the app counts the rest off it). Then each team says whether it runs sprints, under
+**Edit** in Teams & Stages: *doesn't run sprints*, *our cadence*, or *a cadence of its own*.
+Teams on a cadence gain a **Sprint** option under *Group by* that cuts every period on their real
+sprint boundaries.
+
+The cadence lives in Settings rather than on each team because **a train is a synchronised
+cadence** — asking thirteen boards to type the same fortnight is one question asked thirteen
+times with twelve chances to disagree, and a disagreement quietly withdraws the pooled Sprint
+option on All Teams. Whether a team runs sprints *is* a fact about the team, which is why that
+half stays there: in a real estate only some of them do.
 
 It changes no measurement. Cycle time, throughput, aged work and the rest are worked out exactly
-as before; all that moves is where each period begins and ends. That is the whole point: the
-*2 weeks* option counts fortnights from a fixed date in 1970, so for a team on a two-week sprint
-it lands half a sprint out and every bar straddles two of them. A bar labelled with a sprint start
-is the one a team can argue with.
+as before; all that moves is where each period begins and ends. That is the point: the *2 weeks*
+option counts fortnights from a fixed date in 1970, so for a two-week team it lands half a sprint
+out and every bar straddles two of them. A bar labelled with a sprint start is one a team can
+argue with.
 
-Leave either box blank and nothing changes — a length with no anchor has no phase, and an anchor
-with no length has no grid, so the app reads the two only as a pair and offers nothing until it
-has both.
+**On All Teams the option appears only when every team in scope is on the same cadence** — same
+length, same phase. Teams a whole number of sprints apart count as the same grid; two teams
+offset by half a sprint do not, because one bar would be the back half of one team's sprint and
+the front half of the other's. A whole train on the company cadence satisfies this by
+construction, which is the other reason the cadence sits in Settings. When the option is withheld
+the note under the charts says which of the three reasons it is: some teams have none, none do,
+or they are not aligned. The Scorecard is unaffected — it aligns to whole weeks whatever *Group
+by* says, for [its own reasons](#the-scorecard-the-train-in-three-figures).
 
-**On All Teams the option appears only when every team in scope is on the same cadence** — the
-same length, and starting on the same days. Teams a whole number of sprints apart count as the
-same grid; two teams on fourteen days offset by seven do not, because one bar would be the back
-half of one team's sprint and the front half of the other's. When the option is withheld the note
-under the charts says which of the three reasons it is: some teams have none, none of them do, or
-they are not aligned. The Scorecard is unaffected — it aligns to whole weeks whatever *Group by*
-says, for [its own reasons](#every-team-at-a-glance-the-scorecard).
+Both the company cadence and a team's answer travel in a [share link](#share-a-read-only-link),
+because between them they decide where the bars are: a link that dropped either would show the
+reader a different set of numbers under the same headings.
 
-The cadence travels in a [share link](#share-a-read-only-link), because it decides where the bars
-are: a link that dropped it would show the reader a different set of numbers under the same
-headings.
+## A Team's Own Settings
+
+Four things belong to one team rather than to the app: its **WIP ≤** and **85% ≤** targets,
+whether it runs **sprints**, and whether it counts in the train's **aged share**. All four live
+behind **Edit** on the team's row, in a window that saves as you go — there is no OK button
+because there is nothing to cancel.
+
+They used to be four editable cells in the row itself, which worked until the list got long.
+Between them they were 717px of a row with 928px to live in, so with thirteen teams the window
+scrolled sideways — and the scrollbar sat at the *bottom* of the list, so from the top there was
+nothing on screen to say the row continued. Team names were squeezed to 138px and truncated
+mid-word.
+
+The row now **states** what a team has set and the editor **changes** it: `WIP 6 · Sprint 14d`,
+or an em dash for a team with nothing configured. Read-only text costs a fraction of a control's
+width, which is what buys the name box back the room it needs — and the column still reads
+straight down the list, so you can see which teams carry a target without opening anything.
 
 ## Grouping Teams into ARTs
 
@@ -660,8 +684,9 @@ one team is that team's own dashboard with three of its tiles on it.
 
 `trainRowsOf` pools **items**, not teams, so the Predictability figure is item-weighted: a large
 team moves it more than a small one, and a team that doesn't manage aged WIP at all drags the
-train's number somewhere nobody owns. **In the train's aged share** in *Teams & Stages* is how a
-team sits out. Every team is in unless you untick it.
+train's number somewhere nobody owns. **In the train's aged share**, under
+[**Edit** on a team's row](#a-teams-own-settings), is how a team sits out. Every team is in
+unless you untick it.
 
 The case it was built for is a Scrum team that measures its predictability as the share of a
 sprint commitment it completed — a number this app cannot compute, because it stores no
@@ -1516,9 +1541,15 @@ The sibling app, [Sprint Predictability](https://eagleadams86.github.io/sprint-v
 commitment-versus-delivered lives.
 
 **A sprint entity, and sprints that slipped** — the cadence here is a perfect arithmetic grid
-counted off one anchor. A team that skipped a sprint two years ago has its older periods off by
+counted off one anchor. A train that skipped a sprint two years ago has its older periods off by
 one length. Fixing that means storing a list of real sprint start dates, which is a different
 feature with a different shape, and it is deliberately out.
+
+**Per-team anything else** — the four settings behind **Edit** are the whole list. Everything
+else in Settings is shared by every team on purpose: an ageing threshold or a set of grading
+bands that differed per team would make the All Teams table and the Scorecard comparisons
+between figures measured differently, which is the fault the shared end date exists to prevent
+one level along.
 
 
 **Blocked time** — how long an item couldn't move because something was in its way. A plain
