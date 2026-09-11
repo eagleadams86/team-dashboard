@@ -402,7 +402,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. */
-const EXPECTED = 3860;
+const EXPECTED = 3900;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -640,28 +640,56 @@ async function run(TD, win) {
   /* ── The pair rule, and the pooled rule ─────────────────────────────────── */
   group('cadence — read as a pair, pooled only when genuinely shared');
 
-  is(TD.cadenceOf({ sprintDays: 14, sprintAnchor: '2026-01-07' }).days, 14, 'both fields make a cadence');
-  is(TD.cadenceOf({ sprintDays: 14 }), null, 'a length with no anchor is not one');
-  is(TD.cadenceOf({ sprintAnchor: '2026-01-07' }), null, 'and neither is an anchor with no length');
-  is(TD.cadenceOf({}), null, 'a team that set neither has none');
-  is(TD.cadenceOf(null), null, 'and neither does no team at all');
+  const CO = TD.SPRINT_COMPANY, OWN = TD.SPRINT_OWN;
+  const COMPANY = { sprintDays: 14, sprintAnchor: '2026-01-07' };
 
-  const team = (d, a) => ({ sprintDays: d, sprintAnchor: a });
-  is(TD.sharedCadence([team(14, '2026-01-07'), team(14, '2026-01-07')]).days, 14,
+  /* THE PAIR RULE, asked of whichever object holds the pair. */
+  is(TD.pairCadence(14, '2026-01-07').days, 14, 'both fields make a cadence');
+  is(TD.pairCadence(14, ''), null, 'a length with no anchor is not one');
+  is(TD.pairCadence(null, '2026-01-07'), null, 'and neither is an anchor with no length');
+
+  /* THREE ANSWERS, AND THE MIDDLE ONE IS THE POINT. It was briefly inferred from
+     "has an own pair", which made a team that had once typed an override
+     unable to go back to the company's — the picker snapped straight back. */
+  is(TD.cadenceOf({ usesSprints: CO }, COMPANY).days, 14,
+     'a team on the company cadence runs the company cadence');
+  is(TD.cadenceOf({ usesSprints: CO, sprintDays: 21, sprintAnchor: '2026-02-04' }, COMPANY).days, 14,
+     'even when it still carries an override it is not using — the MODE decides, not the data');
+  is(TD.cadenceOf({ usesSprints: OWN, sprintDays: 21, sprintAnchor: '2026-02-04' }, COMPANY).days, 21,
+     'and a team on its own runs its own');
+  is(TD.cadenceOf({ usesSprints: OWN }, COMPANY), null,
+     'a team on "its own" with no own pair has no cadence — it does NOT fall through to the company');
+  is(TD.cadenceOf({ usesSprints: CO }, { sprintDays: null, sprintAnchor: '' }), null,
+     'nor does one on a company cadence nobody has set');
+  is(TD.cadenceOf({ sprintDays: 14, sprintAnchor: '2026-01-07' }, COMPANY), null,
+     'a team that never said it runs sprints has none, whatever it carries');
+  is(TD.cadenceOf({}, COMPANY), null, 'a team that set nothing has none');
+  is(TD.cadenceOf(null, COMPANY), null, 'and neither does no team at all');
+
+  const team = (d, a) => ({ usesSprints: OWN, sprintDays: d, sprintAnchor: a });
+  is(TD.sharedCadence([team(14, '2026-01-07'), team(14, '2026-01-07')], COMPANY).days, 14,
      'two teams on the same grid share it');
-  is(TD.sharedCadence([team(14, '2026-01-07'), team(14, '2026-01-21')]).days, 14,
+  is(TD.sharedCadence([team(14, '2026-01-07'), team(14, '2026-01-21')], COMPANY).days, 14,
      'anchors a WHOLE NUMBER of sprints apart are the same grid, not two');
-  is(TD.sharedCadence([team(14, '2026-01-07'), team(14, '2026-01-14')]), null,
+  is(TD.sharedCadence([team(14, '2026-01-07'), team(14, '2026-01-14')], COMPANY), null,
      'but half a cadence apart is two grids — a bar would straddle both');
-  is(TD.sharedCadence([team(14, '2026-01-07'), team(21, '2026-01-07')]), null,
+  is(TD.sharedCadence([team(14, '2026-01-07'), team(21, '2026-01-07')], COMPANY), null,
      'same anchor, different length is not shared either');
-  is(TD.sharedCadence([team(14, '2026-01-07'), team(null, '')]), null,
+  is(TD.sharedCadence([team(14, '2026-01-07'), {}], COMPANY), null,
      'one team without a cadence withdraws it for all of them');
-  is(TD.sharedCadence([]), null, 'an empty scope shares nothing');
-  is(TD.sharedCadence(null), null, 'and neither does no scope at all');
+  is(TD.sharedCadence([], COMPANY), null, 'an empty scope shares nothing');
+  is(TD.sharedCadence(null, COMPANY), null, 'and neither does no scope at all');
   /* The anchor before the first team's, which is where a sign bug would hide. */
-  is(TD.sharedCadence([team(14, '2026-01-21'), team(14, '2026-01-07')]).days, 14,
+  is(TD.sharedCadence([team(14, '2026-01-21'), team(14, '2026-01-07')], COMPANY).days, 14,
      'the phase check works whichever team is listed first');
+  /* THE ORDINARY CASE: a whole train on the company cadence, nobody carrying a
+     date of their own. This is what six of Charles's thirteen teams look like,
+     and it shares BY CONSTRUCTION — which is the argument for the setting. */
+  is(TD.sharedCadence([{ usesSprints: CO }, { usesSprints: CO }, { usesSprints: CO }], COMPANY).days, 14,
+     'a train on one company cadence shares it without anyone typing a date');
+  is(TD.sharedCadence([{ usesSprints: CO }, { usesSprints: CO }],
+       { sprintDays: null, sprintAnchor: '' }), null,
+     'and shares nothing when the company cadence itself is unset');
 
   /* ── The two guards ─────────────────────────────────────────────────────── */
   group('sprint cadence — what a hand-edited copy can store');
@@ -1887,7 +1915,7 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 18, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 19, 'SCHEMA was bumped in the same commit as the whitelist widening');
 
 
   /* ══════════════════════════════════════════════════════════
@@ -2863,7 +2891,7 @@ async function run(TD, win) {
   is('smuggled' in strayS, false, 'a stray settings key is dropped at the boundary');
   is(strayS.agedDays, 21, 'while every known key still comes through');
   is(Object.keys(strayS).sort().join(','),
-     'agedDays,agedShareGreen,agedShareRed,cycleTimeLabel,defectShareGreen,defectShareRed,featureAgedDays,featureCycleGreen,featureCycleRed,featureTypes,filters,outlierDays,outlierMode,sameDayValue,unplannedLabel,unplannedType,weekStart,workingDays',
+     'agedDays,agedShareGreen,agedShareRed,cycleTimeLabel,defectShareGreen,defectShareRed,featureAgedDays,featureCycleGreen,featureCycleRed,featureTypes,filters,outlierDays,outlierMode,sameDayValue,sprintAnchor,sprintDays,unplannedLabel,unplannedType,weekStart,workingDays',
      'and the surviving keys are exactly the known set');
 
   is(d.names.wip, 'Work in progress', 'the rest are the standard metric names');
@@ -4407,7 +4435,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 18, 'the schema marker is 18 — the version that added the per-team sprint cadence');
+  is(St.SCHEMA, 19, 'the schema marker is 19 — the version that moved the cadence to Settings');
 
 
   /* ────────────────────────────────────────────────────────── */
@@ -4700,10 +4728,10 @@ async function run(TD, win) {
   group('features at the storage boundary');
   {
     const S4 = win.TDState;
-    is(S4.SCHEMA, 18, 'the feature layer took the schema to 12, the feature ageing '
+    is(S4.SCHEMA, 19, 'the feature layer took the schema to 12, the feature ageing '
        + 'threshold to 13, the status vocabulary to 14, the aged share boundaries to 15, '
-       + 'the Scorecard\u2019s other four to 16, the week start to 17 and the sprint '
-       + 'cadence to 18');
+       + 'the Scorecard\u2019s other four to 16, the week start to 17, the sprint '
+       + 'cadence to 18 and moving that cadence to Settings to 19');
 
     const t = S4.sanitizeTeams([{ id: 'a', name: 'X', rows: [],
       features: [{ c: '2026-01-12', s: '2026-01-06', t: 'Feature', i: 'DAE-1' }] }])[0];
@@ -5989,7 +6017,7 @@ async function run(TD, win) {
      id sits on the other side of. */
   plant({
     teams: [
-      { id: 'team-c', name: 'Cadenced', projectId: 'CAD', rows: [],
+      { id: 'team-c', name: 'Cadenced', projectId: 'CAD', rows: [], usesSprints: 2,
         sprintDays: 14, sprintAnchor: '2026-01-07', artPredictability: 0 },
       { id: 'team-d', name: 'Plain', rows: [] }
     ]
@@ -5997,12 +6025,14 @@ async function run(TD, win) {
   const spCad = Sh.buildSharePayload(['team-c', 'team-d']);
   const spCadT = spCad.teams.find(t => t.id === 'team-c');
   const spPlainT = spCad.teams.find(t => t.id === 'team-d');
-  is(spCadT.sprintDays, 14, 'a shared team carries its sprint length');
+  is(spCadT.usesSprints, 2, 'a shared team carries whether — and on whose cadence — it sprints');
+  is(spCadT.sprintDays, 14, 'and its own sprint length');
   is(spCadT.sprintAnchor, '2026-01-07', 'and its anchor — the recipient must see the same sprints');
   is(spCadT.artPredictability, 0, 'and whether it counts in the train\u2019s aged share');
   is(spCadT.projectId, undefined, 'while the project id still does NOT travel — it routes a paste, '
      + 'it does not draw a figure');
-  is(spPlainT.sprintDays, undefined, 'a team with no cadence writes no key at all');
+  is(spPlainT.usesSprints, undefined, 'a team that runs no sprints writes no key at all');
+  is(spPlainT.sprintDays, undefined, 'and carries no length either');
   is(spPlainT.artPredictability, undefined, 'and a team that is in the roll-up writes nothing either');
   is(spCad.v, 1, 'SHARE_PAYLOAD_V is NOT bumped — an older build drops the fields and draws weeks');
 
@@ -7168,7 +7198,7 @@ group('ARTs — the grouping, and the boundary it crosses');
      null, 'a hostile pointer is dropped, not swapped for a fresh id');
   is(Object.keys(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', rows: [] }])[0]).sort(),
      ['artId', 'artPredictability', 'features', 'id', 'name', 'projectId', 'rows',
-      'sleDays', 'sprintAnchor', 'sprintDays', 'wipLimit'],
+      'sleDays', 'sprintAnchor', 'sprintDays', 'usesSprints', 'wipLimit'],
      'and every team carries the field, set or not');
   /* THE POINT OF THE LIST ABOVE, said as its own check: a field that is not in
      sanitizeTeams' returned literal does not survive the door, whatever wrote
@@ -7554,47 +7584,96 @@ group('ARTs — the grouping, and the boundary it crosses');
 
   group('a team’s own limit and target — the boundary');
 
-  /* ── The cadence boxes and the roll-up tick, driven as a person drives them ─
-     THROUGH THE DOM, not by calling the cleaners: the guards are pinned above,
-     and what this pins is the WIRING — that the box is found, the value stored,
-     and a clamped entry written back so the box cannot go on showing a number
-     the charts were not drawn with. */
+  /* ── The team editor, driven as a person drives it ──────────────────────────
+     THROUGH THE DOM, not by calling the cleaners: those are pinned above, and
+     what this pins is the WIRING — that Edit opens the right team, that the
+     three sprint answers round-trip, that a clamped entry is written back so the
+     box cannot go on showing a number the charts were not drawn with, and that
+     the row's summary tells the truth when the window closes. */
   {
-    plant({ teams: [{ id: 'c1', name: 'Alpha', rows: [] }], settings: {} });
+    plant({ teams: [{ id: 'c1', name: 'Alpha', rows: [] }, { id: 'c2', name: 'Beta', rows: [] }],
+            settings: { sprintDays: 14, sprintAnchor: '2026-01-07' } });
     appDoc.getElementById('manageBtn').click();
-    const dBox = appDoc.querySelector('[data-sprint-days="c1"]');
-    const aBox = appDoc.querySelector('[data-sprint-from="c1"]');
-    const tick = appDoc.querySelector('[data-rollup="c1"]');
-    ok(dBox && aBox && tick, 'every team row carries a sprint length, an anchor and a roll-up tick');
-    is(dBox.getAttribute('min'), '1', 'the length box has a whole-number min');
-    is(dBox.getAttribute('step'), '1', 'and steps by one from it — a step counts from the min');
-    is(tick.checked, true, 'a team nobody has ticked out is IN the roll-up');
 
-    dBox.value = '14';
-    dBox.dispatchEvent(new win.Event('input', { bubbles: true }));
-    is(win.tdGet().teams[0].sprintDays, 14, 'typing a length stores it');
-    is(win.tdGet().teams[0].sprintAnchor, undefined,
-       'half a cadence writes no anchor — and the grid is not yet a grid');
+    /* The row states, and does not edit. Four controls in this row is what made
+       the window scroll sideways past the end of a thirteen-team list. */
+    const row = appDoc.querySelector('#teamRows tr');
+    is(!!row.querySelector('[data-sprint-days]'), false, 'the row carries no cadence boxes');
+    is(!!row.querySelector('[data-rollup]'), false, 'nor the aged-share tick');
+    is(!!row.querySelector('input.target'), false, 'nor the two target boxes');
+    ok(row.querySelector('td.setup'), 'it carries a read-only summary instead');
+    is(row.querySelector('td.setup').textContent.trim(), '—',
+       'which is an em dash for a team with nothing set — shorter than four empty boxes');
 
-    aBox.value = '2026-01-07';
-    aBox.dispatchEvent(new win.Event('input', { bubbles: true }));
-    is(win.tdGet().teams[0].sprintAnchor, '2026-01-07', 'and the anchor completes it');
+    appDoc.querySelector('[data-edit-team="c1"]').click();
+    ok(appDoc.getElementById('teamDialog').open, 'Edit opens that team’s settings');
+    ok(/Alpha/.test(appDoc.getElementById('teamDialogTitle').textContent),
+       'and the heading names it — the row behind is covered, so nothing else can');
 
-    /* Past the ceiling, written back so the box agrees with what was stored. */
-    dBox.value = '999';
-    dBox.dispatchEvent(new win.Event('input', { bubbles: true }));
-    dBox.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const wip = appDoc.getElementById('teamWip');
+    const mode = appDoc.getElementById('teamSprintMode');
+    const own = appDoc.getElementById('teamSprintOwnWrap');
+    is(mode.value, 'none', 'a team nobody has answered for runs no sprints');
+    is(own.hidden, true, 'and is not shown boxes for a grid it is not on');
+
+    wip.value = '999';
+    wip.dispatchEvent(new win.Event('input', { bubbles: true }));
+    wip.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.tdGet().teams[0].wipLimit, 999, 'a target typed in the editor is stored');
+    wip.value = '8.4';
+    wip.dispatchEvent(new win.Event('input', { bubbles: true }));
+    wip.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(wip.value, '8', 'and a rounded one is written back, so the box cannot disagree with the chart');
+
+    /* THE THREE ANSWERS, and the round trip through them. The middle one was
+       briefly unselectable — see cadenceOf. */
+    mode.value = 'company';
+    mode.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.tdGet().teams[0].usesSprints, 1, 'a team can be put on the company cadence');
+    is(own.hidden, true, 'which needs no boxes of its own');
+
+    mode.value = 'own';
+    mode.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(own.hidden, false, 'choosing its own reveals the two boxes');
+    const sd = appDoc.getElementById('teamSprintDays');
+    sd.value = '999';
+    sd.dispatchEvent(new win.Event('input', { bubbles: true }));
+    sd.dispatchEvent(new win.Event('change', { bubbles: true }));
     is(win.tdGet().teams[0].sprintDays, TD.SPRINT_DAYS_MAX, 'a huge length is clamped');
-    is(dBox.value, String(TD.SPRINT_DAYS_MAX),
-       'and the box is rewritten, so it cannot show a number the charts were not drawn with');
+    is(sd.value, String(TD.SPRINT_DAYS_MAX), 'and written back');
+    appDoc.getElementById('teamSprintAnchor').value = '2026-03-04';
+    appDoc.getElementById('teamSprintAnchor').dispatchEvent(new win.Event('input', { bubbles: true }));
+    is(win.tdGet().teams[0].usesSprints, 2, 'its own is stored as its own');
 
+    /* Switching away must NOT throw the dates away — a reader trying the three
+       answers would otherwise lose what they typed by looking. */
+    mode.value = 'company';
+    mode.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(mode.value, 'company', 'the company cadence STAYS chosen with an override still on file');
+    is(win.tdGet().teams[0].sprintDays, TD.SPRINT_DAYS_MAX,
+       'and the override is kept, merely unused');
+    mode.value = 'none';
+    mode.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.tdGet().teams[0].usesSprints, undefined, 'no sprints writes no key at all');
+    is(win.tdGet().teams[0].sprintAnchor, '2026-03-04', 'and still does not discard the dates');
+
+    const tick = appDoc.getElementById('teamRollup');
+    is(tick.checked, true, 'a team nobody ticked out is IN the aged share');
     tick.checked = false;
     tick.dispatchEvent(new win.Event('change', { bubbles: true }));
-    is(win.tdGet().teams[0].artPredictability, 0, 'unticking holds the team out of the aged share');
-    tick.checked = true;
-    tick.dispatchEvent(new win.Event('change', { bubbles: true }));
-    is(win.tdGet().teams[0].artPredictability, undefined,
-       'and ticking it back writes no key at all — in is the absence of the field');
+    is(win.tdGet().teams[0].artPredictability, 0, 'unticking holds it out');
+
+    /* The summary is rebuilt on CLOSE, not per keystroke — it is what the reader
+       comes back out to. */
+    appDoc.getElementById('teamDialog').close();
+    /* The rebuild is driven by a MutationObserver, whose callback is delivered
+       as a microtask — so the row is still the old one on the line after
+       close(). Anything asserting the summary has to yield first. */
+    await new Promise(r => setTimeout(r, 0));
+    const after = appDoc.querySelector('#teamRows tr td.setup').textContent;
+    ok(/WIP 8/.test(after), 'the row then states the target that was set', after);
+    ok(/out of aged share/.test(after), 'and that this team is out of the roll-up', after);
+    ok(!/Sprint/.test(after), 'and says nothing about sprints for a team that runs none', after);
     appDoc.getElementById('manageDialog').close();
   }
 
@@ -7718,9 +7797,13 @@ group('ARTs — the grouping, and the boundary it crosses');
   win.renderAll();
   const uiDoc = win.document;
   uiDoc.getElementById('manageBtn').click();
-  const wipBox = uiDoc.querySelector('#teamRows input[data-wip-limit]');
-  const sleBox = uiDoc.querySelector('#teamRows input[data-sle-days]');
-  ok(!!wipBox && !!sleBox, 'both boxes are in the Teams dialog, from the first team');
+  /* THE BOXES MOVED INTO THE TEAM EDITOR on 2026-09-11 — four editable cells
+     were 717px of a 928px row. What they must DO is unchanged, so everything
+     this group asserts is unchanged with them. */
+  uiDoc.querySelector('[data-edit-team="ui1"]').click();
+  const wipBox = uiDoc.getElementById('teamWip');
+  const sleBox = uiDoc.getElementById('teamSle');
+  ok(!!wipBox && !!sleBox, 'both boxes are in the team editor, from the first team');
   is([wipBox.value, sleBox.value], ['2', '10'], 'each showing what is stored');
 
   /* ── THE ARROWS MOVE IN WHOLE DAYS ────────────────────────────────────────
@@ -7745,7 +7828,7 @@ group('ARTs — the grouping, and the boundary it crosses');
      work that has not — but nothing on screen said so, and the demo happens to
      show 10 for both. Each of the three places that touches one of them now
      explains the other. Pinned so a tidy-up cannot quietly take it back out. */
-  const teamNotes = [...uiDoc.querySelectorAll('.manage-note')]
+  const teamNotes = [...uiDoc.querySelectorAll('#teamDialog .manage-note')]
     .map(p2 => p2.textContent.replace(/\s+/g, ' '));
   ok(teamNotes.some(t => /FINISHED/.test(t) && /ageing threshold/.test(t)),
      'the Teams dialog says the target is read against FINISHED work, and names the '
@@ -7757,13 +7840,16 @@ group('ARTs — the grouping, and the boundary it crosses');
      element doing both jobs, because this table deliberately has no header row. */
   ok(uiDoc.querySelector('label[for="' + wipBox.id + '"]'),
      'the visible prefix IS the label element, so the two cannot drift apart');
-  /* The accessible name CONTAINS the visible label — WCAG 2.5.3, so a voice
-     control user saying what they can see reaches the box. What it adds beyond
-     the visible prefix is which row it belongs to. */
-  ok(/^WIP limit/.test(wipBox.getAttribute('aria-label'))
-     && /row 1/.test(wipBox.getAttribute('aria-label')),
-     'and the box announces itself in full to a screen reader, starting with the words on screen',
-     wipBox.getAttribute('aria-label'));
+  /* WHICH TEAM is no longer the box's job to say. In the row it had to be —
+     thirteen identical boxes down a column with no header — and the aria-label
+     carried "row 1" for exactly that reason. In a modal editor the HEADING says
+     it, once, for every control inside; repeating it on each box would make a
+     screen reader announce the team name four times over. */
+  is(wipBox.getAttribute('aria-label'), null,
+     'the box needs no aria-label of its own — its visible label is its name');
+  ok(/Bounded/.test(uiDoc.getElementById('teamDialogTitle').textContent),
+     'because the heading names the team, once, for every control in the window',
+     uiDoc.getElementById('teamDialogTitle').textContent);
 
   /* Typing stores what will be DRAWN, so a box and a chart can never disagree.
      The value is set and an input event dispatched — a synthetic click never
@@ -8595,9 +8681,9 @@ group('ARTs — the grouping, and the boundary it crosses');
      whole list because that is the invariant: a setting added here has to say
      which section it belongs to, or add one. */
   is([...sDlg.querySelectorAll('.manage-head')].map(e => e.textContent),
-     ['Labels & Work Types', 'Aged Work', 'Grading', 'Features', 'Your Week', 'Working Days',
-      'Unusually Long Items', 'Work Type Filter List'],
-     'eight sections, each headed by its name, like the window beside it');
+     ['Labels & Work Types', 'Aged Work', 'Grading', 'Features', 'Your Week',
+      'Our Sprint Cadence', 'Working Days', 'Unusually Long Items', 'Work Type Filter List'],
+     'nine sections, each headed by its name, like the window beside it');
   ok(sDoc.getElementById('btnAddFilter').closest('.row.spread'),
      'and the Add button in its section\u2019s heading row rather than under the table');
   /* Every heading is inside a section, and every section is separated from the
@@ -8722,20 +8808,20 @@ group('ARTs — the grouping, and the boundary it crosses');
   const teamRow = win.document.querySelector('#teamRows tr');
   is(teamRow.querySelector('.count').textContent, '1 item',
      'a count carries its own noun, singular when it should be');
-  /* Name, project id, the two targets, the sprint cadence, the aged-share tick,
-     count, actions. Every box is present from the first team — unlike the ART
-     picker below them, which needs an ART to exist before it can offer
-     anything. The cadence and the tick joined the row on 2026-09-11; the count
-     here is what makes a cell quietly disappearing a failure rather than a
-     shrug. */
-  is(teamRow.cells.length, 8, 'and there is no ART cell until an ART exists');
+  /* Name, project id, the read-only summary, Edit, count, actions — unlike the
+     ART picker, which needs an ART to exist before it can offer anything. The
+     four editable cells came OUT on 2026-09-11: between them they were 717px of
+     a 928px row, and with thirteen teams the window scrolled sideways with the
+     scrollbar at the bottom of the list. The count here is what makes a cell
+     quietly reappearing a failure rather than a shrug. */
+  is(teamRow.cells.length, 6, 'and there is no ART cell until an ART exists');
   ok(teamRow.querySelector('input.projid'),
      'while the project id box is there from the first team — it is typed in, not chosen');
 
   plant({ arts: [{ id: 'ax', name: 'Delivery' }],
           teams: [{ id: 'z1', name: 'Zephyr', artId: 'ax', rows: [] },
                   { id: 'z2', name: 'Zither', rows: [] }], settings: {} });
-  is(win.document.querySelector('#teamRows tr').cells.length, 9,
+  is(win.document.querySelector('#teamRows tr').cells.length, 7,
      'the ART cell appears the moment there is a train to choose');
   is(win.document.querySelector('#artRows .count').textContent, '1 team',
      'and an ART states how many teams are on it, in its own words');

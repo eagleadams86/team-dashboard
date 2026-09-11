@@ -1735,14 +1735,16 @@ table.manage td { text-align: right; padding: 10px 12px;
 table.manage td:first-child { text-align: left; padding-left: 0; }
 table.manage td:last-child { padding-right: 0; }
 table.manage td.count { color: var(--text-muted); white-space: nowrap; }
-/* The two halves of one setting, kept on one line: a wrapped cadence would read
-   as two controls where there is one, and half of one does nothing. The row
-   outgrows the dialog on a phone and .table-scroll carries it, which is the
-   same answer the alias column already relies on. */
-table.manage td.cadence { white-space: nowrap; }
-table.manage td.cadence input[type="date"] { max-width: 150px; }
-table.manage td.rollup { white-space: nowrap; }
-table.manage td.rollup input[type="checkbox"] { margin: 0; }
+/* WHAT A TEAM HAS SET, stated rather than edited — see setupCell for why four
+   controls became one column. Left-aligned against the right-aligned figures
+   around it because it is a SENTENCE, not a number, and it wraps rather than
+   scrolls: two short lines inside one row cost less than a row nobody can see
+   the end of. The min-width keeps the column from collapsing to the width of an
+   em dash on an estate where only one team has anything set. */
+table.manage td.setup { text-align: left; color: var(--text-secondary);
+  font-size: var(--fs-xs); min-width: 150px; max-width: 260px; }
+table.manage td.setup .setup-none { color: var(--text-muted); }
+table.manage td.edit { width: 1%; white-space: nowrap; }
 
 table.manage input[type="text"] { max-width: 320px; }
 table.manage select { max-width: 220px; }
@@ -3665,43 +3667,18 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       issue keys — <em>DAE</em> for DAE-1552. It is what lets one export covering several teams be
       pasted in one go and split between them; it changes no figure. Leave it blank and the team
       simply takes nothing from a split.</p>
-    <p class="manage-note"><strong>WIP &le;</strong> is how much work this team means to have open
-      at once, and <strong>85% &le;</strong> how long it means an item to take &mdash; the promise
-      the 85th percentile is read against. Both are drawn as a line on the charts and neither
-      changes a figure: they are what the figures are compared to. Leave either blank and the app
-      states the number without judging it, which is what it does today.</p>
-    <!-- The two numbers look alike on screen and are read against different work,
-         which was reported as "are these duplicate settings?". Said where the
-         target is typed, and again beside the threshold in Settings. -->
-    <p class="manage-note"><strong>85% &le; is about work that has FINISHED</strong> &mdash; it is
-      checked against the items this team delivered. The separate
-      <strong>ageing threshold</strong> in Settings is about work that has <em>not</em>: how long
-      something can sit open before it is flagged. They are different questions, so they are
-      usually different numbers &mdash; and the threshold is normally the <strong>lower</strong>
-      of the two, because an item that has already passed your target is too late to rescue. A
-      promise of 10 days is often watched with a threshold around 6.</p>
-    <!-- Every clause below is a fact the code enforces. The last two exist
-         because both are surprises: a cadence changes where the bars are and
-         not what they measure, and the pooled option can vanish for a reason
-         that is not on this screen. -->
-    <p class="manage-note"><strong>Sprint</strong> is how long this team's sprint is, in days, and
-      the date one of them started &mdash; any one will do, and the app counts the rest off it.
-      Set both and <strong>Group by</strong> gains a <strong>Sprint</strong> option that cuts
-      every period on this team's real sprint boundaries instead of on a fortnight counted from a
-      fixed date. It changes no measurement, only where the periods begin and end. Leave either
-      blank and nothing changes, which is what the app does today.</p>
-    <p class="manage-note">On <strong>All Teams</strong> the Sprint option appears only when every
-      team shown is on the <em>same</em> cadence &mdash; same length, and starting on the same
-      days. One axis cannot honestly say &ldquo;Sprint&rdquo; over two different grids, and a bar
-      would be the back half of one team's sprint and the front half of another's.</p>
-    <!-- The tick is the only yes/no in this table, and the only control here
-         that changes a figure on a different tab, so it says which one. -->
-    <p class="manage-note"><strong>In the train's aged share</strong> decides whether this team's
-      items count towards the <strong>Predictability</strong> figure on the Scorecard. Every team
-      is in unless you untick it. Untick a team that measures its predictability another way
-      &mdash; a Scrum team watching how much of its sprint commitment it completes, say &mdash;
-      and the card says how many teams it is reading. It changes nothing on any other tab, and
-      nothing on this team's own dashboard.</p>
+    <!-- ONE LINE WHERE THERE WERE FIVE. The paragraphs that stood here explained
+         the WIP limit, the 85% target, the sprint cadence and the aged-share
+         tick — four controls that are no longer in this table, and five
+         paragraphs of prose a reader had to scroll past before reaching the
+         first team. Each explanation now sits in the section of the editor that
+         owns the control, which is where somebody reads it at the moment it
+         means something. What is left is what is true of the TABLE. -->
+    <p class="manage-note"><strong>Edit</strong> opens a team&rsquo;s own settings &mdash; its
+      <strong>WIP</strong> and <strong>85%</strong> targets, whether it runs
+      <strong>sprints</strong>, and whether it counts in the train&rsquo;s
+      <strong>aged share</strong>. Whatever a team has set is listed beside it, so the column
+      reads down the list without opening anything.</p>
     <div class="table-scroll">
       <table class="manage" id="teamTable" aria-label="Teams"><tbody id="teamRows"></tbody></table>
     </div>
@@ -4072,6 +4049,33 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <p class="hint" id="weekStartHint" style="margin-top:var(--sp-3)"></p>
   </section>
 
+  <!-- NEXT TO "YOUR WEEK" ON PURPOSE: both are calendar conventions the whole
+       company shares rather than measurements, and a sprint cadence is the same
+       KIND of fact as which day a week begins on. It sits in Settings because a
+       train IS a synchronised cadence — asking thirteen teams to type the same
+       fortnight is asking the same question thirteen times and inviting twelve
+       chances to get it wrong. Teams say whether they run sprints, one at a
+       time, in their own editor; this says what a sprint IS. -->
+  <section class="manage-sec">
+    <div class="row spread">
+      <strong class="manage-head">Our Sprint Cadence</strong>
+    </div>
+    <p class="manage-note">How long a sprint is here, and the date one of them started &mdash;
+      any one will do, and the app counts the rest off it. It measures nothing on its own: it
+      is the grid the teams that run sprints are grouped on.</p>
+    <div class="grid two pairs" style="margin-top:var(--sp-5)">
+      <div>
+        <label for="setSprintDays">A sprint is (days)</label>
+        <input type="number" id="setSprintDays" style="--digits:2" step="1" min="1" placeholder="14">
+      </div>
+      <div>
+        <label for="setSprintAnchor">One of them started on</label>
+        <input type="date" id="setSprintAnchor">
+      </div>
+    </div>
+    <p class="hint" id="sprintCadenceHint" style="margin-top:var(--sp-3)"></p>
+  </section>
+
   <section class="manage-sec">
     <div class="row spread">
       <strong class="manage-head">Working Days</strong>
@@ -4296,6 +4300,103 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
      app has already learnt twice (the settings debounce, and why wireForecast
      redraws only its own result). It is also read straight off the page by the
      CSV writer, and an <input> has no textContent for cellText to export. -->
+<!-- ══════════════════ ONE TEAM'S SETTINGS ══════════════════
+     A SECTIONED window, the shape the family's other row editors use, and it
+     SAVES AS YOU GO — there is no OK button because there is nothing to cancel:
+     every box writes through the same cleaners the table used to write through,
+     and Done just closes. That is the rule the three other editors in the family
+     follow, and the reason the table behind it can be read while this is open.
+
+     It exists because four editable cells were 717px of a 928px row (2026-09-11)
+     — see setupCell. Each section states what it changes and, where a figure is
+     involved, that it changes no measurement. -->
+<dialog id="teamDialog" aria-labelledby="teamDialogTitle">
+  <h2 id="teamDialogTitle">Team Settings</h2>
+  <p class="hint" id="teamDialogIntro"></p>
+
+  <section class="manage-sec">
+    <div class="row spread"><strong class="manage-head">Targets</strong></div>
+    <p class="manage-note"><strong>WIP &le;</strong> is how much work this team means to have
+      open at once, and <strong>85% &le;</strong> how long it means an item to take &mdash; the
+      promise the 85th percentile is read against. Both are drawn as a line on the charts and
+      neither changes a figure: they are what the figures are compared to. Leave either blank
+      and the app states the number without judging it.</p>
+    <!-- The two numbers look alike on screen and are read against different
+         work, which was reported as "are these duplicate settings?". It moved
+         here with the boxes: said where the target is typed, and again beside
+         the threshold in Settings. -->
+    <p class="manage-note"><strong>85% &le; is about work that has FINISHED</strong> &mdash; it
+      is checked against the items this team delivered. The separate
+      <strong>ageing threshold</strong> in Settings is about work that has <em>not</em>: how long
+      something can sit open before it is flagged. They are different questions, so they are
+      usually different numbers &mdash; and the threshold is normally the <strong>lower</strong>
+      of the two, because an item that has already passed your target is too late to rescue. A
+      promise of 10 days is often watched with a threshold around 6.</p>
+    <div class="grid two pairs" style="margin-top:var(--sp-5)">
+      <div>
+        <label for="teamWip">WIP &le; (items)</label>
+        <input type="number" id="teamWip" style="--digits:3" inputmode="numeric"
+               min="1" step="1" autocomplete="off">
+      </div>
+      <div>
+        <label for="teamSle" id="teamSleLabel">85% &le; (days)</label>
+        <input type="number" id="teamSle" style="--digits:3" inputmode="numeric"
+               min="1" step="1" autocomplete="off">
+      </div>
+    </div>
+  </section>
+
+  <section class="manage-sec">
+    <div class="row spread"><strong class="manage-head">Sprints</strong></div>
+    <p class="manage-note">Whether this team runs sprints, and on whose cadence. It changes no
+      measurement &mdash; only where each period begins and ends, and whether
+      <strong>Group by &rarr; Sprint</strong> is offered at all.</p>
+    <div style="margin-top:var(--sp-5)">
+      <label for="teamSprintMode">This team&rsquo;s sprints</label>
+      <select id="teamSprintMode">
+        <option value="none">Doesn&rsquo;t run sprints</option>
+        <option value="company">Our cadence &mdash; set in Settings</option>
+        <option value="own">A cadence of its own</option>
+      </select>
+    </div>
+    <!-- Shown only for "own": a length and a date on screen for a team that
+         does not run sprints would be two boxes asserting a grid nobody asked
+         for, and a reader would fill them in to find out what they did. -->
+    <div class="grid two pairs" id="teamSprintOwnWrap" style="margin-top:var(--sp-5)" hidden>
+      <div>
+        <label for="teamSprintDays">A sprint is (days)</label>
+        <input type="number" id="teamSprintDays" style="--digits:2" inputmode="numeric"
+               min="1" step="1" autocomplete="off" placeholder="14">
+      </div>
+      <div>
+        <label for="teamSprintAnchor">One of them started on</label>
+        <input type="date" id="teamSprintAnchor">
+      </div>
+    </div>
+    <p class="hint" id="teamSprintHint" style="margin-top:var(--sp-3)"></p>
+  </section>
+
+  <section class="manage-sec">
+    <div class="row spread"><strong class="manage-head">The Train&rsquo;s Aged Share</strong></div>
+    <p class="manage-note">Whether this team&rsquo;s items count towards the
+      <strong>Predictability</strong> figure on the Scorecard. Every team is in unless you
+      untick it. Untick a team that measures its predictability another way &mdash; a Scrum team
+      watching how much of its sprint commitment it completes, say &mdash; and the card says how
+      many teams it is reading. It changes nothing on any other tab, and nothing on this
+      team&rsquo;s own dashboard.</p>
+    <div style="margin-top:var(--sp-5)">
+      <label class="checkline" for="teamRollup">
+        <input type="checkbox" id="teamRollup">
+        <span>Count this team in the train&rsquo;s aged share</span>
+      </label>
+    </div>
+  </section>
+
+  <div class="row" style="justify-content:flex-end;margin-top:18px">
+    <button class="btn primary" id="teamDialogCloseBtn" type="button">Done</button>
+  </div>
+</dialog>
+
 <dialog id="itemDialog" aria-labelledby="itemTitle">
   <h2 id="itemTitle">Add a Work Item</h2>
   <p class="hint" id="itemIntro"></p>
@@ -4799,16 +4900,52 @@ const BUCKET_NOUNS = { week: 'week', fortnight: 'fortnight', month: 'month',
    half a cadence is not a cadence. A length with no anchor has no phase and an
    anchor with no length has no grid, and inventing either would put every bar
    somewhere the team does not recognise. */
-function cadenceOf(t) {
-  if (!t) return null;
-  const days = cleanSprintDays(t.sprintDays), anchor = cleanSprintAnchor(t.sprintAnchor);
-  return days && anchor ? { days: days, anchor: new Date(anchor + 'T00:00:00Z') } : null;
+/* THREE ANSWERS, NOT TWO, and the third is why `usesSprints` exists as a field
+   of its own rather than being inferred from the pair below it:
+
+     doesn't run sprints   usesSprints absent  -> null
+     runs the company's    usesSprints 1, no own pair -> settings' cadence
+     runs its own          usesSprints 1, own pair    -> the team's
+
+   Inferring "runs sprints" from "has a cadence set" would make the middle case
+   unsayable, and the middle case is the ordinary one: a train is a synchronised
+   cadence, so most teams that run sprints run the SAME one. It would also make
+   the company cadence apply to every team the moment it was typed, including the
+   seven of Charles's thirteen that are not Scrum — a grid asserted over boards
+   that have no sprints at all.
+
+   THE TICK IS AUTHORITATIVE. A team switched back to "no sprints" keeps whatever
+   override it had typed, and that override is simply not consulted — so changing
+   your mind twice does not cost you the dates you entered. */
+/* WHICH cadence, stored rather than inferred. It was briefly inferred — "has an
+   own pair" meant own, otherwise the company's — and that made the middle answer
+   UNSELECTABLE: a team that had once typed an override could never be put back
+   on the company cadence, because the moment the window re-rendered it read the
+   leftover pair and snapped the picker back to "its own" (found by driving the
+   three modes, 2026-09-11). Clearing the pair on switch would have fixed the
+   picker by throwing away dates somebody typed. Storing the answer fixes both. */
+const SPRINT_COMPANY = 1, SPRINT_OWN = 2;
+function cadenceOf(t, settings) {
+  const m = t && Number(t.usesSprints);
+  if (m === SPRINT_OWN) return pairCadence(t.sprintDays, t.sprintAnchor);
+  if (m === SPRINT_COMPANY) {
+    return settings ? pairCadence(settings.sprintDays, settings.sprintAnchor) : null;
+  }
+  return null;
+}
+
+/* A length and an anchor, or nothing — the pair rule in one place, because three
+   callers now ask it of three different objects (a team's override, the
+   company's setting, and a view carrying whichever won). */
+function pairCadence(days, anchor) {
+  const d = cleanSprintDays(days), a = cleanSprintAnchor(anchor);
+  return d && a ? { days: d, anchor: new Date(a + 'T00:00:00Z') } : null;
 }
 
 /* The same, off the view object — which is the door a per-team fact comes
    through on its way into derive(), exactly as wipLimit and sleDays do. */
 function cadenceFrom(view) {
-  return view ? cadenceOf({ sprintDays: view.sprintDays, sprintAnchor: view.sprintAnchor }) : null;
+  return view ? pairCadence(view.sprintDays, view.sprintAnchor) : null;
 }
 
 /* The ONE grid a pooled scope can honestly be cut on, or null.
@@ -4820,12 +4957,12 @@ function cadenceFrom(view) {
 
    Not a limitation. A train IS a synchronised cadence, so the case this admits
    is the case the pooled option is for. */
-function sharedCadence(teams) {
+function sharedCadence(teams, settings) {
   if (!teams || !teams.length) return null;
-  const first = cadenceOf(teams[0]);
+  const first = cadenceOf(teams[0], settings);
   if (!first) return null;
   for (let i = 1; i < teams.length; i++) {
-    const c = cadenceOf(teams[i]);
+    const c = cadenceOf(teams[i], settings);
     if (!c || c.days !== first.days) return null;
     const gap = diffDays(c.anchor, first.anchor);
     if ((((gap % first.days) + first.days) % first.days) !== 0) return null;
@@ -10566,7 +10703,7 @@ function deriveTrain(teams, settings, view, stages, statuses) {
      same phase, so "some of these teams have no cadence" and "these teams are
      on different cadences" both land on weeks — correctly, and the note above
      the charts tells the two apart. */
-  const cad = sharedCadence(teams);
+  const cad = sharedCadence(teams, settings);
   const v = Object.assign({}, view, {
     sprintDays: cad ? cad.days : null,
     sprintAnchor: cad ? isoOf(cad.anchor) : ''
@@ -10648,7 +10785,7 @@ function deriveTeams(teams, settings, view, stages, statuses) {
      option and then drew weeks, silently, because the option is decided from
      the team list and the bars from the view. The two have to be fed from one
      place, and this is it. */
-  const pooledCad = sharedCadence(list);
+  const pooledCad = sharedCadence(list, settings);
   view = Object.assign({}, view, {
     sprintDays: pooledCad ? pooledCad.days : null,
     sprintAnchor: pooledCad ? isoOf(pooledCad.anchor) : ''
@@ -10932,7 +11069,8 @@ window.TD = {
      pinned without a dialog on screen. bucketFor especially: it is the one
      thing standing between BUCKET_NOUNS and an ungated 'sprint'. */
   cleanSprintDays, cleanSprintAnchor, SPRINT_DAYS_MAX,
-  cadenceOf, cadenceFrom, sharedCadence, bucketFor, sprintStartOn,
+  cadenceOf, cadenceFrom, pairCadence, sharedCadence, bucketFor, sprintStartOn,
+  SPRINT_COMPANY, SPRINT_OWN,
   /* What counts as a usable pair of typed dates, and the local-calendar "today"
      the boxes are capped at. Both are function declarations far below this line
      and are hoisted, which is why naming them here is safe — see issueSortKey. */
@@ -11046,6 +11184,21 @@ const DEFAULT_SETTINGS = {
      would make the All Teams table a comparison of different periods, which is
      the fault the shared end date exists to prevent one level along. */
   weekStart: 0,
+  /* ── THE COMPANY'S SPRINT CADENCE ─────────────────────────────────────────
+     Here rather than on a team, and for the reason stated just above about the
+     week start: a train IS a synchronised cadence, so this is a fact about the
+     company and not about any one board. Thirteen teams typing the same
+     fortnight is the same question asked thirteen times with twelve chances to
+     disagree — and `sharedCadence` then withdraws the pooled Sprint option for
+     a reason nobody can see on screen.
+
+     NOT WHETHER A TEAM RUNS SPRINTS. That is a fact about the team and stays on
+     the team (`usesSprints`), because in a real estate only some of them do —
+     six of Charles's thirteen, which is what moved this here (2026-09-11).
+     Both null by default and read only as a pair, like every other pair in this
+     object: half a cadence has no grid. */
+  sprintDays: null,
+  sprintAnchor: '',
   cycleTimeLabel: 'Cycle Time',
   /* OFF, and it should stay off for most boards. The median and the 85th
      percentile this dashboard leads with already resist a long tail by
@@ -11534,6 +11687,17 @@ function sanitizeTeams(teams) {
                 a pair. Half of one survives this function on its own and then
                 means nothing downstream, which is the honest outcome: a length
                 with no anchor has no phase, and this app does not invent one. */
+             /* WHETHER this team runs sprints at all — the fact that stayed on
+                the team when the cadence itself moved to Settings, because only
+                some of a real estate's teams are Scrum. 1 is yes; anything else
+                is no, so a team saved before this field existed is correctly
+                read as not running them. */
+             usesSprints: (t && (Number(t.usesSprints) === SPRINT_COMPANY
+               || Number(t.usesSprints) === SPRINT_OWN)) ? Number(t.usesSprints) : null,
+             /* Its OWN cadence, when it does not run the company's — see
+                cadenceOf for why the two are separate questions. Kept even while
+                usesSprints is off, so switching a team off and on again does not
+                cost the dates somebody typed. */
              sprintDays: cleanSprintDays(t && t.sprintDays),
              sprintAnchor: cleanSprintAnchor(t && t.sprintAnchor),
              /* Whether this team's items count towards the train's aged share
@@ -11844,6 +12008,12 @@ function normalizeSettings(raw) {
   /* 0 to 6 or Sunday — see cleanWeekStart, which is shared with the readers so
      an unnormalised settings object cannot bucket differently from a saved one. */
   s.weekStart = cleanWeekStart(s.weekStart);
+  /* The company cadence, through the same two guards a team's own override goes
+     through — one function per field, shared with the readers, so a settings
+     object that arrived in a share link cannot put a bucket boundary anywhere a
+     typed one could not. */
+  s.sprintDays = cleanSprintDays(s.sprintDays);
+  s.sprintAnchor = cleanSprintAnchor(s.sprintAnchor);
   /* Three literals and nothing else. This one matters more than the scalars
      above it: settings ride into a SHARE LINK, so every field here is
      attacker-controlled, and a mode this app doesn't know would fall through
@@ -11873,7 +12043,21 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 18 added the PER-TEAM SPRINT CADENCE — `sprintDays` and
+/* SCHEMA 19 MOVED THE CADENCE TO SETTINGS and left the team saying only
+   WHETHER it runs sprints (`usesSprints`), a day after 18 put the whole thing on
+   the team. The reason is an estate, not a tidy-up: Charles has thirteen teams
+   of which six are Scrum, on one synchronised cadence. Asking thirteen boards to
+   type the same fortnight is one question asked thirteen times with twelve
+   chances to disagree — and a disagreement withdraws the pooled Sprint option
+   for a reason nobody can see. A train IS a synchronised cadence, so the cadence
+   is a fact about the company, exactly as the week start below it is.
+
+   `settings.sprintDays` + `settings.sprintAnchor` are the company's; a team may
+   still carry its own pair as an override. Neither bump is skippable: an older
+   build reading this drops the settings pair and every team falls back to weeks,
+   which is well defined but is not what the sender is looking at.
+
+   SCHEMA 18 added the PER-TEAM SPRINT CADENCE — `sprintDays` and
    `sprintAnchor`, both unset by default and read only as a pair — and
    `artPredictability`, which is 0 for a team held out of the train's aged
    share on the Scorecard and absent for every team that is in.
@@ -11926,7 +12110,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 18;
+const SCHEMA = 19;
 
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
@@ -11978,6 +12162,7 @@ function serializeState() {
          BEGINS, so a document that wrote `sprintDays: null` into a browser that
          had never heard of sprints would be a stored claim about a grid nobody
          set. Neither key until both are set. */
+      if (t.usesSprints) out.usesSprints = t.usesSprints;
       if (t.sprintDays) out.sprintDays = t.sprintDays;
       if (t.sprintAnchor) out.sprintAnchor = t.sprintAnchor;
       /* Written only when a team is OUT, which is the non-default answer. In is
@@ -15196,94 +15381,44 @@ function renderTeamRows() {
     'autocapitalize="characters" autocomplete="off" placeholder="e.g. DAE" value="' +
     escapeHtml(t.projectId || '') + '"></td>';
 
-  /* The two figures this team SETS rather than measures. Both are optional and
-     both are EMPTY by default: a limit the app picked would draw a line across
-     somebody's chart claiming they had agreed to it, so there is no placeholder
-     figure either — the visible label says what the box means, and nothing
-     inside it suggests a value already chosen.
-     The <label> is the prefix a sighted reader sees AND the accessible name, one
-     element doing both jobs, which is what keeps the two from drifting the way a
-     visible span beside an sr-only label would. It is positional like the name
-     box above — typing in this dialog deliberately does not re-render the row,
-     so a label built from the value would go stale with every keystroke. */
-  const targetCell = (t, i, kind) => {
-    const id = kind + '-of-' + t.id;
-    const isWip = kind === 'wip';
-    const value = isWip ? t.wipLimit : t.sleDays;
-    return '<td class="target"><span class="target-set">' +
-      '<label for="' + escapeHtml(id) + '">' +
-      (isWip ? 'WIP \u2264' : CYCLE_PERCENTILE + '% \u2264') + '</label>' +
-      /* BOTH boxes hold whole numbers up to 999, so both are three characters
-         and both step by one from a min of one. The target used to differ —
-         five characters for "999.5", a half-day step, a min of a tenth — and
-         the arrows walked 11.1, 11.6, 12.1, because a step counts from the min
-         rather than from zero. See cleanSleDays for why it is whole days now;
-         `min` matters as much as `step` here, and they must move together. */
-      '<input class="target" type="number" style="--digits:3"' +
-      ' inputmode="numeric" id="' + escapeHtml(id) + '"' +
-      ' data-' + (isWip ? 'wip-limit' : 'sle-days') + '="' + escapeHtml(t.id) + '"' +
-      ' min="1" max="' + TEAM_TARGET_MAX + '" step="1" autocomplete="off"' +
-      /* The accessible name has to CONTAIN the visible label — WCAG 2.5.3, so
-         somebody saying "WIP" to a voice control reaches the box in front of
-         them. Hence "WIP limit" and "85% target" rather than the fuller wording
-         that spells either of them out; what the aria-label adds beyond the
-         visible prefix is which row it belongs to, which the prefix alone cannot
-         say when three teams each have one. */
-      ' aria-label="' + (isWip ? 'WIP limit in items' : CYCLE_PERCENTILE
-        + '% cycle time target in days') + ' for team in row ' + (i + 1) + '"' +
-      ' value="' + (value == null ? '' : value) + '">' +
-      (isWip ? '' : '<span aria-hidden="true">d</span>') +
-      '</span></td>';
-  };
+  /* ── WHAT THIS TEAM HAS SET, read only ──────────────────────────────────
+     The four things a team configures — a WIP limit, an 85% target, its sprints
+     and whether it counts in the train's aged share — used to be four editable
+     cells in this row, and between them they were 717px of a row that only had
+     928px to live in. With thirteen teams the window scrolled sideways and the
+     scrollbar sat at the BOTTOM of the list, so from the top there was nothing
+     on screen to say the row continued (Charles, 2026-09-11, with a screenshot
+     of eight truncated team names).
 
-  /* ── The sprint grid: ONE cell, not two ─────────────────────────────────────
-     The length and the anchor are a single setting and must never wrap apart —
-     half a cadence does nothing at all (see cadenceOf), so a layout that could
-     put them on separate lines would be offering the reader two controls where
-     there is one. */
-  const cadenceCell = (t, i) => {
-    const dId = 'sprint-days-of-' + t.id, aId = 'sprint-from-of-' + t.id;
-    return '<td class="target cadence"><span class="target-set">' +
-      '<label for="' + escapeHtml(dId) + '">Sprint</label>' +
-      /* Two characters: SPRINT_DAYS_MAX is 56. `min="1"` with `step="1"` for
-         the reason spelled out above — a step counts from the min, and a
-         fractional min is what walked the old target's arrows off whole
-         numbers. */
-      '<input class="target" type="number" style="--digits:2"' +
-      ' inputmode="numeric" id="' + escapeHtml(dId) + '"' +
-      ' data-sprint-days="' + escapeHtml(t.id) + '"' +
-      ' min="1" max="' + SPRINT_DAYS_MAX + '" step="1" autocomplete="off"' +
-      ' aria-label="Sprint length in days for team in row ' + (i + 1) + '"' +
-      ' value="' + (t.sprintDays == null ? '' : t.sprintDays) + '">' +
-      '<span aria-hidden="true">d from</span>' +
-      /* "d from" is decoration, so the date box has NO visible label of its own
-         and takes a screen-reader one — the pattern the project id cell uses. */
-      '<label class="sr-only" for="' + escapeHtml(aId) + '">' +
-      'Date one sprint started, for team in row ' + (i + 1) + '</label>' +
-      '<input type="date" id="' + escapeHtml(aId) + '"' +
-      ' data-sprint-from="' + escapeHtml(t.id) + '" autocomplete="off"' +
-      ' value="' + escapeHtml(t.sprintAnchor || '') + '">' +
-      '</span></td>';
-  };
+     So the row states them and the editor changes them. Read-only text costs a
+     fraction of a control's width, which is what buys the name box back the
+     room it needs: "Distributed CLO (S" was not a team anybody could identify.
 
-  /* Whether this team's items count towards the train's aged share. A tick
-     rather than a number box because it is a yes/no, and the only control in
-     this table that is. */
-  const rollupCell = (t, i) => {
-    const id = 'rollup-of-' + t.id;
-    /* CARRIES ITS OWN VISIBLE LABEL, like every other control in this row and
-       for the reason the count cell's comment gives: the table has no header
-       row, so a bare tick in a column is a control with nothing on screen
-       saying what it does. The accessible name CONTAINS the visible text —
-       WCAG 2.5.3 — so "aged share" said to a voice control reaches the box in
-       front of the reader; what the aria-label adds is which row it is. */
-    return '<td class="target rollup"><span class="target-set">' +
-      '<label for="' + escapeHtml(id) + '">Aged share</label>' +
-      '<input type="checkbox" id="' + escapeHtml(id) + '"' +
-      ' data-rollup="' + escapeHtml(t.id) + '"' +
-      ' aria-label="Aged share of the train, for team in row ' + (i + 1) + '"' +
-      (t.artPredictability === 0 ? '' : ' checked') + '>' +
-      '</span></td>';
+     IT STATES ONLY WHAT IS SET. An em dash for a team with nothing configured
+     is shorter than four empty boxes and says the same thing more plainly — and
+     Charles is mid-experiment with the targets, setting them on one team and
+     clearing them again, so which teams carry one has to stay scannable down
+     the column rather than being a thing you open thirteen windows to learn. */
+  const setupCell = (t) => {
+    const bits = [];
+    if (t.wipLimit) bits.push('WIP ' + t.wipLimit);
+    if (t.sleDays) bits.push(CYCLE_PERCENTILE + '% ' + t.sleDays + 'd');
+    /* Names the GRID, not merely that sprints are on — "Sprint 14d" and
+       "Sprint 14d own" are different answers, and a reader comparing two teams
+       needs to see which is which without opening either. */
+    const cad = cadenceOf(t, state.settings);
+    if (cad) {
+      bits.push('Sprint ' + cad.days + 'd' + (t.usesSprints === SPRINT_OWN ? ' own' : ''));
+    } else if (t.usesSprints) {
+      /* Ticked on with no grid to run on — the company cadence is unset and the
+         team has no override. Said here rather than left blank, because blank
+         reads as "doesn't run sprints" and this team says it does. */
+      bits.push('Sprint \u2014 no cadence set');
+    }
+    if (t.artPredictability === 0) bits.push('out of aged share');
+    return '<td class="setup">' + (bits.length
+      ? escapeHtml(bits.join(' \u00b7 '))
+      : '<span class="setup-none">&mdash;</span>') + '</td>';
   };
 
   tb.innerHTML = '';
@@ -15295,10 +15430,13 @@ function renderTeamRows() {
         '" aria-label="Name of team, row ' + (i + 1) + '"></td>' +
       projCell(t, i) +
       artCell(t, i) +
-      targetCell(t, i, 'wip') +
-      targetCell(t, i, 'sle') +
-      cadenceCell(t, i) +
-      rollupCell(t, i) +
+      setupCell(t, i) +
+      /* Its own cell rather than a fifth glyph in rowacts: the arrows and the
+         delete are about a team's PLACE in this list, and this is about the
+         team. A word rather than a glyph because there is no header row to say
+         what a pencil would mean. */
+      '<td class="edit"><button class="btn small" data-edit-team="' + escapeHtml(t.id) + '"' +
+        ' aria-label="Settings for ' + escapeHtml(t.name) + '">Edit</button></td>' +
       /* The count carries its own noun, the way the sibling's rows do. With no
          header row there is nothing else to say what the number is. */
       '<td class="count">' + t.rows.length + (t.rows.length === 1 ? ' item' : ' items') + '</td>' +
@@ -15594,6 +15732,7 @@ function renderDashboard() {
      — which is why they are passed rather than read: derive() takes a team's
      rows, not a team, and giving it one would let it reach for anything else on
      the object. */
+  const dashCad = cadenceOf(team, state.settings);
   const d = derive(rows, state.settings,
     { filterValue: currentFilterValue(), months: view.months, bucket: view.bucket,
       customFrom: view.customFrom, customTo: view.customTo,
@@ -15624,7 +15763,11 @@ function renderDashboard() {
          anything — it is a date, and features finish on dates exactly as items
          do. Grouping a feature chart by the team's real sprints is right for
          the same reason it is right for items, so this rides in unconditionally. */
-      sprintDays: team && team.sprintDays, sprintAnchor: team && team.sprintAnchor,
+      /* RESOLVED HERE, not passed raw. A team may be running the company's
+         cadence rather than one of its own, and derive() must never have to
+         reach for `state` to find out — it takes a question, not the app. */
+      sprintDays: dashCad ? dashCad.days : null,
+      sprintAnchor: dashCad ? isoOf(dashCad.anchor) : '',
       /* The forecast's other two answers. This object is a LITERAL rather than
          the view itself — derive() takes a question, not the app's state — which
          means a field added to `view` and not added here silently never arrives.
@@ -18467,7 +18610,7 @@ function renderDataTable() {
      because this table's own comment above requires the two to name the same
      period. A team with no cadence falls to weeks here exactly as it does
      there. */
-  const tblCad = cadenceOf(activeTeam());
+  const tblCad = cadenceOf(activeTeam(), state.settings);
   const bucket = bucketFor(view.bucket, tblCad);
   const bucketHead = bucket.charAt(0).toUpperCase() + bucket.slice(1);
   /* The same day derive() buckets on. Read off the settings here rather than
@@ -18745,6 +18888,35 @@ function renderSettingsForm() {
      week ending on Saturday reads a Wednesday-to-Tuesday sprint three days
      late. It also warns about the axis, which is the visible change a reader
      would otherwise meet without explanation. */
+  /* ── The company cadence, and what it is doing for you ────────────────────
+     THE HINT COUNTS THE TEAMS, because this setting measures nothing on its own
+     and a reader who typed 14 and a date has no other way to see whether it
+     reached anything. "14 days from 7 Jan — 6 of 13 teams are on it" is the
+     whole feedback loop; a static sentence would leave a cadence set on an
+     estate where nobody had ticked a single team, silently. */
+  const csD = cleanSprintDays(state.settings.sprintDays);
+  const csA = cleanSprintAnchor(state.settings.sprintAnchor);
+  $('setSprintDays').value = csD == null ? '' : csD;
+  $('setSprintAnchor').value = csA;
+  const onIt = state.teams.filter(t => t.usesSprints === SPRINT_COMPANY).length;
+  const ownIt = state.teams.filter(t => t.usesSprints === SPRINT_OWN).length;
+  $('sprintCadenceHint').innerHTML = (csD && csA)
+    ? 'A sprint here is <strong>' + csD + ' days</strong>, counted off <strong>'
+      + prettyDate(new Date(csA + 'T00:00:00Z')) + '</strong>. '
+      + (onIt
+        ? '<strong>' + onIt + ' of ' + state.teams.length + ' teams</strong> '
+          + (onIt === 1 ? 'is' : 'are') + ' on it'
+          + (ownIt ? ', and ' + ownIt + ' ' + (ownIt === 1 ? 'runs' : 'run')
+              + ' a cadence of ' + (ownIt === 1 ? 'its' : 'their') + ' own' : '') + '. '
+        : 'No team is on it yet &mdash; open <strong>Teams &amp; Stages</strong> and set a '
+          + 'team&rsquo;s sprints to <em>Our cadence</em>. ')
+      + 'It changes no figure by itself: it is the grid <strong>Group by &rarr; Sprint</strong> '
+      + 'cuts periods on.'
+    : 'Set both and the teams you put on it gain a <strong>Sprint</strong> option under '
+      + '<strong>Group by</strong>, cutting every period on your real sprint boundaries '
+      + 'instead of on a fortnight counted from a fixed date. A length with no start date has '
+      + 'no phase, so the app reads the two only as a pair.';
+
   const wsNow = cleanWeekStart(state.settings.weekStart);
   $('setWeekStart').value = String(wsNow);
   $('weekStartHint').innerHTML =
@@ -18920,9 +19092,9 @@ function sprintOffer(tab) {
   if (tab === 'scorecard') return { cad: null, reason: null, scope: 'none' };
   if (tab === 'allteams') {
     const inScope = teamsInArts(state.teams, currentArtScope());
-    const cad = sharedCadence(inScope);
+    const cad = sharedCadence(inScope, state.settings);
     if (cad) return { cad: cad, reason: null, scope: 'pooled', teams: inScope.length };
-    const missing = inScope.filter(t => !cadenceOf(t)).length;
+    const missing = inScope.filter(t => !cadenceOf(t, state.settings)).length;
     return { cad: null, scope: 'pooled', teams: inScope.length, missing: missing,
       /* THE COUNT DECIDES WHICH SENTENCE, not a guess. All of them missing is a
          different finding from some of them missing, and both are different
@@ -18933,7 +19105,7 @@ function sprintOffer(tab) {
         : 'unaligned' };
   }
   const team = activeTeam();
-  const cad = cadenceOf(team);
+  const cad = cadenceOf(team, state.settings);
   return { cad: cad, scope: 'team', team: team,
     reason: cad ? null : (team ? 'teammissing' : 'none') };
 }
@@ -21842,31 +22014,6 @@ $('teamRows').addEventListener('input', e => {
      refused as nonsense. Neither re-renders: that would replace the input being
      typed in. The dashboard behind the dialog is redrawn on close, like every
      other change made in here. */
-  const wipOf = e.target.dataset && e.target.dataset.wipLimit;
-  const sleOf = e.target.dataset && e.target.dataset.sleDays;
-  if (wipOf || sleOf) {
-    const team = state.teams.find(t => t.id === (wipOf || sleOf));
-    if (!team) return;
-    if (wipOf) team.wipLimit = cleanWipLimit(e.target.value);
-    else team.sleDays = cleanSleDays(e.target.value);
-    save();
-    return;
-  }
-  /* The cadence, on the same rule as the two targets above: cleaned and stored
-     on every keystroke, no re-render, because renderTeamRows would replace the
-     box being typed in. The VIEWS are not redrawn here either — a half-typed
-     "1" on the way to "14" would regroup every chart in the app behind the
-     dialog. That happens on `change`, below, when the reader has finished. */
-  const sprintDaysOf = e.target.dataset && e.target.dataset.sprintDays;
-  const sprintFromOf = e.target.dataset && e.target.dataset.sprintFrom;
-  if (sprintDaysOf || sprintFromOf) {
-    const team = state.teams.find(t => t.id === (sprintDaysOf || sprintFromOf));
-    if (!team) return;
-    if (sprintDaysOf) team.sprintDays = cleanSprintDays(e.target.value);
-    else team.sprintAnchor = cleanSprintAnchor(e.target.value);
-    save();
-    return;
-  }
   const id = e.target.dataset && e.target.dataset.team;
   if (!id) return;
   const team = state.teams.find(t => t.id === id);
@@ -21885,6 +22032,148 @@ $('teamRows').addEventListener('input', e => {
    boxes use, and it DOES re-render — a picker keeps its own value across a
    render, where a text box being typed in would not, and the ART table's team
    counts and the All Teams grouping both follow immediately. */
+/* ── ONE TEAM'S SETTINGS ─────────────────────────────────────────────────────
+   Which team is open. An ID rather than the object, so a team deleted from
+   underneath this window — or a state replaced by a restore — cannot leave the
+   boxes writing into an object nothing else holds any more. */
+let teamDialogId = null;
+function openTeamDialog(id) {
+  const team = state.teams.find(t => t.id === id);
+  if (!team) return;
+  teamDialogId = id;
+  /* Names the team in the heading rather than the intro: this window is
+     modal and the row behind it is covered, so the heading is the only thing
+     on screen saying which of thirteen you are changing. */
+  $('teamDialogTitle').textContent = (team.name || 'This team').trim() + ' — Settings';
+  renderTeamDialog();
+  openModal($('teamDialog'));
+  $('teamDialog').scrollTop = 0;
+}
+
+function renderTeamDialog() {
+  const team = state.teams.find(t => t.id === teamDialogId);
+  if (!team) return;
+  $('teamWip').value = team.wipLimit == null ? '' : team.wipLimit;
+  $('teamSle').value = team.sleDays == null ? '' : team.sleDays;
+  /* The target is in whichever days the working-days switch is counting, the
+     same rule every other day label in the app follows. */
+  $('teamSleLabel').textContent = CYCLE_PERCENTILE + '% \u2264 ('
+    + (state.settings.workingDays ? 'working days' : 'days') + ')';
+  const mode = team.usesSprints === SPRINT_OWN ? 'own'
+    : team.usesSprints === SPRINT_COMPANY ? 'company' : 'none';
+  $('teamSprintMode').value = mode;
+  $('teamSprintOwnWrap').hidden = mode !== 'own';
+  $('teamSprintDays').value = team.sprintDays == null ? '' : team.sprintDays;
+  $('teamSprintAnchor').value = team.sprintAnchor || '';
+  $('teamRollup').checked = team.artPredictability !== 0;
+
+  /* WHAT THIS TEAM IS ACTUALLY ON, said as a sentence, because the select says
+     what was CHOSEN and that is not the same thing: "Our cadence" with nothing
+     set in Settings is a choice with no grid behind it, and the dashboard would
+     quietly draw weeks. The three branches are the three ways that can go. */
+  const company = pairCadence(state.settings.sprintDays, state.settings.sprintAnchor);
+  const live = cadenceOf(team, state.settings);
+  $('teamSprintHint').innerHTML = mode === 'none'
+    ? 'Periods for this team are cut on whatever <strong>Group by</strong> says &mdash; week, '
+      + '2 weeks or month. <strong>Sprint</strong> is not offered.'
+    : live
+      ? 'Its sprints are <strong>' + live.days + ' days</strong> from <strong>'
+        + prettyDate(live.anchor) + '</strong>, so <strong>Group by \u2192 Sprint</strong> cuts '
+        + 'every period on them. It changes no measurement &mdash; only where each period '
+        + 'begins and ends.'
+      : mode === 'company'
+        ? 'No company cadence is set yet, so there is nothing for this team to run on and '
+          + '<strong>Sprint</strong> is not offered. Set one under <strong>Our Sprint '
+          + 'Cadence</strong> in Settings' + (company ? '.' : ', or give this team its own.')
+        : 'A length and a start date are both needed &mdash; half a cadence has no grid, so '
+          + '<strong>Sprint</strong> is not offered until both boxes are filled.';
+}
+
+$('manageDialog').addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-edit-team]');
+  if (b) openTeamDialog(b.dataset.editTeam);
+});
+$('teamDialogCloseBtn').addEventListener('click', () => $('teamDialog').close());
+closeOnBackdropClick($('teamDialog'));
+/* The row's summary is only rebuilt when this window closes, not on every
+   keystroke inside it: renderTeamRows would be rebuilding thirteen rows behind a
+   modal nobody can see, and the summary is what the reader comes back OUT to.
+
+   WATCHED BY OBSERVER RATHER THAN BY THE `close` EVENT, and that is not
+   belt-and-braces — the event does not fire at all in the environment this app
+   is tested in (verified 2026-09-11 on a bare `document.createElement('dialog')`
+   with nothing else attached, so it is the engine and not this code). That makes
+   `close` a hook whose failure is INVISIBLE: the window shuts, the reader sees
+   the old summary beside the team they just changed, and nothing errors. An
+   attribute observer fires wherever the close came from — the Done button, the
+   backdrop, Escape, or a programmatic close — and can be driven by a test.
+
+   `manageDialog` above still uses `close`; it is long-standing, it works in
+   every real browser, and churning it is not this change's business. If it ever
+   needs the same treatment, this is the pattern.
+
+   IT RUNS ASYNCHRONOUSLY. An observer callback is a microtask, so the row is
+   still the old one on the line after close() — which is invisible to a reader
+   and a trap for a test, and the suite yields once before reading the summary. */
+new MutationObserver(() => {
+  if ($('teamDialog').open) return;
+  teamDialogId = null;
+  renderTeamRows();
+  renderTeamSelect();
+  renderBucketControl();
+  renderDataTable();
+  renderViews();
+}).observe($('teamDialog'), { attributes: true, attributeFilter: ['open'] });
+
+/* SAVES AS YOU GO — there is no OK button, so every box writes on `input` and
+   normalises on `change`, which is the family's row-editor rule. The views
+   behind this window are NOT redrawn per keystroke; the close handler above
+   does that once. */
+$('teamDialog').addEventListener('input', e => {
+  const team = state.teams.find(t => t.id === teamDialogId);
+  if (!team) return;
+  switch (e.target.id) {
+    case 'teamWip': team.wipLimit = cleanWipLimit(e.target.value); break;
+    case 'teamSle': team.sleDays = cleanSleDays(e.target.value); break;
+    case 'teamSprintDays': team.sprintDays = cleanSprintDays(e.target.value); break;
+    case 'teamSprintAnchor': team.sprintAnchor = cleanSprintAnchor(e.target.value); break;
+    default: return;
+  }
+  save();
+});
+
+$('teamDialog').addEventListener('change', e => {
+  const team = state.teams.find(t => t.id === teamDialogId);
+  if (!team) return;
+  if (e.target.id === 'teamSprintMode') {
+    /* THE OWN PAIR IS NOT CLEARED when the mode changes. A reader switching to
+       "Our cadence" to see what it does, then back, would otherwise have lost
+       the dates they typed — and cadenceOf simply does not consult them unless
+       the mode is "own", so leaving them costs nothing and no figure moves. */
+    team.usesSprints = e.target.value === 'own' ? SPRINT_OWN
+      : e.target.value === 'company' ? SPRINT_COMPANY : null;
+    save();
+    renderTeamDialog();
+    return;
+  }
+  if (e.target.id === 'teamRollup') {
+    team.artPredictability = e.target.checked ? null : 0;
+    save();
+    return;
+  }
+  /* On blur, show what was actually STORED — a box still reading 99 after 99 was
+     clamped to 56, or 8.4 after it rounded to 8, is the app disagreeing with the
+     chart it is about to draw. Then the hint is rewritten, because a cadence box
+     changes the sentence under it. */
+  switch (e.target.id) {
+    case 'teamWip': e.target.value = team.wipLimit == null ? '' : team.wipLimit; break;
+    case 'teamSle': e.target.value = team.sleDays == null ? '' : team.sleDays; break;
+    case 'teamSprintDays':
+    case 'teamSprintAnchor': renderTeamDialog(); break;
+    default: return;
+  }
+});
+
 $('teamRows').addEventListener('change', e => {
   /* On blur, show what was actually stored. Typing "dae-1" leaves the box
      holding a value the app kept nothing of, and a field that quietly disagrees
@@ -21893,49 +22182,6 @@ $('teamRows').addEventListener('change', e => {
   if (projOf) {
     const team = state.teams.find(t => t.id === projOf);
     if (team) e.target.value = team.projectId || '';
-    return;
-  }
-  /* Same treatment for the two targets: on blur the box shows what was actually
-     stored, so a typed 8.4 comes back as 8 rather than leaving a field quietly
-     disagreeing with the line on the chart. And this is where they redraw — the
-     input handler cannot, because re-rendering would take away the box being
-     typed in, and the charts behind this dialog are what the numbers are for. */
-  const wipOf = e.target.dataset && e.target.dataset.wipLimit;
-  const sleOf = e.target.dataset && e.target.dataset.sleDays;
-  if (wipOf || sleOf) {
-    const team = state.teams.find(t => t.id === (wipOf || sleOf));
-    if (!team) return;
-    const stored = wipOf ? team.wipLimit : team.sleDays;
-    e.target.value = stored == null ? '' : stored;
-    renderViews();
-    return;
-  }
-  /* The same write-back the two targets get above, and for the same reason: a
-     box still showing 99 after 99 was clamped to 56 is the app disagreeing with
-     the chart it just drew. Then BOTH renders — the views, because a cadence
-     regroups every period on screen, and the bucket control, because setting or
-     clearing one changes whether Sprint can be offered at all. */
-  const sprintDaysOf = e.target.dataset && e.target.dataset.sprintDays;
-  const sprintFromOf = e.target.dataset && e.target.dataset.sprintFrom;
-  if (sprintDaysOf || sprintFromOf) {
-    const team = state.teams.find(t => t.id === (sprintDaysOf || sprintFromOf));
-    if (!team) return;
-    if (sprintDaysOf) e.target.value = team.sprintDays == null ? '' : team.sprintDays;
-    else e.target.value = team.sprintAnchor || '';
-    renderBucketControl();
-    renderViews();
-    return;
-  }
-  /* The aged-share opt-out. A tick fires `change` and not `input`, so it is
-     only here — and it redraws the Scorecard rather than the dashboard, because
-     that is the one page it moves a figure on. */
-  const rollupOf = e.target.dataset && e.target.dataset.rollup;
-  if (rollupOf) {
-    const team = state.teams.find(t => t.id === rollupOf);
-    if (!team) return;
-    team.artPredictability = e.target.checked ? null : 0;
-    save();
-    renderViews();
     return;
   }
   const id = e.target.dataset && e.target.dataset.artOf;
@@ -22383,6 +22629,23 @@ $('setWeekStart').addEventListener('change', e => {
   renderSettingsForm();
   renderDataTable();
   renderViews();
+});
+
+/* Both halves of the company cadence, on `change` rather than `input`: a
+   half-typed "1" on the way to "14" would regroup every chart in the app behind
+   the dialog. Like the week start above it, this moves BUCKET BOUNDARIES rather
+   than a figure inside them, so everything is rebuilt — and the form is written
+   again because its hint counts the teams the cadence reaches. */
+['setSprintDays', 'setSprintAnchor'].forEach(id => {
+  $(id).addEventListener('change', e => {
+    if (id === 'setSprintDays') state.settings.sprintDays = cleanSprintDays(e.target.value);
+    else state.settings.sprintAnchor = cleanSprintAnchor(e.target.value);
+    save();
+    renderSettingsForm();
+    renderBucketControl();
+    renderDataTable();
+    renderViews();
+  });
 });
 
 $('setWorkingDays').addEventListener('change', e => {
@@ -23257,6 +23520,7 @@ function buildSharePayload(teamIds, win) {
        SHARE_PAYLOAD_V is NOT bumped, matching ARTs, keys, stages and the two
        targets: an older cached build drops both fields, never offers the Sprint
        option and draws weeks — a well-defined grouping, gracefully. */
+    if (t.usesSprints) out.usesSprints = t.usesSprints;
     if (t.sprintDays) out.sprintDays = t.sprintDays;
     if (t.sprintAnchor) out.sprintAnchor = t.sprintAnchor;
     /* And the opt-out, for the plainest reason of the three: dropping it would
@@ -23926,6 +24190,10 @@ window.TDCleanup = { historyAnchor, outsideWindow, windowCutoff };
    14-day grid laid on a Sunday lands on the week boundaries a reader comparing
    Sprint against 2 weeks would expect. A year back is far enough to cover the
    longest profile's 40 weeks. */
+/* Two weeks — the cadence the sibling app is built around (SPRINTS_PER_PI = 6,
+   six of these to a PI) and the one most of a SAFe train runs. */
+const DEMO_SPRINT_DAYS = 14;
+
 function sprintAnchorFor(days) {
   const today = new Date(todayLocalISO() + 'T00:00:00Z');
   const sunday = priorSunday(today);
@@ -23953,13 +24221,12 @@ const DEMO_TEAMS = [
        it, because the demo is regenerated against today's date every time it is
        loaded and a figure that only just passes would eventually not. */
     wipLimit: 6, sleDays: 10,
-    /* A TWO-WEEK CADENCE, shared with Team Long Tail below so the two of them —
-       the demo's only train — line up and the pooled Sprint option on All Teams
-       is reachable from a fresh load. The anchor is computed rather than typed,
-       for the same reason every date in this file is: the demo regenerates
-       against today, and a literal that lands on a sprint boundary this month
-       would stop doing so next month. See sprintAnchorFor. */
-    sprintDays: 14,
+    /* RUNS SPRINTS, on the company cadence written into settings below — which
+       Team Long Tail also runs, so the two of them (the demo's only train) share
+       a grid without either carrying a date of its own. That is the ordinary
+       shape of a train and so the one the demo should teach; a team with an
+       override would teach the exception. */
+    sprints: true,
     /* Where Team Healthy Flow's time goes: mostly into building the thing. That is what
        a healthy board looks like, and it is the reading Team Long Tail's has to be
        compared against for either to mean anything. The headings are the Jira
@@ -23992,11 +24259,11 @@ const DEMO_TEAMS = [
        both charts say the same thing the tiles do — and a reader who has looked
        at Team Healthy Flow first has something to compare it with. */
     wipLimit: 6, sleDays: 10,
-    /* The SAME length and, through sprintAnchorFor, the same anchor as Team
-       Healthy Flow. Identical by construction rather than by two literals that
-       happen to agree — sharedCadence checks the phase, and two typed dates
-       would be one edit away from silently withdrawing the pooled option. */
-    sprintDays: 14,
+    /* On the same company cadence as Team Healthy Flow — identical by
+       construction rather than by two literals that happen to agree, which is
+       what keeps sharedCadence's phase check satisfied without anybody
+       maintaining two dates in step. */
+    sprints: true,
     /* Team Long Tail's whole story in one row of the table: barely a third of its time is
        spent building, and more than half of it is spent waiting to be reviewed
        or waiting to be tested. That is the finding the feature exists to
@@ -24559,6 +24826,15 @@ function loadSample() {
      All Teams column — to show one empty card. The empty card is one cleared
      box away; the other four are not. */
   if (state.settings.featureAgedDays == null) state.settings.featureAgedDays = DEMO_FEATURE_AGED;
+  /* THE COMPANY CADENCE the demo's two train teams run on. Set only when the
+     reader has not set one — the same "don't overwrite a real answer" rule the
+     thresholds below follow — and the anchor is COMPUTED rather than typed,
+     because the demo regenerates against today on every load and a literal that
+     lands on a sprint boundary this month stops doing so next month. */
+  if (state.settings.sprintDays == null && !state.settings.sprintAnchor) {
+    state.settings.sprintDays = DEMO_SPRINT_DAYS;
+    state.settings.sprintAnchor = sprintAnchorFor(DEMO_SPRINT_DAYS);
+  }
 
   /* Both or neither, and ONLY when the reader has answered neither. Setting one
      of a pair the reader had half-drawn would be the demo finishing a line
@@ -24609,11 +24885,13 @@ function loadSample() {
                       team is the same shape sanitizeTeams builds. */
                    wipLimit: profile.wipLimit || null,
                    sleDays: profile.sleDays || null,
-                   sprintDays: profile.sprintDays || null,
-                   /* ONE anchor for the whole demo, so the two cadenced teams
-                      share a phase by construction. A team with no sprintDays
-                      gets no anchor either — half a cadence is not one. */
-                   sprintAnchor: profile.sprintDays ? sprintAnchorFor(profile.sprintDays) : '',
+                   /* ON THE COMPANY CADENCE, not carrying one of their own —
+                      which is the ordinary answer and therefore the one the demo
+                      should teach. The cadence itself is written into settings
+                      below; these two teams just say they run sprints, so they
+                      share a grid BY CONSTRUCTION and the pooled Sprint option
+                      on All Teams is reachable from a fresh load. */
+                   usesSprints: profile.sprints ? SPRINT_COMPANY : null,
                    artPredictability: profile.artPredictability === 0 ? 0 : null,
                    rows: parsed.rows,
                    /* Team Bare Export has no feature quotas and so no feature
