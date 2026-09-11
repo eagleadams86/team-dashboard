@@ -402,7 +402,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. */
-const EXPECTED = 3928;
+const EXPECTED = 3929;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8796,8 +8796,18 @@ group('ARTs — the grouping, and the boundary it crosses');
     const fDoc = win.document;
     plant({ teams: [{ id: 'f1', name: 'One', rows: [] }], settings: {} });
     fDoc.getElementById('manageBtn').click();
+    /* ASK WHAT IS ON SCREEN, not just what the attribute says. The sibling's
+       copy of this check read only the property and passed the whole time while
+       all three of its buttons sat visible over empty lists: `.row` sets
+       `display: flex` at the same specificity as the UA's `[hidden]` rule, so
+       the attribute did nothing. THIS app is safe — it carries a global
+       `[hidden] { display: none !important }` — and that is exactly the kind of
+       thing a test should state rather than a reader assume. */
+    const fShown = (el) => win.getComputedStyle(el).display !== 'none';
+    is(fShown(fDoc.getElementById('btnAddTeamFootRow')), false,
+       'one team does not earn a second Add button — and it is not ON SCREEN');
     is(fDoc.getElementById('btnAddTeamFootRow').hidden, true,
-       'one team does not earn a second Add button');
+       'with the attribute agreeing');
     ok(!fDoc.getElementById('btnAddTeam').closest('#btnAddTeamFootRow'),
        'and the heading-row one is still the heading-row one');
 
@@ -8810,7 +8820,7 @@ group('ARTs — the grouping, and the boundary it crosses');
     for (let i = 0; i < TD.ADD_FOOT_FROM; i++) many.push({ id: 'f' + i, name: 'T' + i, rows: [] });
     plant({ teams: many, settings: {} });
     fDoc.getElementById('manageBtn').click();
-    is(fDoc.getElementById('btnAddTeamFootRow').hidden, false,
+    is(fShown(fDoc.getElementById('btnAddTeamFootRow')), true,
        'a list at the threshold does — the top of it can no longer be seen from the bottom');
     is(fDoc.getElementById('btnAddTeam').hidden, false,
        'and the heading-row button is still there, because it is the one that names the section');
