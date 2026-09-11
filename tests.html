@@ -402,7 +402,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. */
-const EXPECTED = 3800;
+const EXPECTED = 3860;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -542,6 +542,157 @@ async function run(TD, win) {
     if (TD.bucketLabel(TD.bucketStart(d, 'week'), 'week') !== TD.weekKey(TD.priorSunday(d))) weekDrift++;
   }
   is(weekDrift, 0, "the 'week' bucket is priorSunday/weekKey exactly, over 400 consecutive days");
+
+  /* ══════════════════════════════════════════════════════════
+     THE SPRINT GRID — a team's own cadence, counted off its own anchor.
+     Unlike every other bucket it needs a FACT as well as a name, so the first
+     thing pinned here is the gate that enforces that: membership of
+     BUCKET_NOUNS is no longer a sufficient check, and a build that went back to
+     `BUCKET_NOUNS[x] ? x : 'week'` would pass every other test in this file.
+     ══════════════════════════════════════════════════════════ */
+  group('sprint buckets — a grid of a team’s own');
+
+  const CAD = { days: 14, anchor: D(2026, 1, 7) };            /* a Wednesday */
+  const sbs = (y, m, d, cad) => iso(TD.bucketStart(D(y, m, d), 'sprint', 0, cad || CAD));
+
+  /* THE GATE. A sprint asked for without a cadence is a WEEK — the app's own
+     default — and never a fortnight, which is the nearest-looking option and
+     would be a ten-day sprint's figures under a fourteen-day heading. */
+  is(TD.bucketFor('sprint', null), 'week', 'a sprint with no cadence falls back to week');
+  is(TD.bucketFor('sprint', CAD), 'sprint', 'and is honoured with one');
+  is(TD.bucketFor('fortnight', null), 'fortnight', 'every other bucket is unaffected by the gate');
+  is(TD.bucketFor('wat', CAD), 'week', 'and a bucket that is not a bucket is still a week');
+  /* Without a cadence the maths must not run at all, whatever was asked for. */
+  is(iso(TD.bucketStart(D(2026, 3, 4), 'sprint', 0)), '2026-03-01',
+     'bucketStart with no cadence behaves as a week, not as a sprint');
+
+  is(sbs(2026, 1, 7), '2026-01-07', 'the anchor day starts its own sprint');
+  is(sbs(2026, 1, 20), '2026-01-07', 'the last day of that sprint is still in it');
+  is(sbs(2026, 1, 21), '2026-01-21', 'and the next day starts the next one');
+
+  /* THE SIGN TRAP, and the reason sprintStartOn uses Math.floor. The anchor is
+     "any one sprint" and a person types a RECENT one, so most of a board's
+     history sits before it — a truncating divide would step every pre-anchor
+     date forward into the sprint after its own, silently. */
+  is(sbs(2026, 1, 6), '2025-12-24', 'the day before the anchor is in the PREVIOUS sprint');
+  is(sbs(2025, 12, 24), '2025-12-24', 'which begins exactly one cadence back');
+  /* 364 days is 26 whole sprints, so this one lands exactly on the anchor's own
+     day of the week — and 365 does NOT, which is the point of pinning both. */
+  is(sbs(2025, 1, 8), '2025-01-08', 'a date a whole 26 sprints before lands on the anchor day');
+  is(sbs(2025, 1, 7), '2024-12-25', 'while one day earlier belongs to the sprint before it');
+
+  /* THE PROPERTY, rather than a literal, for the deep past: whatever the grid
+     returns must be a whole number of cadences from the anchor. A literal here
+     would only pin one date; this pins the arithmetic over two years of them,
+     on both sides of the anchor, which is where a sign bug lives. */
+  const daysApart = (a, b) => Math.round((a.getTime() - b.getTime()) / 86400000);
+  let offGrid = 0;
+  for (let i = -730; i <= 730; i++) {
+    const d = TD.utcDate(2026, 1, 7); d.setUTCDate(d.getUTCDate() + i);
+    if (daysApart(TD.bucketStart(d, 'sprint', 0, CAD), CAD.anchor) % CAD.days !== 0) offGrid++;
+  }
+  is(offGrid, 0, 'every sprint start over two years either side of the anchor is a whole cadence from it');
+
+  /* Lengths that are NOT whole weeks — the case whole-week arithmetic could not
+     express, and the reason the unit is days. */
+  const CAD10 = { days: 10, anchor: D(2026, 1, 7) };
+  is(sbs(2026, 1, 16, CAD10), '2026-01-07', 'a 10-day sprint holds its 10th day');
+  is(sbs(2026, 1, 17, CAD10), '2026-01-17', 'and ends after exactly ten');
+  is(sbs(2026, 1, 6, CAD10), '2025-12-28', 'a 10-day grid steps backwards correctly too');
+
+  /* The week start governs weeks and fortnights; a sprint carries its phase in
+     its own anchor and must be untouched by it. */
+  let wsDrift = 0;
+  for (let i = 0; i < 200; i++) {
+    const d = TD.utcDate(2026, 1, 1); d.setUTCDate(d.getUTCDate() + i);
+    for (let ws = 0; ws < 7; ws++) {
+      if (iso(TD.bucketStart(d, 'sprint', ws, CAD)) !== iso(TD.bucketStart(d, 'sprint', 0, CAD))) wsDrift++;
+    }
+  }
+  is(wsDrift, 0, 'the week-start setting does not move a sprint boundary, over 200 days × 7 starts');
+
+  /* The three properties every bucket must have, over 3000 consecutive days —
+     the same shape the week/fortnight/month property tests use. */
+  let sprintDrift = 0;
+  for (let i = 0; i < 3000; i++) {
+    const d = TD.utcDate(2020, 1, 1); d.setUTCDate(d.getUTCDate() + i);
+    const b = TD.bucketStart(d, 'sprint', 0, CAD);
+    if (iso(TD.bucketStart(b, 'sprint', 0, CAD)) !== iso(b)) sprintDrift++;          /* stable */
+    if (b > d) sprintDrift++;                                                        /* contains */
+    if (daysApart(d, b) >= CAD.days) sprintDrift++;                                  /* and only its own */
+    const end = TD.bucketEnd(b, 'sprint', CAD);
+    const next = TD.nextBucket(b, 'sprint', CAD);
+    if (daysApart(next, end) !== 1) sprintDrift++;                                   /* end + 1 = next */
+  }
+  is(sprintDrift, 0, 'a sprint bucket is stable, contains its date, and ends the day before the next');
+
+  /* KEYED AND LABELLED BY ITS OWN START DAY, with the year. It cannot borrow
+     weekKey: two sprints fit inside one week whenever a cadence is under seven
+     days, and both would land on one key — a bucket's items added to the one
+     before it. */
+  is(TD.bucketKey(D(2026, 1, 7), 'sprint', 0, CAD), '2026-01-07', 'a sprint keys off its start day');
+  is(TD.bucketLabel(D(2026, 1, 7), 'sprint', 0, CAD), '2026-01-07', 'and is labelled the same way');
+  const CAD3 = { days: 3, anchor: D(2026, 1, 7) };
+  ok(TD.bucketKey(TD.bucketStart(D(2026, 1, 8), 'sprint', 0, CAD3), 'sprint', 0, CAD3)
+     !== TD.bucketKey(TD.bucketStart(D(2026, 1, 11), 'sprint', 0, CAD3), 'sprint', 0, CAD3),
+     'two sprints inside one week get two different keys');
+
+  /* ── The pair rule, and the pooled rule ─────────────────────────────────── */
+  group('cadence — read as a pair, pooled only when genuinely shared');
+
+  is(TD.cadenceOf({ sprintDays: 14, sprintAnchor: '2026-01-07' }).days, 14, 'both fields make a cadence');
+  is(TD.cadenceOf({ sprintDays: 14 }), null, 'a length with no anchor is not one');
+  is(TD.cadenceOf({ sprintAnchor: '2026-01-07' }), null, 'and neither is an anchor with no length');
+  is(TD.cadenceOf({}), null, 'a team that set neither has none');
+  is(TD.cadenceOf(null), null, 'and neither does no team at all');
+
+  const team = (d, a) => ({ sprintDays: d, sprintAnchor: a });
+  is(TD.sharedCadence([team(14, '2026-01-07'), team(14, '2026-01-07')]).days, 14,
+     'two teams on the same grid share it');
+  is(TD.sharedCadence([team(14, '2026-01-07'), team(14, '2026-01-21')]).days, 14,
+     'anchors a WHOLE NUMBER of sprints apart are the same grid, not two');
+  is(TD.sharedCadence([team(14, '2026-01-07'), team(14, '2026-01-14')]), null,
+     'but half a cadence apart is two grids — a bar would straddle both');
+  is(TD.sharedCadence([team(14, '2026-01-07'), team(21, '2026-01-07')]), null,
+     'same anchor, different length is not shared either');
+  is(TD.sharedCadence([team(14, '2026-01-07'), team(null, '')]), null,
+     'one team without a cadence withdraws it for all of them');
+  is(TD.sharedCadence([]), null, 'an empty scope shares nothing');
+  is(TD.sharedCadence(null), null, 'and neither does no scope at all');
+  /* The anchor before the first team's, which is where a sign bug would hide. */
+  is(TD.sharedCadence([team(14, '2026-01-21'), team(14, '2026-01-07')]).days, 14,
+     'the phase check works whichever team is listed first');
+
+  /* ── The two guards ─────────────────────────────────────────────────────── */
+  group('sprint cadence — what a hand-edited copy can store');
+
+  const SPD = TD.cleanSprintDays, SPA = TD.cleanSprintAnchor;
+
+  is(SPD(14), 14, 'a plain length passes');
+  is(SPD('14'), 14, 'and so does the string a box hands over');
+  is(SPD(14.4), 14, 'a fraction is ROUNDED, not refused — 14 is the honest reading of it');
+  is(SPD(1), 1, 'a one-day cadence is a real, if unusual, answer');
+  is(SPD(TD.SPRINT_DAYS_MAX), TD.SPRINT_DAYS_MAX, 'the stated maximum passes');
+  is(SPD(999), TD.SPRINT_DAYS_MAX, 'and past it is clamped, not dropped');
+  /* Number(null) is 0, which is why the guard is `> 0` and not `>= 0`: a zero
+     length is an infinite loop in every axis walk in the app. */
+  is(SPD(0), null, 'zero days is not a cadence');
+  is(SPD(null), null, 'Number(null) is 0 and must not arrive here as a zero-day sprint');
+  is(SPD(undefined), null, 'nor undefined');
+  is(SPD(true), null, 'a boolean is not an opinion about a one-day sprint');
+  is(SPD([14]), null, 'and neither is an array that happens to coerce');
+  is(SPD('wat'), null, 'text is not a length');
+  is(SPD(-14), null, 'and neither is a negative one');
+
+  is(SPA('2026-01-07'), '2026-01-07', 'an ISO day passes');
+  is(SPA('2026-02-31'), '', 'a date-SHAPED string that is not a date does not — only the calendar knows');
+  is(SPA('7 Jan 2026'), '', 'a human spelling is refused at a storage boundary, where parseDate is not');
+  is(SPA('2026-1-7'), '', 'and so is an unpadded one — the shape is exact');
+  is(SPA('"><script>'), '', 'markup cannot pass the shape at all');
+  is(SPA(5), '', 'a number is not a date');
+  is(SPA(true), '', 'nor a boolean');
+  is(SPA(null), '', 'nor nothing');
+  is(SPA(''), '', 'and an empty box is simply no anchor');
 
   /* New Year: the week containing 2 Jan 2025 is week 1 of 2025 — the README's
      rule, and what weekKey(1 Jan) already said. Keyed off its Sunday it used to
@@ -1736,7 +1887,7 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 17, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 18, 'SCHEMA was bumped in the same commit as the whitelist widening');
 
 
   /* ══════════════════════════════════════════════════════════
@@ -4256,7 +4407,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 17, 'the schema marker is 17 — the version that added which day a week starts on');
+  is(St.SCHEMA, 18, 'the schema marker is 18 — the version that added the per-team sprint cadence');
 
 
   /* ────────────────────────────────────────────────────────── */
@@ -4549,9 +4700,10 @@ async function run(TD, win) {
   group('features at the storage boundary');
   {
     const S4 = win.TDState;
-    is(S4.SCHEMA, 17, 'the feature layer took the schema to 12, the feature ageing '
+    is(S4.SCHEMA, 18, 'the feature layer took the schema to 12, the feature ageing '
        + 'threshold to 13, the status vocabulary to 14, the aged share boundaries to 15, '
-       + 'the Scorecard\u2019s other four to 16 and the week start to 17');
+       + 'the Scorecard\u2019s other four to 16, the week start to 17 and the sprint '
+       + 'cadence to 18');
 
     const t = S4.sanitizeTeams([{ id: 'a', name: 'X', rows: [],
       features: [{ c: '2026-01-12', s: '2026-01-06', t: 'Feature', i: 'DAE-1' }] }])[0];
@@ -5829,6 +5981,31 @@ async function run(TD, win) {
   is(Sh.buildSharePayload([]).teams, [], 'choosing nothing shares nothing');
   is(sp.from, undefined, 'no window means no `from` — the payload is byte-identical to before');
 
+  /* THE CADENCE TRAVELS, and the opt-out with it. Both change a FIGURE the
+     recipient reads — the cadence decides where every bar is, and the opt-out
+     decides who is behind the Scorecard's first number — so a link that dropped
+     either would show a different set of numbers under the same headings. That
+     is a wrong figure, not graceful degradation, which is the line the project
+     id sits on the other side of. */
+  plant({
+    teams: [
+      { id: 'team-c', name: 'Cadenced', projectId: 'CAD', rows: [],
+        sprintDays: 14, sprintAnchor: '2026-01-07', artPredictability: 0 },
+      { id: 'team-d', name: 'Plain', rows: [] }
+    ]
+  });
+  const spCad = Sh.buildSharePayload(['team-c', 'team-d']);
+  const spCadT = spCad.teams.find(t => t.id === 'team-c');
+  const spPlainT = spCad.teams.find(t => t.id === 'team-d');
+  is(spCadT.sprintDays, 14, 'a shared team carries its sprint length');
+  is(spCadT.sprintAnchor, '2026-01-07', 'and its anchor — the recipient must see the same sprints');
+  is(spCadT.artPredictability, 0, 'and whether it counts in the train\u2019s aged share');
+  is(spCadT.projectId, undefined, 'while the project id still does NOT travel — it routes a paste, '
+     + 'it does not draw a figure');
+  is(spPlainT.sprintDays, undefined, 'a team with no cadence writes no key at all');
+  is(spPlainT.artPredictability, undefined, 'and a team that is in the roll-up writes nothing either');
+  is(spCad.v, 1, 'SHARE_PAYLOAD_V is NOT bumped — an older build drops the fields and draws weeks');
+
   /* A link carries only the trains its own teams are actually on. Sharing one
      team should not publish the names of every train someone supports — a link
      is the one place this app's data leaves the browser, and an ART name is the
@@ -6990,8 +7167,17 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', artId: '"><script>', rows: [] }])[0].artId,
      null, 'a hostile pointer is dropped, not swapped for a fresh id');
   is(Object.keys(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', rows: [] }])[0]).sort(),
-     ['artId', 'features', 'id', 'name', 'projectId', 'rows', 'sleDays', 'wipLimit'],
+     ['artId', 'artPredictability', 'features', 'id', 'name', 'projectId', 'rows',
+      'sleDays', 'sprintAnchor', 'sprintDays', 'wipLimit'],
      'and every team carries the field, set or not');
+  /* THE POINT OF THE LIST ABOVE, said as its own check: a field that is not in
+     sanitizeTeams' returned literal does not survive the door, whatever wrote
+     it. This is the test that fails loudly when somebody adds a stored field
+     and forgets the allowlist — which is the failure mode the whole
+     numbers-and-dates rule rests on not happening quietly. */
+  is(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', rows: [], notes: 'free text',
+                                  sprintNotes: 'also free text' }])[0].notes,
+     undefined, 'a field nobody allowed does not survive, however plausible its name');
 
   /* ══════════════════════════════════════════════════════════
      The project id — a team's address, and the only thing that can say which
@@ -7364,7 +7550,53 @@ group('ARTs — the grouping, and the boundary it crosses');
      that are per TEAM where every other setting is shared — so the boundary,
      the not-set default and the readings taken against them are all pinned.
      ══════════════════════════════════════════════════════════ */
+
+
   group('a team’s own limit and target — the boundary');
+
+  /* ── The cadence boxes and the roll-up tick, driven as a person drives them ─
+     THROUGH THE DOM, not by calling the cleaners: the guards are pinned above,
+     and what this pins is the WIRING — that the box is found, the value stored,
+     and a clamped entry written back so the box cannot go on showing a number
+     the charts were not drawn with. */
+  {
+    plant({ teams: [{ id: 'c1', name: 'Alpha', rows: [] }], settings: {} });
+    appDoc.getElementById('manageBtn').click();
+    const dBox = appDoc.querySelector('[data-sprint-days="c1"]');
+    const aBox = appDoc.querySelector('[data-sprint-from="c1"]');
+    const tick = appDoc.querySelector('[data-rollup="c1"]');
+    ok(dBox && aBox && tick, 'every team row carries a sprint length, an anchor and a roll-up tick');
+    is(dBox.getAttribute('min'), '1', 'the length box has a whole-number min');
+    is(dBox.getAttribute('step'), '1', 'and steps by one from it — a step counts from the min');
+    is(tick.checked, true, 'a team nobody has ticked out is IN the roll-up');
+
+    dBox.value = '14';
+    dBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+    is(win.tdGet().teams[0].sprintDays, 14, 'typing a length stores it');
+    is(win.tdGet().teams[0].sprintAnchor, undefined,
+       'half a cadence writes no anchor — and the grid is not yet a grid');
+
+    aBox.value = '2026-01-07';
+    aBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+    is(win.tdGet().teams[0].sprintAnchor, '2026-01-07', 'and the anchor completes it');
+
+    /* Past the ceiling, written back so the box agrees with what was stored. */
+    dBox.value = '999';
+    dBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+    dBox.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.tdGet().teams[0].sprintDays, TD.SPRINT_DAYS_MAX, 'a huge length is clamped');
+    is(dBox.value, String(TD.SPRINT_DAYS_MAX),
+       'and the box is rewritten, so it cannot show a number the charts were not drawn with');
+
+    tick.checked = false;
+    tick.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.tdGet().teams[0].artPredictability, 0, 'unticking holds the team out of the aged share');
+    tick.checked = true;
+    tick.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.tdGet().teams[0].artPredictability, undefined,
+       'and ticking it back writes no key at all — in is the absence of the field');
+    appDoc.getElementById('manageDialog').close();
+  }
 
   /* Not set is the DEFAULT and has to stay so: a limit the app picked would draw
      a line on somebody's chart claiming they had agreed to it. Everything that
@@ -8490,17 +8722,20 @@ group('ARTs — the grouping, and the boundary it crosses');
   const teamRow = win.document.querySelector('#teamRows tr');
   is(teamRow.querySelector('.count').textContent, '1 item',
      'a count carries its own noun, singular when it should be');
-  /* Name, project id, the two targets, count, actions. All four boxes are
-     present from the first team — unlike the ART picker below them, which needs
-     an ART to exist before it can offer anything. */
-  is(teamRow.cells.length, 6, 'and there is no ART cell until an ART exists');
+  /* Name, project id, the two targets, the sprint cadence, the aged-share tick,
+     count, actions. Every box is present from the first team — unlike the ART
+     picker below them, which needs an ART to exist before it can offer
+     anything. The cadence and the tick joined the row on 2026-09-11; the count
+     here is what makes a cell quietly disappearing a failure rather than a
+     shrug. */
+  is(teamRow.cells.length, 8, 'and there is no ART cell until an ART exists');
   ok(teamRow.querySelector('input.projid'),
      'while the project id box is there from the first team — it is typed in, not chosen');
 
   plant({ arts: [{ id: 'ax', name: 'Delivery' }],
           teams: [{ id: 'z1', name: 'Zephyr', artId: 'ax', rows: [] },
                   { id: 'z2', name: 'Zither', rows: [] }], settings: {} });
-  is(win.document.querySelector('#teamRows tr').cells.length, 7,
+  is(win.document.querySelector('#teamRows tr').cells.length, 9,
      'the ART cell appears the moment there is a train to choose');
   is(win.document.querySelector('#artRows .count').textContent, '1 team',
      'and an ART states how many teams are on it, in its own words');
@@ -11589,7 +11824,35 @@ group('ARTs — the grouping, and the boundary it crosses');
     fkBoxes()[1].dispatchEvent(new win.Event('change', { bubbles: true }));
     is(fkMenu.hidden, false, 'a tick that rebuilds the menu leaves it open');
     is(fkDoc.activeElement && fkDoc.activeElement.dataset.artPick, 'fk2', 'with focus back on the ticked box');
-    fkDoc.getElementById('monthsSel').focus();
+    /* ── THE FRAME MAY NOT HOLD THE BROWSER'S FOCUS ────────────────────────
+       Every other check in this file reads state; these two read what the
+       BROWSER does when focus moves, and that is the one thing a hidden test
+       frame cannot be relied on to do. A frame the browser does not consider
+       focused sets document.activeElement from a .focus() call and dispatches
+       NO focusin/focusout at all — so the handler under test never runs, the
+       menu stays open, and the failure looks exactly like a broken handler.
+
+       IT IS ORDER-DEPENDENT, WHICH IS WHY IT HID FOR SO LONG (found 2026-09-11,
+       while adding the sprint cadence). The frame holds focus while the suite is
+       short and loses it once enough has run ahead of this point — ANY work will
+       do it, and two hundred `ok(true)` no-ops planted above reproduce these two
+       failures exactly, against an untouched index.html. So a contributor adding
+       unrelated checks earlier in the file would see these two go red and hunt
+       through their own change for a fault that was never there.
+
+       So the focusout is dispatched here when the browser will not dispatch it,
+       with the relatedTarget the browser would have carried. What is under test
+       is the app's RULE — focus leaving the field closes the menu, focus moving
+       inside it does not — and that rule is in the handler, not in the focus
+       machinery. When the frame does hold focus the real event fires too and
+       closeArtMenu simply runs twice, which is idempotent. */
+    const fkPrev = fkDoc.activeElement;
+    const fkTo = fkDoc.getElementById('monthsSel');
+    const fkHadFocus = fkDoc.hasFocus();
+    fkTo.focus();
+    if (!fkHadFocus && fkPrev) {
+      fkPrev.dispatchEvent(new win.FocusEvent('focusout', { bubbles: true, relatedTarget: fkTo }));
+    }
     is(fkMenu.hidden, true, 'focus leaving the field for the page below closes it');
     is(fkBtn.getAttribute('aria-expanded'), 'false', 'and the button says so');
     is(fkDoc.activeElement, fkDoc.getElementById('monthsSel'),

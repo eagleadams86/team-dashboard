@@ -11,6 +11,64 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## Per-Team Sprint Cadence, and the Aged-Share Opt-Out (2026-09-11) — SCHEMA 17 → 18
+
+Charles asked whether Flow Metrics is useful to Scrum teams, and whether a "Scrum team" flag
+should hide the cards that don't apply. **The audit said no, and the flag was not built.** Going
+card by card, only three things in the app are Kanban-specific — the `WIP ≤` line, the `85% ≤`
+SLE verdict and the Time in Stage table — and all three are already per-team, null by default and
+silent when unset. A switch for something already switched off. Everything else is board
+arithmetic off `started`/`completed`/`created`/`type`/`parentKey`, which a Scrum team's export
+carries too. **Do not re-propose the hiding flag** without new evidence; the reasoning is here.
+
+What was genuinely wrong was the BUCKET. The fortnight is counted from `FORTNIGHT_EPOCH`
+(4 Jan 1970), so for a two-week team it lands half a sprint out and every bar straddles two
+sprints — a wrong number wearing a familiar label. Hence `sprintDays` + `sprintAnchor` per team,
+read ONLY as a pair (`cadenceOf`), and a fourth `Group by` option.
+
+- **A sprint grid is NOT a generalised fortnight.** The fortnight snaps through `weekStartOn`,
+  which is why its comment insists the parity anchor moves with the week start. A sprint counts
+  whole days off its own anchor and never touches the week start at all — so the anchor carries
+  both length and phase, and a 10-day cadence is expressible where whole weeks could not say it.
+  `sprintStartOn` uses `Math.floor`, not a truncating divide: a typed anchor is recent, so most
+  of a board sits BEFORE it, and truncation steps every pre-anchor date forward a sprint.
+- **`BUCKET_NOUNS` IS NO LONGER A SUFFICIENT GATE.** `BUCKET_NOUNS[view.bucket] ? … : 'week'` was
+  written out at three sites; adding `sprint` to the table made it pass everywhere, including
+  `planningDerive()`, which has no team. Everything now goes through `bucketFor(want, cad)`, which
+  falls back to **week** — not fortnight, which is the nearest-looking option and the exact swap
+  this feature exists to stop. A test pins `bucketFor('sprint', null) === 'week'`.
+- **The cadence rides on the VIEW, not a new parameter** — the door `wipLimit`/`sleDays` already
+  come through (`deriveTeams`, `renderDashboard`). It crosses into the feature lens where those
+  two deliberately do not: a limit is a promise about items, a sprint boundary is just a date.
+- **`deriveTeams` builds its train with `derive()` directly, NOT `deriveTrain()`.** A cadence put
+  only on `deriveTrain` reached the Scorecard and not All Teams — which then OFFERED Sprint and
+  drew weeks, silently, because the option is decided from the team list and the bars from the
+  view. Both are fed from `sharedCadence(list)` at the top of `deriveTeams` now. If you add
+  another pooled surface, feed it from the same place.
+- **Pooled scopes need the same LENGTH and the same PHASE** (`sharedCadence`) — anchors a whole
+  number of sprints apart are one grid; seven days apart are two. `sprintOffer(tab)` decides, and
+  `cadenceNote` writes the sentence FROM THE SAME OBJECT so the claim cannot drift. Its `default:`
+  branch is deliberately not silent — a silent branch is what let the All Teams bug hide.
+- **`derive()` returns `sprintDenied: true` only when a sprint was asked for and refused.** It does
+  NOT carry the wanted bucket always: the suite pins "no bucket means week, down to the last
+  field", and two derives that both produce weeks are the same derive.
+- **`loadView()` must never add `bucket` to its select-option loop** — that runs at boot before
+  any team is known, and a saved `'sprint'` would be wiped every load. Validated at point of use.
+- **The PI window stays 84 calendar days.** See the Planning-Increment Window section: a window is
+  a span of history, a bucket is how it is cut, and `6 × sprintDays` would make two teams' "PI"
+  different lengths on the page built to compare them.
+- **`artPredictability`** (0 = out, absent = in) holds a team out of the Scorecard's Predictability
+  pool only — Quality and Flow keep every team. `renderScorecard` keys `derived` by unit AND pool
+  and only builds `items:rollup` when somebody is actually out, so an ordinary board still pays
+  two derives. `sharedEnd` needs no change: a subset can only end earlier, so it takes the
+  existing `behind`/`asOf` branch. The card's `why` gained a branch BEFORE the empty one — a pool
+  with no teams derives to `empty`, and "none of these items has completed yet" is then false.
+- **Harness trap found doing this (see Running the Suites):** `tests.html`'s three
+  "tabbing out of the train menu" checks depended on the app iframe holding real browser focus,
+  which it stops doing once enough has run ahead of them. Two hundred `ok(true)` no-ops planted
+  earlier reproduce the failures against an untouched `index.html`. The group now dispatches the
+  `focusout` itself when `document.hasFocus()` is false.
+
 ## The Train Picker Takes Several Trains (2026-09-08) — no schema change
 
 Asked for by Charles, with a screenshot of the picker showing five trains: *"let's make this a

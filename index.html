@@ -1735,6 +1735,14 @@ table.manage td { text-align: right; padding: 10px 12px;
 table.manage td:first-child { text-align: left; padding-left: 0; }
 table.manage td:last-child { padding-right: 0; }
 table.manage td.count { color: var(--text-muted); white-space: nowrap; }
+/* The two halves of one setting, kept on one line: a wrapped cadence would read
+   as two controls where there is one, and half of one does nothing. The row
+   outgrows the dialog on a phone and .table-scroll carries it, which is the
+   same answer the alias column already relies on. */
+table.manage td.cadence { white-space: nowrap; }
+table.manage td.cadence input[type="date"] { max-width: 150px; }
+table.manage td.rollup { white-space: nowrap; }
+table.manage td.rollup input[type="checkbox"] { margin: 0; }
 
 table.manage input[type="text"] { max-width: 320px; }
 table.manage select { max-width: 220px; }
@@ -2637,6 +2645,11 @@ main:focus { outline: none; }
         <option value="week">Week</option>
         <option value="fortnight">2 weeks</option>
         <option value="month">Month</option>
+        <!-- ADDED AND REMOVED by renderBucketControl, never disabled — the rule
+             the unit switch follows, because an option that cannot be chosen is
+             a control that does nothing. It is in the markup so the shape is
+             greppable; the first render takes it straight back out. -->
+        <option value="sprint" id="bucketSprintOpt">Sprint</option>
       </select>
     </div>
     <div class="window" id="windowNote"></div>
@@ -3667,6 +3680,28 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       usually different numbers &mdash; and the threshold is normally the <strong>lower</strong>
       of the two, because an item that has already passed your target is too late to rescue. A
       promise of 10 days is often watched with a threshold around 6.</p>
+    <!-- Every clause below is a fact the code enforces. The last two exist
+         because both are surprises: a cadence changes where the bars are and
+         not what they measure, and the pooled option can vanish for a reason
+         that is not on this screen. -->
+    <p class="manage-note"><strong>Sprint</strong> is how long this team's sprint is, in days, and
+      the date one of them started &mdash; any one will do, and the app counts the rest off it.
+      Set both and <strong>Group by</strong> gains a <strong>Sprint</strong> option that cuts
+      every period on this team's real sprint boundaries instead of on a fortnight counted from a
+      fixed date. It changes no measurement, only where the periods begin and end. Leave either
+      blank and nothing changes, which is what the app does today.</p>
+    <p class="manage-note">On <strong>All Teams</strong> the Sprint option appears only when every
+      team shown is on the <em>same</em> cadence &mdash; same length, and starting on the same
+      days. One axis cannot honestly say &ldquo;Sprint&rdquo; over two different grids, and a bar
+      would be the back half of one team's sprint and the front half of another's.</p>
+    <!-- The tick is the only yes/no in this table, and the only control here
+         that changes a figure on a different tab, so it says which one. -->
+    <p class="manage-note"><strong>In the train's aged share</strong> decides whether this team's
+      items count towards the <strong>Predictability</strong> figure on the Scorecard. Every team
+      is in unless you untick it. Untick a team that measures its predictability another way
+      &mdash; a Scrum team watching how much of its sprint commitment it completes, say &mdash;
+      and the card says how many teams it is reading. It changes nothing on any other tab, and
+      nothing on this team's own dashboard.</p>
     <div class="table-scroll">
       <table class="manage" id="teamTable" aria-label="Teams"><tbody id="teamRows"></tbody></table>
     </div>
@@ -4742,10 +4777,87 @@ function edate(d, months) {
 const PI_WEEKS = 12;
 
 const FORTNIGHT_EPOCH = utcDate(1970, 1, 4);
-const BUCKET_NOUNS = { week: 'week', fortnight: 'fortnight', month: 'month' };
+/* MEMBERSHIP HERE IS NO LONGER SUFFICIENT. Until 'sprint' joined this table the
+   idiom `BUCKET_NOUNS[view.bucket] ? view.bucket : 'week'` was a complete
+   validity check, and it was written out at three separate call sites. It is
+   not one any more: a sprint bucket needs a FACT about the team — its cadence —
+   as well as a name in this table, and planningDerive() has no team at all.
+   Everything that turns a wanted bucket into a used one goes through
+   bucketFor() below. Adding a fourth grouping means going there, not here. */
+const BUCKET_NOUNS = { week: 'week', fortnight: 'fortnight', month: 'month',
+  sprint: 'sprint' };
+
+/* ── A team's own sprint grid ────────────────────────────────────────────────
+   The fortnight above snaps to a fixed 1970 epoch THROUGH the week start, which
+   is why its comment insists the parity anchor moves with the week. A sprint
+   does none of that. It counts whole days off the team's own anchor, so the
+   anchor alone carries both the length and the phase — if a team's sprints
+   start on a Wednesday, their anchor is a Wednesday, and weekStart has no
+   bearing on it at all. Simpler than the fortnight, not a generalisation of it.
+
+   READ ONLY AS A PAIR, the rule agedShareGreen/agedShareRed already follow:
+   half a cadence is not a cadence. A length with no anchor has no phase and an
+   anchor with no length has no grid, and inventing either would put every bar
+   somewhere the team does not recognise. */
+function cadenceOf(t) {
+  if (!t) return null;
+  const days = cleanSprintDays(t.sprintDays), anchor = cleanSprintAnchor(t.sprintAnchor);
+  return days && anchor ? { days: days, anchor: new Date(anchor + 'T00:00:00Z') } : null;
+}
+
+/* The same, off the view object — which is the door a per-team fact comes
+   through on its way into derive(), exactly as wipLimit and sleDays do. */
+function cadenceFrom(view) {
+  return view ? cadenceOf({ sprintDays: view.sprintDays, sprintAnchor: view.sprintAnchor }) : null;
+}
+
+/* The ONE grid a pooled scope can honestly be cut on, or null.
+   Every team must have a cadence, they must be the same LENGTH, and they must
+   be in the same PHASE — anchors a whole number of sprints apart. Two teams on
+   fourteen days offset by seven do not share sprints: a bar labelled 19 Aug
+   would be the back half of one team's sprint and the front half of the
+   other's, which is precisely the straddling this whole feature exists to end.
+
+   Not a limitation. A train IS a synchronised cadence, so the case this admits
+   is the case the pooled option is for. */
+function sharedCadence(teams) {
+  if (!teams || !teams.length) return null;
+  const first = cadenceOf(teams[0]);
+  if (!first) return null;
+  for (let i = 1; i < teams.length; i++) {
+    const c = cadenceOf(teams[i]);
+    if (!c || c.days !== first.days) return null;
+    const gap = diffDays(c.anchor, first.anchor);
+    if ((((gap % first.days) + first.days) % first.days) !== 0) return null;
+  }
+  return first;
+}
+
+/* The bucket a scope can actually be cut into — the single chokepoint every
+   caller reads a wanted bucket through. Falls back to WEEK, the app's own
+   default, rather than to the nearest-looking option: a fortnight is not a
+   ten-day sprint, and quietly serving one for the other is the exact swap this
+   feature was built to stop. */
+function bucketFor(want, cad) {
+  const b = BUCKET_NOUNS[want] ? want : 'week';
+  return (b === 'sprint' && !cad) ? 'week' : b;
+}
+
+/* The sprint containing d, counted off the team's own anchor.
+   Math.floor, NOT a truncating divide. The anchor is "the start of any one
+   sprint" and a person types a recent one, so a board's history mostly sits
+   BEFORE it — and a truncating divide steps a pre-anchor date forward into the
+   sprint after its own, silently, for every bar left of the anchor. The same
+   sign trap the fortnight's ((n % 2) + 2) % 2 guards against. */
+function sprintStartOn(d, cad) {
+  return addDays(cad.anchor, Math.floor(diffDays(d, cad.anchor) / cad.days) * cad.days);
+}
 
 /* The first day of the bucket containing d. */
-function bucketStart(d, bucket, ws) {
+function bucketStart(d, bucket, ws, cad) {
+  /* Before the month branch, and before anything touches the week start: a
+     sprint grid is not built out of weeks. */
+  if (bucket === 'sprint' && cad) return sprintStartOn(d, cad);
   if (bucket === 'month') return utcDate(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
   const start = weekStartOn(d, ws);
   if (bucket !== 'fortnight') return start;
@@ -4761,16 +4873,24 @@ function bucketStart(d, bucket, ws) {
 }
 
 /* d must be a bucket start. */
-function nextBucket(d, bucket) {
+function nextBucket(d, bucket, cad) {
+  if (bucket === 'sprint' && cad) return addDays(d, cad.days);
   return bucket === 'month' ? edate(d, 1) : addDays(d, bucket === 'fortnight' ? 14 : 7);
 }
 
 /* The last day inside the bucket, not the first day of the next one. */
-function bucketEnd(d, bucket) { return addDays(nextBucket(d, bucket), -1); }
+function bucketEnd(d, bucket, cad) { return addDays(nextBucket(d, bucket, cad), -1); }
 
 /* The key a bucket is stored under. Weeks and fortnights both key off their
-   start day through weekKey, so the New Year rule above covers both. */
-function bucketKey(d, bucket, ws) {
+   start day through weekKey, so the New Year rule above covers both.
+
+   A SPRINT KEYS OFF ITS OWN START DAY, in ISO. It cannot borrow weekKey: two
+   sprints can begin inside one week whenever a cadence is shorter than seven
+   days, and both would land on one key — which is how a bucket's items get
+   added to the bucket before it. The start day is unique to the sprint by
+   construction, so it is the key. */
+function bucketKey(d, bucket, ws, cad) {
+  if (bucket === 'sprint' && cad) return isoOf(d);
   if (bucket === 'month') {
     return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
   }
@@ -4780,7 +4900,13 @@ function bucketKey(d, bucket, ws) {
 /* What the x-axis draws. Identical to the key for weeks, so a weekly axis is
    unchanged; a fortnight shows both of its week numbers rather than looking
    like a week that skipped one. */
-function bucketLabel(d, bucket, ws) {
+function bucketLabel(d, bucket, ws, cad) {
+  /* THE YEAR IS PART OF THE LABEL. weekKey carries its year ("2026-33") and a
+     sprint label has to as well, or a twelve-month window draws two bars both
+     reading 19 Aug. Formatting it prettily only when the window happens to sit
+     inside one year would mean two screenshots of the same team not lining up,
+     which is the fault the FORTNIGHT_EPOCH comment above exists to prevent. */
+  if (bucket === 'sprint' && cad) return isoOf(d);
   if (bucket === 'month') {
     return d.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', year: 'numeric' });
   }
@@ -5917,6 +6043,50 @@ function cleanSleDays(v) {
      ordinary state, and the one this app never invents a figure for. */
   const n = Math.round(Number(v));
   return Number.isFinite(n) && n > 0 ? Math.min(n, TEAM_TARGET_MAX) : null;
+}
+
+/* ── A team's sprint cadence ─────────────────────────────────────────────────
+   Eight weeks. Longer than any sprint anybody runs — SAFe caps at four — and
+   past it the month bucket is the honest grouping rather than this one. A guard
+   on a hand-edited copy, like TEAM_TARGET_MAX, not a real bound. */
+const SPRINT_DAYS_MAX = 56;
+
+/* WHOLE CALENDAR DAYS, and calendar is the load-bearing word: a ten-working-day
+   sprint spans fourteen of them, and it is the fourteen that decide where a
+   bucket begins and ends. Rounded rather than refused, like the two cleaners
+   above — a stored 14.4 is somebody's hand-edit and fourteen is the honest
+   reading of it.
+
+   `> 0` rather than `>= 0` is the Number(null) guard: Number(null) is 0, so a
+   team that never set a cadence would otherwise arrive here as a zero-day
+   sprint, and a zero-length grid is an infinite loop in every axis walk. */
+function cleanSprintDays(v) {
+  /* A NUMBER OR THE STRING A BOX HANDS OVER, and nothing else — the guard
+     cleanWeekStart carries and cleanWipLimit does not, because this field is
+     the same KIND of field as the week start: it moves bucket boundaries rather
+     than drawing a line inside them. Number(true) is 1 and Number([14]) is 14,
+     so without this a boolean in a hand-edited backup arrives as a one-day
+     sprint — 365 buckets a year, every axis in the app unreadable — and an
+     array arrives as a fortnight nobody typed. A limit that rode in the same
+     way would draw one wrong line; this would redraw every chart. */
+  if (typeof v !== 'number' && typeof v !== 'string') return null;
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n > 0 ? Math.min(n, SPRINT_DAYS_MAX) : null;
+}
+
+/* The day one sprint started, as the ISO string the rest of the app stores
+   dates in — the shape customWindow() checks, NOT parseDate(). parseDate is
+   permissive on purpose because it reads what a person pasted out of Jira; a
+   storage boundary is the one place that permissiveness is wrong, because
+   whatever it lets through rides in from a hand-edited backup or a share link
+   and then decides where every bucket on the page begins.
+
+   The Date round-trip is what catches 2026-02-31: the regex says it is shaped
+   like a date and only the calendar says it is not one. */
+function cleanSprintAnchor(v) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return '';
+  const d = new Date(v + 'T00:00:00Z');
+  return !isNaN(d.getTime()) && isoOf(d) === v ? v : '';
 }
 
 /* Which columns of a paste are stage columns, and whose stage each one is.
@@ -8626,7 +8796,9 @@ function agedCounts(items, evalPoints, thresholdDays, wip, workingDays) {
  * @param settings  {sameDayValue, unplannedType, unplannedLabel, cycleTimeLabel,
  *                   workingDays}
  * @param view      {filterValue: string ('' = no filter), months: number|'all',
- *                   bucket: 'week'|'fortnight'|'month' (default 'week')}
+ *                   bucket: 'week'|'fortnight'|'month'|'sprint' (default 'week';
+ *                   'sprint' falls back to 'week' unless the view carries a cadence)
+ *                   sprintDays, sprintAnchor: the team's grid, read as a pair}
  */
 /* `stages` is the reader's stage list — names and order — and it is the ONE
    piece of naming this function takes, for the one figure that puts names on an
@@ -8686,6 +8858,11 @@ function buildForecast(o) {
   const wholeThroughput = o.samples || [];
   const weekStarts = o.weekStarts || [];
   const bucket = o.bucket;
+  /* The grid those bucket starts were cut on. An options object, so it rides in
+     beside `bucket` rather than as a parameter — and it MUST ride in: bucketEnd
+     below needs it to know where a sprint ends, and without it a coverage
+     window would be trimmed against fortnight ends over sprint samples. */
+  const cad = o.cadence || null;
   const units = o.units;
   /* No data means no end of data: the anchor falls back to today, which is the
      only honest answer to "counting from" when nothing has been counted. */
@@ -8762,7 +8939,7 @@ function buildForecast(o) {
   let fcSamples = wholeThroughput, fcLost = 0;
   if (fcCoverage && fcCoverage < endDate) {
     const keep = wholeThroughput.filter((v, i) =>
-      weekStarts[i] && bucketEnd(weekStarts[i], bucket) <= fcCoverage).length;
+      weekStarts[i] && bucketEnd(weekStarts[i], bucket, cad) <= fcCoverage).length;
     fcLost = wholeThroughput.length - keep;
     fcSamples = wholeThroughput.slice(0, keep);
   }
@@ -8905,9 +9082,19 @@ function derive(rows, settings, view, stages, statuses) {
      fixture written when a filter meant one type still means exactly that. */
   const filterList = filterTypes(view.filterValue);
   const filterSet = filterList ? new Set(filterList) : null;
+  /* The team's own sprint grid, or null. It arrives on the VIEW rather than in
+     settings, and that is not an accident of plumbing: a cadence is a fact
+     about ONE TEAM where the week start is a fact about the company. It comes
+     through the same door wipLimit and sleDays come through, for the same
+     reason and from the same two callers.
+     Read BEFORE the bucket below, because the bucket depends on it. */
+  const cad = cadenceFrom(view);
   /* Defaulted here rather than relying on the caller, so an old saved view — or
-     a test fixture written before buckets existed — still means "weekly". */
-  const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
+     a test fixture written before buckets existed — still means "weekly". And
+     routed through bucketFor rather than BUCKET_NOUNS, which is no longer a
+     sufficient check on its own: a sprint asked for by a view whose team has no
+     cadence is a week, not a sprint. */
+  const bucket = bucketFor(view.bucket, cad);
   const noun   = BUCKET_NOUNS[bucket];
   /* Which day a week begins on, read once and handed to every bucket call
      below. It is a SETTING and not a view field: "our weeks run Wednesday to
@@ -9155,8 +9342,8 @@ function derive(rows, settings, view, stages, statuses) {
     : edate(endDate, -Number(view.months));
 
   /* The bucket starts either end of the window. */
-  const startPS = startDate ? bucketStart(startDate, bucket, weekStartsOn) : null;
-  const endPS   = bucketStart(endDate, bucket, weekStartsOn);
+  const startPS = startDate ? bucketStart(startDate, bucket, weekStartsOn, cad) : null;
+  const endPS   = bucketStart(endDate, bucket, weekStartsOn, cad);
 
   /* First bucket is the window start, or the earliest completed bucket if the
      window is "All"; then step to the bucket holding the newest date in the
@@ -9167,7 +9354,7 @@ function derive(rows, settings, view, stages, statuses) {
      positive, and a work-in-progress count taken days before the date the
      tile claimed. A trailing zero-throughput bar is true — nothing finished —
      where the front padding the floor below prevents would not be. */
-  const completedSundays = finished.map(r => bucketStart(r.completed, bucket, weekStartsOn));
+  const completedSundays = finished.map(r => bucketStart(r.completed, bucket, weekStartsOn, cad));
   const minCompletedPS = new Date(minOf(completedSundays.map(d => d.getTime())));
   const limit = endPS;
 
@@ -9177,7 +9364,7 @@ function derive(rows, settings, view, stages, statuses) {
      completed bucket, the same floor "All" uses. */
   const firstWeek = startPS && startPS > minCompletedPS ? startPS : minCompletedPS;
   const weekStarts = [];
-  for (let w = firstWeek; w <= limit; w = nextBucket(w, bucket)) {
+  for (let w = firstWeek; w <= limit; w = nextBucket(w, bucket, cad)) {
     weekStarts.push(w);
     if (weekStarts.length > 1200) break;               /* runaway guard */
   }
@@ -9219,19 +9406,19 @@ function derive(rows, settings, view, stages, statuses) {
   for (const r of items) {
     /* Started counts every item that has a start date, finished or not. */
     if (r.started) {
-      const sk = bucketKey(bucketStart(r.started, bucket, weekStartsOn), bucket, weekStartsOn);
+      const sk = bucketKey(bucketStart(r.started, bucket, weekStartsOn, cad), bucket, weekStartsOn, cad);
       byStartedWeek.set(sk, (byStartedWeek.get(sk) || 0) + 1);
     }
     /* Intake keys off the created date, not the completion — a defect raised
        this month counts this month even if it is still open, which is the whole
        point of measuring what comes in against what goes out. */
     if (r.created && isUnplanned(r)) {
-      const rk = bucketKey(bucketStart(r.created, bucket, weekStartsOn), bucket, weekStartsOn);
+      const rk = bucketKey(bucketStart(r.created, bucket, weekStartsOn, cad), bucket, weekStartsOn, cad);
       defectsRaised.set(rk, (defectsRaised.get(rk) || 0) + 1);
     }
     if (!r.completed) continue;
 
-    const ck = bucketKey(bucketStart(r.completed, bucket, weekStartsOn), bucket, weekStartsOn);
+    const ck = bucketKey(bucketStart(r.completed, bucket, weekStartsOn, cad), bucket, weekStartsOn, cad);
     if (!byCompletedWeek.has(ck)) byCompletedWeek.set(ck, []);
     byCompletedWeek.get(ck).push(r);
   }
@@ -9270,7 +9457,7 @@ function derive(rows, settings, view, stages, statuses) {
      could do. Do not "finish the job" by filtering agedCounts. */
   const windowCycleTimes = [];
   for (const ws of weekStarts) {
-    for (const r of byCompletedWeek.get(bucketKey(ws, bucket, weekStartsOn)) || []) {
+    for (const r of byCompletedWeek.get(bucketKey(ws, bucket, weekStartsOn, cad)) || []) {
       const ct = cycleTimeOf(r, sameDay, workingDays);
       if (ct != null) windowCycleTimes.push(ct);
     }
@@ -9284,7 +9471,7 @@ function derive(rows, settings, view, stages, statuses) {
   const excluded = new Set();
   if (outlierCutoff != null) {
     for (const ws of weekStarts) {
-      for (const r of byCompletedWeek.get(bucketKey(ws, bucket, weekStartsOn)) || []) {
+      for (const r of byCompletedWeek.get(bucketKey(ws, bucket, weekStartsOn, cad)) || []) {
         const ct = cycleTimeOf(r, sameDay, workingDays);
         if (ct != null && ct > outlierCutoff) excluded.add(r);
       }
@@ -9314,9 +9501,9 @@ function derive(rows, settings, view, stages, statuses) {
   let unplannedTotal = 0;
 
   for (const ws of weekStarts) {
-    const key = bucketKey(ws, bucket, weekStartsOn);
+    const key = bucketKey(ws, bucket, weekStartsOn, cad);
     weeks.push(key);
-    bucketLabels.push(bucketLabel(ws, bucket, weekStartsOn));
+    bucketLabels.push(bucketLabel(ws, bucket, weekStartsOn, cad));
 
     const done = byCompletedWeek.get(key) || [];
     windowItems.push(...done);
@@ -9394,7 +9581,7 @@ function derive(rows, settings, view, stages, statuses) {
      open item a few days for free. The clamp is also what makes the last point
      of each series equal its tile exactly, which is what "as of" promises. */
   const evalPoints = weekStarts.map(b =>
-    new Date(Math.min(bucketEnd(b, bucket).getTime(), endDate.getTime())));
+    new Date(Math.min(bucketEnd(b, bucket, cad).getTime(), endDate.getTime())));
   const wip = openCounts(items, evalPoints);
   /* A row of nulls, not a row of zeros, when no threshold is in force. The
      series keeps its length so everything that walks it alongside `wip` still
@@ -9551,7 +9738,7 @@ function derive(rows, settings, view, stages, statuses) {
      the most recent data, which is the first thing anyone looks at, and would
      disagree with what Jira says the team finished this month. */
   const lastStart = weekStarts[weekStarts.length - 1];
-  const lastEnd = lastStart ? bucketEnd(lastStart, bucket) : null;
+  const lastEnd = lastStart ? bucketEnd(lastStart, bucket, cad) : null;
   const partial = lastEnd && endDate < lastEnd ? {
     label: bucketLabels[bucketLabels.length - 1],
     daysCovered: diffDays(endDate, lastStart) + 1,
@@ -9607,7 +9794,7 @@ function derive(rows, settings, view, stages, statuses) {
      so the scatter's x axis reads identically to the line chart's beside it. */
   const scatterPoints = [];
   weekStarts.forEach((ws) => {
-    const key = bucketKey(ws, bucket, weekStartsOn);
+    const key = bucketKey(ws, bucket, weekStartsOn, cad);
     (byCompletedWeek.get(key) || []).forEach((r) => {
       const ct = cycleTimeOf(r, sameDay, workingDays);
       /* No start date, no cycle time — the item is finished work with an unknown
@@ -9916,7 +10103,7 @@ function derive(rows, settings, view, stages, statuses) {
   };
 
   const forecast = buildForecast({ view, samples: wholeThroughput, weekStarts,
-    bucket, endDate, units });
+    bucket, cadence: cad, endDate, units });
 
   /* The window's defect share: pooled — defects completed over everything
      completed — NOT the mean of the per-bucket rates the chart plots. The
@@ -9989,6 +10176,20 @@ function derive(rows, settings, view, stages, statuses) {
        name every caller and every pinned test already knows it by. */
     weeks, buckets: weeks, bucketLabels,
     bucket, bucketNoun: noun, bucketNounPlural: noun + 's', partial,
+    /* The grid the figures on this derive were actually cut on, so priorWindowOf
+       re-cuts the window before this one the same way and a note can name it. */
+    cadence: cad,
+    /* A SPRINT WAS ASKED FOR AND NOT GIVEN — the one case a caller cannot work
+       out for itself, because a dashboard quietly serving weeks to a team with
+       no cadence looks identical to one where weeks were chosen.
+
+       PRESENT ONLY WHEN TRUE, rather than always carrying the wanted bucket.
+       Two derives that both produce weeks are the same derive, and the suite
+       pins exactly that ("no bucket means week, down to the last field") — a
+       field that recorded 'week' on one and nothing on the other would break
+       that pin to say something no caller asked. This says the only thing any
+       caller does ask. */
+    ...(view.bucket === 'sprint' && bucket !== 'sprint' ? { sprintDenied: true } : {}),
     /* Carried out so a view can NAME the two days without reaching for the
        settings object again — the note under the picker and the ⓘ both say
        "Wednesday to Tuesday", and reading it twice is how two sentences about
@@ -10298,7 +10499,11 @@ function derive(rows, settings, view, stages, statuses) {
       forecastRuns: fcWords.axisTitles.forecastRuns,
       forecastWhenX: fcWords.axisTitles.forecastWhenX,
       forecastHowManyX: fcWords.axisTitles.forecastHowManyX,
+      /* NAMES WHAT THE TICKS ARE, which for a sprint is a DATE and not a week
+         number — an axis headed "Year-Week Number" over 2026-05-31 would be
+         asking the reader to read a start date as a week. */
       x: bucket === 'month' ? 'Month'
+        : bucket === 'sprint' ? 'Sprint (start date)'
         : bucket === 'fortnight' ? 'Year-Fortnight (week numbers)'
         : 'Year-Week Number'
     }
@@ -10350,7 +10555,23 @@ function trainRowsOf(teams, view) {
    a shared date and the forecast's coverage end; a caller that needs none of
    those — the Scorecard — pays one derive instead of one per team plus one. */
 function deriveTrain(teams, settings, view, stages, statuses) {
-  return derive(trainRowsOf(teams, view), settings, view, stages, statuses);
+  /* THE POOLED GRID IS THE SHARED ONE, OR NONE — and it is settled here rather
+     than by the caller because this function is the one place that knows both
+     the team list and that the rows are about to be poured into a single list.
+     A caller that forgot would pool eight teams onto whichever cadence happened
+     to be on the view, which is the exact straddling this feature exists to
+     end, one level up.
+
+     sharedCadence returns null unless every team is on the same length AND the
+     same phase, so "some of these teams have no cadence" and "these teams are
+     on different cadences" both land on weeks — correctly, and the note above
+     the charts tells the two apart. */
+  const cad = sharedCadence(teams);
+  const v = Object.assign({}, view, {
+    sprintDays: cad ? cad.days : null,
+    sprintAnchor: cad ? isoOf(cad.anchor) : ''
+  });
+  return derive(trainRowsOf(teams, v), settings, v, stages, statuses);
 }
 
 /* ── The window before this one ──────────────────────────────────────────────
@@ -10384,7 +10605,10 @@ function priorWindowOf(d) {
      windows' totals at once. The Quality denominator and the Flow average both
      moved. A shape with no bucket — the pure-date callers in the suite — keeps
      the day-before rule, because it has no axis to align to. */
-  const edge = d.bucket ? bucketStart(d.startDate, d.bucket, d.weekStartsOn) : d.startDate;
+  /* Re-cut on the SAME grid the window it is comparing against was cut on.
+     `d.cadence` is the cadence as USED, not as asked for, so a derive that fell
+     back to weeks compares against weeks. */
+  const edge = d.bucket ? bucketStart(d.startDate, d.bucket, d.weekStartsOn, d.cadence) : d.startDate;
   const to = addDays(edge, -1);
   return { from: addDays(to, -(days - 1)), to, days };
 }
@@ -10409,6 +10633,26 @@ function priorViewOf(base, prior) {
 
 function deriveTeams(teams, settings, view, stages, statuses) {
   const list = Array.isArray(teams) ? teams : [];
+  /* ── ONE GRID FOR THE WHOLE PAGE ──────────────────────────────────────────
+     The shared cadence, or none, applied to the train AND to every row — which
+     is the same rule the shared `asOf` date below follows, one axis along.
+     A table whose rows were each cut on their OWN sprints would put a 14-day
+     team's throughput beside a 21-day team's under one column heading, and the
+     sparklines beneath them would step at different rates with nothing saying
+     so. sharedCadence returns null unless they genuinely all agree, so the only
+     case this admits is the one where all the rows mean the same thing.
+
+     FOUND BY USING IT: this function derives the train with derive() directly
+     rather than through deriveTrain(), so a cadence put only on deriveTrain
+     reached the Scorecard and not this page — All Teams OFFERED the Sprint
+     option and then drew weeks, silently, because the option is decided from
+     the team list and the bars from the view. The two have to be fed from one
+     place, and this is it. */
+  const pooledCad = sharedCadence(list);
+  view = Object.assign({}, view, {
+    sprintDays: pooledCad ? pooledCad.days : null,
+    sprintAnchor: pooledCad ? isoOf(pooledCad.anchor) : ''
+  });
   const listOf = (t) => teamListOf(t, view);
   const everything = trainRowsOf(list, view);
   /* Derived twice when a forecast is wanted, and only then. The first pass is
@@ -10517,6 +10761,10 @@ function deriveTeams(teams, settings, view, stages, statuses) {
       d: derive(listOf(t), settings, Object.assign({}, shared, {
         wipLimit: view && view.unit === 'features' ? null : t.wipLimit,
         sleDays: view && view.unit === 'features' ? null : t.sleDays,
+        /* NOT `t.sprintDays` — the row inherits the PAGE's grid from `shared`
+           above, which is the pooled one settled at the top of this function.
+           See that comment for why a row must not be cut on its own sprints
+           while the column heading above it names one period. */
         /* The All Teams table has no forecast column, so the per-row derives do
            not need the expensive half of one. The TRAIN keeps it. */
         forecastMode: 'off' }), stages, statuses) }))
@@ -10678,6 +10926,13 @@ window.TD = {
   /* The two figures a team sets. Pure guards, so what a hand-edited copy can put
      on somebody's chart is pinned without a dialog on screen. */
   cleanWipLimit, cleanSleDays, TEAM_TARGET_MAX,
+  /* The sprint grid — the two guards, the pair reader, the pooled reader, and
+     the chokepoint every wanted bucket is read through. All pure, so what a
+     hand-edited copy or a share link can do to somebody's bucket boundaries is
+     pinned without a dialog on screen. bucketFor especially: it is the one
+     thing standing between BUCKET_NOUNS and an ungated 'sprint'. */
+  cleanSprintDays, cleanSprintAnchor, SPRINT_DAYS_MAX,
+  cadenceOf, cadenceFrom, sharedCadence, bucketFor, sprintStartOn,
   /* What counts as a usable pair of typed dates, and the local-calendar "today"
      the boxes are capped at. Both are function declarations far below this line
      and are hoisted, which is why naming them here is safe — see issueSortKey. */
@@ -10887,6 +11142,13 @@ const DEFAULT_SETTINGS = {
    out fresh each render so it can never go stale as the data moves on. */
 const DEFAULT_VIEW = { filterDisplay: 'All', months: '3', dateOrder: 'auto', activeTeamId: null,
   chartTab: 'flow', bucket: 'week', forecastItems: DEFAULT_FORECAST_ITEMS, forecastDate: '',
+  /* NOT SAVED PREFERENCES, and they are in this object only because it is the
+     whitelist loadView reads back through. A cadence is a fact about a TEAM —
+     it is put on the view object by whoever is building the question for
+     derive(), the same door wipLimit and sleDays come through, and it is read
+     straight back off the team on the next render. Persisting them here would
+     let a stale copy of one team's grid cut another team's charts. */
+  sprintDays: null, sprintAnchor: '',
   /* How big a feature is, typed. See typedFeatureSizeRange.
      `planSizeOn` is the tick that lets it stand in for a MEASUREMENT, and it is
      read only where there is one — with data, on the feature lens. In planning
@@ -11268,6 +11530,19 @@ function sanitizeTeams(teams) {
              artId, projectId: cleanProjectId(t && t.projectId),
              wipLimit: cleanWipLimit(t && t.wipLimit),
              sleDays: cleanSleDays(t && t.sleDays),
+             /* The sprint grid — see cadenceOf for why the two are read only as
+                a pair. Half of one survives this function on its own and then
+                means nothing downstream, which is the honest outcome: a length
+                with no anchor has no phase, and this app does not invent one. */
+             sprintDays: cleanSprintDays(t && t.sprintDays),
+             sprintAnchor: cleanSprintAnchor(t && t.sprintAnchor),
+             /* Whether this team's items count towards the train's aged share
+                on the Scorecard. 0 is out, anything else is in — so a team
+                saved before this field existed, and one whose value is junk,
+                are both IN, which is what the page did before and the answer
+                nobody has to have opted into. Stored as a number rather than a
+                boolean to sit inside the numbers-and-dates rule. */
+             artPredictability: (t && Number(t.artPredictability) === 0) ? 0 : null,
              rows: hydrateRows(t && t.rows),
              /* Its own list, never mixed into rows — see the split in
                 parsePastedRows. Rebuilt explicitly here like everything else on
@@ -11598,7 +11873,23 @@ function normalizeSettings(raw) {
 
 /* The shape that goes to localStorage and into a backup file. Dates become ISO
    strings; nothing else changes. */
-/* SCHEMA 17 added `weekStart` — which day of the week every weekly and
+/* SCHEMA 18 added the PER-TEAM SPRINT CADENCE — `sprintDays` and
+   `sprintAnchor`, both unset by default and read only as a pair — and
+   `artPredictability`, which is 0 for a team held out of the train's aged
+   share on the Scorecard and absent for every team that is in.
+
+   The cadence is the SECOND field to move bucket boundaries rather than a
+   figure inside them, and it moves them further than `weekStart` below ever
+   did: a week start slides a boundary by up to six days, where a cadence
+   replaces the grid outright. An older build reading a newer document drops
+   both fields, never offers the Sprint option and draws weeks — which is a
+   well-defined grouping rather than a wrong one — but it would also be
+   drawing a DIFFERENT set of bars under the same headings with nothing on
+   screen saying so, which is why this bumps rather than rides in quietly.
+   `artPredictability` bumps for a plainer reason: dropping it silently puts a
+   team back into a figure its owner deliberately took it out of.
+
+   SCHEMA 17 added `weekStart` — which day of the week every weekly and
    fortnightly bucket begins on, 0 to 6, and 0 (Sunday) is what every build
    before it did. It is the first setting that moves the BUCKET BOUNDARIES
    rather than a figure inside them, so an older build reading a newer document
@@ -11635,7 +11926,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 17;
+const SCHEMA = 18;
 
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
@@ -11682,6 +11973,17 @@ function serializeState() {
          rather than not storing a value. */
       if (t.wipLimit) out.wipLimit = t.wipLimit;
       if (t.sleDays) out.sleDays = t.sleDays;
+      /* The cadence, same rule again — and it matters more here than for the
+         two targets above. A cadence decides where every bucket on the page
+         BEGINS, so a document that wrote `sprintDays: null` into a browser that
+         had never heard of sprints would be a stored claim about a grid nobody
+         set. Neither key until both are set. */
+      if (t.sprintDays) out.sprintDays = t.sprintDays;
+      if (t.sprintAnchor) out.sprintAnchor = t.sprintAnchor;
+      /* Written only when a team is OUT, which is the non-default answer. In is
+         the absence of the key, so every document written before this build
+         round-trips through it byte-identically. */
+      if (t.artPredictability === 0) out.artPredictability = 0;
       /* And the features, on the same rule once more: no `features` key at all
          until this team has one, so a browser that never sets up a feature type
          writes exactly the document it wrote before the layer existed. Written
@@ -11883,7 +12185,12 @@ function planningOn() {
    model has to learn that planning exists. */
 
 function planningDerive() {
-  const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
+  /* No team, so no cadence, so never a sprint — bucketFor is handed null on
+     purpose here rather than by omission. This card exists precisely when the
+     browser holds nothing, and a reader who left the grouping on Sprint before
+     clearing their data must not be shown a sprint axis with no sprints behind
+     it. */
+  const bucket = bucketFor(view.bucket, null);
   const noun = BUCKET_NOUNS[bucket];
   /* Today IS the end of the data when there is no data: every date this card
      prints counts forward from the reader's own calendar day. */
@@ -11894,8 +12201,10 @@ function planningDerive() {
      answer — it is where the dates come from, exactly as on a real dashboard,
      where the feature model is handed the item derive's countFrom and target
      rather than working them out again. */
+  /* No cadence, explicitly: planningDerive has no team, and bucketFor above has
+     already turned any asked-for sprint into a week. */
   let forecast = buildForecast({ view, samples: [], weekStarts: [],
-    bucket, endDate, units });
+    bucket, cadence: null, endDate, units });
   let schedule = null;
   if (feature) {
     /* ── A feature forecast with nothing measured ─────────────────────────
@@ -11946,9 +12255,19 @@ function loadView() {
   /* Values get the same scrutiny as keys where nothing downstream re-checks
      them: months and dateOrder go straight into a <select>, and a value no
      option carries leaves it showing blank (selectedIndex -1). The rest are
-     validated at their point of use — bucket against BUCKET_NOUNS, chartTab in
+     validated at their point of use — bucket through bucketFor, chartTab in
      selectChartTab, filterDisplay in renderFilterSelect, activeTeamId at
-     boot. */
+     boot.
+
+     BUCKET MUST NOT JOIN THE LOOP ABOVE, and now has a reason it did not have
+     before. This function runs at boot, before any team is known, and the
+     Sprint option is added to its <select> only once a team with a cadence is
+     on screen — so a saved 'sprint' would fail the "is there an option for it"
+     test on every single load and be wiped, and a reader who groups by sprint
+     would find the setting undone every morning. Validated at its point of use
+     instead, where the team IS known. It is the same rule featureUnit follows
+     for a saved 'features' on a board with no features: the preference is kept,
+     and what cannot be honoured is simply not honoured today. */
   for (const [k, id] of [['months', 'monthsSel'], ['dateOrder', 'dateOrder'],
                         ['unit', 'unitSel']]) {
     if (![...$(id).options].some(o => o.value === String(view[k]))) view[k] = DEFAULT_VIEW[k];
@@ -13845,6 +14164,63 @@ function customNote(d) {
   return '<br>Both dates are needed, and From must come before To.';
 }
 
+/* ── Which grid these bars were cut on ───────────────────────────────────────
+   Two jobs, and they are the same job seen from either side.
+
+   WHEN A SPRINT GRID IS IN FORCE it names it, because every figure on the page
+   moved when it came on and a printout or a screenshot carries no picker. "13
+   sprints" already appears in the note beside this one; it does not say whose
+   sprints, or how long, or where they start, and those three are the whole
+   difference between this grouping and a fortnight.
+
+   WHEN ONE WAS ASKED FOR AND NOT APPLIED (d.sprintDenied) it says so, and says WHY. The reader
+   chose Sprint, the charts are drawn in weeks, and without this sentence there
+   is nothing on screen to tell that apart from having chosen weeks.
+
+   BUILT FROM sprintOffer'S OWN OBJECT, never from a second look at the data —
+   the decision and the sentence about the decision have one source, so the
+   sentence cannot drift into a claim the code did not make. */
+function cadenceNote(d, offer) {
+  if (d && d.bucket === 'sprint' && d.cadence) {
+    return '<br>sprints of ' + d.cadence.days + ' days from '
+      + prettyDate(d.cadence.anchor);
+  }
+  /* Only when a sprint was actually asked for AND refused — derive sets
+     sprintDenied in exactly that case. A reader on weeks is not owed a sentence
+     about a grouping they did not choose. */
+  if (!d || !d.sprintDenied || !offer) return '';
+  const lead = '<br>grouped by ' + (d.bucketNoun || 'week') + ' &mdash; ';
+  switch (offer.reason) {
+    case 'teammissing':
+      /* Names the team, because with a header picker the reader may not be
+         looking at the one they think they are. Escaped: a team name is typed. */
+      return lead + escapeHtml((offer.team && offer.team.name.trim()) || 'this team')
+        + ' has no sprint cadence set.';
+    case 'allmissing':
+      return lead + (offer.teams === 1 ? 'that team has' : 'none of the teams shown have')
+        + ' a sprint cadence set.';
+    case 'somemissing':
+      /* THE COUNT, not "some". A reader with eight teams needs to know whether
+         this is one board to fix or seven. */
+      return lead + offer.missing + ' of the ' + offer.teams + ' teams shown '
+        + (offer.missing === 1 ? 'has' : 'have') + ' no sprint cadence set.';
+    case 'unaligned':
+      /* Every team HAS one here — so the sentence must not say anything is
+         missing, which is the wrong reassurance this switch exists to avoid. */
+      return lead + 'the teams shown are not all on the same sprint cadence.';
+    default:
+      /* NOT SILENT, and this branch earned its sentence. Reaching it means a
+         sprint was asked for, was not applied, and sprintOffer had no reason —
+         i.e. a cadence IS available for this scope and the derive was cut on
+         weeks anyway. That is a wiring fault, not a state a reader can be in,
+         and it is exactly the fault that shipped for an hour while deriveTeams
+         built its train through derive() instead of taking the pooled grid:
+         All Teams offered Sprint and drew weeks with nothing on screen to say
+         so. A note that stayed quiet here is what let it hide. */
+      return lead + 'this grouping could not be applied.';
+  }
+}
+
 /* ── When the export runs past today ────────────────────────────────────────
    '' on every ordinary board, which is what it is for: the sentence exists to
    be absent. When it is not, it names the count and the date the window was
@@ -14860,6 +15236,56 @@ function renderTeamRows() {
       '</span></td>';
   };
 
+  /* ── The sprint grid: ONE cell, not two ─────────────────────────────────────
+     The length and the anchor are a single setting and must never wrap apart —
+     half a cadence does nothing at all (see cadenceOf), so a layout that could
+     put them on separate lines would be offering the reader two controls where
+     there is one. */
+  const cadenceCell = (t, i) => {
+    const dId = 'sprint-days-of-' + t.id, aId = 'sprint-from-of-' + t.id;
+    return '<td class="target cadence"><span class="target-set">' +
+      '<label for="' + escapeHtml(dId) + '">Sprint</label>' +
+      /* Two characters: SPRINT_DAYS_MAX is 56. `min="1"` with `step="1"` for
+         the reason spelled out above — a step counts from the min, and a
+         fractional min is what walked the old target's arrows off whole
+         numbers. */
+      '<input class="target" type="number" style="--digits:2"' +
+      ' inputmode="numeric" id="' + escapeHtml(dId) + '"' +
+      ' data-sprint-days="' + escapeHtml(t.id) + '"' +
+      ' min="1" max="' + SPRINT_DAYS_MAX + '" step="1" autocomplete="off"' +
+      ' aria-label="Sprint length in days for team in row ' + (i + 1) + '"' +
+      ' value="' + (t.sprintDays == null ? '' : t.sprintDays) + '">' +
+      '<span aria-hidden="true">d from</span>' +
+      /* "d from" is decoration, so the date box has NO visible label of its own
+         and takes a screen-reader one — the pattern the project id cell uses. */
+      '<label class="sr-only" for="' + escapeHtml(aId) + '">' +
+      'Date one sprint started, for team in row ' + (i + 1) + '</label>' +
+      '<input type="date" id="' + escapeHtml(aId) + '"' +
+      ' data-sprint-from="' + escapeHtml(t.id) + '" autocomplete="off"' +
+      ' value="' + escapeHtml(t.sprintAnchor || '') + '">' +
+      '</span></td>';
+  };
+
+  /* Whether this team's items count towards the train's aged share. A tick
+     rather than a number box because it is a yes/no, and the only control in
+     this table that is. */
+  const rollupCell = (t, i) => {
+    const id = 'rollup-of-' + t.id;
+    /* CARRIES ITS OWN VISIBLE LABEL, like every other control in this row and
+       for the reason the count cell's comment gives: the table has no header
+       row, so a bare tick in a column is a control with nothing on screen
+       saying what it does. The accessible name CONTAINS the visible text —
+       WCAG 2.5.3 — so "aged share" said to a voice control reaches the box in
+       front of the reader; what the aria-label adds is which row it is. */
+    return '<td class="target rollup"><span class="target-set">' +
+      '<label for="' + escapeHtml(id) + '">Aged share</label>' +
+      '<input type="checkbox" id="' + escapeHtml(id) + '"' +
+      ' data-rollup="' + escapeHtml(t.id) + '"' +
+      ' aria-label="Aged share of the train, for team in row ' + (i + 1) + '"' +
+      (t.artPredictability === 0 ? '' : ' checked') + '>' +
+      '</span></td>';
+  };
+
   tb.innerHTML = '';
   state.teams.forEach((t, i) => {
     const tr = document.createElement('tr');
@@ -14871,6 +15297,8 @@ function renderTeamRows() {
       artCell(t, i) +
       targetCell(t, i, 'wip') +
       targetCell(t, i, 'sle') +
+      cadenceCell(t, i) +
+      rollupCell(t, i) +
       /* The count carries its own noun, the way the sibling's rows do. With no
          header row there is nothing else to say what the number is. */
       '<td class="count">' + t.rows.length + (t.rows.length === 1 ? ' item' : ' items') + '</td>' +
@@ -15189,6 +15617,14 @@ function renderDashboard() {
          asked yet. */
       wipLimit: featureUnit() ? null : (team && team.wipLimit),
       sleDays: featureUnit() ? null : (team && team.sleDays),
+      /* THE CADENCE CROSSES INTO THE FEATURE VIEW, where the two above do not,
+         and the difference is the whole point of the paragraph above. A limit
+         and a target are promises about ITEMS, so reading them against features
+         states something untrue. A sprint boundary is not a promise about
+         anything — it is a date, and features finish on dates exactly as items
+         do. Grouping a feature chart by the team's real sprints is right for
+         the same reason it is right for items, so this rides in unconditionally. */
+      sprintDays: team && team.sprintDays, sprintAnchor: team && team.sprintAnchor,
       /* The forecast's other two answers. This object is a LITERAL rather than
          the view itself — derive() takes a question, not the app's state — which
          means a field added to `view` and not added here silently never arrives.
@@ -15319,7 +15755,8 @@ function renderDashboard() {
      browser resolves to window.name and would put whatever the last page in this
      tab called itself on somebody's printout. */
   if (activeTab === 'dashboard') printHead((team && team.name.trim()) || 'This team', d);
-  if (activeTab === 'dashboard') $('windowNote').innerHTML = span + customNote(d) + futureNote(d) + '<br>' +
+  if (activeTab === 'dashboard') $('windowNote').innerHTML = span + customNote(d) + futureNote(d)
+    + cadenceNote(d, sprintOffer('dashboard')) + '<br>' +
     d.buckets.length + ' ' + (d.buckets.length === 1 ? d.bucketNoun : d.bucketNounPlural) +
     ' &middot; ' + itemsInWindow(d) + outlierNote(d) +
     (d.inProgressCount ? ' (' + d.inProgressCount + ' in progress)' : '') +
@@ -17217,6 +17654,7 @@ function renderAllTeams() {
      under it. On paper neither is lost: printHead() above puts the scope in the
      print-only line, which is the sentence a printout is read by. */
   $('windowNote').innerHTML = span + customNote(train) + futureNote(train)
+    + cadenceNote(train, sprintOffer('allteams'))
     + '<br>' + 'every team, as of the same date' +
     '<br>' + itemsInWindow(train) + ' across ' +
     inScope.length + ' team' + (inScope.length === 1 ? '' : 's') +
@@ -17439,6 +17877,11 @@ const SCOPE_TABS = ['allteams', 'scorecard'];
 const SCORECARD_CARDS = [
   {
     key: 'aged', cat: 'Predictability', unit: 'items',
+    /* The one card with a pool of its own — every team on the page unless
+       somebody has been ticked out in the Teams window. renderScorecard only
+       builds this key when somebody actually is, so an ordinary board reads
+       `items` here and pays no extra derive. */
+    pool: 'items:rollup',
     scale: 'agedShare', help: 'agedShare',
     name: 'Aged Share of WIP',
     /* THE SUB-LINE NAMES THE AVERAGING, and it is not decoration: this figure is
@@ -17446,6 +17889,15 @@ const SCORECARD_CARDS = [
        14 days" over a number would be read as today's. The period count is the
        real one — periods with nothing open have no share and are not averaged
        over — so a train whose data covers half the window says so here. */
+    /* NAMES ITS OWN POPULATION when it is not the page's. The line under the
+       heading already carries the averaging, and the note at the foot of the
+       page says "across 8 teams" — which is true of the page and false of this
+       card the moment a team is ticked out. A figure that moves because five
+       teams are behind it instead of eight, with nothing on screen saying so,
+       is the fault every other sentence on this page exists to prevent. */
+    pop: (d, ctx) => (ctx && ctx.heldOut)
+      ? 'across ' + ctx.scored + ' of ' + ctx.scope + ' teams'
+      : '',
     sub: (d) => d.agedDays == null
       ? 'no ageing threshold set'
       /* "averaged over 0 weeks" over a dash is a claim about an average that
@@ -17465,7 +17917,18 @@ const SCORECARD_CARDS = [
     /* THE EMPTY SHAPE FIRST: it carries no threshold, because it carries no
        window to read one over, and a card that read `agedDays == null` off it
        told a reader with the default 14 days in force that no threshold was set. */
-    why: (d) => d.empty
+    /* THE HELD-OUT BRANCH COMES FIRST, before the empty shape below it. A pool
+       with no teams in it derives to `empty`, and the sentence under that
+       branch — "none of the work items these teams hold has completed yet" — is
+       then flatly untrue: their items may all have completed, and the reason
+       there is no figure is that the reader took every one of them out. Two
+       opposite findings, and the empty shape cannot tell them apart, so the
+       count is asked first. */
+    why: (d, ctx) => (ctx && ctx.scope && !ctx.scored)
+      ? 'Every team ' + (ctx.scope === 1 ? 'here is' : 'in scope is')
+        + ' ticked out of this figure, so there is nothing pooled to read. Open '
+        + 'Teams & Stages in the header to put one back in.'
+      : d.empty
       ? 'None of the work items these teams hold has completed yet, so there is no window '
         + 'to read the board over. The share appears with the first item that finishes.'
       : d.agedDays == null
@@ -17677,7 +18140,15 @@ function scorecardCard(card, dNow, priorD, prior, ctx) {
     + '<h3 class="sc-cat">' + escapeHtml(card.cat) + '</h3>'
     + '<div class="card sc-card' + (graded ? ' ' + state_ : '') + '">'
     + '<div class="sc-name">' + escapeHtml(name) + helpBtn(card.help, name) + '</div>'
-    + '<div class="sc-sub">' + escapeHtml(dNow.empty ? '' : card.sub(dNow, ctx)) + '</div>'
+    /* The population rides on the SUB line rather than a line of its own: it is
+       the same kind of fact as "averaged over 4 weeks" — a qualifier on the
+       figure above it — and a fourth line would push the three cards out of
+       step with each other. Joined with a middot, the separator this app
+       already uses for qualifiers under a figure. */
+    + '<div class="sc-sub">' + escapeHtml([
+        dNow.empty ? '' : card.sub(dNow, ctx),
+        card.pop ? card.pop(dNow, ctx) : ''
+      ].filter(Boolean).join(' \u00b7 ')) + '</div>'
     + '<div class="sc-value">' + (value == null ? '&mdash;' : card.fmt(value)) + glyph + '</div>'
     + bands
     + '<p class="sc-verdict">'
@@ -17745,28 +18216,58 @@ function renderScorecard() {
      and the only place on this page it is — it moves an end date LATER, which
      is what a list that stops early needs, and it is why the window BEFORE this
      one cannot use it (see priorViewOf). */
+  /* ── WHO IS IN THE AGED SHARE ─────────────────────────────────────────────
+     trainRowsOf pours every team's rows into ONE list, so this figure is
+     item-weighted: a big team moves it more than a small one, and a team that
+     does not manage aged WIP at all drags it somewhere nobody owns. The tick in
+     the Teams window is how a team sits out — for a Scrum team measuring its
+     predictability as the share of a sprint commitment it completed, say, where
+     this number is not the one anybody acts on.
+
+     ONLY THIS CARD. Quality is a defect rate and Flow is a feature cycle time;
+     neither asks anything about how a team plans, so neither loses a team.
+     A scorecard where one figure reads over five teams and two read over eight
+     is only honest if it SAYS so, which is what ctx below is for. */
+  const rollupTeams = inScope.filter(t => t.artPredictability !== 0);
+  const heldOut = inScope.length - rollupTeams.length;
+  /* Keyed by unit AND pool. `items` and `features` are the full scope; the
+     third key appears only when somebody is actually held out, so an ordinary
+     board pays exactly the two derives it always did. */
+  const POOLS = { items: inScope, features: inScope };
+  if (heldOut) POOLS['items:rollup'] = rollupTeams;
+  const poolKeys = Object.keys(POOLS);
+  const unitOfPool = k => k.split(':')[0];
+
   const first = {};
-  ['items', 'features'].forEach(u => {
-    first[u] = deriveTrain(inScope, state.settings, viewFor(u), state.stages, state.statuses);
+  poolKeys.forEach(k => {
+    first[k] = deriveTrain(POOLS[k], state.settings, viewFor(unitOfPool(k)),
+      state.stages, state.statuses);
   });
+  /* THE SHARED END IS THE FULL SCOPE'S, deliberately. A reduced pool can only
+     end earlier than the scope it came out of, never later, so letting it into
+     this Math.max could only ever pull the page's date backwards to suit one
+     card — and the whole reason this date exists is that all three cards must
+     describe the same month. It takes the `behind` branch below instead, which
+     is exactly what that branch is for. */
   const ends = ['items', 'features'].map(u => first[u].endDate).filter(Boolean);
   const sharedEnd = ends.length ? new Date(Math.max(...ends.map(d => d.getTime()))) : null;
 
   const derived = {};
-  ['items', 'features'].forEach(u => {
+  poolKeys.forEach(k => {
+    const u = unitOfPool(k);
     /* Derived again only when this list actually ends earlier, which is the
        uncommon case — an ordinary board pays two derives here, not four. */
-    const behind = sharedEnd && first[u].endDate && first[u].endDate < sharedEnd;
+    const behind = sharedEnd && first[k].endDate && first[k].endDate < sharedEnd;
     const d = behind
-      ? deriveTrain(inScope, state.settings, viewFor(u, { asOf: sharedEnd }),
+      ? deriveTrain(POOLS[k], state.settings, viewFor(u, { asOf: sharedEnd }),
           state.stages, state.statuses)
-      : first[u];
+      : first[k];
     const prior = priorWindowOf(d);
     /* The prior derive is skipped entirely when there is no window before this
        one — "All" has none — rather than derived and thrown away. */
-    const priorD = prior ? deriveTrain(inScope, state.settings,
+    const priorD = prior ? deriveTrain(POOLS[k], state.settings,
       priorViewOf(viewFor(u), prior), state.stages, state.statuses) : null;
-    derived[u] = { d, prior, priorD };
+    derived[k] = { d, prior, priorD };
   });
   const itemsD = derived.items.d, featD = derived.features.d;
 
@@ -17816,7 +18317,13 @@ function renderScorecard() {
   /* How many features are behind the Flow card, not merely whether there are
      any: its empty state has to tell three findings apart and the count is what
      separates the first from the other two. */
-  const ctx = { featuresHeld: inScope.reduce((n, t) => n + ((t.features || []).length), 0) };
+  const ctx = { featuresHeld: inScope.reduce((n, t) => n + ((t.features || []).length), 0),
+    /* What the aged card needs to name its own population. `scored` is how many
+       teams are behind that figure and `scope` how many are on the page, so the
+       card can say "across 5 of 8 teams" without counting anything itself —
+       and `heldOut` separates "some are out" from "all of them are", which are
+       different findings and need different sentences. */
+    scope: inScope.length, scored: rollupTeams.length, heldOut: heldOut };
   /* The one sentence that says what the reader is looking at and what it does
      NOT follow. Both halves matter: three figures with no unit named is a
      scorecard nobody can argue with, and a reader arriving from the dashboard
@@ -17826,13 +18333,26 @@ function renderScorecard() {
     + 'before it. Every work type counts, whatever the filter on the other tabs is set to, '
     + 'and the first two figures are about work items while the third is about features — '
     + 'so the Count switch does not reach this page either.'
+    /* "the whole train" stops being true the moment a team is ticked out of the
+       first figure, and this sentence is the one that told the reader it was.
+       Said here as well as on the card, because a reader who scans the intro
+       and then the three numbers would otherwise never look at the sub-line. */
+    + (heldOut
+      ? ' The first figure reads over ' + rollupTeams.length + ' of the '
+        + inScope.length + ' teams — ' + heldOut
+        + (heldOut === 1 ? ' is' : ' are') + ' ticked out of it in Teams & Stages; '
+        + 'the other two read over every team.'
+      : '')
     /* Said once, here, rather than three times down the cards. */
     + (derived.items.prior || derived.features.prior ? ''
       : ' There is no window before “All”, so nothing is being compared — choose a rolling '
         + 'window or a pair of dates above to see which way these are moving.');
 
   cols.innerHTML = SCORECARD_CARDS.map(c => {
-    const x = derived[c.unit];
+    /* A card's own pool when it has one AND somebody is held out; the full
+       scope otherwise. Falling back to `c.unit` rather than assuming the key
+       exists is what keeps an ordinary board on two derives. */
+    const x = derived[(c.pool && derived[c.pool]) ? c.pool : c.unit];
     return scorecardCard(c, x.d, x.priorD, x.prior, ctx);
   }).join('');
 
@@ -17888,7 +18408,15 @@ function renderViews() { renderDashboard(); renderScoped(); }
 /* The two views the train picker governs. Called by the picker's own handlers
    rather than renderViews: ticking a train must not rebuild every chart on a
    dashboard nobody is looking at. */
-function renderScoped() { renderAllTeams(); renderScorecard(); }
+function renderScoped() {
+  renderAllTeams(); renderScorecard();
+  /* AFTER the two renders, and here rather than only in syncStrip, because the
+     three ART-scope handlers call this directly and never go near syncStrip —
+     ticking a train changes which teams are pooled, which changes whether they
+     share a cadence, which changes whether Sprint can be offered at all. */
+  renderBucketControl();
+}
+
 
 function renderDataTable() {
   /* Follows the unit switch, so the list on this tab is the list the dashboard
@@ -17935,7 +18463,12 @@ function renderDataTable() {
 
   /* The last column follows the dashboard's grouping control, so the table and
      the charts always name the same period. */
-  const bucket = BUCKET_NOUNS[view.bucket] ? view.bucket : 'week';
+  /* The active team's cadence, read the same way the charts' derive reads it,
+     because this table's own comment above requires the two to name the same
+     period. A team with no cadence falls to weeks here exactly as it does
+     there. */
+  const tblCad = cadenceOf(activeTeam());
+  const bucket = bucketFor(view.bucket, tblCad);
   const bucketHead = bucket.charAt(0).toUpperCase() + bucket.slice(1);
   /* The same day derive() buckets on. Read off the settings here rather than
      off a derive, because this table is built from rows and not from one. */
@@ -18014,7 +18547,7 @@ function renderDataTable() {
         : '') +
       '<td class="num">' + (ct == null ? '—' : num1(ct)) + '</td>' +
       '<td class="num">' +
-        (r.completed ? bucketLabel(bucketStart(r.completed, bucket, wsDow), bucket, wsDow) : '—') + '</td>' +
+        (r.completed ? bucketLabel(bucketStart(r.completed, bucket, wsDow, tblCad), bucket, wsDow, tblCad) : '—') + '</td>' +
       '</tr>';
   }).join('');
 
@@ -18371,6 +18904,58 @@ function renderEmptyState() {
    with the data — a paste that brings the first feature in has to make the
    control appear, and deleting the last one has to take it away and put the
    reader back on items. */
+/* ── Whether "Sprint" can honestly be offered, and if not, why not ───────────
+   ONE function answers both, because the note under the charts is built from
+   the same object the decision was made with. A note written separately would
+   eventually say "these teams are on different cadences" about a scope where
+   the truth was "one of them has nothing set" — a wrong reassurance, which is
+   the thing an empty state must never be.
+
+   `reason` is null when the option is offered. `teams`/`missing` carry the
+   counts the pooled sentences need. */
+function sprintOffer(tab) {
+  /* The Scorecard hardcodes weekly buckets and takes the control away
+     entirely — see renderScorecard's `base`. Nothing to offer and nothing to
+     explain. */
+  if (tab === 'scorecard') return { cad: null, reason: null, scope: 'none' };
+  if (tab === 'allteams') {
+    const inScope = teamsInArts(state.teams, currentArtScope());
+    const cad = sharedCadence(inScope);
+    if (cad) return { cad: cad, reason: null, scope: 'pooled', teams: inScope.length };
+    const missing = inScope.filter(t => !cadenceOf(t)).length;
+    return { cad: null, scope: 'pooled', teams: inScope.length, missing: missing,
+      /* THE COUNT DECIDES WHICH SENTENCE, not a guess. All of them missing is a
+         different finding from some of them missing, and both are different
+         from every team having one that does not line up. */
+      reason: !inScope.length ? 'none'
+        : missing === inScope.length ? 'allmissing'
+        : missing ? 'somemissing'
+        : 'unaligned' };
+  }
+  const team = activeTeam();
+  const cad = cadenceOf(team);
+  return { cad: cad, scope: 'team', team: team,
+    reason: cad ? null : (team ? 'teammissing' : 'none') };
+}
+
+/* The Group by control, modelled on renderUnitControl below — the precedent in
+   this app for a control whose availability is a fact about the data rather
+   than a preference. */
+function renderBucketControl(tab) {
+  const opt = $('bucketSprintOpt');
+  if (!opt) return;
+  const offer = sprintOffer(tab || activeTab);
+  /* Added and removed rather than disabled or hidden. See the markup. */
+  opt.hidden = !offer.cad;
+  opt.disabled = !offer.cad;
+  /* Read back through bucketFor() rather than off `view`, so the box always
+     shows what is actually being COUNTED — the same reason the unit select is
+     written from featureUnit(). `view.bucket` itself is left alone: a saved
+     'sprint' survives a trip through a team that has no cadence and is honoured
+     again on the way back, which is featureUnit's rule verbatim. */
+  $('bucketSel').value = bucketFor(view.bucket, offer.cad);
+}
+
 function renderUnitControl() {
   /* Offered in planning too. There are no features to count — that is the whole
      situation — but the reader is saying what they are ABOUT to build, and a
@@ -18469,6 +19054,10 @@ function syncStrip(name) {
     if (!el) return;
     el.hidden = !(want.has(k) && (k !== 'unit' || anyFeatures() || planningOn()));
   });
+  /* Whether the Sprint OPTION is offered, now that the BOX's visibility is
+     settled. Told the tab explicitly rather than reading activeTab, because
+     selectTab calls this before it has finished switching. */
+  renderBucketControl(name);
 }
 function selectTab(name) {
   /* A tab that is not on offer must never be landed on. All Teams is taken away
@@ -21217,7 +21806,9 @@ $('stageRows').addEventListener('click', e => {
 
 $('btnAddTeam').addEventListener('click', () => {
   const team = { id: newId(), name: 'Team ' + (state.teams.length + 1),
-                 artId: null, projectId: '', wipLimit: null, sleDays: null, rows: [], features: [] };
+                 artId: null, projectId: '', wipLimit: null, sleDays: null,
+                 sprintDays: null, sprintAnchor: '', artPredictability: null,
+                 rows: [], features: [] };
   state.teams.push(team);
   view.activeTeamId = team.id;
   save();
@@ -21261,6 +21852,21 @@ $('teamRows').addEventListener('input', e => {
     save();
     return;
   }
+  /* The cadence, on the same rule as the two targets above: cleaned and stored
+     on every keystroke, no re-render, because renderTeamRows would replace the
+     box being typed in. The VIEWS are not redrawn here either — a half-typed
+     "1" on the way to "14" would regroup every chart in the app behind the
+     dialog. That happens on `change`, below, when the reader has finished. */
+  const sprintDaysOf = e.target.dataset && e.target.dataset.sprintDays;
+  const sprintFromOf = e.target.dataset && e.target.dataset.sprintFrom;
+  if (sprintDaysOf || sprintFromOf) {
+    const team = state.teams.find(t => t.id === (sprintDaysOf || sprintFromOf));
+    if (!team) return;
+    if (sprintDaysOf) team.sprintDays = cleanSprintDays(e.target.value);
+    else team.sprintAnchor = cleanSprintAnchor(e.target.value);
+    save();
+    return;
+  }
   const id = e.target.dataset && e.target.dataset.team;
   if (!id) return;
   const team = state.teams.find(t => t.id === id);
@@ -21301,6 +21907,34 @@ $('teamRows').addEventListener('change', e => {
     if (!team) return;
     const stored = wipOf ? team.wipLimit : team.sleDays;
     e.target.value = stored == null ? '' : stored;
+    renderViews();
+    return;
+  }
+  /* The same write-back the two targets get above, and for the same reason: a
+     box still showing 99 after 99 was clamped to 56 is the app disagreeing with
+     the chart it just drew. Then BOTH renders — the views, because a cadence
+     regroups every period on screen, and the bucket control, because setting or
+     clearing one changes whether Sprint can be offered at all. */
+  const sprintDaysOf = e.target.dataset && e.target.dataset.sprintDays;
+  const sprintFromOf = e.target.dataset && e.target.dataset.sprintFrom;
+  if (sprintDaysOf || sprintFromOf) {
+    const team = state.teams.find(t => t.id === (sprintDaysOf || sprintFromOf));
+    if (!team) return;
+    if (sprintDaysOf) e.target.value = team.sprintDays == null ? '' : team.sprintDays;
+    else e.target.value = team.sprintAnchor || '';
+    renderBucketControl();
+    renderViews();
+    return;
+  }
+  /* The aged-share opt-out. A tick fires `change` and not `input`, so it is
+     only here — and it redraws the Scorecard rather than the dashboard, because
+     that is the one page it moves a figure on. */
+  const rollupOf = e.target.dataset && e.target.dataset.rollup;
+  if (rollupOf) {
+    const team = state.teams.find(t => t.id === rollupOf);
+    if (!team) return;
+    team.artPredictability = e.target.checked ? null : 0;
+    save();
     renderViews();
     return;
   }
@@ -22604,6 +23238,31 @@ function buildSharePayload(teamIds, win) {
        lines, which is graceful degradation rather than a wrong number. */
     if (t.wipLimit) out.wipLimit = t.wipLimit;
     if (t.sleDays) out.sleDays = t.sleDays;
+    /* THE CADENCE TRAVELS, and on a stronger argument than the two targets it
+       sits under. A target draws a LINE on a chart, and a link that dropped it
+       would show the reader the same bars with the line missing. A cadence
+       decides where the bars ARE — a link that dropped it would show a
+       different set of numbers under the same headings, which is not
+       degradation but a wrong figure.
+
+       It is unlike the project id in the same way the two targets are: an id is
+       a routing rule for a paste box the recipient does not have, where this is
+       read straight off the charts the link exists to show.
+
+       `view.bucket` deliberately does NOT travel with it. A link carries data,
+       not the reading — and it does not need to: the recipient's own picker
+       offers Sprint because the team in the payload carries a cadence, which is
+       the right outcome and takes no code at all.
+
+       SHARE_PAYLOAD_V is NOT bumped, matching ARTs, keys, stages and the two
+       targets: an older cached build drops both fields, never offers the Sprint
+       option and draws weeks — a well-defined grouping, gracefully. */
+    if (t.sprintDays) out.sprintDays = t.sprintDays;
+    if (t.sprintAnchor) out.sprintAnchor = t.sprintAnchor;
+    /* And the opt-out, for the plainest reason of the three: dropping it would
+       put a team back into a figure its owner deliberately took it out of, and
+       the recipient would read a number the sender never saw. */
+    if (t.artPredictability === 0) out.artPredictability = 0;
     /* The features travel on exactly the argument the keys and the two targets
        travel on: they are what the shared charts are drawn from once the reader
        is looking at the feature view, and a link that dropped them would show a
@@ -23253,6 +23912,27 @@ window.TDCleanup = { historyAnchor, outsideWindow, windowCutoff };
    same numbers on every device, so a dataset can be pinned by a test and an
    answer can be talked through twice. Never swap either for Math.random(). */
 
+/* The demo's sprint anchor: the start of a sprint a whole number of cadences
+   back from the Sunday on or before today.
+
+   COMPUTED, NEVER A LITERAL, for exactly the reason the wipLimit comment below
+   gives about figures that only just pass: the demo is regenerated against
+   today's date every time it is loaded, so a typed anchor would drift out of
+   phase with the generated history as the weeks went by — and two teams sharing
+   a typed anchor would be one careless edit away from silently withdrawing the
+   pooled Sprint option with nothing on screen to explain it.
+
+   Anchored on a Sunday because the demo's own history is dealt in weeks, so a
+   14-day grid laid on a Sunday lands on the week boundaries a reader comparing
+   Sprint against 2 weeks would expect. A year back is far enough to cover the
+   longest profile's 40 weeks. */
+function sprintAnchorFor(days) {
+  const today = new Date(todayLocalISO() + 'T00:00:00Z');
+  const sunday = priorSunday(today);
+  const back = Math.ceil(370 / days) * days;
+  return isoOf(addDays(sunday, -back));
+}
+
 /* The teams, as profiles rather than as thousands of literal rows. `weeks` of
    history at `perWeek` completions each; `cycle` days from start to finish, with
    `key` is the project prefix its issue keys carry, or absent for a team whose
@@ -23273,6 +23953,13 @@ const DEMO_TEAMS = [
        it, because the demo is regenerated against today's date every time it is
        loaded and a figure that only just passes would eventually not. */
     wipLimit: 6, sleDays: 10,
+    /* A TWO-WEEK CADENCE, shared with Team Long Tail below so the two of them —
+       the demo's only train — line up and the pooled Sprint option on All Teams
+       is reachable from a fresh load. The anchor is computed rather than typed,
+       for the same reason every date in this file is: the demo regenerates
+       against today, and a literal that lands on a sprint boundary this month
+       would stop doing so next month. See sprintAnchorFor. */
+    sprintDays: 14,
     /* Where Team Healthy Flow's time goes: mostly into building the thing. That is what
        a healthy board looks like, and it is the reading Team Long Tail's has to be
        compared against for either to mean anything. The headings are the Jira
@@ -23305,6 +23992,11 @@ const DEMO_TEAMS = [
        both charts say the same thing the tiles do — and a reader who has looked
        at Team Healthy Flow first has something to compare it with. */
     wipLimit: 6, sleDays: 10,
+    /* The SAME length and, through sprintAnchorFor, the same anchor as Team
+       Healthy Flow. Identical by construction rather than by two literals that
+       happen to agree — sharedCadence checks the phase, and two typed dates
+       would be one edit away from silently withdrawing the pooled option. */
+    sprintDays: 14,
     /* Team Long Tail's whole story in one row of the table: barely a third of its time is
        spent building, and more than half of it is spent waiting to be reviewed
        or waiting to be tested. That is the finding the feature exists to
@@ -23365,7 +24057,16 @@ const DEMO_TEAMS = [
      feature and the one every browser starts in: no line on the charts, no
      verdict on the tiles, and the figures stated without being judged. A demo
      where every team had a limit would teach that a limit is compulsory. */
-  { name: 'Team Bare Export', seed: 5150, dated: false, stale: 9,
+  /* NO CADENCE AND OUT OF THE ROLL-UP, and both are deliberate demo coverage
+     rather than an omission. No cadence means the Sprint option disappears when
+     the header picker lands here, and the fallback sentence under the charts is
+     reachable without anybody editing anything; it also means estate-wide All
+     Teams cannot offer Sprint while this team is in scope, which is the other
+     half of the pooled rule. Out of the roll-up means the Scorecard's
+     Predictability card reads "across 2 of 3 teams" on a fresh load, so the
+     one figure on that page with a population of its own says so out of the
+     box. This team is on no train, so the ART-scoped Scorecard is unaffected. */
+  { name: 'Team Bare Export', seed: 5150, dated: false, stale: 9, artPredictability: 0,
     weeks: 16, perWeek: [2, 4], cycle: [2, 7], tailChance: 0.08, tail: [10, 18],
     wait: [0, 0], wip: [2, 6, 16],
     types: ['Story', 'Story', 'Story', 'Story', 'Story',
@@ -23908,6 +24609,12 @@ function loadSample() {
                       team is the same shape sanitizeTeams builds. */
                    wipLimit: profile.wipLimit || null,
                    sleDays: profile.sleDays || null,
+                   sprintDays: profile.sprintDays || null,
+                   /* ONE anchor for the whole demo, so the two cadenced teams
+                      share a phase by construction. A team with no sprintDays
+                      gets no anchor either — half a cadence is not one. */
+                   sprintAnchor: profile.sprintDays ? sprintAnchorFor(profile.sprintDays) : '',
+                   artPredictability: profile.artPredictability === 0 ? 0 : null,
                    rows: parsed.rows,
                    /* Team Bare Export has no feature quotas and so no feature
                       rows, which is the third face again and the one that makes
