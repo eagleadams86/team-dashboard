@@ -69,7 +69,17 @@ Two changes, and the first is a model correction rather than a layout fix:
   two-row table is silly. The earlier note above ("both Add buttons live in those headers") still
   holds for where the FIRST one lives; what changed is that a list you cannot see the top of
   earns a second. Both directions are pinned.
-  **Stages get `ADD_FOOT_FROM_STAGES = 2`, measured not felt:** a stage is TWO `<tr>`s — a
+  **THE THRESHOLD RULE, which is the thing to keep — not the numbers.** A second Add button is
+  earned when a SECTION grows taller than the dialog's visible height: the point you can no
+  longer see its heading and the end of its list at once. That is a row count per SECTION, not
+  per app, because the distance from heading to fold depends on the prose above the table.
+  **Measure it, never copy it.** In a 734px dialog: Teams passes at **10**, Workflow Stages at
+  **4**, and the sibling's Teams section at **12** (it carries no prose, so its heading survives
+  longer) — the two apps agreeing would be a coincidence, not a convention. The first pair here
+  was 6 and 2, measured against a Teams section carrying five paragraphs that the same day's work
+  then cut to one, which moved the answer and left both numbers stale. Charles caught the
+  sibling's within minutes of seeing it.
+  **Stages were briefly `ADD_FOOT_FROM_STAGES = 2`, an over-correction:** a stage is TWO `<tr>`s — a
   name/alias row of 59px and a status-pick grid of 98px — so one stage is 157px against a team
   row's 59px, 2.7x, and it sits under 366px of prose where Teams has a couple of lines. Six
   stages would put the button ~1300px below the heading; two land at ~680px, the same place six

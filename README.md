@@ -364,9 +364,10 @@ behind **Edit** on the team's row, in a window that saves as you go — there is
 because there is nothing to cancel.
 
 Once a list runs long it also gains a **second Add button at its foot**, so adding a team, a
-train or a stage doesn't mean scrolling back to the heading every time. That's six rows for most
-lists and **two for workflow stages**, whose rows are nearly three times taller — a stage carries
-a whole grid of status ticks under its name. The one in the
+train or a stage doesn't mean scrolling back to the heading every time. It appears when a section grows taller than the window
+showing it — the point you can no longer see its heading and the end of its list at once — which
+is **ten rows** for teams and **four for workflow stages**, whose rows are nearly three times
+taller because a stage carries a whole grid of status ticks under its name. The one in the
 heading stays — it is what tells you what the section adds before you have read a row of it.
 
 They used to be four editable cells in the row itself, which worked until the list got long.
