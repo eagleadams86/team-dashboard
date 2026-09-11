@@ -402,7 +402,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. */
-const EXPECTED = 3920;
+const EXPECTED = 3923;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -8798,6 +8798,22 @@ group('ARTs — the grouping, and the boundary it crosses');
     is(fDoc.activeElement && fDoc.activeElement.dataset.team,
        win.tdGet().teams[win.tdGet().teams.length - 1].id,
        'with the cursor in the name box of the row it just made');
+    /* STAGES EARN IT SOONER, and the two thresholds must not drift together: a
+       stage is TWO <tr>s and 2.7x the height of a team row, under the longest
+       prose in the window, so six of them would put the button ~1300px below
+       the heading — a control nobody would ever meet. */
+    ok(TD.ADD_FOOT_FROM_STAGES < TD.ADD_FOOT_FROM,
+       'a stage earns its foot button sooner than a team does, because its rows are taller',
+       TD.ADD_FOOT_FROM_STAGES + ' vs ' + TD.ADD_FOOT_FROM);
+    plant({ teams: [{ id: 'f1', name: 'One', rows: [] }],
+            stages: Array.from({ length: TD.ADD_FOOT_FROM_STAGES },
+              (_, i) => ({ id: 'g' + i, name: 'S' + i, match: [] })),
+            settings: {} });
+    fDoc.getElementById('manageBtn').click();
+    is(fDoc.getElementById('btnAddStageFootRow').hidden, false,
+       'so it is there at the stage threshold');
+    is(fDoc.getElementById('btnAddTeamFootRow').hidden, true,
+       'while one team still does not earn one — the two counts are read separately');
     fDoc.getElementById('manageDialog').close();
   }
   /* Every heading is inside a section, and every section is separated from the

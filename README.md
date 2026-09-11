@@ -363,8 +363,10 @@ whether it runs **sprints**, and whether it counts in the train's **aged share**
 behind **Edit** on the team's row, in a window that saves as you go — there is no OK button
 because there is nothing to cancel.
 
-Once a list runs past six rows it also gains a **second Add button at its foot**, so adding a
-team, a train or a stage doesn't mean scrolling back to the heading every time. The one in the
+Once a list runs long it also gains a **second Add button at its foot**, so adding a team, a
+train or a stage doesn't mean scrolling back to the heading every time. That's six rows for most
+lists and **two for workflow stages**, whose rows are nearly three times taller — a stage carries
+a whole grid of status ticks under its name. The one in the
 heading stays — it is what tells you what the section adds before you have read a row of it.
 
 They used to be four editable cells in the row itself, which worked until the list got long.

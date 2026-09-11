@@ -69,6 +69,11 @@ Two changes, and the first is a model correction rather than a layout fix:
   two-row table is silly. The earlier note above ("both Add buttons live in those headers") still
   holds for where the FIRST one lives; what changed is that a list you cannot see the top of
   earns a second. Both directions are pinned.
+  **Stages get `ADD_FOOT_FROM_STAGES = 2`, measured not felt:** a stage is TWO `<tr>`s — a
+  name/alias row of 59px and a status-pick grid of 98px — so one stage is 157px against a team
+  row's 59px, 2.7x, and it sits under 366px of prose where Teams has a couple of lines. Six
+  stages would put the button ~1300px below the heading; two land at ~680px, the same place six
+  team rows do. If another tall-rowed list is ever added, measure it rather than reusing 6.
   **`ADD_FOOT_FROM` is declared with the thresholds near the top, not beside its reader** — the
   `TD` export object names it and is built partway down the file, so a `const` next to
   `syncAddFoot` sat in the temporal dead zone and the app threw at boot. The suite reported

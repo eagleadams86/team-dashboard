@@ -3806,8 +3806,9 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
          not only a control — it is what tells you what the section adds before
          you have read a row of it, it is where the sibling app puts its own, and
          with two teams on screen a button above and below a two-row table is
-         silly. So it appears at 6 rows and not before: a second control is
-         earned by a list you cannot see the top of, not by every list. -->
+         silly. STAGES EARN IT AT TWO, not six: a stage is two rows and 2.7x the
+         height of a team row, under the longest prose in the window — see
+         ADD_FOOT_FROM_STAGES. -->
     <div class="row" id="btnAddStageFootRow" hidden style="justify-content:flex-end;margin-top:10px">
       <button class="btn small" id="btnAddStageFoot" type="button">+ Add a Stage</button>
     </div>
@@ -6276,6 +6277,20 @@ function cleanSleDays(v) {
    anything — with the suite reporting no passes and no failures rather than a
    red check, which is the shape that particular mistake always takes here. */
 const ADD_FOOT_FROM = 6;
+
+/* TWO, for Workflow Stages, and the number is measured rather than felt. A stage
+   is not one row but TWO — a name-and-aliases row of 59px and a status-pick grid
+   of 98px under it — so one stage is 157px where a team row is 59px, 2.7 times
+   taller. It also sits under the longest prose in the window: 366px of it,
+   against a couple of lines for Teams.
+
+   Six stages would therefore put the foot button about 1300px below the section
+   heading, which is not "a long list" so much as a button nobody will ever meet.
+   Two stages already come to ~680px under that heading — past the fold on an
+   ordinary laptop — which is the same place six team rows land, and the same
+   moment the heading-row button stops being reachable. Reported by Charles
+   looking at four stages with the heading long gone (2026-09-11). */
+const ADD_FOOT_FROM_STAGES = 2;
 
 const SPRINT_DAYS_MAX = 56;
 
@@ -11160,8 +11175,9 @@ window.TD = {
      pinned without a dialog on screen. bucketFor especially: it is the one
      thing standing between BUCKET_NOUNS and an ungated 'sprint'. */
   cleanSprintDays, cleanSprintAnchor, SPRINT_DAYS_MAX,
-  /* The row count at which a long list earns a second Add button at its foot. */
-  ADD_FOOT_FROM,
+  /* The row counts at which a long list earns a second Add button at its foot.
+     Stages get their own because a stage is two rows and 2.7x the height. */
+  ADD_FOOT_FROM, ADD_FOOT_FROM_STAGES,
   cadenceOf, cadenceFrom, pairCadence, sharedCadence, bucketFor, sprintStartOn,
   SPRINT_COMPANY, SPRINT_OWN,
   /* What counts as a usable pair of typed dates, and the local-calendar "today"
@@ -15727,7 +15743,7 @@ function renderStageRows() {
       'a column per status \u2014 or type the days straight onto each work item, which is ' +
       'what the boxes on the Add a Work Item form are for.</td></tr>';
   }
-  syncAddFoot('btnAddStageFootRow', state.stages.length);
+  syncAddFoot('btnAddStageFootRow', state.stages.length, ADD_FOOT_FROM_STAGES);
   renderStageAliasWarning();
 }
 
@@ -21883,9 +21899,9 @@ $('teamSel').addEventListener('change', e => {
 });
 
 /* ── ARTs ─────────────────────────────────────────────────────────────────── */
-function syncAddFoot(footRowId, count) {
+function syncAddFoot(footRowId, count, from) {
   const row = $(footRowId);
-  if (row) row.hidden = count < ADD_FOOT_FROM;
+  if (row) row.hidden = count < (from || ADD_FOOT_FROM);
 }
 
 /* Both buttons do the same thing, so they share one handler rather than one
