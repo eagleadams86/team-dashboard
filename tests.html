@@ -402,7 +402,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. */
-const EXPECTED = 3923;
+const EXPECTED = 3928;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -1007,23 +1007,51 @@ async function run(TD, win) {
   is(pb.rows[0].started, null, 'the row with a bad start date is kept without one');
   is(pb.rows[1].started, null, 'an empty start date is legitimate, not an error');
 
-  /* A problem row is echoed back as only the cells this app reads — type and
-     dates — never the whole pasted line, which also carries the ticket key and
-     can carry a summary. The line number is how the row is found in the export,
-     which is where the identifying detail belongs. */
+  /* A problem row is echoed back as the cells this app READS — the key, the type
+     and the dates — never the whole pasted line, which can carry a summary.
+
+     THE KEY WAS ADDED ON 2026-09-11, and this test changed deliberately, which
+     is what the note beside refOf asked of whoever got here. It said no key for
+     a year on the argument that the line is untrusted: refOf reads a possibly
+     MISMAPPED column, on a row the parser has already found suspect. What
+     answers that is the guard, not the silence — cleanIssueKey enforces a
+     shape, so a summary landing in the key column comes through as nothing at
+     all rather than as seventeen characters of a work system. The pins below
+     are the two halves: the key gets through, the summary never does. */
   const pe = TD.parsePastedRows(
     'Key\tSummary\tCreated\tIn Progress\tResolved\tIssue Type\n' +
     'DAE-1023\tCustomer data export breaks on accented names\t6/1/2026 9:32\t4/17/2026 0:00\t4/20/2026 10:25\tStory\n' +
     'DAE-858\tAnother sensitive summary here\tnot-a-date\t3/11/2026 0:00\t3/12/2026 0:27\tBug', 'auto');
   is(pe.raisedAfterStart.length, 1, 'the late-raised row is still caught');
   const echoed = pe.raisedAfterStart.concat(pe.badCreated).map(b => b.text).join(' ');
-  is(echoed.includes('DAE-1023') || echoed.includes('DAE-858'), false,
-     'a problem line never echoes the ticket key');
+  is(echoed.includes('DAE-1023'), true,
+     'a problem row names its ticket key — it is what you paste back into Jira to fix it');
   is(echoed.includes('Customer') || echoed.includes('summary'), false,
-     'nor the summary');
+     'and never the summary, which is the half the shape guard exists for');
   is(pe.raisedAfterStart[0].text.includes('Story')
      && pe.raisedAfterStart[0].text.includes('created 6/1/2026 9:32'), true,
-     'what it does echo is the type and the dates, labelled');
+     'along with the type and the dates, labelled');
+  is(pe.raisedAfterStart[0].text.indexOf('DAE-1023'), 0,
+     'the key LEADS, because it is the thing being looked up');
+
+  /* THE FALLBACK, and it is not a stopgap: an export with no key column still
+     names its problem rows by type and dates, which is what finds the row again
+     when there is no key to search for. */
+  const pnk = TD.parsePastedRows(
+    'Created\tIn Progress\tResolved\tIssue Type\n' +
+    '6/1/2026 9:32\t4/17/2026 0:00\t4/20/2026 10:25\tStory', 'auto');
+  is(pnk.raisedAfterStart.length, 1, 'a keyless export still catches the late-raised row');
+  is(pnk.raisedAfterStart[0].text.includes('Story'), true,
+     'and still names it by what it does have', pnk.raisedAfterStart[0].text);
+
+  /* A SUMMARY IN THE KEY COLUMN — the mismapping the old rule was afraid of.
+     It must come through as no key rather than as a truncated sentence. */
+  const pmm = TD.parsePastedRows(
+    'Key\tCreated\tIn Progress\tResolved\tIssue Type\n' +
+    'Customer data export breaks on accented names\t6/1/2026 9:32\t4/17/2026 0:00\t4/20/2026 10:25\tStory', 'auto');
+  is(pmm.raisedAfterStart[0].text.includes('Customer'), false,
+     'a summary sitting in the key column reaches the report as nothing at all',
+     pmm.raisedAfterStart[0].text);
 
   /* ══════════════════════════════════════════════════════════
      The issue key — the ONE identifier this app stores, and the strictest

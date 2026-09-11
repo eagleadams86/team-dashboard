@@ -6694,9 +6694,32 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
      guard as the saved type, so even a mismapped column can't put a long text
      back on screen. The line number is how the row is then found in the export
      itself, which still has every identifying detail — where it belongs. */
+  /* ── NAMING A PROBLEM ROW ────────────────────────────────────────────────
+     THE KEY LEADS, since 2026-09-11. This function deliberately carried no
+     issue key for a year: the rule was that the report never echoes a pasted
+     cell, because `refOf` reads whatever a possibly-MISMAPPED column map points
+     at, and the row it is describing is one the parser has already found
+     suspect. That argument was about untrusted TEXT, and it is answered by the
+     guard rather than by silence — `cleanIssueKey` enforces a SHAPE (letters,
+     a dash, up to six digits), so a cell from the wrong column cannot come
+     through as a sentence. It comes through as nothing, and the line number and
+     dates below still name the row.
+
+     Asked for by Charles: the key is what he pastes back into Jira to go and
+     fix the row the report is complaining about. A line number finds it in the
+     export; the key finds it in the system the export came from, which is where
+     the correction has to be made. Keys have been STORED, drawn on the age
+     chart and listed in Your Data since 2026-08-20, so a report naming one puts
+     nothing on screen the app was not already showing.
+
+     THE FALLBACK IS NOT A STOPGAP. An export with no key column, or a row whose
+     key cell is unreadable, still gets type and three dates — which is what
+     finds the row again when there is no key to search for. */
   const refOf = (cells) => {
     const cell = (i) => cleanWorkType(at(cells, i));
     const parts = [];
+    const key = cleanIssueKey(at(cells, cols.key));
+    if (key) parts.push(key);
     const t = cell(cols.type);      if (t) parts.push(t);
     const k = cell(cols.created);   if (k) parts.push('created ' + k);
     const s = cell(cols.started);   if (s) parts.push('started ' + s);

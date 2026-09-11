@@ -1240,14 +1240,25 @@ built-in Helvetica rather than the face the page is set in.
   appearing in the help text was reported by Charles and fixed 2026-08-13. Any
   new diagnostic or preview must not repeat raw pasted cells; point at the source
   export with a line number instead.
-  **`refOf()` was deliberately left alone when the key arrived (2026-08-20).**
-  The temptation is obvious — the key is stored now, so why not name the problem
-  row with it — but the reason the echo was cut was that the *line* is untrusted,
-  and that has not changed: `refOf` reads whatever cells a possibly-mismapped
-  column map points at. Adding the key there means reading a cell the parser has
-  already decided is suspect. A test pins the current behaviour; if it is ever
-  wanted, put `cleanIssueKey(at(cells, cols.key))` in and change that test
-  deliberately rather than by accident.
+  **`refOf()` NOW LEADS WITH THE ISSUE KEY (2026-09-11), reversing the note that
+  stood here.** That note said the key was left out because the *line* is
+  untrusted — `refOf` reads a possibly-mismapped column, on a row the parser has
+  already found suspect — and it told whoever wanted it to put
+  `cleanIssueKey(at(cells, cols.key))` in and change the test deliberately.
+  That is exactly what happened, at Charles's request: the key is what he pastes
+  back into Jira to go and fix the row the report is complaining about. A line
+  number finds the row in the export; the key finds it in the system the export
+  came from, which is where the correction is made.
+
+  **The argument was answered by the guard, not by the silence.** `cleanIssueKey`
+  enforces a SHAPE, so a summary landing in the key column reaches the report as
+  nothing at all rather than as seventeen characters of a work system — pinned
+  both ways in tests.html, along with the keyless-export fallback (type and three
+  dates), which is not a stopgap: it is what finds a row when there is no key to
+  search for. Keys have been stored, drawn on the age chart and listed in Your
+  Data since 2026-08-20, so a report naming one shows nothing the app was not.
+  **The summary rule is untouched and is the one that matters** — no new
+  diagnostic may echo a pasted cell that is not shape-guarded.
 - **Whitelists at every boundary**: `sanitizeTeams()` and `hydrateRows()` rebuild
   teams/rows from known keys. `hydrateRows()` also applies the paste boundary's
   date-ordering rules (started ≤ completed, created ≤ start) so a hand-edited

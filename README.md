@@ -1152,14 +1152,21 @@ keys off a completion date.
 | No completion and no start | Dropped — untouched backlog says nothing about flow |
 | A date that cannot exist (31 Feb, month 13) | Rejected rather than silently rolled over |
 
-**Every problem row is listed back with its line number and only the cells the app reads** —
-the work type and the three dates, never the whole pasted line. Not even the issue key, which
-the app *does* store: a row reaches this list precisely because its columns look wrong, so the
-cell the key would be read from is the one cell that cannot be trusted to hold a key. The line
-also carries a summary, and that belongs on screen no more than in storage;
-the line number is how you find the row in your export, which still has every identifying
-detail — where it belongs. Long lists are capped, but the count above each list is always the
-true total.
+**Every problem row is listed back with its line number, its issue key, and only the other
+cells the app reads** — the work type and the three dates, never the whole pasted line. The key
+leads, because it is the thing you paste back into Jira to go and fix the row being complained
+about: the line number finds the row in your export, and the key finds it in the system the
+export came from, which is where the correction has to be made.
+
+The key was deliberately left out until September 2026, on the argument that a row reaches this
+list precisely because its columns look wrong — so the cell the key is read from is the one cell
+that cannot be trusted. What answers that is the guard rather than the silence: a key has to
+match a **shape** (letters, a dash, up to six digits), so a summary that has landed in the key
+column arrives as no key at all rather than as a fragment of one. **The summary itself is still
+never echoed, and neither is any other cell that is not shape-guarded** — that is the rule that
+matters, and it is untouched. An export with no key column still names its problem rows by type
+and dates, which is what finds them again when there is no key to search for. Long lists are
+capped, but the count above each list is always the true total.
 
 ### The Three Dates Are Not Equally Trustworthy
 
