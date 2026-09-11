@@ -402,7 +402,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. */
-const EXPECTED = 3905;
+const EXPECTED = 3910;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -7695,7 +7695,54 @@ group('ARTs — the grouping, and the boundary it crosses');
     ok(/WIP 8/.test(after), 'the row then states the target that was set', after);
     ok(/out of aged share/.test(after), 'and that this team is out of the roll-up', after);
     ok(!/Sprint/.test(after), 'and says nothing about sprints for a team that runs none', after);
+    /* ── THE WINDOW FITS, AND SAYS WHICH KIND OF DAY ──────────────────────
+       Both reported by Charles on 2026-09-11, one after the other, from the same
+       screen: the window scrolled, and the box said only "days" in an app that
+       has a working-days switch — with "85% <= (working days)" sitting two
+       fields above it. */
+    appDoc.querySelector('[data-edit-team="c1"]').click();
+    const teamDlg = appDoc.getElementById('teamDialog');
+    const behind = appDoc.getElementById('manageDialog');
+    /* PINNED OFF THE CSS, NOT OFF THE LAYOUT. The app runs here in a hidden
+       iframe a few dozen pixels wide, so getBoundingClientRect answers about
+       that box and not about anything a reader would see — the first attempt at
+       this check read "42 vs 42" and a 6267px-tall dialog. A computed max-width
+       is a CSS value and does not depend on the viewport at all, which makes it
+       the half of this that a test can honestly hold. The height it buys was
+       measured in a real 1440x900 window: 787px of content, no scroll. */
+    const maxW = (el) => parseInt(win.getComputedStyle(el).maxWidth, 10);
+    ok(maxW(teamDlg) < maxW(behind),
+       'the editor is NARROWER than the window it opens over, so the pair reads as a window '
+       + 'on a window', maxW(teamDlg) + ' vs ' + maxW(behind));
+    ok(maxW(teamDlg) > maxW(behind) * 0.6,
+       'but not so narrow that its prose wraps into a column — which is what the scrolling was',
+       Math.round(100 * maxW(teamDlg) / maxW(behind)) + '%');
+    ok(maxW(teamDlg) > 560,
+       'and wider than the 560px default it inherited, which is where this started',
+       maxW(teamDlg) + 'px');
+
+    /* CALENDAR, and stated wherever the number is typed or read back. A sprint
+       boundary is a DATE — the working-days setting cannot reach it — and the
+       box beside it in this very window says "working days" when that setting is
+       on, which is exactly how the question came up. */
+    appDoc.getElementById('teamSprintMode').value = 'own';
+    appDoc.getElementById('teamSprintMode').dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(appDoc.querySelector('label[for="teamSprintDays"]').textContent, 'A sprint is (calendar days)',
+       'the team’s own sprint length says calendar days on the label');
+    appDoc.getElementById('teamDialog').close();
+    await new Promise(r => setTimeout(r, 0));
+
     appDoc.getElementById('manageDialog').close();
+    appDoc.getElementById('settingsBtn').click();
+    is(appDoc.querySelector('label[for="setSprintDays"]').textContent, 'A sprint is (calendar days)',
+       'and so does the company one');
+    ok(/calendar days/.test(appDoc.getElementById('sprintCadenceHint').textContent),
+       'the sentence under it reads the number back the same way',
+       appDoc.getElementById('sprintCadenceHint').textContent);
+    ok([...appDoc.querySelectorAll('#settingsDialog .manage-note')]
+         .some(n => /Calendar days, always/.test(n.textContent) && /working days/.test(n.textContent)),
+       'and the section says outright that the working-days setting cannot move a sprint boundary');
+    appDoc.getElementById('settingsDialog').close();
   }
 
   /* Not set is the DEFAULT and has to stay so: a limit the app picked would draw

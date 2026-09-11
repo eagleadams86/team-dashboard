@@ -52,6 +52,16 @@ Two changes, and the first is a model correction rather than a layout fix:
   ORDINARY state under 19 — an override is kept when a team is switched off — so migrating on
   shape would switch those back on at every load. Only `raw.schema === 18` is touched. Both
   halves are pinned.
+- **The cadence is in CALENDAR days, and every label now says so.** Charles asked which kind,
+  looking at a box labelled just "days" two fields below `85% ≤ (working days)` — the app was
+  actively inconsistent about it. A sprint boundary is a DATE and `workingDays` cannot reach it;
+  said on both labels, in both hints, in the window note and in a Settings paragraph of its own.
+- **`#teamDialog` is 880px** — narrower than the 1100px window it opens over, so the pair reads
+  as a window ON a window, and wide enough that the prose stops wrapping into a column (787px of
+  content at 880 where the inherited 560px default made 924, which is what the scrolling was).
+  **Do not pin dialog LAYOUT in tests**: the app runs in a hidden iframe a few dozen pixels wide,
+  so `getBoundingClientRect` there answered "42 vs 42" and a 6267px-tall dialog. The suite pins
+  the computed `max-width`, which is a CSS value and viewport-independent.
 - **Prose follows its control.** The five `.manage-note` paragraphs above the Teams table
   described four controls that had left; each now sits in the editor section that owns it, which
   also took five paragraphs of scrolling out from above the first team. The "85% ≤ is about work

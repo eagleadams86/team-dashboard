@@ -2140,6 +2140,18 @@ dialog { background: var(--surface); color: var(--text-primary);
 .searchresults .hint { margin: 0; padding: 8px 10px; font-size: var(--fs-xs);
   color: var(--text-muted); line-height: var(--lh-base); }
 #manageDialog { max-width: 1100px; }
+/* NARROWER THAN THE WINDOW IT OPENS OVER — about three quarters of it, asked for
+   by Charles looking at one team's settings scrolling inside a 560px box while
+   1100px of Teams window sat behind it. Two things follow from the number:
+   it is visibly smaller than what is behind, so the pair reads as a window ON a
+   window rather than as a replacement; and it is wide enough that the three
+   sections' prose stops wrapping into a column — 787px of content at 825 where
+   the default 560 made 924, which is what the scrolling actually was.
+   880 rather than a flat 825: it is the width at which the last paragraph stops
+   taking an extra line, so the window clears a 800px-tall viewport instead of
+   needing 819. Below that the base rule's `width: calc(100% - 32px)` takes over
+   and it shrinks with the screen like every other window here. */
+#teamDialog { max-width: 880px; }
 /* The same width as the window above, because it is laid out as that window's
    twin — one section per thing you set, the Add button in its heading row. It
    also needs the room for its own reason: `.grid.two` is auto-fit at 260px a
@@ -4063,9 +4075,20 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <p class="manage-note">How long a sprint is here, and the date one of them started &mdash;
       any one will do, and the app counts the rest off it. It measures nothing on its own: it
       is the grid the teams that run sprints are grouped on.</p>
+    <!-- ALWAYS CALENDAR, and it has to be said out loud because the box beside
+         the 85% target in a team's settings says "working days" whenever that
+         setting is on. Asked by Charles, 2026-09-11, looking at a box labelled
+         just "days" in an app that has a working-days switch. A sprint boundary
+         is a DATE — the grid has to land on real days of the week or two
+         screenshots of one team stop lining up — so the working-days setting
+         cannot reach it, however it is set. -->
+    <p class="manage-note"><strong>Calendar days, always</strong> &mdash; a two-week sprint is
+      <strong>14</strong>, and a ten-working-day one is 14 too. The <strong>working days</strong>
+      setting changes how long an item is said to have <em>taken</em>; it cannot move a sprint
+      boundary, because a boundary is a date on the calendar.</p>
     <div class="grid two pairs" style="margin-top:var(--sp-5)">
       <div>
-        <label for="setSprintDays">A sprint is (days)</label>
+        <label for="setSprintDays">A sprint is (calendar days)</label>
         <input type="number" id="setSprintDays" style="--digits:2" step="1" min="1" placeholder="14">
       </div>
       <div>
@@ -4325,13 +4348,11 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
          work, which was reported as "are these duplicate settings?". It moved
          here with the boxes: said where the target is typed, and again beside
          the threshold in Settings. -->
-    <p class="manage-note"><strong>85% &le; is about work that has FINISHED</strong> &mdash; it
-      is checked against the items this team delivered. The separate
-      <strong>ageing threshold</strong> in Settings is about work that has <em>not</em>: how long
-      something can sit open before it is flagged. They are different questions, so they are
-      usually different numbers &mdash; and the threshold is normally the <strong>lower</strong>
-      of the two, because an item that has already passed your target is too late to rescue. A
-      promise of 10 days is often watched with a threshold around 6.</p>
+    <p class="manage-note"><strong>85% &le; is about work that has FINISHED</strong>; the
+      separate <strong>ageing threshold</strong> in Settings is about work that has <em>not</em>.
+      Different questions, so usually different numbers &mdash; and the threshold is normally the
+      <strong>lower</strong> of the two, because an item past your target is too late to rescue.
+      A promise of 10 days is often watched with a threshold around 6.</p>
     <div class="grid two pairs" style="margin-top:var(--sp-5)">
       <div>
         <label for="teamWip">WIP &le; (items)</label>
@@ -4350,7 +4371,9 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <div class="row spread"><strong class="manage-head">Sprints</strong></div>
     <p class="manage-note">Whether this team runs sprints, and on whose cadence. It changes no
       measurement &mdash; only where each period begins and ends, and whether
-      <strong>Group by &rarr; Sprint</strong> is offered at all.</p>
+      <strong>Group by &rarr; Sprint</strong> is offered at all. A length here is in
+      <strong>calendar days</strong> whatever the working-days setting says &mdash; a two-week
+      sprint is 14 &mdash; because a sprint boundary is a date.</p>
     <div style="margin-top:var(--sp-5)">
       <label for="teamSprintMode">This team&rsquo;s sprints</label>
       <select id="teamSprintMode">
@@ -4364,7 +4387,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
          for, and a reader would fill them in to find out what they did. -->
     <div class="grid two pairs" id="teamSprintOwnWrap" style="margin-top:var(--sp-5)" hidden>
       <div>
-        <label for="teamSprintDays">A sprint is (days)</label>
+        <label for="teamSprintDays">A sprint is (calendar days)</label>
         <input type="number" id="teamSprintDays" style="--digits:2" inputmode="numeric"
                min="1" step="1" autocomplete="off" placeholder="14">
       </div>
@@ -4379,11 +4402,11 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <section class="manage-sec">
     <div class="row spread"><strong class="manage-head">The Train&rsquo;s Aged Share</strong></div>
     <p class="manage-note">Whether this team&rsquo;s items count towards the
-      <strong>Predictability</strong> figure on the Scorecard. Every team is in unless you
-      untick it. Untick a team that measures its predictability another way &mdash; a Scrum team
-      watching how much of its sprint commitment it completes, say &mdash; and the card says how
-      many teams it is reading. It changes nothing on any other tab, and nothing on this
-      team&rsquo;s own dashboard.</p>
+      <strong>Predictability</strong> figure on the Scorecard &mdash; every team is in unless you
+      untick it. Untick one that measures its predictability another way, such as a Scrum team
+      watching how much of its sprint commitment it completes, and the card says how many teams
+      it is reading. Nothing else moves: not another tab, and not this team&rsquo;s own
+      dashboard.</p>
     <div style="margin-top:var(--sp-5)">
       <label class="checkline" for="teamRollup">
         <input type="checkbox" id="teamRollup">
@@ -14386,7 +14409,10 @@ function customNote(d) {
    sentence cannot drift into a claim the code did not make. */
 function cadenceNote(d, offer) {
   if (d && d.bucket === 'sprint' && d.cadence) {
-    return '<br>sprints of ' + d.cadence.days + ' days from '
+    /* Calendar days, said here too: this note is what a printout carries, and a
+       reader holding it beside a cycle time in working days needs to know the
+       two are not counted the same way. */
+    return '<br>sprints of ' + d.cadence.days + ' calendar days from '
       + prettyDate(d.cadence.anchor);
   }
   /* Only when a sprint was actually asked for AND refused — derive sets
@@ -15427,6 +15453,9 @@ function renderTeamRows() {
        needs to see which is which without opening either. */
     const cad = cadenceOf(t, state.settings);
     if (cad) {
+      /* "14d" and not "14 calendar days": this column is a glance down a list of
+         sixteen, and the windows that let you TYPE the number are where the unit
+         is spelled out. */
       bits.push('Sprint ' + cad.days + 'd' + (t.usesSprints === SPRINT_OWN ? ' own' : ''));
     } else if (t.usesSprints) {
       /* Ticked on with no grid to run on — the company cadence is unset and the
@@ -18920,7 +18949,7 @@ function renderSettingsForm() {
   const onIt = state.teams.filter(t => t.usesSprints === SPRINT_COMPANY).length;
   const ownIt = state.teams.filter(t => t.usesSprints === SPRINT_OWN).length;
   $('sprintCadenceHint').innerHTML = (csD && csA)
-    ? 'A sprint here is <strong>' + csD + ' days</strong>, counted off <strong>'
+    ? 'A sprint here is <strong>' + csD + ' calendar days</strong>, counted off <strong>'
       + prettyDate(new Date(csA + 'T00:00:00Z')) + '</strong>. '
       + (onIt
         ? '<strong>' + onIt + ' of ' + state.teams.length + ' teams</strong> '
@@ -22096,7 +22125,7 @@ function renderTeamDialog() {
     ? 'Periods for this team are cut on whatever <strong>Group by</strong> says &mdash; week, '
       + '2 weeks or month. <strong>Sprint</strong> is not offered.'
     : live
-      ? 'Its sprints are <strong>' + live.days + ' days</strong> from <strong>'
+      ? 'Its sprints are <strong>' + live.days + ' calendar days</strong> from <strong>'
         + prettyDate(live.anchor) + '</strong>, so <strong>Group by \u2192 Sprint</strong> cuts '
         + 'every period on them. It changes no measurement &mdash; only where each period '
         + 'begins and ends.'

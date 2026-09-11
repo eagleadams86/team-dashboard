@@ -323,8 +323,10 @@ the card surface. It has a tile this app does not; the difference follows from t
 
 ## Sprint Cadence: Grouping on Your Own Boundaries
 
-Set **Our Sprint Cadence** in Settings — how long a sprint is, and the date one of them started
-(any one; the app counts the rest off it). Then each team says whether it runs sprints, under
+Set **Our Sprint Cadence** in Settings — how long a sprint is in **calendar days**, and the date
+one of them started (any one; the app counts the rest off it). A two-week sprint is `14`, and so
+is a ten-working-day one: the **working days** setting changes how long an item is said to have
+*taken*, but it cannot move a sprint boundary, because a boundary is a date on the calendar. Then each team says whether it runs sprints, under
 **Edit** in Teams & Stages: *doesn't run sprints*, *our cadence*, or *a cadence of its own*.
 Teams on a cadence gain a **Sprint** option under *Group by* that cuts every period on their real
 sprint boundaries.
