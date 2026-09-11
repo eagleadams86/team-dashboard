@@ -6259,10 +6259,22 @@ function cleanSleDays(v) {
    past it the month bucket is the honest grouping rather than this one. A guard
    on a hand-edited copy, like TEAM_TARGET_MAX, not a real bound. */
 /* ── THE ADD BUTTON AT THE FOOT OF A LONG LIST ──────────────────────────────
-   Six rows. Below that the heading-row button is still on screen and a second
-   one is clutter; at or above it the list is tall enough that adding meant
-   scrolling back to the top, which is what Charles hit with sixteen teams
-   (2026-09-11). See syncAddFoot, far below, which is the only reader.
+   THE RULE, and it is the thing to keep: a second button is earned when the
+   SECTION GROWS TALLER THAN THE DIALOG'S VISIBLE HEIGHT — the point at which you
+   cannot see its heading and the end of its list at once, so the button in the
+   heading is no longer somewhere you can reach from the bottom. Below that it is
+   clutter, which is what Charles objected to in the sibling app when six was too
+   low there (2026-09-11).
+
+   That is a row count per SECTION, not per app, because the distance from a
+   heading to the fold depends on how much prose sits above the table. MEASURE
+   IT, do not copy a number: in a 734px dialog, Teams passes 734px at ten rows
+   and Workflow Stages at four. The first six-and-two pair here was measured
+   against a Teams section carrying five paragraphs — paragraphs this same day's
+   work then cut to one, which moved the answer and left the number stale. That
+   is exactly how these go wrong.
+
+   See syncAddFoot, far below, which is the only reader.
 
    A row count rather than a measured height on purpose: a height would have to
    be re-measured on every render, in a dialog that can be open while the window
@@ -6276,21 +6288,19 @@ function cleanSleDays(v) {
    put it in the temporal dead zone at boot and the app threw before it rendered
    anything — with the suite reporting no passes and no failures rather than a
    red check, which is the shape that particular mistake always takes here. */
-const ADD_FOOT_FROM = 6;
+const ADD_FOOT_FROM = 10;
 
-/* TWO, for Workflow Stages, and the number is measured rather than felt. A stage
-   is not one row but TWO — a name-and-aliases row of 59px and a status-pick grid
-   of 98px under it — so one stage is 157px where a team row is 59px, 2.7 times
-   taller. It also sits under the longest prose in the window: 366px of it,
-   against a couple of lines for Teams.
+/* FOUR, for Workflow Stages, under the same measured rule as above. A stage is
+   not one row but TWO — a name-and-aliases row of 59px and a status-pick grid of
+   98px under it — so one stage is 157px where a team row is 59px, 2.7 times
+   taller, and it sits under the longest prose in the window. The section passes
+   the 734px fold at four; three come to 663px, which still shows the heading.
 
-   Six stages would therefore put the foot button about 1300px below the section
-   heading, which is not "a long list" so much as a button nobody will ever meet.
-   Two stages already come to ~680px under that heading — past the fold on an
-   ordinary laptop — which is the same place six team rows land, and the same
-   moment the heading-row button stops being reachable. Reported by Charles
-   looking at four stages with the heading long gone (2026-09-11). */
-const ADD_FOOT_FROM_STAGES = 2;
+   Reported by Charles looking at four stages with the heading long gone, which
+   is precisely the four this lands on. It was briefly TWO — an over-correction
+   from the other direction, chosen before the rule above was written down, and
+   at two the heading is still plainly on screen. */
+const ADD_FOOT_FROM_STAGES = 4;
 
 const SPRINT_DAYS_MAX = 56;
 
