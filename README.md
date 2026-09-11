@@ -3,6 +3,10 @@
 Kanban flow metrics for as many delivery teams as you like, from nothing but a list of
 completed and started dates. Single page, no build step, nothing to install.
 
+Scrum teams too: nothing here asks how you plan, and a team that runs sprints can
+[group every period on its own sprint boundaries](#sprint-cadence-grouping-on-your-own-boundaries)
+rather than on a fortnight counted from a fixed date.
+
 **Live:** https://eagleadams86.github.io/team-dashboard/
 
 **Download:** [the app as one file](https://github.com/eagleadams86/team-dashboard/releases/latest) — double-click it and it
@@ -61,10 +65,11 @@ window is exactly 12 weeks of calendar, but its ends fall mid-week, so the first
 partial — which is true of every other window here too, and why the note above the charts says how
 much of the last period it covers.
 
-**Group by week, 2 weeks or month.** The control sits beside the date window on the dashboard.
-Weekly is the default and the finest grain; monthly smooths out the lumpiness that makes a
-single week hard to read. The grouping also drives the last column of the Your Data table, so
-the table and the charts always name the same period.
+**Group by week, 2 weeks, month — or sprint.** The control sits beside the date window on the
+dashboard. Weekly is the default and the finest grain; monthly smooths out the lumpiness that
+makes a single week hard to read. **Sprint** appears only once a team has a cadence set — see
+[below](#sprint-cadence-grouping-on-your-own-boundaries). The grouping also drives the last
+column of the Your Data table, so the table and the charts always name the same period.
 
 **A tab press starts the new view at the top**, and so does a
 [Find](#find-k) result that opens no record — changing what you are looking at means the
@@ -314,6 +319,34 @@ size and are still laid out by `auto-fit` — as this app's own per-group tile r
 a tile is drawn on**: this app puts tiles on the same surface as its cards (see above), where the
 sibling keeps them a shade apart so that its one *hero* tile can stand out from the rest by being
 the card surface. It has a tile this app does not; the difference follows from that.
+
+## Sprint Cadence: Grouping on Your Own Boundaries
+
+Set a team's **Sprint** length in days and the date one sprint started — any one of them, the app
+counts the rest off it — in **Teams & Stages**, and *Group by* gains a **Sprint** option. Every
+period on the dashboard is then cut on that team's real sprint boundaries.
+
+It changes no measurement. Cycle time, throughput, aged work and the rest are worked out exactly
+as before; all that moves is where each period begins and ends. That is the whole point: the
+*2 weeks* option counts fortnights from a fixed date in 1970, so for a team on a two-week sprint
+it lands half a sprint out and every bar straddles two of them. A bar labelled with a sprint start
+is the one a team can argue with.
+
+Leave either box blank and nothing changes — a length with no anchor has no phase, and an anchor
+with no length has no grid, so the app reads the two only as a pair and offers nothing until it
+has both.
+
+**On All Teams the option appears only when every team in scope is on the same cadence** — the
+same length, and starting on the same days. Teams a whole number of sprints apart count as the
+same grid; two teams on fourteen days offset by seven do not, because one bar would be the back
+half of one team's sprint and the front half of the other's. When the option is withheld the note
+under the charts says which of the three reasons it is: some teams have none, none of them do, or
+they are not aligned. The Scorecard is unaffected — it aligns to whole weeks whatever *Group by*
+says, for [its own reasons](#every-team-at-a-glance-the-scorecard).
+
+The cadence travels in a [share link](#share-a-read-only-link), because it decides where the bars
+are: a link that dropped it would show the reader a different set of numbers under the same
+headings.
 
 ## Grouping Teams into ARTs
 
@@ -607,7 +640,7 @@ Three columns, one per thing a leadership team asks about:
 
 | Column | The figure | Read over |
 |---|---|---|
-| **Predictability** | **Aged share of WIP** — how much of the board has been open past your ageing threshold, averaged across the window | work items |
+| **Predictability** | **Aged share of WIP** — how much of the board has been open past your ageing threshold, averaged across the window | work items, [minus any team held out](#holding-a-team-out-of-the-aged-share) |
 | **Quality** | **Defect share of completions** — how much of what finished was defect work | work items |
 | **Flow** | **Average feature cycle time** — how long a finished feature took, start to completion | **features** |
 
@@ -622,6 +655,30 @@ putting the three side by side.
 
 The tab appears once you have a **second team**, the same rule All Teams follows: a roll-up of
 one team is that team's own dashboard with three of its tiles on it.
+
+### Holding a Team Out of the Aged Share
+
+`trainRowsOf` pools **items**, not teams, so the Predictability figure is item-weighted: a large
+team moves it more than a small one, and a team that doesn't manage aged WIP at all drags the
+train's number somewhere nobody owns. **In the train's aged share** in *Teams & Stages* is how a
+team sits out. Every team is in unless you untick it.
+
+The case it was built for is a Scrum team that measures its predictability as the share of a
+sprint commitment it completed — a number this app cannot compute, because it stores no
+commitment and no sprint scope. Aged WIP is not a rival to that figure so much as its leading
+indicator (an item open past your threshold is an item that won't make the sprint), so ticking a
+team out is a decision worth making deliberately rather than a default.
+
+**Only this card.** Quality is a defect rate and Flow is a feature cycle time; neither asks
+anything about how a team plans, so neither loses a team. When anyone is held out, the
+Predictability card says **"across 5 of 8 teams"** under its heading and the sentence above the
+three cards says how many are out and where to change it — a figure that moved because five teams
+are behind it instead of eight, with nothing on screen saying so, is the one thing this page will
+not do. Hold every team out and the card says exactly that, rather than the "nothing has
+completed yet" it would otherwise reach for.
+
+The tick travels in a share link, for the plainest reason of the three fields that do: dropping it
+would put a team back into a figure its owner deliberately took it out of.
 
 ### The Window Before This One
 
@@ -1448,6 +1505,20 @@ backup with everything else — a recipient sees the figures you saw, under the 
 what was ignored.
 
 ## What Isn't Here, and Why
+
+**Sprint commitment, and the share of it a team completed** — the figure most Scrum teams call
+their predictability. It needs two things this app deliberately does not store: what a team
+committed to at the start of a sprint, and what was in the sprint's scope. Both are planning
+records rather than dates off a board, and neither survives the rule that only numbers, dates and
+capped labels are ever saved. The [sprint cadence](#sprint-cadence-grouping-on-your-own-boundaries)
+gives a Scrum team its own periods to read every other figure over; it is not a route to this one.
+The sibling app, [Sprint Predictability](https://eagleadams86.github.io/sprint-velocity/), is where
+commitment-versus-delivered lives.
+
+**A sprint entity, and sprints that slipped** — the cadence here is a perfect arithmetic grid
+counted off one anchor. A team that skipped a sprint two years ago has its older periods off by
+one length. Fixing that means storing a list of real sprint start dates, which is a different
+feature with a different shape, and it is deliberately out.
 
 
 **Blocked time** — how long an item couldn't move because something was in its way. A plain
