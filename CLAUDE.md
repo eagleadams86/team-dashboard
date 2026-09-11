@@ -46,6 +46,12 @@ Two changes, and the first is a model correction rather than a layout fix:
   instead, which fires however the close came from. Its callback is a MICROTASK, so a test must
   yield once before reading the row. `manageDialog` still uses `close` — long-standing, works in
   real browsers, and not this change's business.
+- **hydrateState migrates SCHEMA 18 documents, VERSIONED rather than SHAPED.** For one day a
+  team's sprints were a bare pair with no mode; read literally by 19 that team runs no sprints
+  and quietly loses the option it was configured for. But "a pair with no mode" is also an
+  ORDINARY state under 19 — an override is kept when a team is switched off — so migrating on
+  shape would switch those back on at every load. Only `raw.schema === 18` is touched. Both
+  halves are pinned.
 - **Prose follows its control.** The five `.manage-note` paragraphs above the Teams table
   described four controls that had left; each now sits in the editor section that owns it, which
   also took five paragraphs of scrolling out from above the first team. The "85% ≤ is about work

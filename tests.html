@@ -402,7 +402,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. */
-const EXPECTED = 3900;
+const EXPECTED = 3905;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -665,6 +665,27 @@ async function run(TD, win) {
      'a team that never said it runs sprints has none, whatever it carries');
   is(TD.cadenceOf({}, COMPANY), null, 'a team that set nothing has none');
   is(TD.cadenceOf(null, COMPANY), null, 'and neither does no team at all');
+
+  /* ── SCHEMA 18 -> 19, and why it is versioned rather than shaped ──────────
+     For one day a team's sprints were a bare pair with no mode. Read literally
+     by this build, such a team runs no sprints and quietly loses the Sprint
+     option it was set up for. But "a pair with no mode" is ALSO an ordinary
+     state under 19 — an override is kept when a team is switched off — so
+     migrating on shape would switch those back on at every load. Only a
+     document that predates the mode is touched, and both halves are pinned. */
+  {
+    const old18 = { schema: 18, teams: [
+      { id: 'm1', name: 'Had one', rows: [], sprintDays: 14, sprintAnchor: '2026-01-07' },
+      { id: 'm2', name: 'Had none', rows: [] }] };
+    const up = win.TDState.hydrateState(old18);
+    is(up.teams[0].usesSprints, OWN, 'a schema-18 team with a cadence is migrated to running its own');
+    is(up.teams[1].usesSprints, null, 'while one that had none still runs none');
+
+    const now19 = { schema: 19, teams: [
+      { id: 'm3', name: 'Switched off', rows: [], sprintDays: 14, sprintAnchor: '2026-01-07' }] };
+    is(win.TDState.hydrateState(now19).teams[0].usesSprints, null,
+       'but a SCHEMA 19 team with a kept override stays off — the dates are remembered, not obeyed');
+  }
 
   const team = (d, a) => ({ usesSprints: OWN, sprintDays: d, sprintAnchor: a });
   is(TD.sharedCadence([team(14, '2026-01-07'), team(14, '2026-01-07')], COMPANY).days, 14,

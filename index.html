@@ -12236,6 +12236,25 @@ function hydrateState(raw) {
      the pointer might dangle. */
   const ids = new Set(arts.map(a => a.id));
   teams.forEach(t => { if (t.artId && !ids.has(t.artId)) t.artId = null; });
+  /* ── SCHEMA 18 -> 19: A CADENCE ON ITS OWN USED TO MEAN "RUNS SPRINTS" ─────
+     For one day, a team's sprints were a length and an anchor on the team and
+     nothing else. `usesSprints` did not exist, so a document written by that
+     build carries the pair and no mode — and read literally by this build that
+     team runs no sprints at all, losing the Sprint option it was configured for
+     with nothing on screen saying why. Anybody who set one up in that window
+     would watch the feature quietly switch itself off.
+
+     VERSIONED, NOT SHAPED, and that distinction is the whole point. "Has a pair
+     and no mode" is a perfectly ordinary state under 19: an override is KEPT
+     when a team is switched back to no sprints, so that somebody trying the
+     three answers does not lose the dates they typed. Migrating on shape alone
+     would switch those teams back ON every time the document was read. Only a
+     document that actually predates the mode is migrated. */
+  if (Number(raw && raw.schema) === 18) {
+    teams.forEach(t => {
+      if (!t.usesSprints && pairCadence(t.sprintDays, t.sprintAnchor)) t.usesSprints = SPRINT_OWN;
+    });
+  }
   /* And the same for a row's day counts. A stage id pointing at a stage that
      isn't in the list is dropped rather than kept "just in case": it happens for
      real — an older build hydrates the rows and drops `stages` — and a figure
