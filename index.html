@@ -995,7 +995,11 @@ select { cursor: pointer; }
 .art-pick-all:hover { background: var(--accent-bg); }
 .art-pick-menu hr { border: 0; border-top: 1px solid var(--border); margin: 8px 0; }
 .art-pick-list { display: grid; gap: 7px; max-height: 260px; overflow: hidden auto; }
-@media (prefers-reduced-motion: reduce) { .art-pick-caret { transition-duration: .01ms; } }
+/* No reduced-motion block for the caret. Its `transform .12s` is settled by pack
+   rule 15, which is `* { transition-duration: .01ms !important }` in `theme.css` —
+   `!important` and unscoped, so a local copy could only ever agree with it or drift
+   from it. The caret is also the wrong half to keep: what CSS cannot reach is a
+   scroll asked for from SCRIPT, and this page never scrolls smoothly (2026-09-12). */
 /* A team's train, under its name in the table. Only drawn when the table is
    showing more than one, which is the only time it says anything. */
 .team-art { display: block; font-size: var(--fs-xs); color: var(--text-secondary);
