@@ -3948,7 +3948,11 @@ app now holds identifiers out of a work system, and the answer to "where does th
   alone — `theme.css` has to sit beside it, and opening the HTML off disk
   without it gives an unstyled page. Don't re-inline to "restore" `file://`.
   What stays in the app's own `<style>`, after the link so it still wins:
-  `color-scheme` per theme and `--chrome-h`. **There were per-theme `--shadow`
+  `--chrome-h` and `--page-w`. **`color-scheme` was there too until 2026-09-12**,
+  when it became pack rule 18 — `theme.css` emits it on every palette block now,
+  derived from each theme's `isLight`, so it follows the PALETTE and not the
+  theme's name. Don't re-add a local one; it is drift, and `check_consumers.py`
+  flags it. **There were per-theme `--shadow`
   values too, and they went on 2026-08-23** with every other elevation shadow in
   the family — four apps had invented one, none of them a pack token, for
   something nobody could see once a modal backdrop sat over it. Pack hard rule 14,

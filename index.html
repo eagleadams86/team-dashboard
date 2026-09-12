@@ -182,12 +182,12 @@
    rebuild, re-copy into every app.
 ──────────────────────────────────────────────────────────────────────────── */
 
-/* App tokens on top of the shared palette. color-scheme makes the browser draw
-   its own controls (pickers, spinners, scrollbars) to match the theme. Overrides
-   live in [data-theme] blocks AFTER the :root defaults — equal specificity, so
-   the later rule winning is load-bearing. (A --shadow per theme lived here too,
-   until the family dropped elevation shadows outright on 2026-08-23.) */
-:root { color-scheme: dark;   /* midnight, the default */
+/* App tokens on top of the shared palette. (A --shadow per theme lived here too,
+   until the family dropped elevation shadows outright on 2026-08-23, and
+   `color-scheme` until rule 18 moved it into the pack on 2026-09-12 — theme.css
+   emits it on every palette block now, derived from each theme's `isLight`, so
+   it follows the PALETTE and not the theme's name. Don't re-add a local one.) */
+:root {
   --chrome-h: 30px;
   /* ONE number, read by BOTH .wrap/.shell and .headbar. They have to be the same
      or the brand stops lining up with the left edge of the first card — which is
@@ -199,19 +199,6 @@
      PAPTrack and the dashboard. A new app picks one, and does not invent a third. */
   --page-w: 1500px;
 }
-[data-theme="dark"]  { color-scheme: dark; }
-[data-theme="light"] { color-scheme: light; }
-[data-theme="sepia"] { color-scheme: light; }
-/* Auto has no palette of its own — theme.css resolves it to Light or, under
-   prefers-color-scheme: dark, to Midnight. All this block carries now is
-   color-scheme, and it still has to resolve the same way the palette does, or an
-   Auto page in light mode tells the browser to draw its native controls dark. The
-   dark half is left to :root, which is Midnight and already says exactly that. */
-[data-theme="auto"] { color-scheme: light; }
-@media (prefers-color-scheme: dark) {
-  [data-theme="auto"] { color-scheme: dark; }
-}
-
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
