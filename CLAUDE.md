@@ -213,6 +213,18 @@ taking all fifteen teams and reading past the ones you had not asked about.
   list said twice — in the one corner of the page where the length of a sentence moves
   everything under it. Nothing is lost on paper: `printHead()` puts the scope in the print-only
   line, which is the sentence a printout is read by.
+- **The window note has a height budget: THREE LINES (2026-09-14).** A line of it is 19.5px and a
+  field beside it is 64px, and the strip bottom-aligns its children — so once the note is the
+  tallest thing on the line, every extra line is a gap ABOVE the fields. All Teams had grown to
+  seven lines (73px of empty strip over the selects, in Charles's screenshot) because three
+  sentences about COLUMNS — Aged vs Avg aged %, the defect rate over features, each team's own
+  outlier fence — had been appended to it while the comments and README called them "the note
+  under the table". They are under the table now (`#allTeamsNote`, written by `renderAllTeams`,
+  hidden with the table), and the same-date line went because the hint over the table says it.
+  The Scorecard's "against …" line joined the Showing line for the same reason. The rule: the
+  strip note states the window and the three helpers' warnings, nothing else; a sentence about
+  what a column means goes under that column's table. Pinned in a 1900px frame — at 1240 the
+  custom-date fields fill the line and the note drops to its own row, where there is no gap.
 - **`.controls .window` FLEXES; `margin-left: auto` alone let it take a row of the strip.** A
   wrapping flex row places each item at its own content width and only shrinks what already
   shares a line, so a long enough note was pushed onto a row of its own and the strip went from

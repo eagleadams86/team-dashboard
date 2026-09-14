@@ -1032,7 +1032,15 @@ select { cursor: pointer; }
    line of the note rather than a row of the strip. `min-width: 0` because a
    flex item will not shrink past its longest word without it, and the dates in
    here are long words. The auto margin goes with it — an auto margin eats the
-   free space before flex-grow can, which would pin this back at 260px. */
+   free space before flex-grow can, which would pin this back at 260px.
+
+   AND IT HAS A HEIGHT BUDGET: THREE LINES (2026-09-14). A line of it is 19.5px
+   and a field beside it is 64px; the strip bottom-aligns its children, so once
+   the note is the tallest thing on the line every extra line of it is a gap
+   ABOVE the fields, not below the note. All Teams had grown to seven lines —
+   73px of empty strip over the selects. The cure is what the note says, not a
+   rule here: it states the window and its warnings, and a sentence about what
+   a COLUMN means goes under that column's table (#allTeamsNote). */
 .controls .window { flex: 1 1 260px; min-width: 0; align-self: center; text-align: right;
   font-size: var(--fs-xs); color: var(--text-secondary); }
 .controls .window strong { color: var(--text-primary); font-weight: var(--fw-semibold); }
@@ -2779,6 +2787,16 @@ main:focus { outline: none; }
       <div class="table-scroll" style="margin-top:var(--sp-5)">
         <table class="data" id="allTeamsTable"></table>
       </div>
+      <!-- WHAT THE COLUMNS MEAN, under the columns. Until 2026-09-14 these
+           sentences were appended to #windowNote in the control strip, which
+           the comments and the README already called "the note under the
+           table" and which it never was. Beside the fields that note is a
+           narrow column: a line of it is 19.5px and a field is 64px, so three
+           lines fit and — the strip bottom-aligning its children — every line
+           past the third opened a gap ABOVE the fields, 73px of it in the
+           screenshot Charles sent. Written by renderAllTeams; hidden with the
+           table, because the empty state below carries its own message. -->
+      <p class="hint" id="allTeamsNote" hidden></p>
       <div class="note info" id="allTeamsNone" hidden></div>
     </div>
   </section>
@@ -17543,7 +17561,8 @@ function teamColumns(train) {
        not-applicable cell. The column stays in place rather than disappearing
        when Count is switched — a column that comes and goes would shift every
        heading beside it, and the sort could be resting on the one that left.
-       The note under the table says why the cells are empty; see windowNote. */
+       The note under the table says why the cells are empty; see
+       #allTeamsNote in renderAllTeams. */
     { key: 'defects', label: defect + ' rate', desc: true,
       get: (d) => d.summary.unplannedShare, fmt: (v) => or(v, pct1) },
     /* Ascending on the first press: the interesting end is the OLDEST export,
@@ -17931,6 +17950,7 @@ function renderAllTeams() {
         : 'No team' + where + ' has any work items yet. Paste an export on the Your Data tab, '
           + 'or add items by hand there, and every team appears here side by side.';
     $('windowNote').innerHTML = '';
+    $('allTeamsNote').hidden = true;
     $('allTeamsTiles').innerHTML = '';
     drawTrainThroughput(null);
     /* THE PRINT LINE IS REWRITTEN HERE TOO (2026-09-10, evening audit). This
@@ -17968,12 +17988,34 @@ function renderAllTeams() {
      below follows this picker" — so this was the same list said twice, in the
      one corner of the page where the length of a sentence moves everything
      under it. On paper neither is lost: printHead() above puts the scope in the
-     print-only line, which is the sentence a printout is read by. */
+     print-only line, which is the sentence a printout is read by.
+
+     IT SAYS WHAT THE WINDOW IS, AND NOTHING ELSE (2026-09-14). Until then it
+     also carried three sentences about COLUMNS — what Aged and Avg aged % each
+     count, why the defect rate is dashes over features, that every row keeps
+     its own outlier fence — and a line saying every team is read as of the
+     same date. Beside the fields this note is a column some 340px wide; a line
+     of it is 19.5px and a field is 64px, so THREE LINES FIT, and because the
+     strip bottom-aligns its children every line past the third opened a gap
+     above the fields — 73px of it, over features with custom dates, in the
+     screenshot Charles sent. The column sentences are under the table now
+     (#allTeamsNote, below), where the comments had always said they were; the
+     same-date line went because the hint over the table says it in full. What
+     is left is two lines on an ordinary board, and only the warnings the three
+     helpers add — a future-dated row, a half-set date pair, a sprint grid —
+     can lengthen it. */
   $('windowNote').innerHTML = span + customNote(train) + futureNote(train)
     + cadenceNote(train, sprintOffer('allteams'))
-    + '<br>' + 'every team, as of the same date' +
-    '<br>' + itemsInWindow(train) + ' across ' +
-    inScope.length + ' team' + (inScope.length === 1 ? '' : 's') +
+    + '<br>' + itemsInWindow(train) + ' across ' +
+    inScope.length + ' team' + (inScope.length === 1 ? '' : 's');
+
+  /* WHAT THE COLUMNS MEAN, under the columns. A tile can carry its own reason
+     on its foot and a card can carry one on its face; a table cell has nowhere
+     to put a sentence, and an ⓘ on the heading is ruled out three comments up
+     — nine of them put this table into a sideways scroll. So the reasons go in
+     the one line under the table, next to the columns they are about. */
+  const kind = escapeHtml((state.settings.unplannedLabel || 'unplanned').toLowerCase());
+  $('allTeamsNote').innerHTML =
     /* NOT outlierNote(train). Every row in this table ignores its own team's
        outliers, measured against its own spread — see the comment in
        deriveTeams — so there is no single cutoff to state here, and quoting the
@@ -17981,32 +18023,26 @@ function renderAllTeams() {
        taken with. The count is the sum of what the rows actually ignored; the
        train row in the <tfoot> is the one line that uses the train's own fence,
        and its cell says so on hover. */
-    (teamOutliers ? '<br>each team ignoring its own outliers &mdash; '
-      + teamOutliers + ' item' + (teamOutliers === 1 ? '' : 's') + ' in total' : '') +
+    (teamOutliers ? 'Every team ignores its own outliers &mdash; '
+      + teamOutliers + ' item' + (teamOutliers === 1 ? '' : 's') + ' in total.<br>' : '') +
     /* WHY TWO NEIGHBOURING CELLS DO NOT DIVIDE. Aged is the count open at the
        shared end date; Avg aged % is the share over every period of the window,
        so a row reading 6 and 34% is not an arithmetic slip. The heading says
        "Avg" for the same reason and neither is enough on its own — the heading
-       names the shape and this names what it is a shape OF. */
-    '<br>Aged is the count open on that date; Avg aged % is the share over every '
-      + train.bucketNoun + ' of the window' +
-    /* WHY ONE COLUMN IS ALL DASHES. A tile can carry its own reason on its foot
-       and a card can carry one on its face; a table cell has nowhere to put a
-       sentence, and an ⓘ on the heading is ruled out three comments up — nine
-       of them put this table into a sideways scroll. So the reason goes in the
-       one place under the table that already carries this kind of caveat, next
-       to the outlier line above it.
-
-       Said only in the feature view, where the column is empty for a reason
-       nobody can read off the screen. In the item view the same cells can be
-       empty because a team finished nothing, which the rest of that team's row
-       of dashes already explains. */
+       names the shape and this names what it is a shape OF. The date is NAMED,
+       not "that date": up in the strip the window's end was the line above,
+       and down here it is a screen away. */
+    'Aged is the count open on ' + prettyDate(train.endDate)
+      + '; Avg aged % is the share over every ' + train.bucketNoun + ' of the window.' +
+    /* WHY ONE COLUMN IS ALL DASHES. Said only in the feature view, where the
+       column is empty for a reason nobody can read off the screen. In the item
+       view the same cells can be empty because a team finished nothing, which
+       the rest of that team's row of dashes already explains. */
     (train.unit === 'features'
-      ? '<br>the ' + escapeHtml((state.settings.unplannedLabel || 'unplanned').toLowerCase())
-        + ' rate is not a feature-level figure &mdash; a '
-        + escapeHtml((state.settings.unplannedLabel || 'unplanned').toLowerCase())
-        + ' is a kind of work item'
+      ? '<br>The ' + kind + ' rate is not a feature-level figure &mdash; a '
+        + kind + ' is a kind of work item.'
       : '');
+  $('allTeamsNote').hidden = false;
 
 
   const s = train.summary;
@@ -18704,8 +18740,13 @@ function renderScorecard() {
      future-dated row that moved this page's window was a FEATURE, and a note
      written off the items derive alone would have been silent on the one screen
      that was wrong. */
+  /* ON THE SHOWING LINE, not under it (2026-09-14): the strip's note has a
+     budget of three lines beside a 64px field — see `.controls .window` — and
+     this one was four, which sat the fields 7px low and moved the page by 14px
+     between this tab and the Dashboard. The middot is the separator the
+     Dashboard's own count line already uses. */
   $('windowNote').innerHTML = span + customNote(leadD) + futureNote(itemsD, featD) +
-    '<br>' + (p
+    ' &middot; ' + (p
       ? 'against <strong>' + prettyDate(p.from) + '</strong> to <strong>'
         + prettyDate(p.to) + '</strong>, the ' + p.days + ' days before'
       : 'no window before this one to compare against') +

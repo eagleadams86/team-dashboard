@@ -402,7 +402,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. */
-const EXPECTED = 3929;
+const EXPECTED = 3945;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -14950,6 +14950,125 @@ group('a card with no chart matches the one beside it');
        'and nothing hangs out past the strip');
 
     f.remove();
+    if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
+    if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the window note is no taller than the fields beside it');
+
+  /* ── THE GAP ABOVE THE FIELDS ─────────────────────────────────────────────
+     Charles, 2026-09-14, All Teams over features with custom dates: the note in
+     the top right of the strip ran to seven lines and the fields, bottom-
+     aligned against it, sat 73px below the top of the strip with nothing above
+     them. A field is 64px and a line of the note is 19.5px, so the third line
+     is the last that fits; the four extra were caveats about COLUMNS — what
+     Aged and Avg aged % each count, the defect rate over features, every
+     team's own outlier fence — which the comments had always called "the note
+     under the table", and a same-date line the hint over the table already
+     says. The caveats are under the table now and the note states the window.
+
+     A 1900px frame, Charles's width: at 1240 the custom-date fields fill the
+     line and the note drops to a row of its own, where there is no gap to
+     measure. The Scorecard shares the strip and had four lines, so it is read
+     in the same frame. */
+  {
+    const keep = { state: localStorage.getItem('td-state'),
+                   view: localStorage.getItem('td-view') };
+    const feats = (extra) => [
+      { c: '2026-08-20', s: '2026-07-01', t: 'Feature', i: 'GP-1' },
+      { c: '2026-08-27', s: '2026-07-10', t: 'Feature', i: 'GP-2' }].concat(extra || []);
+    const rows = ['2026-08-14', '2026-08-21', '2026-08-28', '2026-09-04']
+      .map(c => ({ c, s: '2026-08-03', t: 'Story' }));
+    const boot = async (extraFeat) => {
+      localStorage.setItem('td-state', JSON.stringify({
+        schema: TD.SCHEMA, stages: [],
+        arts: [{ id: 'g1', name: 'Gap Train' }],
+        teams: [{ id: 'gp1', name: 'Team One', artId: 'g1', rows, features: feats(extraFeat) },
+                { id: 'gp2', name: 'Team Two', artId: 'g1', rows, features: feats() },
+                { id: 'gp3', name: 'Team Three', artId: null, rows, features: [] }],
+        settings: {}
+      }));
+      localStorage.setItem('td-view', JSON.stringify({ activeTab: 'allteams',
+        unit: 'features', months: 'custom', customFrom: '2026-08-12',
+        customTo: '2026-09-08', bucket: 'week' }));
+      const f = document.createElement('iframe');
+      f.setAttribute('data-td-tests', '');
+      f.setAttribute('aria-hidden', 'true');
+      f.style.cssText = 'position:absolute;left:-9999px;width:1900px;height:1400px;border:0';
+      await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html' + BUST; document.body.appendChild(f); });
+      return f;
+    };
+    const measure = (nd) => {
+      const n = nd.getElementById('windowNote').getBoundingClientRect();
+      const fld = [...nd.querySelectorAll('#viewControls .field')]
+        .find(el => el.offsetParent !== null).getBoundingClientRect();
+      return { note: Math.round(n.height), field: Math.round(fld.height),
+               sharesLine: n.top < fld.bottom && n.bottom > fld.top };
+    };
+
+    let f = await boot();
+    let nd = f.contentDocument, nw = f.contentWindow;
+    is(nd.getElementById('unitSel').value, 'features', 'the frame is over features, or this measures the wrong note');
+    let m = measure(nd);
+    ok(m.sharesLine, 'the note shares the fields’ line');
+    ok(m.note <= m.field + 1,
+       'and is no taller than a field, so nothing sits above the fields — the report was 73px of strip over the selects',
+       JSON.stringify(m));
+    const strip = nd.getElementById('windowNote').textContent;
+    ok(!/Aged is the count|feature-level|outliers|same date/.test(strip),
+       'the strip note says what the window is and carries no sentence about a column', strip);
+    const under = nd.getElementById('allTeamsNote');
+    ok(!under.hidden, 'the caveats are under the table instead');
+    /* The date is the window's own end — the one the strip's Showing line
+       stops at — not the custom To: a feature list that stops on Aug 27 is read
+       to Aug 27 however far the picker reaches. */
+    const endsAt = (/to (\w+ \d+, \d{4})/.exec(strip) || [])[1];
+    ok(endsAt && under.textContent.includes('Aged is the count open on ' + endsAt
+         + '; Avg aged % is the share over every week of the window.'),
+       'naming the date the count is open on — the strip’s own end date — which a screen away from the strip “that date” no longer did',
+       endsAt + ' | ' + under.textContent);
+    ok(/The defect rate is not a feature-level figure/.test(under.textContent),
+       'and, over features, why the defect column is dashes', under.textContent);
+    const unit = nd.getElementById('unitSel');
+    unit.value = 'items';
+    unit.dispatchEvent(new nw.Event('change', { bubbles: true }));
+    ok(!/feature-level/.test(under.textContent),
+       'over items the defect sentence goes — the column has figures', under.textContent);
+    ok(/Aged is the count/.test(under.textContent), 'and the ageing one stays', under.textContent);
+    /* A window nothing finished in: the table goes, and its caveats go with it
+       rather than explaining columns that are not on screen. */
+    const from = nd.getElementById('customFrom'), to = nd.getElementById('customTo');
+    from.value = '2020-01-01'; from.dispatchEvent(new nw.Event('change', { bubbles: true }));
+    to.value = '2020-02-01'; to.dispatchEvent(new nw.Event('change', { bubbles: true }));
+    ok(!nd.getElementById('allTeamsNone').hidden, 'a window nothing finished in shows the empty state');
+    ok(under.hidden, 'and the caveats are hidden with the table');
+    f.remove();
+
+    /* The one warning an ordinary board can add: a row dated after today. It
+       is the longest line the note carries and wraps once in the column beside
+       the fields, so this is the worst the note gets — one line over the
+       field, centred, and never a row of the strip. */
+    f = await boot([{ c: '2026-12-01', s: '2026-11-02', t: 'Feature', i: 'GP-9' }]);
+    nd = f.contentDocument; nw = f.contentWindow;
+    const warn = nd.getElementById('windowNote').textContent;
+    ok(/1 feature dated after today/.test(warn), 'the future-dated warning is in the note', warn);
+    m = measure(nd);
+    ok(m.sharesLine, 'and the note still shares the fields’ line');
+    ok(m.note <= m.field + 20,
+       'costing at most one line over the field — a warning may nudge the fields, a caveat never', JSON.stringify(m));
+
+    /* The Scorecard's note in the same strip: it had four lines, which sat the
+       fields 7px low and moved the page 14px between it and the Dashboard. */
+    nw.selectTab('scorecard');
+    const sc = nd.getElementById('windowNote').textContent.replace(/\s+/g, ' ');
+    ok(/Showing .* · against .* days before/.test(sc),
+       'the Scorecard names the window it compares against on the Showing line', sc);
+    m = measure(nd);
+    ok(m.note <= m.field + 20,
+       'and with the warning is at most one line over the field, like All Teams', JSON.stringify(m));
+    f.remove();
+
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
     if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
   }
