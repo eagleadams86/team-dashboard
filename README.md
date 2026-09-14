@@ -3293,8 +3293,10 @@ window for that, and it deletes nothing:
 
 - **How much to keep** — the last 3, 6 or 12 months, the last 2 or 3 years, or everything from
   a date you pick yourself.
-- **Which teams** — any combination; **Select all** takes the lot, and the count above the
-  list says where you are. Teams with nothing in them can't be picked.
+- **Which teams** — any combination. Teams with nothing in them can't be picked. Once any team
+  is on a train the list is **grouped by train**, exactly like the share window's: each ART's
+  heading has a tick box that picks or clears that train's teams (only the ones holding items),
+  shows partly ticked when only some are, and can't be pressed when all its teams are empty.
 - **Unfinished items** — off by default, and worth leaving off. An item with no completion date
   is still in progress however old its start date, and it still counts as work started on the
   net flow chart.

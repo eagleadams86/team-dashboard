@@ -14,7 +14,7 @@ file records what is specific to this repo and what must never regress.
 ## The Share Window Groups Teams by Train (2026-09-14) — no schema change
 
 Charles, with a screenshot of twenty-four teams in one column: *"include the art name next to
-the team or add an art picker."* Both, in one shape: `shareTeamGroups()` heads each train's
+the team or add an art picker."* Both, in one shape: `artTeamGroups()` heads each train's
 teams with the train's name, and the heading is a tick box that picks or clears them.
 **Sprint Velocity has the identical block** — the share window is shared chrome, so a change
 belongs in both.
@@ -29,8 +29,14 @@ belongs in both.
   list, even though the boundary prunes it.
 - **The 24px indent is MEASURED**: the UA gives a checkbox 4px before and 3px after, so a team's
   box lines up under the heading's NAME at 24px, not the 21 that box + gap sums to.
-- The cleanup window's "Which Teams" list was deliberately left flat — it was not asked for, and
-  it has no Select All to pair a shortcut with.
+- **Clean Up Old Data's list took the same grouping the same day, at Charles's word** (it was
+  left flat at first because nobody had asked). It reuses `artTeamGroups()`; `cleanupTeamsPicked()`,
+  `renderCleanupTeams()` and `openCleanup()` read `input[data-clean-team]` only, for the reason
+  above. **Its one difference is the disabled EMPTY team**: a heading picks only the enabled teams
+  under it, its tick state is worked out from those alone (so an empty team never holds a heading
+  at "partly"), and a train whose teams are all empty has a DISABLED heading. `syncCleanupHeads()`
+  runs at the top of `refreshCleanupPreview()`, which every path that moves a box ends in.
+  Sprint Velocity has no clean-up window, so there is nothing to mirror.
 
 ## The Teams Window: Four Cells Out, One Editor In (2026-09-11) — SCHEMA 18 → 19
 

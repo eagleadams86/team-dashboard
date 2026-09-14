@@ -9115,6 +9115,43 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('the clean-up window groups its teams under their trains too');
+
+  /* Same shape as the share window, plus this window's own rule: an empty team's
+     box is disabled, so a heading picks only what can be picked, and a train of
+     empty teams has a heading that cannot be pressed. */
+  {
+    const D = win.document, box = D.getElementById('cleanupTeams');
+    plant({ arts: [{ id: 'sh1', name: 'Pay & <Ops>' }, { id: 'sh3', name: 'Quiet' }],
+            teams: [{ id: 'sg1', name: 'Kestrel', artId: 'sh1', rows: oneRow },
+                    { id: 'sg2', name: 'Otter', artId: 'sh1', rows: [] },
+                    { id: 'sg4', name: 'Puffin', artId: 'sh3', rows: [] },
+                    { id: 'sg3', name: 'Heron', rows: oneRow }], settings: {} });
+    win.openCleanup();
+    is([...box.querySelectorAll('label')].map(l =>
+         (l.classList.contains('art-head') ? '# ' : '') + l.textContent.trim()),
+       ['# Pay & <Ops> (2 teams)', 'Kestrel (1 item)', 'Otter (empty)', '# Quiet (1 team)', 'Puffin (empty)',
+        '# No ART (1 team)', 'Heron (1 item)'],
+       'trains in their own order, un-grouped teams last, names as text');
+    box.querySelectorAll('[data-clean-team]').forEach(i => { i.checked = false; });
+    win.refreshCleanupPreview();
+    const head = box.querySelector('[data-clean-art="sh1"]');
+    const said = () => [head.checked, head.indeterminate];
+    ok(/Pick at least one team/.test(D.getElementById('cleanupPreview').textContent),
+       'with nothing ticked the preview asks for a team — the headings are not a pick');
+    head.click();
+    is(win.cleanupTeamsPicked().map(t => t.id), ['sg1'], 'a heading ticks the teams under it that hold items');
+    is(said(), [true, false], 'and reads as ticked, the empty team not holding it back');
+    is(box.querySelector('[data-clean-team="sg2"]').checked, false, 'the empty team stays unticked');
+    is(box.querySelector('[data-clean-art="sh3"]').disabled, true, 'a train of empty teams has a disabled heading');
+    box.querySelector('[data-clean-team="sg1"]').click();
+    is(said(), [false, false], 'and the heading follows a team box back off');
+    is(box.querySelector('[data-clean-art="sh1"]') === head, true,
+       'the list is not rebuilt by a tick, so the box the keyboard is on survives');
+    D.getElementById('cleanupDialog').close();
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('deriveTeams — one window, one date, every team');
 
   /* Three teams whose exports stop on different days. Without a shared date,
