@@ -16514,7 +16514,7 @@ group('a card with no chart matches the one beside it');
      because the sentence is drawn by the render the scope picker triggers. */
   {
     plant({ teams: [], settings: {} });
-    loadDemo();
+    const sDemo = loadDemo();
     win.renderAll();
     win.selectTab('dashboard');
     win.selectChartTab('forecast');
@@ -16539,7 +16539,31 @@ group('a card with no chart matches the one beside it');
     ok(/^1 team\u2019s export stops before the others \(Team Bare Export\)/.test(staleLine() || ''),
        'across all three teams the line names Team Bare Export alone, which is nine days behind',
        staleLine());
-    ok(/1 period short/.test(staleLine() || ''), 'and says what that cost', staleLine());
+    /* WHAT IT COST IS DERIVED, NOT PINNED (2026-09-14). The demo ends on the
+       reader's own calendar day and Team Bare Export nine days before it, so
+       the whole weeks the lag swallows depend on the WEEKDAY: a check written
+       on Friday 2026-09-04 saw one week end inside the gap, and read "2
+       periods short" on Monday 2026-09-14 with nothing changed. So count the
+       gap here the way the app's coverage trim does — every whole week whose
+       last day lies after the stale export's end and no later than the newest
+       — from the demo's own two dates and the same week-start setting. */
+    const sEndOf = (t) => TD.derive(t.rows, win.TDState.normalizeSettings({}),
+      { filterValue: null, months: 'all', bucket: 'week' }).dataEnd;
+    const sBareEnd = sEndOf(sDemo.find(t => t.name === 'Team Bare Export'));
+    const sNewest = new Date(Math.max(...sDemo.map(t => sEndOf(t).getTime())));
+    ok(sBareEnd < sNewest, 'Team Bare Export’s export ends before the newest one',
+       iso(sBareEnd) + ' < ' + iso(sNewest));
+    let sLost = 0;
+    for (let w = TD.weekStartOn(sBareEnd, win.TDState.normalizeSettings({}).weekStart);
+         w <= sNewest; w = TD.nextBucket(w, 'week')) {
+      const wEnd = TD.bucketEnd(w, 'week');
+      if (wEnd > sBareEnd && wEnd <= sNewest) sLost++;
+    }
+    ok(sLost >= 1, 'nine days always swallow at least one whole week', sLost);
+    ok(new RegExp('\\u2014 ' + sLost + ' period' + (sLost === 1 ? '' : 's') + ' short of the charts above')
+         .test(staleLine() || ''),
+       'and says what that cost — ' + sLost + ' whole ' + (sLost === 1 ? 'week' : 'weeks')
+       + ' between ' + iso(sBareEnd) + ' and ' + iso(sNewest), staleLine());
     /* Features: Team Bare Export has none, so the only team behind is Team
        Long Tail's one day — and the line goes away with it. */
     sFire(sUnit, 'features');
