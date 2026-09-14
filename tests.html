@@ -9069,6 +9069,52 @@ group('ARTs — the grouping, and the boundary it crosses');
   win.document.getElementById('manageCloseBtn').click();
 
   /* ────────────────────────────────────────────────────────── */
+  group('the share window groups its teams under their trains');
+
+  /* Asked for 2026-09-14 over twenty-four teams in one column. A heading per
+     train is a shortcut over the team boxes, never a thing that is shared — so
+     every check that reads the pick reads it through sharePicked(), the function
+     the link is built from. Sprint Velocity pins the same window the same way. */
+  {
+    const D = win.document, box = D.getElementById('shareTeams');
+    const lines = () => [...box.querySelectorAll('label')].map(l =>
+      (l.classList.contains('art-head') ? '# ' : '') + l.textContent.trim());
+    plant({ arts: [{ id: 'sh1', name: 'Pay & <Ops>' }, { id: 'sh2', name: 'Empty' }],
+            teams: [{ id: 'sg1', name: 'Kestrel', artId: 'sh1', rows: oneRow },
+                    { id: 'sg2', name: 'Otter', artId: 'sh1', rows: [] },
+                    { id: 'sg3', name: 'Heron', rows: oneRow }], settings: {} });
+    win.openShare();
+    is(lines(), ['# Pay & <Ops> (2 teams)', 'Kestrel (1 item)', 'Otter (empty)', '# No ART (1 team)', 'Heron (1 item)'],
+       'trains in their own order, a train with no teams left out, un-grouped teams last, names as text');
+    box.querySelectorAll('[data-share-team]').forEach(i => { i.checked = false; });
+    win.syncSelectAll();
+    const head = box.querySelector('[data-share-art="sh1"]');
+    const said = () => [head.checked, head.indeterminate];
+    head.click();
+    is(win.sharePicked(), ['sg1', 'sg2'], 'a heading ticks every team under it');
+    is(said(), [true, false], 'and reads as ticked');
+    is(D.getElementById('shareTeamCount').textContent, '2 of 3 selected', 'the count counts teams, never headings');
+    box.querySelector('[data-share-team="sg2"]').click();
+    is(said(), [false, true], 'one team off reads as partly ticked');
+    head.click();
+    is(win.sharePicked(), ['sg1', 'sg2'], 'pressing a partly ticked heading takes the rest');
+    head.click();
+    is(win.sharePicked(), [], 'and pressing it again clears them');
+    D.getElementById('shareSelectAll').click();
+    is(win.sharePicked(), ['sg1', 'sg2', 'sg3'], 'Select All ticks every team and no heading');
+    is([...box.querySelectorAll('[data-share-art]')].map(h => h.checked), [true, true], 'and every heading follows');
+    D.getElementById('shareDialog').close();
+
+    plant({ arts: [{ id: 'sh1', name: 'Nobody' }],
+            teams: [{ id: 'sg1', name: 'Kestrel', rows: oneRow }, { id: 'sg2', name: 'Otter', rows: oneRow }],
+            settings: {} });
+    win.openShare();
+    is(box.querySelectorAll('.art-head, .in-art').length, 0,
+       'with no team on a train the list stays flat — a lone No ART heading would divide nothing');
+    D.getElementById('shareDialog').close();
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   group('deriveTeams — one window, one date, every team');
 
   /* Three teams whose exports stop on different days. Without a shared date,

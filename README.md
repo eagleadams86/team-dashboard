@@ -3394,6 +3394,13 @@ data travels **inside the link itself**: everything after the `#` never leaves t
 so the figures reach the recipient without GitHub Pages or anyone else seeing them. The payload is a trimmed copy — the chosen teams plus the shared settings, because
 those drive every number on the charts.
 
+**Once any team is on a train, the team list is grouped by train** — each ART's name heads its
+own teams, in the order the Teams window lists them, with teams on no train last under
+**No ART**. The heading has a tick box of its own: tick it to pick every team on that train,
+untick it to clear them, and it shows as partly ticked when only some are. It is only a shortcut
+for ticking teams — the count still counts teams, and nothing about the heading goes into the
+link. A board with no teams on a train keeps the plain list.
+
 It carries the same fields the app stores, **issue keys and status names included**. That is
 deliberate: the keys name the items on the charts and the statuses name its columns, and a link
 that dropped either would show the recipient a different picture from the one you are looking at.

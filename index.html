@@ -1977,6 +1977,15 @@ legend { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04
 label.checkline { display: flex; gap: 8px; align-items: center; font-size: var(--fs-sm);
   font-weight: 400; color: var(--text-primary); margin: 0; min-height: 24px; }
 .checkline input { flex: none; }
+/* The share window's list grouped by ART: a heading line per train, its teams
+   indented so each team's box sits under the train's NAME rather than under the
+   train's own box. 24px is measured, not summed from the box alone: the browser
+   gives a checkbox 4px of margin before it and 3px after, so the heading's name
+   starts 4 + 13 + 3 + 8 = 28px in and a team's box at 24 + 4. The space above a
+   heading (not the first) is where one train visibly ends. Mirrored in Sprint
+   Velocity. */
+.checklist .art-head:not(:first-child) { margin-top: 8px; }
+.checklist .checkline.in-art { padding-left: 24px; }
 #shareLink { width: 100%; font-family: var(--font-mono); font-size: var(--fs-xs);
   color: var(--text-secondary); }
 .warn { color: var(--err); font-size: var(--fs-xs); margin-top: 10px; }
@@ -24044,15 +24053,60 @@ function shareBanner() {
    client, so warn well below any hard limit rather than at it. */
 const SHARE_WARN_AT = 8000;
 
+/* The share window's team list, grouped by ART once any team is on one
+   (2026-09-14). Charles, looking at twenty-four teams in one column: with that
+   many a flat list says nothing about which train each team is on, so a train
+   heads its own teams — ARTs in the Teams window's order, teams on no ART last
+   under "No ART", the grouping the header picker already draws.
+
+   Each heading is a BOX OF ITS OWN: it ticks or clears that train's teams, and
+   reads as partly ticked when only some are, so it is the ART picker without
+   being a second list to keep in step. It is a shortcut and never a thing that
+   is shared — the count, Select All and the link all read the TEAM boxes only
+   (`data-share-team`), and a heading's state is always worked out from them.
+
+   Null when no team is on a train, so a board with no ARTs, or ARTs nobody has
+   been put on, keeps the plain list: a single "No ART" heading over every team
+   would be a heading that divides nothing. A team whose artId names nothing is
+   filed under No ART rather than lost — the boundary prunes dangling ids, but a
+   list that decides what can be shared must not depend on that. */
+function shareTeamGroups() {
+  const known = new Set(state.arts.map(a => a.id));
+  const groups = state.arts
+    .map(a => ({ id: a.id, name: a.name, teams: state.teams.filter(t => t.artId === a.id) }))
+    .filter(g => g.teams.length);
+  if (!groups.length) return null;
+  const rest = state.teams.filter(t => !t.artId || !known.has(t.artId));
+  if (rest.length) groups.push({ id: ART_NONE, name: 'No ART', teams: rest });
+  return groups;
+}
+
 function openShare() {
   const active = activeTeam();
-  $('shareTeams').innerHTML = state.teams.map(t =>
-    '<label class="checkline"><input type="checkbox" data-share-team="' + escapeHtml(t.id) + '"' +
+  const teamLine = (t, groupId) =>
+    '<label class="checkline' + (groupId ? ' in-art' : '') + '"><input type="checkbox" data-share-team="' +
+    escapeHtml(t.id) + '"' + (groupId ? ' data-share-group="' + escapeHtml(groupId) + '"' : '') +
     (active && t.id === active.id ? ' checked' : '') + '><span>' + escapeHtml(t.name) +
     (t.rows.length ? ' (' + t.rows.length + ' item' + (t.rows.length === 1 ? '' : 's') + ')' : ' (empty)') +
-    '</span></label>').join('');
-  $('shareTeams').querySelectorAll('input').forEach(i => {
+    '</span></label>';
+  const groups = shareTeamGroups();
+  $('shareTeams').innerHTML = groups
+    ? groups.map(g =>
+        '<label class="checkline art-head"><input type="checkbox" data-share-art="' + escapeHtml(g.id) +
+        '"><span><strong>' + escapeHtml(g.name) + '</strong> (' + g.teams.length + ' team' +
+        (g.teams.length === 1 ? '' : 's') + ')</span></label>' +
+        g.teams.map(t => teamLine(t, g.id)).join('')).join('')
+    : state.teams.map(t => teamLine(t, '')).join('');
+  $('shareTeams').querySelectorAll('input[data-share-team]').forEach(i => {
     i.onchange = () => { syncSelectAll(); refreshShareLink(); };
+  });
+  $('shareTeams').querySelectorAll('input[data-share-art]').forEach(h => {
+    h.onchange = () => {
+      shareBoxes().filter(i => i.dataset.shareGroup === h.dataset.shareArt)
+        .forEach(i => { i.checked = h.checked; });
+      syncSelectAll();
+      refreshShareLink();
+    };
   });
   syncSelectAll();
   refreshShareLink();
@@ -24060,12 +24114,15 @@ function openShare() {
   $('shareDialog').scrollTop = 0;
 }
 
+/* TEAM boxes only — the ART headings above them are shortcuts, and a heading
+   counted here would be a train "selected" in the count and an id in the link
+   that names no team. */
 function sharePicked() {
-  return Array.from($('shareTeams').querySelectorAll('input:checked'))
+  return Array.from($('shareTeams').querySelectorAll('input[data-share-team]:checked'))
     .map(i => i.dataset.shareTeam);
 }
 
-const shareBoxes = () => Array.from($('shareTeams').querySelectorAll('input'));
+const shareBoxes = () => Array.from($('shareTeams').querySelectorAll('input[data-share-team]'));
 
 /* One button rather than an All/None pair: with everything ticked the only
    useful thing it can do is clear the lot, so it says so. The count beside it
@@ -24082,6 +24139,15 @@ function syncSelectAll() {
   btn.textContent = (boxes.length && picked === boxes.length) ? 'Select None' : 'Select All';
   btn.hidden = boxes.length < 2;
   $('shareTeamCount').textContent = `${picked} of ${boxes.length} selected`;
+  /* Each ART heading reads off its own teams: ticked when all of them are,
+     partly ticked when some are. Every path that moves a team box ends here, so
+     a heading can never disagree with the teams under it. */
+  $('shareTeams').querySelectorAll('input[data-share-art]').forEach(h => {
+    const mine = boxes.filter(i => i.dataset.shareGroup === h.dataset.shareArt);
+    const on = mine.filter(i => i.checked).length;
+    h.checked = on > 0 && on === mine.length;
+    h.indeterminate = on > 0 && on < mine.length;
+  });
 }
 
 $('shareSelectAll').addEventListener('click', () => {

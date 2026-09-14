@@ -11,6 +11,27 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## The Share Window Groups Teams by Train (2026-09-14) — no schema change
+
+Charles, with a screenshot of twenty-four teams in one column: *"include the art name next to
+the team or add an art picker."* Both, in one shape: `shareTeamGroups()` heads each train's
+teams with the train's name, and the heading is a tick box that picks or clears them.
+**Sprint Velocity has the identical block** — the share window is shared chrome, so a change
+belongs in both.
+
+- **A heading is a SHORTCUT, never a selection.** `sharePicked()` and `shareBoxes()` read
+  `input[data-share-team]` only; before this they read every `input` in the list, which would
+  have put an ART id into the link and a train into the "N of M selected" count. The heading's
+  checked/indeterminate state is WORKED OUT from its teams at the end of `syncSelectAll()`,
+  which every path that moves a team box already ends in — so it cannot drift.
+- **Null when no team is on a train**, and the plain list stays: one "No ART" heading over every
+  team divides nothing. A dangling `artId` lands under No ART rather than dropping out of the
+  list, even though the boundary prunes it.
+- **The 24px indent is MEASURED**: the UA gives a checkbox 4px before and 3px after, so a team's
+  box lines up under the heading's NAME at 24px, not the 21 that box + gap sums to.
+- The cleanup window's "Which Teams" list was deliberately left flat — it was not asked for, and
+  it has no Select All to pair a shortcut with.
+
 ## The Teams Window: Four Cells Out, One Editor In (2026-09-11) — SCHEMA 18 → 19
 
 Charles opened the Teams window on his thirteen real teams and the row scrolled sideways — with
