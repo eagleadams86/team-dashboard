@@ -402,7 +402,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. */
-const EXPECTED = 3945;
+const EXPECTED = 3946;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -15015,6 +15015,18 @@ group('a card with no chart matches the one beside it');
     ok(m.note <= m.field + 1,
        'and is no taller than a field, so nothing sits above the fields — the report was 73px of strip over the selects',
        JSON.stringify(m));
+    /* Where the fields sit, as an offset from the strip's own top: the number
+       the second report of the day is about. It is read here with a two-line
+       note and must not change with a four-line one. */
+    const fieldTop = (d) => {
+      const fld = [...d.querySelectorAll('#viewControls .field')]
+        .find(el => el.offsetParent !== null).getBoundingClientRect();
+      return Math.round(fld.top - d.getElementById('viewControls').getBoundingClientRect().top);
+    };
+    const restTop = fieldTop(nd);
+    ok(restTop > 0 && restTop < 20,
+       'the fields sit at the top of the strip, under its padding — not hung off the tallest thing beside them',
+       String(restTop));
     const strip = nd.getElementById('windowNote').textContent;
     ok(!/Aged is the count|feature-level|outliers|same date/.test(strip),
        'the strip note says what the window is and carries no sentence about a column', strip);
@@ -15055,8 +15067,9 @@ group('a card with no chart matches the one beside it');
     ok(/1 feature dated after today/.test(warn), 'the future-dated warning is in the note', warn);
     m = measure(nd);
     ok(m.sharesLine, 'and the note still shares the fields’ line');
-    ok(m.note <= m.field + 20,
-       'costing at most one line over the field — a warning may nudge the fields, a caveat never', JSON.stringify(m));
+    is(fieldTop(nd), restTop,
+       'and the fields have not moved: a fourth line of the note lengthens the strip under the note, '
+       + 'it does not hang the selects a line lower — Charles’s second report of 2026-09-14');
 
     /* The Scorecard's note in the same strip: it had four lines, which sat the
        fields 7px low and moved the page 14px between it and the Dashboard. */
@@ -15064,9 +15077,7 @@ group('a card with no chart matches the one beside it');
     const sc = nd.getElementById('windowNote').textContent.replace(/\s+/g, ' ');
     ok(/Showing .* · against .* days before/.test(sc),
        'the Scorecard names the window it compares against on the Showing line', sc);
-    m = measure(nd);
-    ok(m.note <= m.field + 20,
-       'and with the warning is at most one line over the field, like All Teams', JSON.stringify(m));
+    is(fieldTop(nd), restTop, 'and its fields sit exactly where All Teams’ do, so the tabs do not shift the strip');
     f.remove();
 
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);

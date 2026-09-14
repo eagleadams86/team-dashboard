@@ -225,6 +225,13 @@ taking all fifteen teams and reading past the ones you had not asked about.
   strip note states the window and the three helpers' warnings, nothing else; a sentence about
   what a column means goes under that column's table. Pinned in a 1900px frame — at 1240 the
   custom-date fields fill the line and the note drops to its own row, where there is no gap.
+- **And the strip TOP-aligns its children (same day, second report).** It bottom-aligned them
+  "so the selects sit on one line whatever height their labels wrap to", which never happens — a
+  wrapping flex row wraps a field before it shrinks one — while it DID hang the fields off the
+  tallest thing on the line, i.e. the note whenever a warning gave it a fourth line. Now the
+  fields sit at the top of the strip and a long note extends the strip under its own column; the
+  selects have one position whatever the note says. Pinned as the fields' offset from the
+  strip's top, read with a two-line note and required unchanged with a four-line one.
 - **`.controls .window` FLEXES; `margin-left: auto` alone let it take a row of the strip.** A
   wrapping flex row places each item at its own content width and only shrinks what already
   shares a line, so a long enough note was pushed onto a row of its own and the strip went from

@@ -1006,7 +1006,7 @@ select { cursor: pointer; }
 .forecast-row .aside { color: var(--text-secondary); font-weight: 400; }
 
 /* dashboard controls strip */
-.controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;
+.controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 12px 18px; margin-bottom: 18px; }
 .controls .field { min-width: 160px; }
@@ -1017,10 +1017,19 @@ select { cursor: pointer; }
    is not a number chosen here: it is what `.controls .field` above resolves to,
    so the same control is the same size on both tabs. */
 #unitFieldData { max-width: 160px; }
-/* The strip bottom-aligns its children so the selects sit on one line whatever
-   height their labels wrap to — but the window note has no control to line up
-   with, so flex-end just left it sitting low against the taller fields beside
-   it. It centres on its own row instead.
+/* THE STRIP TOP-ALIGNS ITS CHILDREN (2026-09-14, second report the same day).
+   It bottom-aligned them until then, "so the selects sit on one line whatever
+   height their labels wrap to" — a case that never happens: a wrapping flex
+   row wraps a field onto the next line before it shrinks one, so a label is
+   never narrower than its own words, and the selects are on one line either
+   way. What flex-end DID do was hang the fields off the tallest thing on the
+   line, and the tallest thing is the note whenever it carries a warning — so
+   its fourth line, which nothing on this page can rule out (a future-dated
+   row, a sprint grid, a half-set date pair), dropped every select by a line.
+   Charles: "can you top align the fields so they never shift around?" Now the
+   fields sit at the top of the strip and a long note extends the strip below
+   its own column; the selects have one position whatever the note says. The
+   note top-aligns with them, so its first line reads level with the labels.
 
    IT FLEXES INTO THE SPACE THE FIELDS LEAVE, and `margin-left: auto` alone did
    not (2026-09-08). A wrapping flex row places each item at its OWN content
@@ -1038,10 +1047,12 @@ select { cursor: pointer; }
    and a field beside it is 64px; the strip bottom-aligns its children, so once
    the note is the tallest thing on the line every extra line of it is a gap
    ABOVE the fields, not below the note. All Teams had grown to seven lines —
-   73px of empty strip over the selects. The cure is what the note says, not a
-   rule here: it states the window and its warnings, and a sentence about what
-   a COLUMN means goes under that column's table (#allTeamsNote). */
-.controls .window { flex: 1 1 260px; min-width: 0; align-self: center; text-align: right;
+   73px of empty strip over the selects. The first cure was what the note says:
+   it states the window and its warnings, and a sentence about what a COLUMN
+   means goes under that column's table (#allTeamsNote). The second is the
+   top alignment above, for the lines the warnings still add: a fourth line
+   now lengthens the strip under the note and moves no select. */
+.controls .window { flex: 1 1 260px; min-width: 0; align-self: flex-start; text-align: right;
   font-size: var(--fs-xs); color: var(--text-secondary); }
 .controls .window strong { color: var(--text-primary); font-weight: var(--fw-semibold); }
 
