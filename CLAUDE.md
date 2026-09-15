@@ -4816,3 +4816,9 @@ proven red against the build before it. The reasoning sits here, per fix.
   takes the indexes, and `orderGuessed` is judged on the same evidence. Where there is a header, a
   column only counts if its HEADING names a date: under a month-first first guess `2.13.10` parses as
   13 Feb 2010, so the column finder took the version column as the start date and its cells voted again.
+- **Three behaviours that had no check now have one, each proven by breaking it.** A mutation run
+  turned each off in a copy and the suite stayed green: `deriveTeams` without the pooled cadence
+  (All Teams offering Sprint and drawing weeks — the bug this app found by use), the Scorecard
+  ignoring the aged-share tick (23% where 25% was right, no "across 2 of 3 teams"), and the team
+  editor's close observer not redrawing the row (the old check changed the sprint mode on the way,
+  which redraws the row by itself). Each new check is red against its mutation and green on the app.

@@ -4661,6 +4661,28 @@ async function run(TD, win) {
      Multi-team state. These are the boundary: everything here decides what a
      copy arriving from the cloud is allowed to turn into.
      ══════════════════════════════════════════════════════════ */
+  group('the team row states what its editor set, once the editor closes');
+
+  /* The editor saves as you go and does NOT redraw the row per keystroke; the
+     close observer does (2026-09-15 review). The existing check changed the
+     sprint mode on the way, and that path redraws the row by itself — so an
+     observer that forgot the row still passed. A limit typed and the window
+     closed, with nothing else touched, must reach the row. */
+  {
+    const rDoc = win.document;
+    plant({ teams: [{ id: 'rr1', name: 'Row One', rows: [] }, { id: 'rr2', name: 'Row Two', rows: [] }], settings: {} });
+    rDoc.getElementById('manageBtn').click();
+    rDoc.querySelector('[data-edit-team="rr1"]').click();
+    const rWip = rDoc.getElementById('teamWip');
+    rWip.value = '7';
+    rWip.dispatchEvent(new win.Event('input', { bubbles: true }));
+    rDoc.getElementById('teamDialog').close();
+    await new Promise(r => setTimeout(r, 0));
+    const rSetup = rDoc.querySelector('#teamRows tr td.setup').textContent;
+    ok(/WIP 7/.test(rSetup), 'a limit typed into the editor is on the team row after closing it', rSetup);
+    rDoc.getElementById('manageDialog').close();
+  }
+
   group('sanitizeTeams — ids from outside are not trusted');
 
   const S = win.TDState;
@@ -9358,6 +9380,19 @@ group('ARTs — the grouping, and the boundary it crosses');
   const teamsFixture = [tA, tB, tC];
   const rollup = TD.deriveTeams(teamsFixture, SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
 
+  /* ALL TEAMS DRAWS THE SPRINTS IT OFFERS (2026-09-15 review). The bug this app
+     found by use — Sprint offered, weeks drawn, because the train was derived
+     without the pooled cadence — had no check: deriveTeams with its cadence line
+     removed still passed the suite. Two teams on one company cadence must come
+     back cut on sprints, train and rows alike. */
+  {
+    const cadSet = Object.assign({}, SAMPLE_SETTINGS, { sprintDays: 14, sprintAnchor: '2015-01-04' });
+    const onCad = [tA, tB].map(t => Object.assign({}, t, { usesSprints: 1 }));
+    const pooled = TD.deriveTeams(onCad, cadSet, { filterValue: '', months: 'all', bucket: 'sprint' });
+    is(pooled.train.bucket, 'sprint', 'two teams on one company cadence pool into sprints — offered Sprint, draws sprints');
+    is(pooled.rows.map(r => r.d.bucket), ['sprint', 'sprint'], 'and every row is cut on those same sprints');
+  }
+
   is(iso(rollup.asOf), '2015-05-10', 'the shared date is the newest date anybody has');
   is(rollup.rows.map(r => r.name), ['Alpha', 'Bravo', 'Charlie'],
      'rows come back in the picker’s order, not sorted by anything');
@@ -10944,6 +10979,22 @@ group('ARTs — the grouping, and the boundary it crosses');
 
   /* ────────────────────────────────────────────────────────── */
   group('the scorecard never says a colour and nothing else');
+
+  /* THE PREDICTABILITY CARD SAYS WHO IS IN ITS POOL (2026-09-15 review). The only
+     opt-out check read storage; a build that ignored the tick drew 23% where 25%
+     was right, with no "across 2 of 3 teams", and passed. */
+  {
+    const poRows = [{ c: '2026-08-10', s: '2026-07-01', t: 'Story' },
+                    { c: '2026-08-12', s: '2026-08-02', t: 'Bug' },
+                    { s: '2026-06-01', t: 'Story' }];
+    plant({ teams: [{ id: 'po1', name: 'One', rows: poRows }, { id: 'po2', name: 'Two', rows: poRows },
+                    { id: 'po3', name: 'Out', rows: poRows, artPredictability: 0 }], settings: {} });
+    win.renderAll();
+    win.selectTab('scorecard');
+    const poSub = [...win.document.querySelectorAll('.sc-card')][0].querySelector('.sc-sub').textContent;
+    ok(/across 2 of 3 teams/.test(poSub),
+       'with a team ticked out, the Predictability card says it reads over the other two', poSub);
+  }
 
   {
     const scRows = [{ c: '2026-08-10', s: '2026-07-01', t: 'Story' },
