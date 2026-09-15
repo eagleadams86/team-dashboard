@@ -25746,7 +25746,11 @@ const DEMO_TEAMS = [
     workFields: {
       sn: { Bug: ['Incident', 'Incident', 'Incident', ''],
             Task: ['Service Catalog Task', 'Change Task', ''], Spike: ['Vulnerabilities'] },
-      bug: ['Production', '', 'Production', 'Pre Production'],
+      /* THREE long, against the Bug cycle's four, and that is load-bearing: two
+         cycles of the same length line up, so every bug left a defect after the
+         switch — the fourth of each four — landed on the same Bug Type and the
+         Found in production tile read 0%. */
+      bug: ['Production', 'Pre Production', ''],
       kind: ['Non-Discretionary', 'Non-Discretionary', 'Discretionary']
     } }
 ];
@@ -26355,7 +26359,7 @@ function loadSample() {
      lives — so without this the demo loads three teams of charts behind a tab the
      reader is not looking at, and appears to have done nothing. */
   selectTab('dashboard');
-  window.toast('Demo loaded — three teams, each named for what it shows', 6000);
+  window.toast('Demo loaded — four teams, each named for what it shows', 6000);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
