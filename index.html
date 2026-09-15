@@ -4611,6 +4611,23 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     </div>
   </section>
 
+  <section class="manage-sec">
+    <div class="row spread"><strong class="manage-head">ServiceNow Incidents</strong></div>
+    <p class="manage-note">Whether this team&rsquo;s ServiceNow <strong>Incidents</strong> count as
+      defects &mdash; every team&rsquo;s do unless you untick it. Untick it for a support team,
+      whose incidents are mostly problems it solves for other teams: those items then leave its
+      defect rate on its dashboard, on All Teams and on the Scorecard, and count as support work
+      instead. Nothing else moves &mdash; they still count as delivered, and every other ServiceNow
+      type is untouched.</p>
+    <div style="margin-top:var(--sp-5)">
+      <label class="checkline" for="teamIncidents">
+        <input type="checkbox" id="teamIncidents">
+        <span>Count this team&rsquo;s ServiceNow incidents as defects</span>
+      </label>
+    </div>
+    <p class="hint" id="teamIncidentsHint" style="margin-top:var(--sp-3)"></p>
+  </section>
+
   <div class="row" style="justify-content:flex-end;margin-top:18px">
     <button class="btn primary" id="teamDialogCloseBtn" type="button">Done</button>
   </div>
@@ -9903,7 +9920,16 @@ function derive(rows, settings, view, stages, statuses) {
      open, which is what every reading at an evaluation point already said. */
   const finished = items.filter(r => arrived(r.completed));
 
-  const isUnplanned = r => String(r.type || '').trim().toLowerCase() === unplannedStr;
+  /* The one definition of a defect, with this view's team facts — see
+     countsAsDefect. No facts on the view is the definition before the switch. */
+  const supportIncidents = (view.teamFacts && view.teamFacts.incidentsAsSupport instanceof Set)
+    ? view.teamFacts.incidentsAsSupport : null;
+  const isUnplanned = r =>
+    countsAsDefect(r, unplannedStr, !(supportIncidents && supportIncidents.has(r)));
+  /* The incidents that WOULD have been defects and were counted as support
+     instead — the number a card states so the move is on the page, not hidden. */
+  const isSupportIncident = r => !!supportIncidents && supportIncidents.has(r)
+    && String(r.type || '').trim().toLowerCase() === unplannedStr;
 
   /* The window hangs off the latest date in the data, not off today: a paste of
      last quarter's export should show last quarter, not an empty chart. */
@@ -10163,6 +10189,7 @@ function derive(rows, settings, view, stages, statuses) {
      exactly the set the charts above are drawn from. */
   const windowItems = [];
   let unplannedTotal = 0;
+  let incidentsAsSupportTotal = 0;
 
   for (const ws of weekStarts) {
     const key = bucketKey(ws, bucket, weekStartsOn, cad);
@@ -10180,6 +10207,7 @@ function derive(rows, settings, view, stages, statuses) {
     const planned   = done.length - unplanned;
     unplannedRate.push(unplanned > 0 ? unplanned / (planned + unplanned) : 0);
     unplannedTotal += unplanned;
+    incidentsAsSupportTotal += done.filter(isSupportIncident).length;
 
     /* Both durations for this bucket, taken from the rows rather than from a
        map filled earlier, so the excluded set can be consulted per item. An
@@ -10917,6 +10945,9 @@ function derive(rows, settings, view, stages, statuses) {
       avgThroughput: wholeThroughput.length ? mean(wholeThroughput) : null,
       avgCycleTime: windowCycles.length ? mean(windowCycles) : null,
       unplannedShare,
+      /* Defect-typed ServiceNow incidents in this window that a support team's
+         switch counted as support work — null over features, like the share. */
+      incidentsAsSupport: unit === 'features' ? null : incidentsAsSupportTotal,
       netFlowTotal: netFlow.reduce((a, b) => a + b, 0),
       avgLeadTime: windowLeads.length ? mean(windowLeads) : null,
       /* Over every item in the window, not the mean of the per-bucket
@@ -11199,6 +11230,43 @@ function derive(rows, settings, view, stages, statuses) {
      eight percentiles, and a "total" row built that way would be quietly wrong
      in its most-read column. Deriving over the concatenated rows gives the
      train the same treatment a team gets, from the same code. */
+/* ── ONE DEFINITION OF A DEFECT (2026-09-15) ────────────────────────────────
+   An item is a defect when its work type is the defect type in Settings — the
+   rule this app has always had — UNLESS it is a ServiceNow incident on a team
+   whose incidents are support work (`incidentsAsDefects === 0`). A support
+   team's incidents are mostly problems it solves for other teams; counted as its
+   own defects they made the team doing exactly its job read as the least
+   reliable one on the train — on the defect rate, on All Teams and on the
+   Scorecard.
+
+   NOTHING IN THE DATA SAYS WHOSE PROBLEM AN INCIDENT WAS, so the app does not
+   guess per item. The switch is the reader stating a fact about a team. Every
+   reader of "is this a defect" goes through here; a second test written inline
+   somewhere is how two screens come to disagree about one team. */
+function countsAsDefect(r, defectTypeLower, incidentsAsDefects) {
+  if (!r || String(r.type || '').trim().toLowerCase() !== defectTypeLower) return false;
+  return incidentsAsDefects !== false || r.snType !== SN_INCIDENT;
+}
+
+/* The facts about TEAMS that derive() needs and must not reach for: it takes a
+   list of rows, and a pooled list has lost which team each row came from. So the
+   answer travels as a Set of the ROW OBJECTS themselves — the way `excluded`
+   works inside derive — and identity survives everything a list goes through on
+   its way in: pooling, the work-type filter, the window, asOf and the window
+   before. Built where a view is made — deriveTrain, deriveTeams and
+   renderDashboard — and a view without it gets the definition this app had
+   before the switch existed. */
+function teamFactsOf(teams) {
+  const incidentsAsSupport = new Set();
+  for (const t of (Array.isArray(teams) ? teams : [])) {
+    if (!t || t.incidentsAsDefects !== 0) continue;
+    for (const r of (t.rows || []).concat(t.features || [])) {
+      if (r && r.snType === SN_INCIDENT) incidentsAsSupport.add(r);
+    }
+  }
+  return { incidentsAsSupport };
+}
+
 /* Which of a team's two lists a run is about. PURE — it reads the view it was
    handed rather than the app's, so the same rule serves the dashboard, a shared
    link and a test, and nothing here has to reach for global state. */
@@ -11233,7 +11301,9 @@ function deriveTrain(teams, settings, view, stages, statuses) {
   const cad = sharedCadence(teams, settings);
   const v = Object.assign({}, view, {
     sprintDays: cad ? cad.days : null,
-    sprintAnchor: cad ? isoOf(cad.anchor) : ''
+    sprintAnchor: cad ? isoOf(cad.anchor) : '',
+    /* Whose incidents are support work — see teamFactsOf. */
+    teamFacts: teamFactsOf(teams)
   });
   return derive(trainRowsOf(teams, v), settings, v, stages, statuses);
 }
@@ -11315,7 +11385,10 @@ function deriveTeams(teams, settings, view, stages, statuses) {
   const pooledCad = sharedCadence(list, settings);
   view = Object.assign({}, view, {
     sprintDays: pooledCad ? pooledCad.days : null,
-    sprintAnchor: pooledCad ? isoOf(pooledCad.anchor) : ''
+    sprintAnchor: pooledCad ? isoOf(pooledCad.anchor) : '',
+    /* Built once over every team, and it serves the train AND each team's row:
+       membership is by row identity, so a team's own rows find themselves in it. */
+    teamFacts: teamFactsOf(list)
   });
   const listOf = (t) => teamListOf(t, view);
   const everything = trainRowsOf(list, view);
@@ -11507,6 +11580,7 @@ window.TD = {
   cleanIssueKey,
   /* The three work fields (2026-09-15). */
   WORK_FIELDS, SN_TYPES, SN_INCIDENT, BUG_FOUND, WORK_KINDS, readEnum, enumCode,
+  countsAsDefect, teamFactsOf,
   /* The feature layer's parse-side pieces. PROSE_HEADING and proseColumns are
      exported so the storage guard can be pinned as a RULE — "no column whose
      heading is prose may hold any role" — rather than one role at a time
@@ -16071,6 +16145,7 @@ function renderTeamRows() {
       bits.push('Sprint \u2014 no cadence set');
     }
     if (t.artPredictability === 0) bits.push('out of aged share');
+    if (t.incidentsAsDefects === 0) bits.push('incidents as support');
     return '<td class="setup">' + (bits.length
       ? escapeHtml(bits.join(' \u00b7 '))
       : '<span class="setup-none">&mdash;</span>') + '</td>';
@@ -16431,6 +16506,12 @@ function renderDashboard() {
          reach for `state` to find out — it takes a question, not the app. */
       sprintDays: dashCad ? dashCad.days : null,
       sprintAnchor: dashCad ? isoOf(dashCad.anchor) : '',
+      /* WHOSE INCIDENTS ARE SUPPORT WORK, off the team and resolved here, like the
+         cadence. This literal is the trap the note below describes: deriveTrain
+         and deriveTeams build the same field for the pooled pages, and a team's
+         dashboard that forgot it would count incidents its own All Teams row
+         does not. */
+      teamFacts: teamFactsOf(team ? [team] : []),
       /* The forecast's other two answers. This object is a LITERAL rather than
          the view itself — derive() takes a question, not the app's state — which
          means a field added to `view` and not added here silently never arrives.
@@ -18488,6 +18569,7 @@ function renderAllTeams() {
      — nine of them put this table into a sideways scroll. So the reasons go in
      the one line under the table, next to the columns they are about. */
   const kind = escapeHtml((state.settings.unplannedLabel || 'unplanned').toLowerCase());
+  const supportTeams = inScope.filter(t => t.incidentsAsDefects === 0).length;
   $('allTeamsNote').innerHTML =
     /* NOT outlierNote(train). Every row in this table ignores its own team's
        outliers, measured against its own spread — see the comment in
@@ -18514,6 +18596,15 @@ function renderAllTeams() {
     (train.unit === 'features'
       ? '<br>The ' + kind + ' rate is not a feature-level figure &mdash; a '
         + kind + ' is a kind of work item.'
+      : '') +
+    /* WHY ONE ROW'S RATE IS NOT EVERY BUG IT HOLDS. A support team's incidents
+       leave its defect rate (see countsAsDefect), and a reader comparing rows
+       down that column is owed the reason one of them reads low. Counted, not
+       named: the Teams window says which, and this line is about the column. */
+    (supportTeams && train.unit !== 'features'
+      ? '<br>ServiceNow incidents count as support work, not ' + kind + 's, on ' + supportTeams
+        + ' of ' + inScope.length + ' team' + (inScope.length === 1 ? '' : 's')
+        + ' &mdash; set per team in Teams &amp; Stages.'
       : '');
   $('allTeamsNote').hidden = false;
 
@@ -18767,6 +18858,12 @@ const SCORECARD_CARDS = [
     scale: 'defectShare', help: 'scDefectShare',
     name: null,   /* named off the settings label; see scorecardCardName */
     sub: () => 'of everything completed in the window',
+    /* The population qualifier the aged card has, for the Quality card's own
+       reason: on a support team, incidents are not counted as defects here. */
+    pop: (d, ctx) => (ctx && ctx.supportTeams)
+      ? 'incidents are support work on ' + ctx.supportTeams + ' of ' + ctx.scope + ' team'
+        + (ctx.scope === 1 ? '' : 's')
+      : '',
     get: (d) => d.summary.unplannedShare,
     fmt: (v) => pct1(v),
     dir: ['higher', 'lower'], moveNoun: 'points',
@@ -19155,7 +19252,10 @@ function renderScorecard() {
        card can say "across 5 of 8 teams" without counting anything itself —
        and `heldOut` separates "some are out" from "all of them are", which are
        different findings and need different sentences. */
-    scope: inScope.length, scored: rollupTeams.length, heldOut: heldOut };
+    scope: inScope.length, scored: rollupTeams.length, heldOut: heldOut,
+    /* How many teams in scope count their ServiceNow incidents as support work —
+       the Quality card states it, because its figure reads fewer bugs for them. */
+    supportTeams: inScope.filter(t => t.incidentsAsDefects === 0).length };
   /* The one sentence that says what the reader is looking at and what it does
      NOT follow. Both halves matter: three figures with no unit named is a
      scorecard nobody can argue with, and a reader arriving from the dashboard
@@ -22889,6 +22989,25 @@ function renderTeamDialog() {
   $('teamSprintDays').value = team.sprintDays == null ? '' : team.sprintDays;
   $('teamSprintAnchor').value = team.sprintAnchor || '';
   $('teamRollup').checked = team.artPredictability !== 0;
+  $('teamIncidents').checked = team.incidentsAsDefects !== 0;
+  /* COUNTS off this team's own lists, so a reader can see what the tick would
+     move before moving it — and a team with none is told it changes nothing yet,
+     rather than left to wonder why nothing did. */
+  const defectLower = String(state.settings.unplannedType || '').trim().toLowerCase();
+  const incidents = (team.rows || []).concat(team.features || []).filter(r => r.snType === SN_INCIDENT);
+  const incidentDefects = incidents
+    .filter(r => String(r.type || '').trim().toLowerCase() === defectLower).length;
+  const defectWord = '<strong>' + escapeHtml(state.settings.unplannedType || '') + '</strong>';
+  $('teamIncidentsHint').innerHTML = !incidents.length
+    ? 'None of this team&rsquo;s items is a ServiceNow incident, so this changes nothing yet.'
+    : incidents.length === 1
+      ? 'One of this team&rsquo;s items is a ServiceNow incident, and it '
+        + (incidentDefects ? 'is' : 'is not') + ' typed ' + defectWord
+        + ' &mdash; the work type this decides about.'
+      : '<strong>' + incidents.length + '</strong> of this team&rsquo;s items are ServiceNow '
+        + 'incidents, and <strong>' + incidentDefects + '</strong> of them '
+        + (incidentDefects === 1 ? 'is' : 'are') + ' typed ' + defectWord
+        + ' &mdash; the ones this decides about.';
 
   /* WHAT THIS TEAM IS ACTUALLY ON, said as a sentence, because the select says
      what was CHOSEN and that is not the same thing: "Our cadence" with nothing
@@ -22981,6 +23100,11 @@ $('teamDialog').addEventListener('change', e => {
   }
   if (e.target.id === 'teamRollup') {
     team.artPredictability = e.target.checked ? null : 0;
+    save();
+    return;
+  }
+  if (e.target.id === 'teamIncidents') {
+    team.incidentsAsDefects = e.target.checked ? null : 0;
     save();
     return;
   }

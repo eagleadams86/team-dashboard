@@ -406,9 +406,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    the count; the same evening the controls staying beside the name, the
    keyboard reveal and the nudge's padding edge added 9 more, and the root's
    scroll padding (a focus lands below the sticky chrome, pinned or not) 14.
-   The three work fields (2026-09-15) brought it to 4163, and typing them in
-   on an item to 4173. */
-const EXPECTED = 4173;
+   The three work fields (2026-09-15) brought it to 4163, typing them in on an
+   item to 4173, and a support team's incidents switch to 4194. */
+const EXPECTED = 4194;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -5086,11 +5086,15 @@ async function run(TD, win) {
        The arithmetic returns 0 over a list of features — none of them is a Bug
        — and a 0 there is a claim of perfect quality on a board that may have
        plenty of bugs. */
+    /* `incidentsAsSupport` (2026-09-15) parts company on `unplannedShare`'s own
+       reason: it counts defects a support team's switch took out, and there is
+       no defect of a feature for it to count. */
     const dropUnit = (o) => {
-      const c = Object.assign({}, o); delete c.agedNow; delete c.unplannedShare; return c;
+      const c = Object.assign({}, o); delete c.agedNow; delete c.unplannedShare;
+      delete c.incidentsAsSupport; return c;
     };
     is(JSON.stringify(dropUnit(asFeats.summary)), JSON.stringify(dropUnit(asItems.summary)),
-       'including every summary figure but the two the unit decides');
+       'including every summary figure but the three the unit decides');
     is(asItems.summary.agedNow, 0, 'which the item view states off its own defaulted threshold');
     is(asFeats.summary.agedNow, null,
        'and the feature view leaves at null, because no feature threshold is set');
@@ -17638,6 +17642,114 @@ group('a card with no chart matches the one beside it');
     is([saved.n, saved.b, saved.d], [2, undefined, 1],
        'a save writes what the selects say — and a cleared one takes its value out');
     ok(!wDoc.getElementById('itemDialog').open, 'and the dialog closes on a good save');
+    plant({ teams: [], settings: {} });
+  }
+
+  group('one definition of a defect: a support team’s ServiceNow incidents');
+  {
+    const TD = win.TD, S = win.TDState;
+    const cd = TD.countsAsDefect;
+    is([cd({ type: 'Bug' }, 'bug', true), cd({ type: ' bug ' }, 'bug', true), cd({ type: 'Story' }, 'bug', true),
+        cd({ type: 'Bug', snType: 2 }, 'bug', true), cd({ type: 'Bug', snType: 2 }, 'bug', false),
+        cd({ type: 'Bug', snType: 1 }, 'bug', false), cd({ type: 'Bug' }, 'bug', false),
+        cd({ type: 'Story', snType: 2 }, 'bug', false)],
+       [true, true, false, true, false, true, true, false],
+       'countsAsDefect: the defect type decides, and only an incident on a support team is taken out');
+
+    const row = (i, t, n) => Object.assign({ c: '2026-01-' + String(6 + (i % 10)).padStart(2, '0'),
+      s: '2026-01-05', k: '2026-01-05', t, i: 'X-' + i }, n ? { n } : {});
+    const A = [row(1, 'Bug'), row(2, 'Bug', 2)].concat([3, 4, 5, 6, 7, 8, 9, 10].map(i => row(i, 'Story')));
+    const B = [row(11, 'Bug', 2), row(12, 'Bug', 2), row(13, 'Bug', 2), row(14, 'Bug', 1), row(15, 'Story', 2)]
+      .concat([16, 17, 18, 19, 20].map(i => row(i, 'Story')));
+    /* A feature on the delivery team, so the feature-view derive below has a
+       window to read rather than the empty shape. */
+    const doc = { teams: [{ id: 'dA', name: 'Delivery', rows: A,
+                            features: [{ c: '2026-01-10', s: '2026-01-05', t: 'Feature', i: 'X-99' }] },
+                          { id: 'dB', name: 'Support', incidentsAsDefects: 0, rows: B }], settings: {} };
+    const H = S.hydrateState(doc);
+    const tA = H.teams[0], tB = H.teams[1];
+    const st = S.normalizeSettings({});
+    const vw = { months: 'all', bucket: 'week', filterValue: '', forecastMode: 'off' };
+
+    const plain = win.derive(tA.rows.concat(tB.rows), st, vw);
+    near(plain.summary.unplannedShare, 0.3, 'with no team facts on the view every Bug counts, as before the switch');
+    is(win.derive(tA.rows, st, Object.assign({}, vw, { teamFacts: TD.teamFactsOf([tA]) })).unplannedRate,
+       win.derive(tA.rows, st, vw).unplannedRate,
+       'a team whose incidents count as defects derives exactly as it always did');
+    is(TD.teamFactsOf([tA, tB]).incidentsAsSupport.size, 4,
+       'the facts hold the support team’s four incidents, bug or not, and none of the other team’s');
+
+    const train = win.deriveTrain([tA, tB], st, vw);
+    near(train.summary.unplannedShare, 0.15,
+         'pooled, the train counts the delivery team’s bugs and only the support team’s own bug');
+    is(train.summary.incidentsAsSupport, 3, 'and says how many incidents it counted as support');
+    near(win.deriveTrain([tB], st, vw).summary.unplannedShare, 0.1, 'the support team alone reads its one bug');
+    const all = win.deriveTeams([tA, tB], st, vw);
+    near(all.train.summary.unplannedShare, 0.15, 'All Teams’ train agrees with the Scorecard’s pool');
+    const rowD = (id) => {
+      const x = (all.rows || []).find(r => (r.team && r.team.id) === id || r.id === id);
+      return x ? (x.d || x.derived || x) : null;
+    };
+    near(rowD('dB') && rowD('dB').summary ? rowD('dB').summary.unplannedShare : NaN, 0.1,
+         'and the support team’s row matches its own derive');
+    near(rowD('dA') && rowD('dA').summary ? rowD('dA').summary.unplannedShare : NaN, 0.2,
+         'while the delivery team’s row keeps its incident as a defect');
+    near(win.deriveTrain([tA, tB], st, Object.assign({}, vw, { filterValue: 'Bug' })).summary.unplannedShare, 0.5,
+         'a Bug filter still takes the support team’s incidents out of the defects it keeps');
+    is(win.deriveTrain([tA, tB], st, Object.assign({}, vw, { unit: 'features' })).summary.incidentsAsSupport, null,
+       'over features the count is not a figure at all');
+
+    plant(doc);
+    win.renderAll();
+    const wDoc = win.document;
+    win.openTeamDialog('dA');
+    const tick = wDoc.getElementById('teamIncidents');
+    is(tick.checked, true, 'a team nobody ticked counts its incidents as defects');
+    is(wDoc.getElementById('teamIncidentsHint').textContent,
+       'One of this team’s items is a ServiceNow incident, and it is typed Bug — the work type this decides about.',
+       'and the window counts what the tick would move');
+    tick.checked = false;
+    tick.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.tdGet().teams[0].incidentsAsDefects, 0, 'unticking makes its incidents support work');
+    tick.checked = true;
+    tick.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.tdGet().teams[0].incidentsAsDefects, undefined, 'and ticking again writes nothing at all');
+    wDoc.getElementById('teamDialog').close();
+    await new Promise(r => setTimeout(r, 0));
+    win.openTeamDialog('dB');
+    ok(/4 of this team’s items are ServiceNow incidents, and 3 of them are typed Bug/
+         .test(wDoc.getElementById('teamIncidentsHint').textContent), 'the plural reads too',
+       wDoc.getElementById('teamIncidentsHint').textContent);
+    wDoc.getElementById('teamDialog').close();
+    await new Promise(r => setTimeout(r, 0));
+    const setups = [...wDoc.querySelectorAll('#teamRows tr td.setup')].map(td => td.textContent);
+    ok(!/incidents as support/.test(setups[0] || '') && /incidents as support/.test(setups[1] || ''),
+       'the Teams row says which team counts its incidents as support', String(setups));
+
+    const sel = wDoc.getElementById('teamSel');
+    sel.value = 'dB';
+    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const filt = wDoc.getElementById('filterSel');
+    if (filt && filt.options.length) {
+      filt.selectedIndex = 0;
+      filt.dispatchEvent(new win.Event('change', { bubbles: true }));
+    }
+    win.renderAll();
+    const defTile = [...wDoc.querySelectorAll('#dashTiles .tile, .tile')]
+      .find(t => /Defect rate/.test(t.textContent));
+    ok(defTile && /10\.0%/.test(defTile.textContent),
+       'the support team’s own dashboard reads the same 10.0% its All Teams row does',
+       defTile ? defTile.textContent : 'no tile');
+    win.selectTab('allteams');
+    ok(/ServiceNow incidents count as support work, not defects, on 1 of 2 teams/
+         .test(wDoc.getElementById('allTeamsNote').textContent),
+       'All Teams says under the table why one row reads fewer defects',
+       wDoc.getElementById('allTeamsNote').textContent);
+    win.selectTab('scorecard');
+    const cols = wDoc.getElementById('scorecardCols').textContent;
+    ok(/incidents are support work on 1 of 2 teams/.test(cols) && /15\.0%/.test(cols),
+       'and the Scorecard’s Quality card states it beside the pooled 15.0%', cols);
+    win.selectTab('dashboard');
     plant({ teams: [], settings: {} });
   }
 
