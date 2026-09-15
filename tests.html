@@ -1048,6 +1048,26 @@ async function run(TD, win) {
   is(pnk.raisedAfterStart[0].text.includes('Story'), true,
      'and still names it by what it does have', pnk.raisedAfterStart[0].text);
 
+  /* A DATE CELL THAT IS NOT A DATE IS NEVER ECHOED (2026-09-15 review). These
+     are the rows the report lists BECAUSE a date could not be read, so they are
+     exactly where a mismapped column shows — and the dates went through a length
+     cap only, which a short summary or a formula clears. */
+  const pmis = TD.parsePastedRows([
+    'Key\tCreated\tIn Progress\tResolved\tIssue Type',
+    'ABC-9\t1/1/2026\t4/17/2026\tfix login bug for Acme\tStory',
+    'ABC-10\t1/1/2026\tCustomer data export\t4/20/2026\tStory',
+    '\t1/1/2026\t=cmd|calc\t4/20/2026\tBug'
+  ].join('\n'), 'auto');
+  const misEcho = [].concat(pmis.badCompleted, pmis.badStarted, pmis.badCreated, pmis.raisedAfterStart)
+    .map(b => b.text).join(' | ');
+  ok(pmis.badCompleted.length + pmis.badStarted.length >= 3, 'all three unreadable dates are listed', misEcho);
+  is(/fix login|Acme|Customer|export|cmd|calc/.test(misEcho), false,
+     'and none of them echoes the text that was sitting in the date column', misEcho);
+  is(/resolved unreadable/.test(misEcho) && /started unreadable/.test(misEcho), true,
+     'each says which date was unreadable instead', misEcho);
+  is(/ABC-9 · Story · created 1\/1\/2026 · started 4\/17\/2026/.test(misEcho), true,
+     'while a date that did read is still shown as written, which is what finds the row', misEcho);
+
   /* A SUMMARY IN THE KEY COLUMN — the mismapping the old rule was afraid of.
      It must come through as no key rather than as a truncated sentence. */
   const pmm = TD.parsePastedRows(

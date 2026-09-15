@@ -1392,8 +1392,8 @@ built-in Helvetica rather than the face the page is set in.
 - The pasted text itself is parsed on the spot and never stored; `pasteBox` is
   cleared on a replace-load.
 - **On-screen text follows the same rule as storage.** Problem rows in the paste
-  report are echoed via `refOf()` as only the type and the three dates (each cell
-  through `cleanWorkType`), never the raw pasted line — a ticket key (DAE-1023)
+  report are echoed via `refOf()` as only the type and the three dates (the type
+  through `cleanWorkType`; a date only when it reads as a date, otherwise `unreadable` — 2026-09-15), never the raw pasted line — a ticket key (DAE-1023)
   appearing in the help text was reported by Charles and fixed 2026-08-13. Any
   new diagnostic or preview must not repeat raw pasted cells; point at the source
   export with a line number instead.
@@ -4741,3 +4741,10 @@ proven red against the build before it. The reasoning sits here, per fix.
   `dateyFilled` first for each date role, then the old passes; the start role never settles on an
   empty column at all, because with no start dates the Created fallback is an answer and an empty
   column is none. The all-in-flight case is pinned alongside the three new ones.
+- **A date cell in the paste report is shown only if it reads as a date.** `refOf` put the three
+  dates through `cleanWorkType`, a LENGTH cap, so on the rows the report lists because a date could
+  not be read — the rows a mismapped column produces — a short summary or a formula in the date
+  column came back word for word. `parseDate` is anchored on the whole cell, so a cell it accepts is
+  a date and is shown as written (that is what finds the row in the export); anything else reads
+  `unreadable`. The global rule this keeps: no diagnostic echoes a pasted cell that is not
+  shape-guarded, and a length cap is not a shape.

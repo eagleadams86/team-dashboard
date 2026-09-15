@@ -6875,15 +6875,28 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
      THE FALLBACK IS NOT A STOPGAP. An export with no key column, or a row whose
      key cell is unreadable, still gets type and three dates — which is what
      finds the row again when there is no key to search for. */
+  /* A DATE CELL IS ECHOED ONLY IF IT READS AS A DATE (2026-09-15 review). The
+     three dates went through cleanWorkType, which caps LENGTH and nothing else —
+     so on the exact rows this report exists for, the ones whose date could not
+     be read, a summary or a formula sitting in the date column came back on
+     screen word for word ("resolved fix login bug for Acme"). parseDate is
+     anchored on the whole cell, so a cell it accepts IS a date and can be shown
+     as written, which is what finds the row in the export; anything else says
+     it was unreadable and nothing more. The line number still points at it. */
   const refOf = (cells) => {
     const cell = (i) => cleanWorkType(at(cells, i));
+    const dateCell = (i) => {
+      const raw = at(cells, i);
+      if (!raw) return '';
+      return parseDate(raw, resolved) ? cleanWorkType(raw) || 'unreadable' : 'unreadable';
+    };
     const parts = [];
     const key = cleanIssueKey(at(cells, cols.key));
     if (key) parts.push(key);
-    const t = cell(cols.type);      if (t) parts.push(t);
-    const k = cell(cols.created);   if (k) parts.push('created ' + k);
-    const s = cell(cols.started);   if (s) parts.push('started ' + s);
-    const c = cell(cols.completed); if (c) parts.push('resolved ' + c);
+    const t = cell(cols.type);          if (t) parts.push(t);
+    const k = dateCell(cols.created);   if (k) parts.push('created ' + k);
+    const s = dateCell(cols.started);   if (s) parts.push('started ' + s);
+    const c = dateCell(cols.completed); if (c) parts.push('resolved ' + c);
     return parts.join(' · ') || '(no readable cells)';
   };
 
