@@ -6472,6 +6472,13 @@ const ADD_FOOT_FROM = 10;
    from the other direction, chosen before the rule above was written down, and
    at two the heading is still plainly on screen. */
 const ADD_FOOT_FROM_STAGES = 4;
+/* ARTs and work-type filters, MEASURED rather than borrowed (2026-09-15 review) —
+   both used to take Teams' 10 through syncAddFoot's default, against the rule
+   written above. In the same 734px dialog the ARTs section's heading and the end
+   of its list stop sharing the window at 11 rows (690px at 10, 749px at 11), and
+   the filter list at 13 (731px at 12, 779px at 13). */
+const ADD_FOOT_FROM_ARTS = 11;
+const ADD_FOOT_FROM_FILTERS = 13;
 
 const SPRINT_DAYS_MAX = 56;
 
@@ -11434,7 +11441,7 @@ window.TD = {
   cleanSprintDays, cleanSprintAnchor, SPRINT_DAYS_MAX,
   /* The row counts at which a long list earns a second Add button at its foot.
      Stages get their own because a stage is two rows and 2.7x the height. */
-  ADD_FOOT_FROM, ADD_FOOT_FROM_STAGES,
+  ADD_FOOT_FROM, ADD_FOOT_FROM_STAGES, ADD_FOOT_FROM_ARTS, ADD_FOOT_FROM_FILTERS,
   cadenceOf, cadenceFrom, pairCadence, sharedCadence, bucketFor, sprintStartOn,
   SPRINT_COMPANY, SPRINT_OWN,
   /* What counts as a usable pair of typed dates, and the local-calendar "today"
@@ -16134,7 +16141,7 @@ function renderArtRows() {
     tb.innerHTML = '<tr><td colspan="3" class="empty-row">' +
       'No trains yet. Add one and every team gets a picker in the table above.</td></tr>';
   }
-  syncAddFoot('btnAddArtFootRow', state.arts.length);
+  syncAddFoot('btnAddArtFootRow', state.arts.length, ADD_FOOT_FROM_ARTS);
 }
 
 function renderFilterSelect() {
@@ -19284,7 +19291,7 @@ function renderFilterRows() {
         escapeHtml(name) + '">&times;</button>') + '</span></td>';
     tb.appendChild(tr);
   });
-  syncAddFoot('btnAddFilterFootRow', state.settings.filters.length);
+  syncAddFoot('btnAddFilterFootRow', state.settings.filters.length, ADD_FOOT_FROM_FILTERS);
 }
 
 /* Swap a filter one place along the list. The teams-and-ARTs mover next to

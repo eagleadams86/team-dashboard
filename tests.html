@@ -9023,6 +9023,29 @@ group('ARTs — the grouping, and the boundary it crosses');
     is(fDoc.getElementById('btnAddTeamFootRow').hidden, true,
        'while one team still does not earn one — the two counts are read separately');
     fDoc.getElementById('manageDialog').close();
+
+    /* ARTs and filters have their OWN measured thresholds (2026-09-15 review);
+       both borrowed Teams' 10. Pinned at the number and one below it. */
+    is([TD.ADD_FOOT_FROM_ARTS, TD.ADD_FOOT_FROM_FILTERS].map(n => typeof n), ['number', 'number'],
+       'the ART and filter thresholds are exported');
+    const artsOf = (n) => Array.from({ length: n }, (_, i) => ({ id: 'fa' + i, name: 'A' + i }));
+    plant({ teams: [{ id: 'f1', name: 'One', rows: [] }], arts: artsOf(TD.ADD_FOOT_FROM_ARTS - 1), settings: {} });
+    fDoc.getElementById('manageBtn').click();
+    is(fDoc.getElementById('btnAddArtFootRow').hidden, true, 'one ART short of its threshold earns no foot button');
+    fDoc.getElementById('manageDialog').close();
+    plant({ teams: [{ id: 'f1', name: 'One', rows: [] }], arts: artsOf(TD.ADD_FOOT_FROM_ARTS), settings: {} });
+    fDoc.getElementById('manageBtn').click();
+    is(fDoc.getElementById('btnAddArtFootRow').hidden, false, 'and at it, it does');
+    fDoc.getElementById('manageDialog').close();
+    const filtersOf = (n) => Array.from({ length: n }, (_, i) => ({ display: 'F' + i, value: 'V' + i }));
+    /* The filter rows are drawn straight, NOT by opening Settings: the group
+       below opens that window itself and asserts it starts closed. */
+    plant({ teams: [{ id: 'f1', name: 'One', rows: [] }], settings: { filters: filtersOf(TD.ADD_FOOT_FROM_FILTERS - 1) } });
+    win.renderFilterRows();
+    is(fDoc.getElementById('btnAddFilterFootRow').hidden, true, 'one filter short of its threshold earns none');
+    plant({ teams: [{ id: 'f1', name: 'One', rows: [] }], settings: { filters: filtersOf(TD.ADD_FOOT_FROM_FILTERS) } });
+    win.renderFilterRows();
+    is(fDoc.getElementById('btnAddFilterFootRow').hidden, false, 'and at it, it does');
   }
   /* Every heading is inside a section, and every section is separated from the
      one above it by a rule — the thing that was missing when the window was

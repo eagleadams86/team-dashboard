@@ -4822,3 +4822,7 @@ proven red against the build before it. The reasoning sits here, per fix.
   ignoring the aged-share tick (23% where 25% was right, no "across 2 of 3 teams"), and the team
   editor's close observer not redrawing the row (the old check changed the sprint mode on the way,
   which redraws the row by itself). Each new check is red against its mutation and green on the app.
+- **ARTs and filters measure their own foot-button thresholds.** Both took Teams' `ADD_FOOT_FROM` (10)
+  through `syncAddFoot`'s default, against "measure it, never copy it". In the same 734px dialog the
+  ARTs section crosses at **11** (690px at 10, 749px at 11) and the filter list at **13** (731px at 12,
+  779px at 13): `ADD_FOOT_FROM_ARTS` and `ADD_FOOT_FROM_FILTERS`, pinned at the number and one below.
