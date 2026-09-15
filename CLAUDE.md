@@ -4833,3 +4833,10 @@ proven red against the build before it. The reasoning sits here, per fix.
 - **CI waits 300 s for the summary, not 60.** The step spent 46-52 s of its 60 across the last eight
   runs, on a suite growing by the day — Money Map's red-on-green failure waiting to happen. Same
   widening Money Map made on 2026-09-07.
+- **A timestamp that names its zone lands on the reader's calendar.** `withoutTime` dropped the clock
+  before any offset was applied, so `2026-09-16T01:00:00Z` — 9pm the day before in New York — was dated
+  the 16th: until local midnight the future-date fence held it open and the window slid back six days,
+  and its cycle time was a day long for good. `parseDate` now turns a stamp carrying `Z` or an offset
+  into the reader's local date first (the calendar `todayLocalISO` already compares against); a stamp
+  with no zone is a wall-clock date and is read as written. CI runs in UTC, where both readings agree,
+  so the checks build their expectations from the browser's own zone and go red on a non-UTC machine.

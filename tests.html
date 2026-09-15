@@ -916,7 +916,18 @@ async function run(TD, win) {
   is(iso(TD.parseDate('9/23/2025 10:21', 'mdy')), '2025-09-23', 'm/d/yyyy with a time on the end');
   is(iso(TD.parseDate('23/09/2025 14:05:00', 'dmy')), '2025-09-23', 'd/m/yyyy with seconds');
   is(iso(TD.parseDate('23/Sep/25 4:12 PM', 'dmy')), '2025-09-23', 'Jira dd/Mon/yy with am/pm');
-  is(iso(TD.parseDate('2025-09-23T10:21:00Z', 'dmy')), '2025-09-23', 'ISO timestamp with T and Z');
+  /* An instant — Z or an offset — is read on the READER's calendar (2026-09-15
+     review), so these expectations are built from the browser's own zone: the
+     suite runs in UTC on CI and in New York on Charles's Mac, and both must be
+     right. A stamp with no zone is a wall-clock date and never moves. */
+  const localDay = (ms) => { const d = new Date(ms);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  is(iso(TD.parseDate('2025-09-23T10:21:00Z', 'dmy')), localDay(Date.UTC(2025, 8, 23, 10, 21)), 'ISO timestamp with T and Z');
+  is(iso(TD.parseDate('2026-09-16T01:00:00Z', 'dmy')), localDay(Date.UTC(2026, 8, 16, 1, 0)),
+     'a UTC stamp lands on the day it was where the reader is, not the day it was in Greenwich');
+  is(iso(TD.parseDate('2026-09-15T23:30:00-05:00', 'dmy')), localDay(Date.UTC(2026, 8, 16, 4, 30)),
+     'and so does a stamp with an offset');
+  is(iso(TD.parseDate('2026-09-15 23:30', 'dmy')), '2026-09-15', 'while a stamp with no zone is read as written');
   is(iso(TD.parseDate('9/23/2025 0:00', 'mdy')), '2025-09-23', 'midnight is still a date');
   is(TD.parseDate('10:21', 'dmy'), null, 'a bare time is not a date');
 
