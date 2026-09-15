@@ -4000,7 +4000,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       </div>
       <div>
         <label for="setUnplannedType">Defect work type — the exact text in your Type column</label>
-        <input type="text" id="setUnplannedType" maxlength="120" placeholder="Bug">
+        <input type="text" id="setUnplannedType" maxlength="40" placeholder="Bug">
       </div>
       <div>
         <label for="setSameDay">Cycle time to use when an item starts and finishes the same day (days)</label>
@@ -12242,6 +12242,15 @@ function normalizeSettings(raw) {
     if (typeof s[k] !== 'string') s[k] = DEFAULT_SETTINGS[k];
     s[k] = s[k].slice(0, 120);
   }
+  /* TWO OF THE THREE ARE WORK-TYPE-SHAPED, and a 120-character cap let either
+     hold a sentence (2026-09-15 review). The defect type is matched against a
+     row's type, which cleanWorkType holds to 40 characters — so anything longer
+     could never match a row and could only ever be stored text, and it was
+     truncated rather than dropped. The cycle-time word is offered as four options
+     and has no box to type into; a word from before the select is still kept, on
+     the same 40-character terms. Both go through cleanWorkType: dropped WHOLE. */
+  s.unplannedType = cleanWorkType(s.unplannedType);
+  s.cycleTimeLabel = cleanWorkType(s.cycleTimeLabel) || DEFAULT_SETTINGS.cycleTimeLabel;
   /* The feature labels, held to the SAME guard as a work type in a pasted row —
      cleanWorkType, so a label longer than a label is dropped WHOLE rather than
      truncated. That matters here for the same reason it matters at the paste: a

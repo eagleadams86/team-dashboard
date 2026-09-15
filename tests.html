@@ -6011,6 +6011,17 @@ async function run(TD, win) {
      'so does a negative one');
   is(S.normalizeSettings({ unplannedType: 42 }).unplannedType, 'Bug',
      'a non-string label setting falls back to its default');
+  /* The defect type is matched against a row's type, which is held to 40
+     characters — so a longer one can only be stored text, and is dropped WHOLE,
+     not cut (2026-09-15 review). The cycle-time word likewise. */
+  is(S.normalizeSettings({ unplannedType: 'x'.repeat(41) }).unplannedType, '',
+     'a defect type longer than any row type can hold is dropped whole');
+  is(S.normalizeSettings({ unplannedType: 'Production Incident' }).unplannedType, 'Production Incident',
+     'while an ordinary one is kept as typed');
+  is(S.normalizeSettings({ cycleTimeLabel: '"><img src=x> ' + 'y'.repeat(60) }).cycleTimeLabel, 'Cycle Time',
+     'a cycle-time word the length of a sentence falls back to the default');
+  is(win.document.getElementById('setUnplannedType').maxLength, 40,
+     'and the box stops at 40 characters, so what is typed is what is kept');
   /* A checkbox that decides how every duration is measured: only the boolean
      true turns it on, and it is a real boolean either way — localStorage drops
      an undefined and Firestore refuses a whole document over one. */

@@ -4762,3 +4762,10 @@ proven red against the build before it. The reasoning sits here, per fix.
   `Number(t.artPredictability) === 0`, and `Number(null)`, `Number('')` and `Number(false)` are all 0 —
   so a hand-edited null held the team OUT, the reverse of what its comment promised for junk, and the
   exact trap recorded under "The trap the drawing found". It tests the raw value now: `0` or `'0'`.
+- **The defect type and the cycle-time word are work-type-shaped.** `normalizeSettings` capped
+  `cycleTimeLabel`, `unplannedType` and `unplannedLabel` at 120 characters of anything, truncating.
+  The defect type is matched against a row's type, which `cleanWorkType` holds to 40 — so a longer
+  one could only ever be stored text — and the cycle-time word is a four-option select. Both now go
+  through `cleanWorkType` (dropped whole), and the defect box's `maxlength` is 40. A pre-select
+  custom word of 40 or fewer is still kept, as the existing "never re-cased" check requires.
+  `unplannedLabel` keeps 120: it is a label the reader types, like a team name.
