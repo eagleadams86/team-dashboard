@@ -9531,6 +9531,46 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(TD.periodsToDays(jan1, 1, 'month'), 31, 'a month from 1 January is 31 days, not an average one');
   is(TD.periodsToDays(jan1, 2, 'month'), 59, 'and two is 59 — February is stepped, not approximated');
 
+  /* A SPRINT IS ITS OWN LENGTH, never a week (2026-09-15 review). Both helpers
+     wrote `fortnight ? 14 : 7`, so a 14-day sprint was walked as 7 days and every
+     forecast on a sprint grid came out twice as early. */
+  const SPR14 = { days: 14, anchor: jan1 }, SPR10 = { days: 10, anchor: jan1 };
+  near(TD.periodsBetween(jan1, D(2015, 1, 29), 'sprint', SPR14), 2, 'four weeks is 2 sprints of 14 days');
+  near(TD.periodsBetween(jan1, D(2015, 1, 21), 'sprint', SPR10), 2, 'and twenty days is 2 sprints of 10');
+  is(TD.periodsToDays(jan1, 2, 'sprint', SPR14), 28, '2 sprints of 14 days is 28 days, not 14');
+  is(TD.periodsToDays(jan1, 1.5, 'sprint', SPR10), 15, 'and 1.5 sprints of 10 is 15');
+  is(TD.periodsToDays(jan1, 2, 'sprint', SPR14), TD.periodsToDays(jan1, 2, 'fortnight'),
+     'a 14-day sprint and a fortnight are the same number of days');
+  is(TD.periodsToDays(jan1, 2, 'sprint', null), 14, 'a sprint with no cadence cannot be a length, so it reads as the week bucketFor serves');
+
+  /* And through derive(), because the helpers being right is not the same as
+     every caller handing them the cadence. One board, a steady ten items a
+     fortnight, forecast twice: grouped by fortnight, and grouped by a 14-day
+     sprint anchored on the same grid. Same samples, same periods — so the same
+     dates and the same counts, or a caller dropped the cadence. */
+  {
+    const fStart = TD.bucketStart(D(2025, 1, 8), 'fortnight');
+    const spRows = [];
+    for (let p = 0; p < 20; p++) for (let i = 0; i < 10; i++) {
+      const done = new Date(fStart.getTime() + (p * 14 + 1 + (i % 12)) * 864e5);
+      spRows.push({ started: new Date(done.getTime() - 3 * 864e5), completed: done, type: 'Story' });
+    }
+    const spSet = SAMPLE_SETTINGS;
+    const spView = (bucket) => ({ filterValue: '', months: 'all', bucket, forecastItems: 60,
+      sprintDays: 14, sprintAnchor: iso(fStart) });
+    const byF = TD.derive(spRows, spSet, spView('fortnight'));
+    const byS = TD.derive(spRows, spSet, spView('sprint'));
+    is(byS.bucket, 'sprint', 'the sprint derive really is cut on sprints');
+    is(byS.forecast.horizonPeriods, byF.forecast.horizonPeriods,
+       'a 14-day sprint puts as many periods before the target date as a fortnight does');
+    is(byS.forecast.when && byS.forecast.when.rows.map(r => r.days).join(),
+       byF.forecast.when && byF.forecast.when.rows.map(r => r.days).join(),
+       'and forecasts 60 items on the same days, not half of them');
+    is(byS.forecast.howMany && byS.forecast.howMany.rows.map(r => r.count).join(),
+       byF.forecast.howMany && byF.forecast.howMany.rows.map(r => r.count).join(),
+       'and the same count by the target date, not double');
+  }
+
   /* The bars, and the confidence each carries. Ten trials so the shares are
      exact tenths and can be read off by hand. */
   const hWhen = TD.forecastHistogram([1, 1, 2, 2, 2, 3, 3, 4, 4, 5], true);

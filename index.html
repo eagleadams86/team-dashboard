@@ -8475,7 +8475,7 @@ function featureForecastOf(o) {
     : plain ? forecastFeaturePeriods(samples, sizes, wanted, FORECAST_TRIALS)
             : forecastFeaturePeriodsScoped(samples, sizes, wanted, sc, FORECAST_TRIALS);
   const whenTrials = whenPeriods
-    && whenPeriods.map(p => periodsToDays(o.countFrom, p, o.bucket));
+    && whenPeriods.map(p => periodsToDays(o.countFrom, p, o.bucket, o.cadence));
   const manyTrials = reason ? null
     : plain ? forecastFeaturesIn(samples, sizes, o.horizonPeriods, FORECAST_TRIALS)
             : forecastFeaturesInScoped(samples, sizes, o.horizonPeriods, sc, FORECAST_TRIALS);
@@ -9054,12 +9054,24 @@ function forecastItemsIn(samples, periods, trials) {
 const daysAtConfidence  = (trials, conf) => percentileOf(trials, conf);
 const countAtConfidence = (trials, conf) => percentileOf(trials, 100 - conf);
 
-/* How many periods lie between two dates, fractionally. Weeks and fortnights
-   are a fixed number of days; months are stepped, because they are not. */
-function periodsBetween(from, to, bucket) {
+/* The length in days of one fixed-length period: a week, a fortnight, or a
+   sprint of the cadence the figures were cut on. A SPRINT IS NOT A WEEK. Both
+   helpers below read this and nothing else, because until 2026-09-15 each wrote
+   `bucket === 'fortnight' ? 14 : 7` and a 14-day sprint was walked as 7 days —
+   every forecast date on a sprint grid came out twice as early as the samples
+   said, and every "how many by" count twice as high. A sprint with no cadence
+   cannot happen past bucketFor(), and falls back to the week it would be. */
+function periodLengthDays(bucket, cad) {
+  if (bucket === 'sprint' && cad && cad.days) return cad.days;
+  return bucket === 'fortnight' ? 14 : 7;
+}
+
+/* How many periods lie between two dates, fractionally. Weeks, fortnights and
+   sprints are a fixed number of days; months are stepped, because they are not. */
+function periodsBetween(from, to, bucket, cad) {
   if (!from || !to || to <= from) return 0;
   if (bucket !== 'month') {
-    const len = bucket === 'fortnight' ? 14 : 7;
+    const len = periodLengthDays(bucket, cad);
     return (to.getTime() - from.getTime()) / (len * DAY_MS);
   }
   let k = 0;
@@ -9083,8 +9095,8 @@ function periodsBetween(from, to, bucket) {
    that day is over, and a forecast that rounds a promise down is the wrong
    kind of wrong. Months are stepped rather than approximated, because they
    are not a fixed number of days. */
-function periodsToDays(from, n, bucket) {
-  if (bucket !== 'month') return Math.ceil(n * (bucket === 'fortnight' ? 14 : 7));
+function periodsToDays(from, n, bucket, cad) {
+  if (bucket !== 'month') return Math.ceil(n * periodLengthDays(bucket, cad));
   const whole = Math.floor(n), frac = n - whole;
   const a = edate(from, whole);
   return Math.ceil(diffDays(a, from) + frac * diffDays(edate(from, whole + 1), a));
@@ -9322,7 +9334,7 @@ function buildForecast(o) {
 
   const fcTarget = (fcStored && !isNaN(fcStored) && fcStored > countFrom)
     ? fcStored : edate(countFrom, 3);
-  const fcHorizon = periodsBetween(countFrom, fcTarget, bucket);
+  const fcHorizon = periodsBetween(countFrom, fcTarget, bucket, cad);
 
   /* ── Periods a team in scope had no data for ─────────────────────────────
      Only ever set by deriveTeams, and only for a pooled forecast. One shared
@@ -9368,7 +9380,7 @@ function buildForecast(o) {
     ? forecastPeriodsFor(fcSamples, fcItems, FORECAST_TRIALS)
     : forecastPeriodsForScoped(fcSamples, fcItems, sc, FORECAST_TRIALS);
   const whenTrials = whenPeriods
-    && whenPeriods.map(p => periodsToDays(countFrom, p, bucket));
+    && whenPeriods.map(p => periodsToDays(countFrom, p, bucket, cad));
   const manyTrials = plain
     ? forecastItemsIn(fcSamples, fcHorizon, FORECAST_TRIALS)
     : forecastItemsInScoped(fcSamples, fcHorizon, sc, FORECAST_TRIALS);
@@ -11117,7 +11129,7 @@ function deriveTeams(teams, settings, view, stages, statuses) {
      true; a day behind is a fact for that column, not a reason on this card. */
   const staleTeams = preScan.map(({ t, d }) => {
     if (!d.dataEnd || d.dataEnd >= train.endDate) return null;
-    const periods = Math.floor(periodsBetween(d.dataEnd, train.endDate, train.bucket));
+    const periods = Math.floor(periodsBetween(d.dataEnd, train.endDate, train.bucket, train.cadence));
     if (periods < 1) return null;
     return { id: t.id, name: t.name, dataEnd: d.dataEnd, periods };
   }).filter(Boolean).sort((a, b) => a.dataEnd - b.dataEnd);
@@ -16511,6 +16523,7 @@ function renderDashboard() {
         featureCount: f.items, targetDate: f.targetDate,
         horizonPeriods: f.horizonPeriods, countFrom: f.countFrom,
         countingFromToday: f.countingFromToday, bucket: fcDerived.bucket,
+        cadence: fcDerived.cadence,
         lostPeriods: f.lostPeriods, coverageEnd: f.coverageEnd,
         scenario: view.scenario })
     });
@@ -16979,7 +16992,7 @@ function renderSchedule(d, sched) {
   const rows = scheduleRows(sched, FORECAST_CONFIDENCE);
   const allDone = scheduleAllDone(sched, FORECAST_CONFIDENCE);
   const toDate = (periods) => addDays(f.countFrom,
-    periodsToDays(f.countFrom, periods, d.bucket));
+    periodsToDays(f.countFrom, periods, d.bucket, d.cadence));
 
   $('nameSchedule').innerHTML = '<span>When each feature lands</span>'
     + helpBtn('schedule', 'When each feature lands');

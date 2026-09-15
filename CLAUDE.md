@@ -4716,3 +4716,19 @@ Three shapes worth carrying to the siblings:
 Left open on purpose: the In progress cell's `textContent` runs the count into the delta
 ("9+6.3") for a hand-selected copy; Chromium's accessibility tree separates them, the export
 strips the delta, and a whitespace node would cost the 2px the 1024 layout was bought with.
+
+## Fixes From the 2026-09-15 Review
+
+Six reviewers over the whole app at `f62fcd2` (sprint cadence, page chrome, share and clean-up,
+security, core figures in five timezones, suite health). One fix per commit, each with a check
+proven red against the build before it. The reasoning sits here, per fix.
+
+- **A sprint is walked at its own length in the forecast.** `periodsBetween` and `periodsToDays`
+  wrote `fortnight ? 14 : 7`, so on a sprint grid every sample period was walked as a WEEK: a
+  14-day team's forecast dates came out twice as early and its "how many by" counts twice as high,
+  and `staleTeams` called a team a whole period behind after 7 days. Both now read
+  `periodLengthDays(bucket, cad)`, and every caller hands in the cadence the figures were cut on —
+  `buildForecast`'s `cad`, `featureForecastOf`'s `o.cadence` (passed from `fcDerived.cadence`),
+  `train.cadence` in `deriveTeams` and `d.cadence` in the schedule. The derive-level check forecasts
+  one board as fortnights and as 14-day sprints on the same grid and requires identical answers,
+  because the pure checks alone cannot see a caller that forgot the cadence.

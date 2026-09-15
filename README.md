@@ -345,7 +345,8 @@ is a ten-working-day one: the **working days** setting changes how long an item 
 *taken*, but it cannot move a sprint boundary, because a boundary is a date on the calendar. Then each team says whether it runs sprints, under
 **Edit** in Teams & Stages: *doesn't run sprints*, *our cadence*, or *a cadence of its own*.
 Teams on a cadence gain a **Sprint** option under *Group by* that cuts every period on their real
-sprint boundaries.
+sprint boundaries. The forecast walks those periods at their real length too, so a 14-day sprint
+forecasts the same dates a fortnight does.
 
 The cadence lives in Settings rather than on each team because **a train is a synchronised
 cadence** — asking thirteen boards to type the same fortnight is one question asked thirteen
