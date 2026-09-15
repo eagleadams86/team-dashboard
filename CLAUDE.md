@@ -4840,3 +4840,8 @@ proven red against the build before it. The reasoning sits here, per fix.
   into the reader's local date first (the calendar `todayLocalISO` already compares against); a stamp
   with no zone is a wall-clock date and is read as written. CI runs in UTC, where both readings agree,
   so the checks build their expectations from the browser's own zone and go red on a non-UTC machine.
+- **An axis past its cap keeps the newest periods.** `derive` broke its bucket walk at 1,200 from the
+  OLD end, so a one-day sprint over four years drew three and silently dropped the newest nine months.
+  The walk now runs to the end (`AXIS_WALK_GUARD` only stops one that cannot finish), the oldest past
+  `AXIS_MAX_BUCKETS` are dropped, and `startDate` moves to the first period kept, so the window note
+  describes what is drawn. A one-day cadence stays legal — the suite pins it as a real answer.

@@ -9590,6 +9590,10 @@ function buildForecast(o) {
   return forecast;
 }
 
+/* How many periods an axis may hold, and how far a walk may go looking for them.
+   The first is a presentation limit; the second only stops a walk that cannot end. */
+const AXIS_MAX_BUCKETS = 1200, AXIS_WALK_GUARD = 50000;
+
 function derive(rows, settings, view, stages, statuses) {
   const stageList = Array.isArray(stages) ? stages : [];
   /* Optional, exactly as `stages` is and for the same reason: a caller passing
@@ -9859,7 +9863,7 @@ function derive(rows, settings, view, stages, statuses) {
      about. 84 days rather than 12 months / 4.33: a PI is weeks, and rounding it
      through months would land it a few days out of step with the sprints it is
      made of. Inclusive of both ends, like the month windows beside it. */
-  const startDate = custom ? custom.from
+  let startDate = custom ? custom.from
     : view.months === 'all' || view.months === 'custom' ? null
     : view.months === 'pi' ? addDays(endDate, -(PI_WEEKS * 7 - 1))
     : edate(endDate, -Number(view.months));
@@ -9889,7 +9893,17 @@ function derive(rows, settings, view, stages, statuses) {
   const weekStarts = [];
   for (let w = firstWeek; w <= limit; w = nextBucket(w, bucket, cad)) {
     weekStarts.push(w);
-    if (weekStarts.length > 1200) break;               /* runaway guard */
+    if (weekStarts.length > AXIS_WALK_GUARD) break;    /* runaway guard */
+  }
+  /* THE NEWEST PERIODS ARE KEPT (2026-09-15 review). The guard used to stop the
+     walk at 1,200 periods from the OLD end, so a one-day sprint over four years of
+     data drew three years and dropped the newest nine months — the part anybody
+     looks at — with nothing on screen saying so. Past the cap the oldest go, and
+     the window's start moves with them, so every note naming the window names the
+     periods actually drawn. */
+  if (weekStarts.length > AXIS_MAX_BUCKETS) {
+    weekStarts.splice(0, weekStarts.length - AXIS_MAX_BUCKETS);
+    startDate = weekStarts[0];
   }
 
   /* An axis with nothing on it, which only a TYPED window can produce: every
