@@ -4674,6 +4674,13 @@ async function run(TD, win) {
   is(objArtErr + objStageErr, '', 'neither an ART nor a stage name that is an object throws');
   is(S.sanitizeTeams([{ id: 'n1', name: 42 }])[0].name, '42', 'a number is still kept as its digits');
   is(S.sanitizeTeams([{ id: 'n2', name: ['A'] }])[0].name, 'Untitled team', 'but an array is not a name');
+  /* Held out of the aged share is a 0 and nothing that merely coerces to one —
+     Number(null), Number('') and Number(false) are all 0 (2026-09-15 review). */
+  is(S.sanitizeTeams([null, '', false, 'yes', undefined].map((v, i) =>
+       ({ id: 'ap' + i, name: 'T', artPredictability: v }))).map(t => t.artPredictability),
+     [null, null, null, null, null], 'null, empty, false and junk all leave a team IN the aged share');
+  is(S.sanitizeTeams([{ id: 'ap9', name: 'T', artPredictability: 0 }, { id: 'ap8', name: 'T', artPredictability: '0' }])
+       .map(t => t.artPredictability), [0, 0], 'only a real 0, or the digit a form hands over, holds it out');
 
   /* The ordering rules the paste enforces, applied to the other door the same
      data can come through. A copy this app saved already satisfies

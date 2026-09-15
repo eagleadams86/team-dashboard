@@ -4758,3 +4758,7 @@ proven red against the build before it. The reasoning sits here, per fix.
   have gone red on a correct app — the fault `f84b279` fixed for the stale-export check. It is built
   from `Date.now()` now. Proven by running the suite with the clock pinned to 2026-12-02 (red before,
   green after), since a default run cannot see it.
+- **Only a real 0 holds a team out of the aged share.** `sanitizeTeams` read
+  `Number(t.artPredictability) === 0`, and `Number(null)`, `Number('')` and `Number(false)` are all 0 —
+  so a hand-edited null held the team OUT, the reverse of what its comment promised for junk, and the
+  exact trap recorded under "The trap the drawing found". It tests the raw value now: `0` or `'0'`.

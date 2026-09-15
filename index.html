@@ -12042,7 +12042,10 @@ function sanitizeTeams(teams) {
                 are both IN, which is what the page did before and the answer
                 nobody has to have opted into. Stored as a number rather than a
                 boolean to sit inside the numbers-and-dates rule. */
-             artPredictability: (t && Number(t.artPredictability) === 0) ? 0 : null,
+             /* The RAW value, never its Number() (2026-09-15 review): Number(null),
+                Number('') and Number(false) are all 0, so a hand-edited null held
+                a team OUT — the reverse of what this comment promises for junk. */
+             artPredictability: (t && (t.artPredictability === 0 || t.artPredictability === '0')) ? 0 : null,
              rows: hydrateRows(t && t.rows),
              /* Its own list, never mixed into rows — see the split in
                 parsePastedRows. Rebuilt explicitly here like everything else on
