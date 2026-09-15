@@ -401,8 +401,10 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    met while adding them, for the next person: the Scorecard is not offered
    below two teams, so a one-team fixture reads stale cards; and the scope list
    is a position on the device that an earlier group may have left ticks in, so
-   press "All trains" before ticking. */
-const EXPECTED = 3946;
+   press "All trains" before ticking. The suite had grown to 4001 by 2026-09-14,
+   when the one-line header and tab bar added 19 and the floor was brought up to
+   the count. */
+const EXPECTED = 4020;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -15974,6 +15976,93 @@ group('a card with no chart matches the one beside it');
     is(cs(bar).position, 'static', 'and the band is back in the flow');
     appFrame.style.cssText = wasCss;
     await new Promise((r) => setTimeout(r, 250));
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the header and the tab bar are one scrolling line at every width (2026-09-14)');
+
+  /* Charles, 2026-09-14, family-wide: "should we just make them both always
+     single line side scrollers?" A 705px desktop window had the header controls
+     on two lines. The app frame is resized for the pin group's reason — it is
+     1px wide, and a row measured there is measuring nothing. 705 is where the
+     header overflows; the four tabs still fit there, so the tab bar's arrows are
+     checked in a 360px frame, which is still a mouse-driven frame. 1600 is where
+     nothing may have changed. Sprint Predictability carries the same check. */
+  {
+    const rsDoc = win.document;
+    const appFrame = document.getElementById('app');
+    const wasCss = appFrame.style.cssText;
+    const sized = async (w) => {
+      appFrame.style.cssText =
+        'position:absolute;width:' + w + 'px;height:900px;opacity:0;border:0;left:-9999px';
+      await new Promise((r) => setTimeout(r, 300));
+    };
+    const rect = (el) => el.getBoundingClientRect();
+    const lines = (el) => new Set([...el.children]
+      .filter((c) => c.getClientRects().length && !c.classList.contains('sr-only')
+        && win.getComputedStyle(c).display !== 'none')
+      .map((c) => Math.round(rect(c).top))).size;
+    const ctl = rsDoc.querySelector('.headctl'), tabs = rsDoc.querySelector('.tabs');
+    const headNav = rsDoc.querySelector('.headrow > .rownav');
+    const tabNav = rsDoc.querySelector('.tabrow > .rownav');
+    ok(!!ctl && !!headNav && !!tabNav,
+       'the page carries the header scroller and an arrow box for each row');
+    if (ctl && headNav && tabNav) {
+      try {
+        /* Two teams, so All Teams and the Scorecard are on offer and the bar is
+           the four tabs it is at its widest. */
+        plant({ stages: [], arts: [], settings: {},
+                teams: [{ id: 'rs1', name: 'Scroller One', rows: [
+                           { c: '2026-08-09', s: '2026-08-02', t: 'Story' } ] },
+                        { id: 'rs2', name: 'Scroller Two', rows: [
+                           { c: '2026-08-10', s: '2026-08-03', t: 'Story' } ] }] });
+        win.renderAll();
+        await sized(705);
+        win.scrollTo(0, 0);
+        is(lines(ctl), 1, '705px: the header controls are one line');
+        is(lines(tabs), 1, 'and the tabs are one row');
+        ok(ctl.scrollWidth > ctl.clientWidth,
+           'the controls have something to scroll here — otherwise nothing is being measured',
+           ctl.scrollWidth + ' vs ' + ctl.clientWidth);
+        ok(!headNav.hidden, 'so the header shows its arrows');
+        const [prev, next] = headNav.querySelectorAll('button');
+        ok(prev.disabled && !next.disabled, 'at the start, \u2039 is off and \u203a is on');
+        next.click();
+        ok(ctl.scrollLeft > 0, 'pressing \u203a scrolls the row', ctl.scrollLeft);
+        await new Promise((r) => setTimeout(r, 50));
+        ok(!prev.disabled, 'and \u2039 comes on');
+        ok(tabNav.hidden,
+           'while the four tabs fit, so their bar shows no arrows — arrows only when something is off an end',
+           tabs.scrollWidth + ' vs ' + tabs.clientWidth);
+
+        await sized(360);
+        is(lines(tabs), 1, '360px: the tabs are still one row');
+        ok(tabs.scrollWidth > tabs.clientWidth, 'with something to scroll',
+           tabs.scrollWidth + ' vs ' + tabs.clientWidth);
+        ok(!tabNav.hidden, 'so the tab bar shows its arrows');
+        tabs.scrollLeft = 0;
+        tabNav.querySelectorAll('button')[1].click();
+        ok(tabs.scrollLeft > 0, 'and its \u203a scrolls the tabs', tabs.scrollLeft);
+        ok(!ctl.contains(headNav) && !tabs.contains(tabNav)
+           && tabNav.parentElement === rsDoc.querySelector('.tabrow'),
+           'neither arrow box is inside the thing it scrolls — the tab one is never inside the tablist');
+
+        await sized(1600);
+        ok(ctl.scrollWidth - ctl.clientWidth <= 1, '1600px: the controls fit',
+           ctl.scrollWidth - ctl.clientWidth);
+        ok(headNav.hidden && tabNav.hidden, 'so neither row shows arrows');
+        ok(Math.abs(rect(ctl).top - rect(rsDoc.querySelector('.brand')).top) < 16,
+           'and the controls sit beside the name, on its line, as they always have');
+        is(lines(tabs), 1, 'the tabs one row');
+      } finally {
+        appFrame.style.cssText = wasCss;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    }
+    /* Its own fetch, for the temporal-dead-zone reason the print group gives. */
+    const rsSrc = await (await bustFetch('index.html')).text();
+    ok(/@media \(hover: none\), \(pointer: coarse\) \{ \.rownav \{ display: none !important; \} \}/.test(rsSrc),
+       'the arrows are for a mouse or trackpad — a finger swipes the row');
   }
 
   /* ────────────────────────────────────────────────────────── */

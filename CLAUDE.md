@@ -793,6 +793,55 @@ nowrap row only scrolls when there is something to scroll.
 
 **Sprint Predictability has both of these now**, and it shares this app's chrome.
 
+## The Header and the Tab Bar Are One Scrolling Line (2026-09-14)
+
+**Charles, 2026-09-14, family-wide: "should we just make them both always single line side
+scrollers?"** Before this, the header's controls WRAPPED at any width they did not fit, and the
+tab bar only scrolled below 720px. Money Map is the reference (financial-plan `b14f4ae`);
+Sprint Predictability carries the identical change in the same pass, and a change to one belongs in both.
+
+- **The header.** The controls sit in `.headrow` (the row and its arrows) › `.headctl` (the
+  scroller: `nowrap`, `overflow-x: auto`, `scrollbar-width: none`, 4px padding with a -4px
+  margin so the focus ring has room and nothing moves, children `flex: 0 0 auto`, and its own
+  12px gap — a nested row inherits none). `.headrow` is `flex: 0 1 auto`: sized to its content,
+  so it sits beside the name while it fits (the name's auto margin still pushes it right), and
+  `.headbar`'s flex-wrap takes the WHOLE row onto a line of its own, where it shrinks and
+  scrolls, when it does not. **A header is one line or two, never three.** The ids and the
+  family's header order are unchanged; the header-order sweep reads `findBtn`'s parent, which is
+  `.headctl` now.
+- **The tabs.** `.tabs` is the scroller in the BASE rule (`.tabs > .tab` is `flex: 0 0 auto;
+  white-space: nowrap`). The 720px rule keeps only `margin: -4px -4px 0` — the bottom 4px
+  inside the row's height, which the pin measures — so the phone tab row is what it was.
+- **The arrows.** A `.rownav` box of two buttons (`tabindex="-1"`, `aria-hidden`) beside each
+  scroller, never inside it; the tab one sits between the tablist and the 📌 and is `no-print`.
+  Money Map borrows its year strip's `.ynav.snav` buttons; this app has none, so `.rownav button`
+  is drawn from tokens — no border, no fill until hover (`--surface-alt`), `--text-secondary`,
+  opacity .35 disabled — **identical in both apps**. `.rownav` sets no `display`, so `hidden`
+  works, and `@media (hover: none), (pointer: coarse)` hides it with `!important`: a finger
+  swipes the row, and in Money Map the arrows grew a phone's header 6px.
+- **`wireScrollRow(row, nav)` is Money Map's, verbatim** — ResizeObserver, MutationObserver,
+  scroll and resize keep it true; the arrows show only while the row has something off an end,
+  each is disabled at its own end, and a press steps 80% of the row, instantly. Money Map's tab
+  drag edge-scroll is NOT here: these tabs are not reordered by dragging.
+- **Print.** `.headctl` wraps and stops scrolling on paper, and `.rownav` joins the furniture.
+- **`.subtabs` is left alone, on measurement**: the four Dashboard section tabs are about 320px
+  and were one line at 1600, 1100, 705, 390 and 844×390, so there was nothing to fix.
+- **Measured against the previous commit** (Playwright, sample data loaded): 1600px identical. 705px: header
+  93 → 89px, the controls two lines → one with arrows; the four tabs still fit there, so the tab
+  bar shows no arrows until the window is narrower. 1100px: 93 → 89px — the controls go onto
+  their own line under the name, where six used to sit beside it with one below. 390×844 phone:
+  185 → 93px. 844×390 sideways phone: 101 → 93px.
+  **The phones are not pixel-identical, and that is the change rather than a regression**: this
+  header never had a phone scroller (Money Map's did), so its controls used to stack two or three
+  lines deep there. The phone TAB rows are unchanged, and the arrows never show on touch.
+- **Tests.** 19 checks in a group after the pin group, resizing `#app` the way that group
+  does: 705px (header one line, arrows shown, › scrolls, ‹ comes on, tab arrows hidden while the
+  four tabs fit), 360px (tabs one row, arrows shown, › scrolls, neither box inside its
+  scroller) and 1600px (nothing overflows, no arrows, controls beside the name), plus the touch
+  media query. Two teams are planted so the bar is at its widest. Confirmed red on the old page;
+  EXPECTED 3946 → 4020 (the suite already registered 4001).
+
+
 ## WIP vs Month Got Its Own ⓘ (2026-09-03) — no schema change
 
 Charles asked what the column meant. That is the finding, not the request: the
