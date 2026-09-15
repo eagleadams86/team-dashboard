@@ -4807,3 +4807,12 @@ proven red against the build before it. The reasoning sits here, per fix.
   (`{display: {}, value: 5}`) still arrives as a blank row. The review called it a nit; the suite
   already pins that behaviour deliberately ("non-string fields inside an entry become empty
   strings"), so it is a decision, not a gap.
+- **The date order is decided by the date columns.** `detectDateOrder` counted every cell in the
+  paste, and a Fix versions column (`2.13.10`) is the shape of a month-first date — six of them
+  outvoted one day-first date on a trimmed export and moved 5 Dec 2025 to 12 May, with no "guessed"
+  warning. `readAs` still makes its first guess off every cell (the columns cannot be found without
+  one), then re-counts over the columns it read dates from; when those hold any numeric dates their
+  answer is the order, and the columns are read again if it changed. `dateEvidence(rows, only)`
+  takes the indexes, and `orderGuessed` is judged on the same evidence. Where there is a header, a
+  column only counts if its HEADING names a date: under a month-first first guess `2.13.10` parses as
+  13 Feb 2010, so the column finder took the version column as the start date and its cells voted again.
