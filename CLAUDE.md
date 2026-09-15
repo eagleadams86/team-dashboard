@@ -784,7 +784,9 @@ nowrap row only scrolls when there is something to scroll.
 - **selectTab() nudges the chosen tab into view**, only when it is actually off
   an end, by RECTANGLE and not `offsetLeft` (whose offsetParent is the page), and
   **never `scrollIntoView`** — that is free to scroll the PAGE to satisfy the
-  vertical axis. Money Map's arithmetic, and Sprint Predictability's.
+  vertical axis. Money Map's arithmetic, and Sprint Predictability's — against the scroller's
+  PADDING edge since 2026-09-14 (SV's 2026-09-04 fix 3, ported), so a nudged tab lands with its
+  focus ring's room rather than on the clip line.
 - **The suite asserts ONE LINE, not "it overflows".** Whether the row overflows
   depends on how many tabs are on offer, and All Teams is away below two teams —
   which is the state that frame is in by the time it gets there. It measures the
@@ -803,10 +805,12 @@ Sprint Predictability carries the identical change in the same pass, and a chang
 - **The header.** The controls sit in `.headrow` (the row and its arrows) › `.headctl` (the
   scroller: `nowrap`, `overflow-x: auto`, `scrollbar-width: none`, 4px padding with a -4px
   margin so the focus ring has room and nothing moves, children `flex: 0 0 auto`, and its own
-  12px gap — a nested row inherits none). `.headrow` is `flex: 0 1 auto`: sized to its content,
-  so it sits beside the name while it fits (the name's auto margin still pushes it right), and
-  `.headbar`'s flex-wrap takes the WHOLE row onto a line of its own, where it shrinks and
-  scrolls, when it does not. **A header is one line or two, never three.** The ids and the
+  12px gap — a nested row inherits none). **The row stays BESIDE THE NAME and scrolls there**
+  (a correction the same evening — see the last bullet): `.headrow` is `flex: 1 1 0%` with
+  `min-width: min(15rem, 100%)` and `justify-content: flex-end`, so it takes what the name leaves
+  with its controls packed right, and `.headbar`'s flex-wrap takes it under the name only when
+  that would leave it under 15rem — an upright phone. **A header is one line or two, never
+  three.** The ids and the
   family's header order are unchanged; the header-order sweep reads `findBtn`'s parent, which is
   `.headctl` now.
 - **The tabs.** `.tabs` is the scroller in the BASE rule (`.tabs > .tab` is `flex: 0 0 auto;
@@ -822,7 +826,10 @@ Sprint Predictability carries the identical change in the same pass, and a chang
 - **`wireScrollRow(row, nav)` is Money Map's, verbatim** — ResizeObserver, MutationObserver,
   scroll and resize keep it true; the arrows show only while the row has something off an end,
   each is disabled at its own end, and a press steps 80% of the row, instantly. Money Map's tab
-  drag edge-scroll is NOT here: these tabs are not reordered by dragging.
+  drag edge-scroll is NOT here: these tabs are not reordered by dragging. **A control reached
+  from the KEYBOARD lands whole inside the row** (a `focusin` guarded by `:focus-visible`,
+  measured against the padding edge) — the browser scrolls a focus target into view only when
+  it is wholly hidden, so Tab onto a button half past the edge used to leave it half past.
 - **Print.** `.headctl` wraps and stops scrolling on paper, and `.rownav` joins the furniture.
 - **`.subtabs` is left alone, on measurement**: the four Dashboard section tabs are about 320px
   and were one line at 1600, 1100, 705, 390 and 844×390, so there was nothing to fix.
@@ -840,6 +847,22 @@ Sprint Predictability carries the identical change in the same pass, and a chang
   scroller) and 1600px (nothing overflows, no arrows, controls beside the name), plus the touch
   media query. Two teams are planted so the bar is at its widest. Confirmed red on the old page;
   EXPECTED 3946 → 4020 (the suite already registered 4001).
+- **Beside the name, and three keyboard fixes (the same evening, 2026-09-14).** Charles: *"keep
+  buttons beside the name"* — the first cut was content-sized and wrapped the whole row under
+  the name the moment it did not fit, leaving the name alone on a line above seven controls at
+  1100px. The row rule above is Money Map's (financial-plan `2c19e01`), verbatim, and so is the
+  `focusin` reveal, so `wireScrollRow` is byte-identical across the family again. And
+  `selectTab()`'s nudge now aims at the padding edge, which Sprint Predictability had since its
+  2026-09-04 audit. **Measured against the previous commit** (Playwright, sample data): 1600px
+  and 390×844 pixel-identical; header 89 → 51px at 1100 and at 705, 93 → 55 at 844×390, the
+  controls beside the name on one line in all three. Real Tab / ArrowRight walks: at 705 Share
+  was 37px past the edge, at 420 Teams & Stages 49px and every off-end tab flush or past it —
+  nothing clipped now. Choosing the last tab at 420 left −0.4px of ring room; now 3.6 (the end
+  of the row clamps a pixel short of 4). **Tests**, in the same group: the controls beside the
+  name at 705; a reveal check on the header at 705 and on the tabs at 360, which scrolls an item
+  until its middle sits ON the edge before focusing it rather than hoping one straddles; and the
+  nudge's room at 360 through a programmatic click, so only `selectTab()` moves the row. All four
+  red on the old page. EXPECTED 4020 → 4029.
 
 
 ## WIP vs Month Got Its Own ⓘ (2026-09-03) — no schema change

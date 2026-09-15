@@ -403,8 +403,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    is a position on the device that an earlier group may have left ticks in, so
    press "All trains" before ticking. The suite had grown to 4001 by 2026-09-14,
    when the one-line header and tab bar added 19 and the floor was brought up to
-   the count. */
-const EXPECTED = 4020;
+   the count; the same evening the controls staying beside the name, the
+   keyboard reveal and the nudge's padding edge added 9 more. */
+const EXPECTED = 4029;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -16021,6 +16022,40 @@ group('a card with no chart matches the one beside it');
         win.scrollTo(0, 0);
         is(lines(ctl), 1, '705px: the header controls are one line');
         is(lines(tabs), 1, 'and the tabs are one row');
+        const brandTop = rect(rsDoc.querySelector('.brand')).top;
+        ok(Math.abs(rect(ctl).top - brandTop) < 16,
+           'the controls stay BESIDE the name and scroll there, rather than taking a line of their own '
+           + '(Charles, 2026-09-14: "keep buttons beside the name")', rect(ctl).top - brandTop);
+        /* A control half past the edge, focused from the keyboard, is brought
+           WHOLE into the row with its ring's 4px — the browser only scrolls a
+           focus target that is entirely hidden. Money Map's check, verbatim;
+           Sprint Predictability carries the same. */
+        const reveal = (row, items) => {
+          /* The straddle is MADE rather than hoped for: at rest a 12px gap can
+             land exactly on the edge, and then nothing is half past it. The
+             first item reaching past the edge is scrolled until its middle
+             sits on the edge. */
+          row.scrollLeft = 0;
+          let box = rect(row);
+          const half = items.find((el) => rect(el).right > box.right - 1);
+          ok(!!half, 'there is an item reaching past the edge to test with');
+          if (!half) return;
+          const r0 = rect(half);
+          row.scrollLeft += Math.max(0, r0.left + r0.width / 2 - box.right);
+          box = rect(row);
+          const r1 = rect(half);
+          ok(r1.left < box.right && r1.right > box.right, 'set up: it straddles the edge',
+             r1.left + ' ' + r1.right + ' vs ' + box.right);
+          half.focus();
+          const r = rect(half), b2 = rect(row);
+          ok(b2.right - r.right >= 3 && r.left - b2.left >= 3,
+             'focused, it is scrolled fully inside the row with its ring room',
+             (r.left - b2.left).toFixed(1) + ' / ' + (b2.right - r.right).toFixed(1));
+          half.blur();
+          row.scrollLeft = 0;
+        };
+        reveal(ctl, [...ctl.children].filter((c) => c.getClientRects().length
+          && !c.classList.contains('sr-only')));
         ok(ctl.scrollWidth > ctl.clientWidth,
            'the controls have something to scroll here — otherwise nothing is being measured',
            ctl.scrollWidth + ' vs ' + ctl.clientWidth);
@@ -16043,6 +16078,30 @@ group('a card with no chart matches the one beside it');
         tabs.scrollLeft = 0;
         tabNav.querySelectorAll('button')[1].click();
         ok(tabs.scrollLeft > 0, 'and its \u203a scrolls the tabs', tabs.scrollLeft);
+        reveal(tabs, [...tabs.querySelectorAll('[role="tab"]')].filter((t) => !t.hidden));
+        /* THE NUDGE AIMS AT THE PADDING EDGE (2026-09-14, Sprint
+           Predictability's 2026-09-04 fix 3, ported). A click is programmatic
+           here, so nothing is focused and only selectTab() moves the row: the
+           chosen tab has to land with its ring's room, not flush with the box,
+           where the scroller clips. 3px, not 4: scrollLeft clamps to a
+           rounded scrollWidth, so the row's END can land a pixel short \u2014 a
+           nudge to the border edge still reads 0 or less. */
+        {
+          const onNow = [...tabs.querySelectorAll('.tab')].filter((t) => !t.hidden);
+          const wasTab = onNow.find((t) => t.getAttribute('aria-selected') === 'true') || onNow[0];
+          const lastTab = onNow[onNow.length - 1];
+          tabs.scrollLeft = 0;
+          ok(rect(lastTab).right > rect(tabs).right, 'set up: the last tab sits past the right edge',
+             Math.round(rect(lastTab).right - rect(tabs).right));
+          lastTab.click();
+          await new Promise((r) => setTimeout(r, 100));
+          ok(rect(tabs).right - rect(lastTab).right >= 3,
+             'choosing it nudges it in with the focus ring\u2019s room, measured from the padding edge',
+             (rect(tabs).right - rect(lastTab).right).toFixed(2) + 'px');
+          wasTab.click();
+          tabs.scrollLeft = 0;
+          win.scrollTo(0, 0);
+        }
         ok(!ctl.contains(headNav) && !tabs.contains(tabNav)
            && tabNav.parentElement === rsDoc.querySelector('.tabrow'),
            'neither arrow box is inside the thing it scrolls — the tab one is never inside the tablist');
