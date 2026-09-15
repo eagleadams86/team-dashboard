@@ -27,17 +27,18 @@ figures with last window's beside them. The first two are driven by the same wor
 date window and grouping; the Scorecard follows the date window only, and
 [says why](#what-it-deliberately-does-not-follow).
 
-On the Dashboard the charts are grouped into four tabs — **by what the data means**, so the
+On the Dashboard the charts are grouped into five tabs — **by what the data means**, so the
 measures that move together are read together:
 
 | Group | Question it answers | What's plotted |
 |---|---|---|
 | **Flow** — how long work takes | How long does an item take, and how reliably? | Cycle time (average and 85th percentile); **every finished item, as a dot**; lead time (average and 85th percentile) |
 | **Delivery** — how much comes out | What pace do we deliver at, and is it steady? | Items completed per period; net flow (completed minus started); **[raised, started, finished](#raised-started-finished-the-cumulative-flow-diagram)** — the cumulative flow diagram |
-| **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **[aged share of WIP](#aged-share-of-wip-the-count-in-proportion)**, the two in proportion; **[work item age](#work-item-age-what-to-do-this-morning)**, by workflow stage where your export says one; defect rate — defects resolved and defects raised; **[time in stage](#where-the-time-goes-time-in-stage)**, where the wait actually goes |
+| **Health** — the state of the board | How loaded is the board, and how stale? | Work in progress; aged work; **[aged share of WIP](#aged-share-of-wip-the-count-in-proportion)**, the two in proportion; **[work item age](#work-item-age-what-to-do-this-morning)**, by workflow stage where your export says one; **[time in stage](#where-the-time-goes-time-in-stage)**, where the wait actually goes |
+| **Work Mix** — what kind of work finished | Where do defects come from and get caught, and how much of our work did we have to do? | Defect rate — defects resolved and defects raised; **[where defects came from and where they were found](#work-mix-what-kind-of-work-finished)**; the non-discretionary share |
 | **Forecast** — what that implies | When will this batch be done, and how much by a date? | Two distributions from ten thousand simulated runs, one per question |
 
-The first three describe what already happened. **Forecast** is the only one that looks
+The first four describe what already happened. **Forecast** is the only one that looks
 forward, and it is the reason for collecting any of the rest — see
 [Forecasting](#forecasting-what-the-pace-youve-had-implies) below.
 
@@ -375,8 +376,9 @@ reader a different set of numbers under the same headings.
 
 ## A Team's Own Settings
 
-Four things belong to one team rather than to the app: its **WIP ≤** and **85% ≤** targets,
-whether it runs **sprints**, and whether it counts in the train's **aged share**. All four live
+Five things belong to one team rather than to the app: its **WIP ≤** and **85% ≤** targets,
+whether it runs **sprints**, whether it counts in the train's **aged share**, and whether its
+[ServiceNow incidents count as defects](#a-support-teams-incidents). All five live
 behind **Edit** on the team's row, in a window that saves as you go — there is no OK button
 because there is nothing to cancel.
 
@@ -467,6 +469,7 @@ people actually scan for:
 | **In progress** | Who is overloaded — and is their board filling or draining? |
 | **Aged** / **Avg aged %** | Who has work going stale — and how much of their board is it, averaged across the window? |
 | **Defect rate** | Who has a quality problem? — empty in the feature view, and the note under the table says why |
+| **Non-disc. %** | Whose capacity goes on work they had to do? — the [non-discretionary share](#work-mix-what-kind-of-work-finished), and a dash for a team whose export carries no Type of Work |
 | **Data to** | …and whose figures are worth trusting at all |
 
 **Throughput trend** and **Data to** carry an ⓘ of their own. They are the two columns that
@@ -691,7 +694,7 @@ Three columns, one per thing a leadership team asks about:
 | Column | The figure | Read over |
 |---|---|---|
 | **Predictability** | **Aged share of WIP** — how much of the board has been open past your ageing threshold, averaged across the window | work items, [minus any team held out](#holding-a-team-out-of-the-aged-share) |
-| **Quality** | **Defect share of completions** — how much of what finished was defect work | work items |
+| **Quality** | **Defect share of completions** — how much of what finished was defect work; a [support team's incidents](#a-support-teams-incidents) are not defects here, and the card says how many teams that covers | work items |
 | **Flow** | **Average feature cycle time** — how long a finished feature took, start to completion | **features** |
 
 Each card carries the figure, a **band strip** stating the three ranges you are reading it
@@ -926,14 +929,14 @@ sync and no account, so it says so outright.
 ## The Demo — Trying It Without Pasting Anything
 
 **Load sample data** isn't filler to fill the screen: it's this app's demo, and the rule is
-that **every feature has to be reachable from it**. Three teams, about nine months of
-made-up work items ending today, and one of the three deliberately short of a column.
+that **every feature has to be reachable from it**. Four teams, about nine months of
+made-up work items ending today, and one of them deliberately short of a column.
 
 The button is on the [welcome card](#the-first-thing-you-see) a first run opens on, and again
 beside *Load pasted rows* on the Your Data tab you reach from it — and, since the Dashboard tab
 is [hidden until something has data](#teams), those are the two places it can be met. Pressing it switches you to the dashboard. It
 disappears once anything holds data, and so does the copy of it on the empty-dashboard card,
-which from a working app would be a mis-click that quietly adds three teams.
+which from a working app would be a mis-click that quietly adds four teams.
 
 It lands on **Team Long Tail**, because Team Healthy Flow's board is the prettier one and says
 less — the reason this app reads the 85th percentile rather than the average is only visible
@@ -944,9 +947,10 @@ page rather than a list of names you'd have to open one by one:
 
 | Team | What it's there to show |
 |---|---|
-| **Team Healthy Flow** | The healthy board. Carries issue keys (`KFR-…`), as Team Long Tail does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. It sets a **WIP limit of 6 and a 10-day target** and is comfortably inside both. Its work is broken down into **29 features** of a fairly even size — most take between 4 and 14 items — which is the comparison Team Long Tail's are read against. **None of its features is aged** against the demo's 30-day feature threshold either — the same clean reading its items give. It runs on the demo's **14-day company sprint cadence**, as Team Long Tail does, so *Group by* offers **Sprint**. The baseline the other two read against. |
-| **Team Long Tail** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Team Healthy Flow's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. It sets **the same limit of 6 and the same 10-day target Team Healthy Flow does** and keeps neither — which is the point of the pair carrying identical figures. Its **20 features are bigger and far more varied** than Team Healthy Flow's, from 3 items to 26, and take about two and a half times as long end to end — the same finding as its cycle times, said about features. **One of its three in-flight features is past the 30-day feature threshold** the demo sets, so the aged reading holds at both levels while Team Healthy Flow's stays clean. |
-| **Team Bare Export** | A newer team: four months of history, **no created dates, no issue keys, no Status column, no stage times and no features at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the other two**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. It sets **no limit and no target**, which is how every browser starts and the only way the no-line, no-verdict face of those two is reachable. With no keys it has no parent keys either, so it is also the team the feature layer's empty face is reachable from. It runs no sprints, and it is **held out of the aged share**, so the Scorecard's Predictability card reads *across 2 of 3 teams* — the opt-out's face on the demo. Also proves each team's data stands on its own. |
+| **Team Healthy Flow** | The healthy board. Carries issue keys (`KFR-…`), as Team Long Tail does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. It sets a **WIP limit of 6 and a 10-day target** and is comfortably inside both. Its work is broken down into **29 features** of a fairly even size — most take between 4 and 14 items — which is the comparison Team Long Tail's are read against. **None of its features is aged** against the demo's 30-day feature threshold either — the same clean reading its items give. It runs on the demo's **14-day company sprint cadence**, as Team Long Tail does, so *Group by* offers **Sprint**. Its export also carries the three [work fields](#work-mix-what-kind-of-work-finished): mostly blank for ServiceNow with the odd incident, so **Where Defects Came From** has both halves, and mostly Discretionary work. The baseline the others read against. |
+| **Team Long Tail** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Team Healthy Flow's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. It sets **the same limit of 6 and the same 10-day target Team Healthy Flow does** and keeps neither — which is the point of the pair carrying identical figures. Its **20 features are bigger and far more varied** than Team Healthy Flow's, from 3 items to 26, and take about two and a half times as long end to end — the same finding as its cycle times, said about features. **One of its three in-flight features is past the 30-day feature threshold** the demo sets, so the aged reading holds at both levels while Team Healthy Flow's stays clean. Its export has **no ServiceNow column** — so Where Defects Came From shows its empty face — some bugs with **no Bug Type**, and more **Non-Discretionary** work than Team Healthy Flow. |
+| **Team Bare Export** | A newer team: four months of history, **no created dates, no issue keys, no Status column, no stage times and no features at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the others**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. It sets **no limit and no target**, which is how every browser starts and the only way the no-line, no-verdict face of those two is reachable. With no keys it has no parent keys either, so it is also the team the feature layer's empty face is reachable from. It runs no sprints, and it is **held out of the aged share**, so the Scorecard's Predictability card reads *across 3 of 4 teams* — the opt-out's face on the demo. It carries none of the three work fields. Also proves each team's data stands on its own. |
+| **Team Support Desk** | The team the [incidents switch](#a-support-teams-incidents) is for. Most of its bugs are **ServiceNow incidents it works for other teams**, and its settings count them as support work — so its defect rate is its own bugs, and the **From ServiceNow** tile states the rest, about two thirds of what it finishes. Short cycle times, a bug-heavy mix, mostly **Non-Discretionary** work, and no train, sprints or stages. On the Scorecard the Quality card says *incidents are support work on 1 of 4 teams*. |
 
 Team Healthy Flow and Team Long Tail also arrive with the **project ids their own keys are
 built from** (`KFR` and `HRN`), so [pasting several teams at once](#pasting-several-teams-at-once)
@@ -988,8 +992,8 @@ and *No ART*; both groups have somebody in them; and scoping to the train visibl
 figures at the foot of the table. A train per
 team would make grouping look pointless, and putting all three on one would leave *No ART* absent.
 
-On **All Teams** the three read as a train with one obvious problem: Team Long Tail's 85th
-percentile is three or four times the other two, it holds most of the aged work, and its defect
+On **All Teams** the four read as an estate with one obvious problem: Team Long Tail's 85th
+percentile is several times everyone else's, it holds most of the aged work, and its defect
 rate is the highest — while Team Bare Export's *Data to* column quietly explains why its
 delivery rate looks worse there than on its own page.
 
@@ -998,7 +1002,7 @@ Long Tail's throughput is falling (−0.9) while its board fills (+6.3). Its cyc
 team that is slow at the work, it is a team taking on more than it finishes.
 
 The demo also **seeds the two aged-share boundaries**, at 20% and 40%, and that is the only way
-to see the grading without setting it up: its three teams land on **0%, 33% and 67%** — one on
+to see the grading without setting it up: three of its teams land on **0%, 33% and 67%** — one on
 each of green, amber and red — so the tile, its symbol and the chart's bands all have a face to
 show. They are only written if you have not answered either box yourself, and your own browser
 starts with both empty and nothing graded. The dialog says which of those is true of your
@@ -1006,13 +1010,13 @@ browser: with one box already filled it tells you nothing will be graded until t
 with both filled it tells you your own pair is kept, and if your ageing threshold is not the
 default 14 calendar days it says the figures on your screen will differ from the ones it quotes.
 
-The **work item age** chart reads differently on each of the three, which is what makes it worth
+The **work item age** chart reads differently on each team, which is what makes it worth
 looking at from the demo: Team Healthy Flow has nothing past the threshold and every dot below
 its own 85% line; Team Long Tail's oldest item has been in flight longer than its own 85th
-percentile by a wide margin, which is the whole argument for drawing that line; and all three
+percentile by a wide margin, which is the whole argument for drawing that line; and all of them
 carry enough work types in flight for the columns to say something.
 
-All three teams have enough weekly history to **forecast** on the default 3-month window — Team
+All four teams have enough weekly history to **forecast** on the default 3-month window — Team
 Bare Export, at four months, is the one that decides that — and Team Long Tail's spread is wide
 enough that its 50%, 85% and 95% answers are days apart rather than all the same date, which is
 the whole argument for reading a distribution instead of a single number. Switching **Group by**
@@ -1026,7 +1030,7 @@ be two filters matching nothing). It is only added if you have not already chang
 yourself. The dates cover the **whole week**, not just weekdays, which is what makes the
 **working days** setting reachable from the demo: turning it on visibly shortens Team Long
 Tail's tail and drops two items out of its aged count. The span is long enough that **Clean up
-old data** has real answers — a 3-month cutoff would drop items from all three teams, a 12-month
+old data** has real answers — a 3-month cutoff would drop items from all four teams, a 12-month
 one from none — and that the 6, 9 and 12-month **date windows** each change the picture.
 
 **The dates are counted from the day you load it**, so the demo is live whenever it's opened
@@ -1072,6 +1076,10 @@ item is filed under the stage it's sitting in, which is what puts stage on the w
 chart's axis. Extra columns holding a **number of days per status** are read on the same
 set-up. A column whose heading — or a cell whose value — matches nothing you've set up is
 simply ignored, and always was.
+
+Three Jira custom fields are read when your export carries them — **ServiceNow Assignment Type**,
+**Bug Type** and **Type of Work** — under their `Custom field (…)` headings or their bare names.
+See [Work Mix](#work-mix-what-kind-of-work-finished).
 
 **The columns are worked out from the data, not assumed by position.** Header names win when
 they're there (`Resolved`/`Completed`, `In Progress`/`Start`, `Created`, `Issue Type`);
@@ -2418,6 +2426,82 @@ pinned to 100% so the bands stay put and a quiet board reads as quiet rather tha
 the bands themselves are drawn at half strength — at full strength, with most boards living under
 40%, six tenths of every chart came out red before anything was plotted and the eye read the
 *area* as the finding.
+
+## Work Mix: What Kind of Work Finished
+
+Three Jira custom fields say something the dates cannot: **where a piece of work came from, where
+a bug was found, and whether the team had any choice about doing it.** When your export carries
+them, the Dashboard's **Work Mix** tab reads them.
+
+| Jira column | Values read | What it feeds |
+|---|---|---|
+| `Custom field (ServiceNow Assignment Type)` | Change Task, Incident, Service Catalog Task, Vulnerabilities | **Where Defects Came From**, the **From ServiceNow** tile, and a team's [incidents switch](#a-support-teams-incidents) |
+| `Custom field (Bug Type)` | Production, Pre Production | **Where Defects Were Found** and the **Found in production** tile |
+| `Custom field (Type of Work)` | Discretionary, Non-Discretionary | **Non-Discretionary Share**, its tile, and the All Teams **Non-disc. %** column |
+
+The bare names work as headings too. Case, spaces and hyphens don't matter — `pre-production`
+is Pre Production.
+
+### Only the Number of a Value Is Stored
+
+Each field is a short, closed list, so an item stores **which value it was, as a number** — never
+the text of the cell. A cell holding anything else is dropped and counted in the paste report,
+which never prints it. The columns are only ever found **by their heading**: a column of
+"Production" and "Incident" looks exactly like a column of work types, so without a heading
+nothing is guessed.
+
+All three headings contain the word *type*, and the work type column used to be found by the
+leftmost heading that loosely said "type" — so one of these to the left of *Issue Type* would have
+taken its place. They now claim their own columns first, and an exact **Issue Type** or **Type**
+heading wins over a looser one such as *Status Category*.
+
+They can be typed in too: the Add/Edit Work Item window has a select for each.
+
+### The Four Cards
+
+| Card | What it shows |
+|---|---|
+| **Defect rate** | The chart it always was — moved here from Health so it sits beside its two splits |
+| **Where Defects Came From** | Defects resolved each period, stacked: raised in Jira, or through ServiceNow |
+| **Where Defects Were Found** | The same defects: found in Production, in Pre Production, or not recorded |
+| **Non-Discretionary Share** | The share of finished work carrying a Type of Work that was Non-Discretionary, with the pooled overall line |
+
+Four tiles sit above them: the defect rate, **From ServiceNow**, **Found in production** and
+**Non-discretionary**.
+
+### Blanks, and Patchy Fields
+
+- **A share counts only work that carries a value.** Every title and tile foot says how many did,
+  so a patchy field reads as patchy rather than complete.
+- **No value is a dash, never 0%.** A period with no Type of Work is a gap in the line, not a zero.
+- **A blank ServiceNow type means "raised in Jira" only on a team whose export carries that
+  column.** A team without the column is left out of the source split — a blank there says
+  nothing about where the work came from.
+- Over **features** the two defect splits are not a figure — a defect is a kind of work item —
+  while Type of Work and the ServiceNow share still count.
+- Every share is **pooled over the window** — sums over sums — never an average of the plotted
+  points.
+
+### A Support Team's Incidents
+
+A support team picks up ServiceNow **incidents** that are often problems it solves for *other*
+teams. They arrive in Jira as bugs, so counted as defects they make the team doing exactly its
+job look like the least reliable one on the train.
+
+**Nothing in an export says whose problem an incident was**, so the app doesn't guess item by
+item. Instead each team has a switch behind **Edit** in Teams & Stages: **Count this team's
+ServiceNow incidents as defects**. It is on for every team unless you untick it. Untick it for a
+support team and its incidents:
+
+- leave its **defect rate** — on its dashboard, in the All Teams column and in the Scorecard's
+  Quality figure, which all use one definition of a defect;
+- still count as **delivered**, and every other ServiceNow type is untouched;
+- are counted on the **From ServiceNow** tile and in the Where Defects Came From title, so the
+  move is on the page.
+
+The window counts how many of the team's items are incidents before you touch it, the team's row
+says *incidents as support*, and All Teams and the Scorecard say how many teams in scope have it
+off.
 
 ## Features: the Unit Above a Work Item
 
