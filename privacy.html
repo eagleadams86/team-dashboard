@@ -86,12 +86,14 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   <em>project id</em> for each team, an optional work-in-progress limit and cycle time target for
   each team (two numbers you set, which the charts are drawn against), whether each team runs sprints and
   — for a team on a cadence of its own — that sprint's length and a date one started, whether a team
-  counts in its train's aged share,
+  counts in its train's aged share, whether a team's ServiceNow incidents count as defects,
   the names of any workflow stages you set up, the list of statuses read out of your exports
   (see below), and for each team a
   list of work items — a completed date, an optional start date, an optional created date, an
   optional work type, an optional issue key, an optional parent key and, where your export
-  carried them, which status the item is in and a number of days against each stage. A team may also hold a separate
+  carried them, which status the item is in, a number of days against each stage, which of four ServiceNow
+  assignment types it came from, whether a bug was found in production or pre-production, and
+  whether the work was discretionary. A team may also hold a separate
   list of <em>features</em>, each one the same handful of dates and keys as a work item — plus the
   shared settings (labels, the text that
   marks unplanned work, the text that marks a feature, the thresholds, the six numbers the
@@ -120,6 +122,13 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   consideration entirely before your export is read, so no part of it can reach any field at all —
   the status list below included.
   A copy saved before that date simply has no parent keys.</p>
+
+  <p><strong>The ServiceNow assignment type, the Bug Type and the Type of Work are kept as numbers
+  from fixed lists</strong>, added September 15, 2026. Each is a Jira custom field whose values
+  are a short, closed list — Change Task, Incident, Service Catalog Task or Vulnerabilities;
+  Production or Pre Production; Discretionary or Non-Discretionary — and an item stores only the
+  number of the one its cell matched, never the text of the cell. A cell holding anything else is
+  discarded whole. A copy saved before that date simply has none of the three.</p>
 
   <p><strong>The project id is the letters at the front of those keys</strong> — DAE, for
   DAE-1552 — held against the team it belongs to so that one export covering several teams can

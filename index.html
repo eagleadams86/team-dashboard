@@ -5519,7 +5519,15 @@ const HEADER_PATTERNS = {
   completed: [/complet|resolv|closed|done|finish/i, /end\s*date/i],
   started:   [/start|begin|in.?progress/i, /created/i],
   created:   [/creat|raised|reported|logged|opened|submitted/i],
-  type:      [/(issue\s*)?type|kind|category/i],
+  /* EXACT FIRST, THEN LOOSE (2026-09-15). matchHeader tries these patterns in
+     order across the whole heading row, so a heading that is exactly "Type" or
+     "Issue Type" now wins over a looser match sitting to its left — "Status
+     Category", "Request Type", or a Jira custom field such as "Custom field (Bug
+     Type)". With no exact heading the loose pattern runs exactly as it always
+     did, so the only pastes this changes are ones that were reading the wrong
+     column. The three work-field headings below are also taken out of this
+     role's reach outright, in detectColumns. */
+  type:      [/^\s*(issue\s*)?type\s*$/i, /(issue\s*)?type|kind|category/i],
   /* ANCHORED, unlike every pattern above it, and that is the whole point: the
      others may match anywhere in a heading because a date column can be called
      almost anything, while the neighbours of a key column are "Issue Type",
@@ -5543,7 +5551,16 @@ const HEADER_PATTERNS = {
      every item in the file onto itself or onto its neighbour, silently, and a
      wrong parent is worse than no parent: it invents a feature breakdown that
      nobody's board has. No heading, no parent. */
-  parent:    [/^\s*parent(\s*issue)?\s*key\s*$/i]
+  parent:    [/^\s*parent(\s*issue)?\s*key\s*$/i],
+  /* The three WORK FIELDS (2026-09-15) — Jira custom fields, exported as
+     "Custom field (Bug Type)" and the like, or under their bare names. ANCHORED,
+     and with no headerless fallback, for the parent key's reason: a column of
+     "Production" or "Incident" looks exactly like a column of work types, so
+     without a heading there is nothing to tell them apart by. Each claims its
+     column BEFORE any other role is looked for — see detectColumns. */
+  snType:    [/^\s*(?:custom\s*field\s*\(\s*service\s*now\s*assignment\s*type\s*\)|service\s*now\s*assignment\s*type)\s*$/i],
+  bugFound:  [/^\s*(?:custom\s*field\s*\(\s*bug\s*type\s*\)|bug\s*type)\s*$/i],
+  workKind:  [/^\s*(?:custom\s*field\s*\(\s*type\s*of\s*work\s*\)|type\s*of\s*work)\s*$/i]
 };
 
 /* Headings whose column is prose, and which therefore may hold NO role at all.
@@ -5717,10 +5734,18 @@ function detectColumns(rows, header, order, stages, statuses) {
      worth nothing. So this exclusion has no second pass and no fallback: a role
      that can only be filled by a prose column goes unfilled. */
   const prose = proseColumns(header);
+  /* The work fields claim their columns FIRST, by anchored heading only, and
+     every other role then looks past them in every pass — the prose rule, for a
+     narrower reason: all three headings say "type", and a work-type column that
+     turned out to be the Bug Type would file "Production" as a kind of work. */
+  const workCols = {};
+  for (const f of WORK_FIELDS) workCols[f.role] = matchHeader(header, f.role, prose);
+  const workSkip = new Set(Object.values(workCols).filter(i => i >= 0));
   const skipWith = (set) => {
-    if (!prose.size) return set;
+    if (!prose.size && !workSkip.size) return set;
     const out = new Set(set);
     for (const i of prose) out.add(i);
+    for (const i of workSkip) out.add(i);
     return out;
   };
   const roleAt = (field) => {
@@ -5730,7 +5755,7 @@ function detectColumns(rows, header, order, stages, statuses) {
     }
     const clear = matchHeader(header, field, skipWith(stageSkip),
       DATE_ROLE[field] ? datey : null);
-    return clear >= 0 ? clear : matchHeader(header, field, prose);
+    return clear >= 0 ? clear : matchHeader(header, field, skipWith(new Set()));
   };
   /* Only the strict start patterns — "In Progress"/"Start"/"Begin" — so that a
      Created column can be recognised as created first, and then fall back into
@@ -5740,7 +5765,7 @@ function detectColumns(rows, header, order, stages, statuses) {
      and the commonest stage name on a board. */
   const startAt = (skip, accept) => header
     ? header.findIndex((h, i) =>
-        !skip.has(i) && !prose.has(i) && (!accept || accept(i))
+        !skip.has(i) && !prose.has(i) && !workSkip.has(i) && (!accept || accept(i))
         && /start|begin|in.?progress/i.test(String(h || '')))
     : -1;
   const startedFilled = startAt(stageSkip, dateyFilled);
@@ -5771,7 +5796,9 @@ function detectColumns(rows, header, order, stages, statuses) {
        somebody's review time to their test stage on the strength of column
        order. A stage column is only ever a column whose heading matches an alias
        the reader typed. */
-    stages: stageCols
+    stages: stageCols,
+    /* Found above, before any other role — see workCols. */
+    snType: workCols.snType, bugFound: workCols.bugFound, workKind: workCols.workKind
   };
   const createdByHeader = roleAt('created');
   if (createdByHeader >= 0 && createdByHeader !== map.completed && createdByHeader !== map.started) {
@@ -5807,7 +5834,7 @@ function detectColumns(rows, header, order, stages, statuses) {
      a stage they set up is simply reporting nothing. columnsReadHtml says which
      column and which stage. */
   const roleCols = [map.completed, map.started, map.created, map.type, map.key, map.status,
-    map.parent].filter(i => i >= 0);
+    map.parent, map.snType, map.bugFound, map.workKind].filter(i => i >= 0);
   map.stageClash = map.stages.filter(sc => roleCols.includes(sc.index));
   map.stages = map.stages.filter(sc => !roleCols.includes(sc.index));
 
@@ -5904,7 +5931,7 @@ function detectColumns(rows, header, order, stages, statuses) {
      from a column of short labels. Naming those columns as taken is what keeps
      the type detector off "Parent summary". */
   const taken = () => new Set([map.completed, map.started, map.created, map.type, map.key,
-    map.status, map.parent].filter(i => i >= 0)
+    map.status, map.parent, map.snType, map.bugFound, map.workKind].filter(i => i >= 0)
     .concat(map.stages.map(sc => sc.index), [...prose]));
 
   /* No heading, or a heading this app declined to trust: find the key column by
@@ -6026,6 +6053,47 @@ function cleanWorkType(t) {
   const s = t.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim();
   return s.length > 40 ? '' : s;
 }
+
+/* ── THE THREE WORK FIELDS (2026-09-15) — SCHEMA 19 → 20 ─────────────────────
+   ServiceNow Assignment Type, Bug Type and Type of Work: three Jira custom
+   fields whose values are a SHORT CLOSED LIST. That is what admits them under
+   the numbers-and-dates rule, and more strongly than a length cap could: the
+   words live HERE, in the code, and a row stores only the NUMBER of the one it
+   matched. A cell that is not one of these values — allowing for case, spaces
+   and hyphens — is dropped whole and counted for the paste report, which never
+   prints it. There is no input that both passes and carries prose.
+
+   Index 0 is deliberately empty, so a code is never 0: a 0 would read as set to
+   a strict test and as not set to a loose one, which is the Number(null) trap
+   wearing a different hat. */
+const SN_TYPES = [null, 'Change Task', 'Incident', 'Service Catalog Task', 'Vulnerabilities'];
+const SN_INCIDENT = 2;
+const BUG_FOUND = [null, 'Production', 'Pre Production'];
+const WORK_KINDS = [null, 'Discretionary', 'Non-Discretionary'];
+/* One table, so the parse, the report, the hydrate and the save cannot disagree
+   about which field is which: `role` is the detectColumns role AND the row
+   field, `wire` the stored letter, `name` what the paste report calls it. */
+const WORK_FIELDS = [
+  { role: 'snType',   wire: 'n', list: SN_TYPES,   name: 'ServiceNow assignment type' },
+  { role: 'bugFound', wire: 'b', list: BUG_FOUND,  name: 'Bug Type' },
+  { role: 'workKind', wire: 'd', list: WORK_KINDS, name: 'Type of Work' }
+];
+const enumNorm = (v) => String(v).toLowerCase().replace(/[\s\-_‐-―]+/g, '');
+/* A pasted cell → { code, unknown }. Blank is no value and NOT unknown: a blank
+   Bug Type is the ordinary state of every item that is not a bug. */
+function readEnum(raw, list) {
+  const t = String(raw == null ? '' : raw).trim();
+  if (!t) return { code: null, unknown: false };
+  if (t.length > 40) return { code: null, unknown: true };
+  const n = enumNorm(t);
+  for (let i = 1; i < list.length; i++) if (enumNorm(list[i]) === n) return { code: i, unknown: false };
+  return { code: null, unknown: true };
+}
+/* A stored value → a code or null. An integer in range and NOTHING else: a word,
+   a digit string, 0, a fraction or a boolean arriving on a hand-edited backup or
+   a share link is dropped, because a document this app wrote only ever holds
+   the number. */
+const enumCode = (v, list) => (Number.isInteger(v) && v >= 1 && v < list.length) ? v : null;
 
 /* How many work-type labels may mean "a feature". A board with more than a
    handful of feature-shaped issue types does not exist — Feature, Epic,
@@ -7007,6 +7075,13 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
   /* Two different orderings, two different meanings — see the checks below. */
   const startAfterDone = [], raisedAfterStart = [];
   let unfinished = 0, undated = 0;
+  /* Per work field: its column, how many KEPT rows carry a value, how many cells
+     were not a known value, and how many of each — counts for the report, which
+     names a value only out of WORK_FIELDS' own lists. */
+  const workFields = {};
+  for (const f of WORK_FIELDS) {
+    workFields[f.role] = { index: cols[f.role], read: 0, unknown: 0, byCode: f.list.map(() => 0) };
+  }
 
   /* ── A STATUS IS A FACT ABOUT THE WORKFLOW, NOT ABOUT THE ROWS THAT LOADED ──
      Reported by Charles on 2026-09-01: a `Days in Ready for Work` column he
@@ -7175,6 +7250,17 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
        loaded; a feature nobody has finished is not a work item in progress. */
     if (!completed && !isFeature) unfinished++;
 
+    /* The work fields, read only for a KEEPER — the tallies are claims about
+       what loaded, which is the status block's rule below. */
+    const work = {};
+    for (const f of WORK_FIELDS) {
+      if (cols[f.role] < 0) continue;
+      const got = readEnum(at(cells, cols[f.role]), f.list);
+      const tally = workFields[f.role];
+      if (got.code) { tally.read++; tally.byCode[got.code]++; work[f.role] = got.code; }
+      else if (got.unknown) tally.unknown++;
+    }
+
     /* ── The stage columns, read only once the row is a KEEPER ───────────────
        Everything below this line runs after the three `return`s above, and that
        position is the whole point: both figures it produces are reports about
@@ -7290,6 +7376,8 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
        which is what keeps stageOf a two-line function with no precedence rule
        to get wrong. */
     if (statusId) out.status = statusId;
+    /* Omit-when-empty, like every optional field on a row. */
+    for (const f of WORK_FIELDS) if (work[f.role]) out[f.role] = work[f.role];
     /* The split, and the whole reason features are extracted rather than
        flagged: from this line on a feature is not in `rows`, so no item-level
        figure can see it. Throughput, cycle time, the percentile, the defect
@@ -7344,6 +7432,7 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
               which it used to report as the same thing. */
            lineCount: lines.length,
            unmatchedStatus,
+           workFields,
            /* The vocabulary this paste WOULD leave behind, and the ids it put on
               rows point into it. The caller adopts the two together or neither —
               see the note on statusList above. */
@@ -11382,6 +11471,8 @@ window.TD = {
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
   cleanIssueKey,
+  /* The three work fields (2026-09-15). */
+  WORK_FIELDS, SN_TYPES, SN_INCIDENT, BUG_FOUND, WORK_KINDS, readEnum, enumCode,
   /* The feature layer's parse-side pieces. PROSE_HEADING and proseColumns are
      exported so the storage guard can be pinned as a RULE — "no column whose
      heading is prose may hold any role" — rather than one role at a time
@@ -12138,6 +12229,13 @@ function sanitizeTeams(teams) {
                 Number('') and Number(false) are all 0, so a hand-edited null held
                 a team OUT — the reverse of what this comment promises for junk. */
              artPredictability: (t && (t.artPredictability === 0 || t.artPredictability === '0')) ? 0 : null,
+             /* Whether this team's ServiceNow INCIDENTS count as defects. 0 is no:
+                a support team, whose incidents are problems solved for other
+                teams and count as support load instead. Anything else is yes —
+                every team saved before this field existed, and what the page did
+                before. The RAW value, never its Number(), for the reason given
+                on artPredictability just above. */
+             incidentsAsDefects: (t && (t.incidentsAsDefects === 0 || t.incidentsAsDefects === '0')) ? 0 : null,
              rows: hydrateRows(t && t.rows),
              /* Its own list, never mixed into rows — see the split in
                 parsePastedRows. Rebuilt explicitly here like everything else on
@@ -12231,7 +12329,12 @@ function hydrateRow(r) {
 
          Note what is NOT here: no label, no fallback, no repair. The words live
          in exactly one place and a row can only ever point at them. */
-      status: (r && typeof r.u === 'string' && ID_OK.test(r.u)) ? r.u : ''
+      status: (r && typeof r.u === 'string' && ID_OK.test(r.u)) ? r.u : '',
+      /* `n`, `b` and `d` on the wire — the three work fields, each a code into
+         its list in WORK_FIELDS and nothing else. See enumCode. */
+      snType: enumCode(r && r.n, SN_TYPES),
+      bugFound: enumCode(r && r.b, BUG_FOUND),
+      workKind: enumCode(r && r.d, WORK_KINDS)
     };
   }
 }
@@ -12297,6 +12400,8 @@ const serializeRows = rows => rows.map(r => {
      whose export has no Parent key column saves exactly what it saved before
      this field existed. */
   if (r.parentKey) out.p = r.parentKey;
+  /* The work fields: a code under its wire letter, and no key at all without one. */
+  for (const f of WORK_FIELDS) if (enumCode(r[f.role], f.list)) out[f.wire] = r[f.role];
   return out;
 });
 
@@ -12498,6 +12603,14 @@ function normalizeSettings(raw) {
    build reading this drops the settings pair and every team falls back to weeks,
    which is well defined but is not what the sender is looking at.
 
+   SCHEMA 20 added the three WORK FIELDS on every item and feature — `n`
+   (ServiceNow assignment type), `b` (Bug Type) and `d` (Type of Work), each a
+   small code into a fixed list — and `incidentsAsDefects` on a team, 0 for a
+   support team whose ServiceNow incidents count as support rather than as
+   defects. An older build drops the switch and puts that team's incidents back
+   into its defect rate — a different figure under the same heading — so it
+   halts rather than riding in quietly.
+
    SCHEMA 18 added the PER-TEAM SPRINT CADENCE — `sprintDays` and
    `sprintAnchor`, both unset by default and read only as a pair — and
    `artPredictability`, which is 0 for a team held out of the train's aged
@@ -12551,7 +12664,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 19;
+const SCHEMA = 20;
 
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
@@ -12610,6 +12723,9 @@ function serializeState() {
          the absence of the key, so every document written before this build
          round-trips through it byte-identically. */
       if (t.artPredictability === 0) out.artPredictability = 0;
+      /* Written only for a team whose incidents are support work — the
+         non-default answer, on the opt-out's rule just above. */
+      if (t.incidentsAsDefects === 0) out.incidentsAsDefects = 0;
       /* And the features, on the same rule once more: no `features` key at all
          until this team has one, so a browser that never sets up a feature type
          writes exactly the document it wrote before the layer existed. Written
@@ -12665,6 +12781,13 @@ const countStageDays = teams =>
 const countFeatureLinks = teams =>
   teams.reduce((n, t) => n + t.rows.filter(r => r.parentKey).length
     + (t.features ? t.features.length : 0), 0);
+
+/* The three work fields, on items and features alike. Into the prompt on the
+   re-typeability test: a column pasted per item comes back only by finding the
+   export again. The team's incidents switch stays out — it is one tick. */
+const countWorkFields = teams =>
+  teams.reduce((n, t) => n + t.rows.concat(t.features || [])
+    .filter(r => r.snType || r.bugFound || r.workKind).length, 0);
 function hydrateState(raw) {
   const arts = sanitizeArts(raw && raw.arts);
   const stages = sanitizeStages(raw && raw.stages);
@@ -13092,7 +13215,7 @@ window.tdRaisesKeyboard = raisesKeyboard;
 window.TDState = { sanitizeTeams, sanitizeArts, sanitizeStages, sanitizeStatuses,
   hydrateState, normalizeSettings,
   isBackup, ID_OK, PROTO_KEY, serializeRows, hydrateRows, hydrateRow, hydrateFeatures,
-  hydrateStageDays, mergeFeatures, countFeatureLinks, SCHEMA };
+  hydrateStageDays, mergeFeatures, countFeatureLinks, countWorkFields, SCHEMA };
 /* Click-to-copy's pure part, and the entry point the suite drives. */
 window.tdDots = { dotUnder, copyDotKey, dotTipFooter, onlyTopDot };
 /* The All Teams table's column list, for the suite. It is a pure function of a
@@ -13144,17 +13267,19 @@ window.tdAdopt = (data) => {
   const hadKeys = countKeys(state.teams);
   const hadStages = countStageDays(state.teams);
   const hadFeatures = countFeatureLinks(state.teams);
+  const hadWork = countWorkFields(state.teams);
   const incoming = hydrateState(data);
   const losingCreated = hadCreated > 0 && countCreated(incoming.teams) === 0;
   const losingKeys = hadKeys > 0 && countKeys(incoming.teams) === 0;
   const losingStages = hadStages > 0 && countStageDays(incoming.teams) === 0;
   const losingFeatures = hadFeatures > 0 && countFeatureLinks(incoming.teams) === 0;
+  const losingWork = hadWork > 0 && countWorkFields(incoming.teams) === 0;
 
-  /* ONE prompt covering all four fields, not one each. They are lost together
+  /* ONE prompt covering all five fields, not one each. They are lost together
      in the case this exists for — a build that predates any of them drops the
      lot — and four dialogs in a row for the same event is how somebody learns
      to dismiss them without reading. */
-  if (losingCreated || losingKeys || losingStages || losingFeatures) {
+  if (losingCreated || losingKeys || losingStages || losingFeatures || losingWork) {
     const stale = !(data && data.schema >= SCHEMA);
     const lost = [];
     if (losingCreated) lost.push(hadCreated + ' Created date' + (hadCreated === 1 ? '' : 's'));
@@ -13163,6 +13288,8 @@ window.tdAdopt = (data) => {
       + (hadStages === 1 ? '' : 's'));
     if (losingFeatures) lost.push('the feature breakdown on ' + hadFeatures + ' row'
       + (hadFeatures === 1 ? '' : 's'));
+    if (losingWork) lost.push('the ServiceNow, Bug Type and Type of Work values on ' + hadWork
+      + ' row' + (hadWork === 1 ? '' : 's'));
     const noun = lost.join(' and ');
     const keep = !confirm(
       'The copy you are restoring is missing what this browser has: ' + noun + '.\n\n'
@@ -21455,6 +21582,37 @@ function featuresReadHtml(res) {
   return html;
 }
 
+/* What the three work fields gave — each column named by POSITION, like every
+   column in this report, and counted. A value is named only out of WORK_FIELDS'
+   own lists, so a refused cell reaches the screen as a number and never as its
+   text. Silent for a field whose column was not found: most exports have none. */
+function workFieldsReadHtml(res) {
+  const wf = res.workFields || {};
+  let html = '';
+  for (const f of WORK_FIELDS) {
+    const t = wf[f.role];
+    if (!t || t.index < 0) continue;
+    const found = [];
+    for (let c = 1; c < f.list.length; c++) {
+      if (t.byCode[c]) found.push(escapeHtml(f.list[c]) + ' ' + t.byCode[c]);
+    }
+    html += '<br>Read <strong>column ' + (t.index + 1) + '</strong> as the ' + escapeHtml(f.name) + ': '
+      + (t.read
+        ? '<strong>' + t.read + ' row' + (t.read === 1 ? '</strong> carries' : 's</strong> carry')
+          + ' one (' + found.join(', ') + ')'
+        : 'no row carries one')
+      + '. Saved as one of ' + (f.list.length - 1) + ' fixed values, never as the text in the cell.';
+    if (t.unknown) {
+      const known = f.list.slice(1).map(escapeHtml);
+      const either = known.length === 2 ? known.join(' or ')
+        : known.slice(0, -1).join(', ') + ' or ' + known[known.length - 1];
+      html += ' <strong>' + t.unknown + ' cell' + (t.unknown === 1 ? ' was' : 's were') + ' not '
+        + either + '</strong>, so ' + (t.unknown === 1 ? 'it was' : 'they were') + ' left out.';
+    }
+  }
+  return html;
+}
+
 function columnsReadHtml(res) {
   const colName = i => (i < 0 ? 'none' : 'column ' + (i + 1));
   return '<br>Read <strong>' + colName(res.columns.completed) + '</strong> as the completed date, ' +
@@ -21490,6 +21648,7 @@ function columnsReadHtml(res) {
        was NOT read from that part of the export, because the column next to
        this one is the one people worry about. */
     featuresReadHtml(res) +
+    workFieldsReadHtml(res) +
     /* The two-column case: Created is standing in as the start date, which is
        what this app has always done with it. Lead time then equals cycle time,
        and that needs saying before someone reads it as a finding. */
@@ -22608,7 +22767,7 @@ function onAddTeam() {
   const team = { id: newId(), name: 'Team ' + (state.teams.length + 1),
                  artId: null, projectId: '', wipLimit: null, sleDays: null,
                  sprintDays: null, sprintAnchor: '', artPredictability: null,
-                 rows: [], features: [] };
+                 incidentsAsDefects: null, rows: [], features: [] };
   state.teams.push(team);
   view.activeTeamId = team.id;
   save();
@@ -24163,6 +24322,9 @@ function buildSharePayload(teamIds, win) {
        put a team back into a figure its owner deliberately took it out of, and
        the recipient would read a number the sender never saw. */
     if (t.artPredictability === 0) out.artPredictability = 0;
+    /* And whether its ServiceNow incidents count as defects: dropping it would
+       show the recipient a different defect rate from the sender's. */
+    if (t.incidentsAsDefects === 0) out.incidentsAsDefects = 0;
     /* The features travel on exactly the argument the keys and the two targets
        travel on: they are what the shared charts are drawn from once the reader
        is looking at the feature view, and a link that dropped them would show a
@@ -25642,6 +25804,7 @@ function loadSample() {
                       on All Teams is reachable from a fresh load. */
                    usesSprints: profile.sprints ? SPRINT_COMPANY : null,
                    artPredictability: profile.artPredictability === 0 ? 0 : null,
+                   incidentsAsDefects: profile.incidentsAsDefects === 0 ? 0 : null,
                    rows: parsed.rows,
                    /* Team Bare Export has no feature quotas and so no feature
                       rows, which is the third face again and the one that makes

@@ -405,8 +405,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    when the one-line header and tab bar added 19 and the floor was brought up to
    the count; the same evening the controls staying beside the name, the
    keyboard reveal and the nudge's padding edge added 9 more, and the root's
-   scroll padding (a focus lands below the sticky chrome, pinned or not) 14. */
-const EXPECTED = 4121;
+   scroll padding (a focus lands below the sticky chrome, pinned or not) 14.
+   The three work fields (2026-09-15) brought it to 4163. */
+const EXPECTED = 4163;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -2063,7 +2064,7 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 19, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 20, 'SCHEMA was bumped in the same commit as the whitelist widening');
 
 
   /* ══════════════════════════════════════════════════════════
@@ -4583,7 +4584,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 19, 'the schema marker is 19 — the version that moved the cadence to Settings');
+  is(St.SCHEMA, 20, 'the schema marker is 20 — the version after the one that moved the cadence to Settings');
 
 
   /* ────────────────────────────────────────────────────────── */
@@ -4949,8 +4950,8 @@ async function run(TD, win) {
     const hostile = S3.hydrateFeatures([{ k: '2026-01-03', i: 'DAE-9', t: 'Feature',
       summary: 'Customer data export', assignee: 'a name' }]);
     is(Object.keys(hostile[0]).sort(),
-       ['completed', 'created', 'key', 'parentKey', 'stage', 'stages', 'started', 'status',
-        'type'],
+       ['bugFound', 'completed', 'created', 'key', 'parentKey', 'snType', 'stage', 'stages',
+        'started', 'status', 'type', 'workKind'],
        'a feature carries the row allowlist and nothing else');
   }
 
@@ -4958,10 +4959,10 @@ async function run(TD, win) {
   group('features at the storage boundary');
   {
     const S4 = win.TDState;
-    is(S4.SCHEMA, 19, 'the feature layer took the schema to 12, the feature ageing '
+    is(S4.SCHEMA, 20, 'the feature layer took the schema to 12, the feature ageing '
        + 'threshold to 13, the status vocabulary to 14, the aged share boundaries to 15, '
        + 'the Scorecard\u2019s other four to 16, the week start to 17, the sprint '
-       + 'cadence to 18 and moving that cadence to Settings to 19');
+       + 'cadence to 18, moving that cadence to Settings to 19 and the work fields to 20');
 
     const t = S4.sanitizeTeams([{ id: 'a', name: 'X', rows: [],
       features: [{ c: '2026-01-12', s: '2026-01-06', t: 'Feature', i: 'DAE-1' }] }])[0];
@@ -7451,7 +7452,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', artId: '"><script>', rows: [] }])[0].artId,
      null, 'a hostile pointer is dropped, not swapped for a fresh id');
   is(Object.keys(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', rows: [] }])[0]).sort(),
-     ['artId', 'artPredictability', 'features', 'id', 'name', 'projectId', 'rows',
+     ['artId', 'artPredictability', 'features', 'id', 'incidentsAsDefects', 'name', 'projectId', 'rows',
       'sleDays', 'sprintAnchor', 'sprintDays', 'usesSprints', 'wipLimit'],
      'and every team carries the field, set or not');
   /* THE POINT OF THE LIST ABOVE, said as its own check: a field that is not in
@@ -17450,6 +17451,154 @@ group('a card with no chart matches the one beside it');
     win.tdPin.apply(false);
     frame.style.cssText = wasCss;
     await new Promise((r) => setTimeout(r, 250));
+    plant({ teams: [], settings: {} });
+  }
+
+
+  /* ══════════════════════════════════════════════════════════
+     THE THREE WORK FIELDS (2026-09-15) — ServiceNow Assignment Type, Bug
+     Type and Type of Work. Stored as codes into fixed lists, read only under
+     their own anchored headings, and never allowed near the work type role.
+     ══════════════════════════════════════════════════════════ */
+  group('work fields: reading the three custom columns');
+  {
+    const T = win.TD;
+    const tab = (cells) => cells.join('\t');
+    const paste = [
+      tab(['Key', 'Custom field (ServiceNow Assignment Type)', 'Custom field (Bug Type)', 'Issue Type',
+           'Custom field (Type of Work)', 'Created', 'In Progress', 'Resolved']),
+      tab(['DAE-1', 'Incident', 'Production', 'Bug', 'Non-Discretionary', '2026-01-02', '2026-01-03', '2026-01-05']),
+      tab(['DAE-2', '', 'pre-production', 'Bug', 'discretionary', '2026-01-02', '2026-01-04', '2026-01-06']),
+      tab(['DAE-3', 'service  catalog task', '', 'Story', '', '2026-01-02', '2026-01-04', '']),
+      tab(['DAE-4', 'Customer rang about login', 'Staging', 'Story', 'Mandatory', '2026-01-02', '2026-01-04', '2026-01-07'])
+    ].join('\n');
+    const res = T.parsePastedRows(paste, 'auto', [], [], []);
+    is(res.columns.type, 3, 'Issue Type is the work type, though three headings to its left say "type"');
+    is([res.columns.snType, res.columns.bugFound, res.columns.workKind], [1, 2, 4],
+       'and each custom column is claimed by its own role');
+    is(res.rows.map(r => r.type), ['Bug', 'Bug', 'Story', 'Story'], 'so the types are the types');
+    is(res.rows.map(r => r.snType || null), [T.SN_INCIDENT, null, 3, null],
+       'ServiceNow types read whatever the case and spacing; an unknown value is dropped whole');
+    is(res.rows.map(r => r.bugFound || null), [1, 2, null, null],
+       'Bug Type reads Production and a hyphenated pre-production');
+    is(res.rows.map(r => r.workKind || null), [2, 1, null, null],
+       'Type of Work tells Non-Discretionary from Discretionary');
+    ok(res.rows.every(r => !('snType' in r) || Number.isInteger(r.snType)),
+       'a parsed row carries a code or no key at all — never the word');
+    is([res.workFields.snType.read, res.workFields.snType.unknown], [2, 1],
+       'the tally counts what was read and what was refused');
+    is([res.workFields.bugFound.unknown, res.workFields.workKind.unknown], [1, 1],
+       'for every field');
+    const html = win.columnsReadHtml(res);
+    ok(/Read <strong>column 2<\/strong> as the ServiceNow assignment type: <strong>2 rows<\/strong> carry one \(Incident 1, Service Catalog Task 1\)/.test(html),
+       'the report names the column by position and counts the values', html);
+    ok(/1 cell was not Production or Pre Production/.test(html), 'and counts a refused cell', html);
+    ok(!/Customer rang|Staging|Mandatory|Custom field/.test(html),
+       'without ever echoing the refused cell, or the heading');
+    const plain = T.parsePastedRows(tab(['Key', 'Issue Type', 'Resolved', 'In Progress']) + '\n'
+      + tab(['DAE-1', 'Bug', '2026-01-05', '2026-01-03']), 'auto', [], [], []);
+    ok(!/ServiceNow|Bug Type|Type of Work/.test(win.columnsReadHtml(plain)),
+       'and an export with none of the columns gets no line about them');
+
+    const bare = T.parsePastedRows([
+      tab(['Issue Type', 'Bug Type', 'Type of Work', 'ServiceNow Assignment Type', 'Resolved', 'In Progress']),
+      tab(['Bug', 'Production', 'Discretionary', 'Change Task', '2026-01-05', '2026-01-03'])
+    ].join('\n'), 'auto', [], [], []);
+    is([bare.columns.bugFound, bare.columns.workKind, bare.columns.snType, bare.columns.type], [1, 2, 3, 0],
+       'the bare heading form is read too');
+    is([bare.rows[0].bugFound, bare.rows[0].workKind, bare.rows[0].snType], [1, 1, 1],
+       'with its values');
+
+    const headless = T.parsePastedRows([
+      tab(['2026-01-05', '2026-01-03', 'Bug', 'Production']),
+      tab(['2026-01-06', '2026-01-04', 'Bug', 'Pre Production']),
+      tab(['2026-01-07', '2026-01-05', 'Bug', 'Production'])
+    ].join('\n'), 'auto', [], [], []);
+    is([headless.columns.bugFound, headless.columns.snType, headless.columns.workKind], [-1, -1, -1],
+       'with no heading there is no work field — a column of Production looks like a column of work types');
+    ok(headless.rows.length === 3 && headless.rows.every(r => !r.bugFound), 'so nothing is stored for one');
+
+    const feat = T.parsePastedRows([
+      tab(['Key', 'Issue Type', 'Custom field (Type of Work)', 'Created']),
+      tab(['DAE-9', 'Feature', 'Non-Discretionary', '2026-01-02'])
+    ].join('\n'), 'auto', [], ['Feature'], []);
+    is(feat.features.length ? feat.features[0].workKind : 'no feature', 2, 'a feature carries a work field too');
+
+    is([T.readEnum('  NON discretionary ', T.WORK_KINDS).code, T.readEnum('', T.WORK_KINDS),
+        T.readEnum('Non-Discretionary work', T.WORK_KINDS)],
+       [2, { code: null, unknown: false }, { code: null, unknown: true }],
+       'readEnum: spacing and case forgiven, blank is not unknown, anything more is unknown');
+  }
+
+  group('work fields: a custom heading never takes the work type, run both ways');
+  {
+    const T = win.TD;
+    const LOOSE = /(issue\s*)?type|kind|category/i;
+    const rows = [['DAE-1', 'Production', 'Bug', '2026-01-02', '2026-01-05'],
+                  ['DAE-2', 'Pre Production', 'Story', '2026-01-02', '2026-01-06']];
+    const header = ['Key', 'Custom field (Bug Type)', 'Issue Type', 'Created', 'Resolved'];
+    is(header.findIndex(h => LOOSE.test(h)), 1,
+       'without the guard, the leftmost loose type match is the Bug Type column — the fault');
+    is(T.detectColumns(rows, header, 'dmy', [], []).type, 2, 'with it, Issue Type takes the role');
+    is(T.detectColumns(rows.map(r => [r[0], r[1], r[3], r[4]]),
+                       ['Key', 'Custom field (Bug Type)', 'Created', 'Resolved'], 'dmy', [], []).type, -1,
+       'an export with no Issue Type leaves the role empty — the custom column is no stand-in, '
+       + 'and the headerless guess skips it');
+    const cat = ['Key', 'Status Category', 'Issue Type', 'Created', 'Resolved'];
+    is(cat.findIndex(h => LOOSE.test(h)), 1, 'the loose pattern alone takes Status Category too');
+    is(T.detectColumns([['DAE-1', 'Done', 'Bug', '2026-01-02', '2026-01-05']], cat, 'dmy', [], []).type, 2,
+       'and an exact Issue Type now wins over it');
+    is(T.detectColumns([['DAE-1', 'Bug', '2026-01-05']], ['Key', 'Work Type', 'Resolved'], 'dmy', [], []).type, 1,
+       'while a heading that is only loosely a type is still found when nothing exact is there');
+  }
+
+  group('work fields at the storage boundary');
+  {
+    const S = win.TDState;
+    const h = S.hydrateRow({ c: '2026-01-05', s: '2026-01-03', t: 'Bug', n: 2, b: 1, d: 2 });
+    is([h.snType, h.bugFound, h.workKind], [2, 1, 2], 'codes round-trip through the hydrate');
+    is(S.serializeRows([h])[0], { c: '2026-01-05', s: '2026-01-03', t: 'Bug', n: 2, b: 1, d: 2 },
+       'and back out under their wire letters');
+    const hostile = ['Incident', '2', 0, -1, 1.5, true, null, {}, [2], 9];
+    is(hostile.map(v => S.hydrateRow({ c: '2026-01-05', t: 'Bug', n: v, b: v, d: v }))
+         .map(r => [r.snType, r.bugFound, r.workKind]),
+       hostile.map(() => [null, null, null]),
+       'a word, a digit string, 0, a fraction, a boolean or an out-of-range code is dropped');
+    is([S.hydrateRow({ c: '2026-01-05', n: 4 }).snType, S.hydrateRow({ c: '2026-01-05', b: 3 }).bugFound,
+        S.hydrateRow({ c: '2026-01-05', d: 3 }).workKind], [4, null, null],
+       'each field is held to the length of its own list');
+    is(Object.keys(S.serializeRows([S.hydrateRow({ c: '2026-01-05', s: '2026-01-03', t: 'Story' })])[0]),
+       ['c', 's', 't'], 'a row with none of them writes none — byte-identical to before');
+    is(S.hydrateFeatures([{ k: '2026-01-02', i: 'DAE-9', t: 'Feature', d: 1 }])[0].workKind, 1,
+       'a feature crosses the same door');
+
+    is(S.sanitizeTeams([0, '0', null, '', false, 1, 'no', undefined]
+         .map((v, i) => ({ id: 'ia' + i, name: 'T', incidentsAsDefects: v })))
+         .map(t => t.incidentsAsDefects),
+       [0, 0, null, null, null, null, null, null],
+       'only a real 0 makes a team’s incidents support work — null, blank and false do not');
+    plant({ teams: [{ id: 'sw1', name: 'Support', incidentsAsDefects: 0, rows: [] },
+                    { id: 'sw2', name: 'Delivery', rows: [] }], settings: {} });
+    const saved = win.tdGet().teams;
+    is([saved[0].incidentsAsDefects, saved[1].incidentsAsDefects], [0, undefined],
+       'the switch is saved only when it is off');
+    const sp = win.TDShare.buildSharePayload(['sw1', 'sw2']).teams;
+    is([sp[0].incidentsAsDefects, sp[1].incidentsAsDefects], [0, undefined],
+       'and travels in a share link on the same rule — dropping it would show a different defect rate');
+    ok(S.SCHEMA === 20, 'SCHEMA 20, in the same commit as the whitelist');
+
+    plant({ schema: S.SCHEMA, teams: [{ id: 'wf1', name: 'Work', rows: [
+      { c: '2015-01-21', s: '2015-01-14', t: 'Bug', n: 2, b: 1, d: 2 }] }], settings: {} });
+    const asked = [];
+    const realConfirm = win.confirm;
+    win.confirm = (m) => { asked.push(m); return false; };
+    const took = win.tdAdopt({ schema: 19, teams: [{ id: 'wf1', name: 'Work', rows: [
+      { c: '2015-01-21', s: '2015-01-14', t: 'Bug' }] }], settings: {} });
+    win.confirm = realConfirm;
+    is(took, false, 'a copy without the work fields asks before it replaces one with them');
+    ok(/ServiceNow, Bug Type and Type of Work values on 1 row\b/.test(asked[0] || ''),
+       'and names what would go', String(asked[0]));
+    is(win.tdGet().teams[0].rows[0].n, 2, 'so this device keeps them on Cancel');
     plant({ teams: [], settings: {} });
   }
 
