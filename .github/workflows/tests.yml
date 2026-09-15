@@ -57,7 +57,12 @@ jobs:
              run (2026-08-20). Match on the state, not on a word. */
           await page.waitForFunction(
             () => !/^Loading/.test(document.getElementById('summary').textContent),
-            null, { timeout: 60000 });
+            null, { timeout: 300000 });
+          /* 300 s, not 60 (2026-09-15 review). The last eight runs spent 46-52 s
+             of a 60 s wait on a suite that is 4,100 checks and growing, which is a
+             red run waiting to happen on a slow runner. Money Map widened to 300 s
+             for exactly this on 2026-09-07. A hung page still fails; it just takes
+             five minutes to say so. */
           const summary = await page.evaluate(() => document.getElementById('summary').textContent);
           const failedNames = await page.evaluate(() =>
             [...document.querySelectorAll('tr.fail')].map((tr) => tr.textContent.trim()));

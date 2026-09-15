@@ -4830,3 +4830,6 @@ proven red against the build before it. The reasoning sits here, per fix.
   sets a 14-day company cadence with two teams on it and holds Team Bare Export out of the aged share,
   and the README's demo table — which says every demo finding is listed and pinned — mentioned
   neither. Both rows now do, and the demo group pins the settings, the two modes and the opt-out.
+- **CI waits 300 s for the summary, not 60.** The step spent 46-52 s of its 60 across the last eight
+  runs, on a suite growing by the day — Money Map's red-on-green failure waiting to happen. Same
+  widening Money Map made on 2026-09-07.
