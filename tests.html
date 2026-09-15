@@ -1542,6 +1542,41 @@ async function run(TD, win) {
   is(moved.rows[0].stages, { fp: 3.84 }, 'the stage still reads its own column');
   is(moved.rows.length, 2, 'and both rows are read as completed work, not silently dropped');
 
+  /* A FILLED date column beats an EMPTY one (2026-09-15 review). Jira's
+     all-fields export carries unused custom date columns, and an empty one whose
+     heading matched a date role used to take it: every start date gone, or every
+     row unfinished. The empty pass is still there for the case it was written
+     for — the last group below. */
+  const emptyStart = TD.parsePastedRows([
+    'Issue key\tIssue Type\tCreated\tResolved\tCustom field (Start date)',
+    'AB-1\tStory\t2026-01-02\t2026-01-10\t',
+    'AB-2\tStory\t2026-01-03\t2026-01-12\t',
+    'AB-3\tStory\t2026-01-04\t\t'
+  ].join('\n'), 'auto', []);
+  is(emptyStart.columns.started, 2,
+     'an empty "Start date" column does not take the start role — Created stands in, as it always has');
+  is(emptyStart.rows.length, 3, 'so the open item is still in progress, not dropped as undated');
+  const emptyBeforeReal = TD.parsePastedRows([
+    'Issue key\tCustom field (Start date)\tIn Progress\tResolved',
+    'AB-1\t\t2026-01-02\t2026-01-10',
+    'AB-2\t\t2026-01-03\t2026-01-12'
+  ].join('\n'), 'auto', []);
+  is(emptyBeforeReal.columns.started, 2, 'and an empty one placed first does not beat a filled In Progress');
+  const emptyDone = TD.parsePastedRows([
+    'Issue key\tCustom field (Done date)\tIn Progress\tResolved',
+    'AB-1\t\t2026-01-02\t2026-01-10',
+    'AB-2\t\t2026-01-03\t2026-01-12'
+  ].join('\n'), 'auto', []);
+  is(emptyDone.columns.completed, 3, 'an empty "Done date" does not beat a filled Resolved');
+  is(emptyDone.rows.filter(r => r.completed).length, 2, 'so both rows are finished work, not all unfinished');
+  const allInFlight = TD.parsePastedRows([
+    'Issue key\tIn Progress\tResolved',
+    'AB-1\t2026-01-02\t',
+    'AB-2\t2026-01-03\t'
+  ].join('\n'), 'auto', []);
+  is(allInFlight.columns.completed, 2,
+     'an export of nothing but work in flight still has its one empty Resolved as the completion column');
+
   /* The second, unfussy pass, proved. A date role PREFERS a column of dates; it
      does not require one, or a Resolved column this app cannot parse would stop
      being the completion column and take its own error report with it. */

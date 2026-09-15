@@ -5651,6 +5651,21 @@ function detectColumns(rows, header, order, stages, statuses) {
     /* A column of serials under a heading that names it is still a date column
        — the heading is the evidence content alone could not give. */
     || stats[i].serialRate > 0;
+  /* A FILLED date column is preferred over an EMPTY one (2026-09-15 review).
+     The empty pass above is right for the column it was written for — an
+     export of nothing but work in flight, whose one Resolved column is empty —
+     and wrong the moment a second heading matches too. Jira's all-fields export
+     carries unused "Custom field (Start date)" and "Target start" columns, and an
+     empty one placed before the real In Progress, or before nothing at all where
+     Created should have stood in, took the start role and emptied every cycle
+     time; an empty "Done date" before Resolved made every row unfinished. So each
+     date role is looked for among columns that HOLD dates first, and only then
+     among empty ones. The start role never settles on an empty column at all:
+     with no start dates the historic fallback below makes Created the start,
+     which is an answer, where an empty column is none. */
+  const dateyFilled = (i) => !!stats[i] && stats[i].filled > 0
+    && (stats[i].dateRate > 0 || stats[i].serialRate > 0);
+  const empty = (i) => !stats[i] || stats[i].filled === 0;
   const DATE_ROLE = { completed: true, started: true, created: true };
   /* Two passes, and the second is the old matcher untouched: every heading is a
      candidate again, values and stage claims included. So the guard only ever
@@ -5672,6 +5687,10 @@ function detectColumns(rows, header, order, stages, statuses) {
     return out;
   };
   const roleAt = (field) => {
+    if (DATE_ROLE[field]) {
+      const filled = matchHeader(header, field, skipWith(stageSkip), dateyFilled);
+      if (filled >= 0) return filled;
+    }
     const clear = matchHeader(header, field, skipWith(stageSkip),
       DATE_ROLE[field] ? datey : null);
     return clear >= 0 ? clear : matchHeader(header, field, prose);
@@ -5682,13 +5701,14 @@ function detectColumns(rows, header, order, stages, statuses) {
      stage columns for the same reason as roleAt, and this is the role that
      needed it most: "In Progress" is both the commonest start heading there is
      and the commonest stage name on a board. */
-  const startAt = (skip, fussy) => header
+  const startAt = (skip, accept) => header
     ? header.findIndex((h, i) =>
-        !skip.has(i) && !prose.has(i) && (!fussy || datey(i))
+        !skip.has(i) && !prose.has(i) && (!accept || accept(i))
         && /start|begin|in.?progress/i.test(String(h || '')))
     : -1;
-  const startedClear = startAt(stageSkip, true);
-  const startedStrict = startedClear >= 0 ? startedClear : startAt(new Set(), false);
+  const startedFilled = startAt(stageSkip, dateyFilled);
+  const startedClear = startedFilled >= 0 ? startedFilled : startAt(stageSkip, i => datey(i) && !empty(i));
+  const startedStrict = startedClear >= 0 ? startedClear : startAt(new Set(), i => !empty(i));
   const map = {
     completed: roleAt('completed'),
     started:   startedStrict,

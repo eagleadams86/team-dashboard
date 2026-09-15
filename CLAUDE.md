@@ -4732,3 +4732,12 @@ proven red against the build before it. The reasoning sits here, per fix.
   `train.cadence` in `deriveTeams` and `d.cadence` in the schedule. The derive-level check forecasts
   one board as fortnights and as 14-day sprints on the same grid and requires identical answers,
   because the pure checks alone cannot see a caller that forgot the cadence.
+- **A filled date column beats an empty one.** `datey` passes an EMPTY column on purpose — an export
+  of nothing but work in flight has an empty Resolved, and it is still the completion column — but
+  that pass ran before any preference for a column that holds dates. Jira's all-fields export
+  carries unused `Custom field (Start date)`, `Target start` and similar columns, and an empty one
+  took the start role from a filled In Progress, or from the Created fallback, emptying every cycle
+  time; an empty `Done date` before Resolved made every row unfinished. `detectColumns` now tries
+  `dateyFilled` first for each date role, then the old passes; the start role never settles on an
+  empty column at all, because with no start dates the Created fallback is an answer and an empty
+  column is none. The all-in-flight case is pinned alongside the three new ones.
