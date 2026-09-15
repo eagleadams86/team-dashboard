@@ -4656,6 +4656,24 @@ async function run(TD, win) {
      '', 'a non-string type from outside becomes an empty string');
   ok(S.sanitizeTeams([{ id: 'a', name: 'x'.repeat(500) }])[0].name.length <= 120,
      'an absurdly long name is capped');
+  /* An object whose toString is not a function makes String() THROW, and one
+     such name in a restored backup stopped the whole restore with no message
+     (2026-09-15 review). */
+  const objName = { toString: 1 };
+  let objTeams = null, objErr = '';
+  try { objTeams = S.sanitizeTeams([{ id: 'o1', name: objName, rows: [] }, { id: 'o2', name: 'Kept' }]); }
+  catch (e) { objErr = String(e); }
+  is(objErr, '', 'a team name that is an object does not throw');
+  is(objTeams && objTeams.map(t => t.name), ['Untitled team', 'Kept'],
+     'it becomes the placeholder, and the team beside it is untouched');
+  let objArtErr = '', objStageErr = '';
+  try { is(S.sanitizeArts([{ id: 'a1', name: objName }])[0].name, 'Untitled ART', 'and an ART name the same'); }
+  catch (e) { objArtErr = String(e); }
+  try { is(S.sanitizeStages([{ id: 's1', name: objName, match: [] }])[0].name, 'Untitled stage', 'and a stage name the same'); }
+  catch (e) { objStageErr = String(e); }
+  is(objArtErr + objStageErr, '', 'neither an ART nor a stage name that is an object throws');
+  is(S.sanitizeTeams([{ id: 'n1', name: 42 }])[0].name, '42', 'a number is still kept as its digits');
+  is(S.sanitizeTeams([{ id: 'n2', name: ['A'] }])[0].name, 'Untitled team', 'but an array is not a name');
 
   /* The ordering rules the paste enforces, applied to the other door the same
      data can come through. A copy this app saved already satisfies

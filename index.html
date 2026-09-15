@@ -11895,12 +11895,24 @@ const PROTO_KEY = '__proto__';
 /* The same boundary teams cross. Names are capped like every other label here,
    ids are replaced unless they are plainly safe, and duplicates get a fresh id
    rather than two ARTs answering to one name. */
+/* A NAME FROM OUTSIDE IS A STRING OR IT IS THE PLACEHOLDER (2026-09-15 review).
+   `String(x)` was the guard, and `String({toString: 1})` THROWS — so one team,
+   ART or stage whose name was an object in a restored backup stopped the whole
+   restore with no message, and the same value in a stored copy stopped the boot.
+   A number is kept as its digits, as String() always did; anything that is not
+   a string or a finite number is not a name. */
+function cleanName(v, fallback) {
+  const s = typeof v === 'string' ? v
+    : (typeof v === 'number' && Number.isFinite(v)) ? String(v) : '';
+  return (s || fallback).slice(0, 120);
+}
+
 function sanitizeArts(arts) {
   const seen = new Set();
   return (Array.isArray(arts) ? arts : []).map(a => {
     let id = (a && typeof a.id === 'string' && ID_OK.test(a.id) && !seen.has(a.id)) ? a.id : newId();
     seen.add(id);
-    return { id, name: String((a && a.name) || 'Untitled ART').slice(0, 120) };
+    return { id, name: cleanName(a && a.name, 'Untitled ART') };
   });
 }
 
@@ -11949,7 +11961,7 @@ function sanitizeStages(stages) {
       claimed.add(sid);
       picked.push(sid);
     });
-    return { id, name: String((st && st.name) || 'Untitled stage').slice(0, 120),
+    return { id, name: cleanName(st && st.name, 'Untitled stage'),
              match: aliases, statuses: picked };
   });
 }
@@ -12003,7 +12015,7 @@ function sanitizeTeams(teams) {
        which is the ordinary state and the one a hostile or nonsensical value
        falls back to: a limit this app invented would draw a line on somebody's
        chart claiming they had agreed to it. */
-    return { id, name: String((t && t.name) || 'Untitled team').slice(0, 120),
+    return { id, name: cleanName(t && t.name, 'Untitled team'),
              artId, projectId: cleanProjectId(t && t.projectId),
              wipLimit: cleanWipLimit(t && t.wipLimit),
              sleDays: cleanSleDays(t && t.sleDays),

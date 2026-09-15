@@ -4748,3 +4748,8 @@ proven red against the build before it. The reasoning sits here, per fix.
   a date and is shown as written (that is what finds the row in the export); anything else reads
   `unreadable`. The global rule this keeps: no diagnostic echoes a pasted cell that is not
   shape-guarded, and a length cap is not a shape.
+- **A name from outside is a string or the placeholder.** `sanitizeTeams`, `sanitizeArts` and
+  `sanitizeStages` guarded names with `String(x)`, and `String({toString: 1})` throws — so one
+  object-valued name in a restored backup stopped the restore with no message, and the same value in
+  a stored copy stopped the boot and showed no teams. `cleanName(v, fallback)` takes a string, keeps a
+  finite number as its digits (what `String()` always did), and treats anything else as no name.
