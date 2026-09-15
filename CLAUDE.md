@@ -4795,3 +4795,8 @@ proven red against the build before it. The reasoning sits here, per fix.
   Features the dashboard read "10 of 20 items" and All Teams "22 of 49 items across 3 teams" over
   lists of features — the exact thing the unit words on the derive exist to stop. It reads
   `d.unitOne`/`d.unitMany` now, falling back to items on the empty shape.
+- **Clean-up says what it keeps.** The preview told a team whose items all went that it was emptied
+  "completely" while its features stayed (clean-up is items-only by design); and the confirm counted
+  every team ticked, including one losing nothing, and dropped the unfinished-items clause the preview
+  had just stated. A team keeping features now reads "removes every item from … The team and its
+  features stay", and the confirm counts only teams that lose items and carries the clause.

@@ -9270,6 +9270,46 @@ group('ARTs — the grouping, and the boundary it crosses');
     D.getElementById('cleanupDialog').close();
   }
 
+  /* The preview and the confirm say what really happens (2026-09-15 review).
+     Clean-up takes items, never features, so a team with features is not
+     "emptied completely"; and the confirm counts only teams that lose something
+     and keeps the unfinished-items clause the preview states. */
+  {
+    const D = win.document, box = D.getElementById('cleanupTeams');
+    const later = [{ c: '2016-06-01', s: '2016-05-20', t: 'Story' }];
+    plant({ teams: [{ id: 'cw1', name: 'Kestrel', rows: oneRow,
+                      features: [{ i: 'KF-1', c: '2015-04-30', s: '2015-04-01', t: 'Feature' }] },
+                    { id: 'cw2', name: 'Heron', rows: oneRow },
+                    { id: 'cw3', name: 'Puffin', rows: later }], settings: {} });
+    win.openCleanup();
+    const pick = (ids) => {
+      box.querySelectorAll('[data-clean-team]').forEach(i => { i.checked = ids.includes(i.dataset.cleanTeam); });
+      win.refreshCleanupPreview();
+    };
+    const keep = D.getElementById('cleanupKeep');
+    keep.value = 'custom'; keep.dispatchEvent(new win.Event('change', { bubbles: true }));
+    D.getElementById('cleanupDate').value = '2016-01-01';
+    D.getElementById('cleanupDate').dispatchEvent(new win.Event('input', { bubbles: true }));
+    D.getElementById('cleanupWip').checked = true;
+    pick(['cw1']);
+    const said = () => D.getElementById('cleanupPreview').textContent;
+    ok(!/completely/.test(said()) && /features stay/.test(said()),
+       'a team whose items all go but whose features stay is not "emptied completely"', said());
+    pick(['cw2']);
+    ok(/empties Heron completely/.test(said()), 'while a team with nothing else left still is', said());
+    pick(['cw1', 'cw2', 'cw3']);
+    let asked = '';
+    const realConfirm = win.confirm;
+    win.confirm = (m) => { asked = m; return false; };
+    try { D.getElementById('cleanupRunBtn').click(); } finally { win.confirm = realConfirm; }
+    ok(/from 2 teams/.test(asked), 'the confirm counts the two teams losing items, not the three ticked', asked);
+    ok(/unfinished items started before it/.test(asked), 'and keeps the unfinished-items clause', asked);
+    is(win.tdGet().teams.map(t => t.rows.length), [1, 1, 1], 'and declining it removes nothing');
+    keep.value = '6'; keep.dispatchEvent(new win.Event('change', { bubbles: true }));
+    D.getElementById('cleanupWip').checked = false;
+    D.getElementById('cleanupDialog').close();
+  }
+
   /* ────────────────────────────────────────────────────────── */
   group('deriveTeams — one window, one date, every team');
 

@@ -24608,9 +24608,18 @@ function refreshCleanupPreview() {
     'everything completed before <strong>' + prettyDate(cutoff) + '</strong>' +
     (wip ? ', plus unfinished items started before it' : '') + '. ' +
     plural(kept, 'item') + ' would stay.' + breakdown +
-    (emptied.length ? '<p style="margin:8px 0 0">This empties ' +
-      emptied.map(p => '<strong>' + escapeHtml(p.team.name) + '</strong>').join(', ') +
-      ' completely. The team itself stays — only its items go.</p>' : '') +
+    /* "Completely" only when nothing else is left (2026-09-15 review). Clean-up
+       takes ITEMS and never features, so a team holding features keeps them —
+       and "empties … completely" over a team that still has 29 was a claim the
+       next screen contradicted. */
+    (emptied.length ? '<p style="margin:8px 0 0">' +
+      (emptied.some(p => (p.team.features || []).length)
+        ? 'This removes every item from ' +
+          emptied.map(p => '<strong>' + escapeHtml(p.team.name) + '</strong>').join(', ') +
+          '. The team and its features stay — only its items go.</p>'
+        : 'This empties ' +
+          emptied.map(p => '<strong>' + escapeHtml(p.team.name) + '</strong>').join(', ') +
+          ' completely. The team itself stays — only its items go.</p>') : '') +
     '</div>';
   $('cleanupRunBtn').disabled = false;
 }
@@ -24719,9 +24728,15 @@ $('cleanupRunBtn').addEventListener('click', () => {
   if (!going) return;
 
   const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
-  const scope = teams.length === 1 ? teams[0].name : plural(teams.length, 'team');
+  /* The confirm says what the preview said (2026-09-15 review): it counted every
+     team ticked, including one losing nothing, and dropped the unfinished-items
+     clause — the last thing read before an irreversible press was the vaguest. */
+  const losing = teams.filter(t => t.rows.some(r => outsideWindow(r, cutoff, wip)));
+  const scope = losing.length === 1 ? losing[0].name : plural(losing.length, 'team');
   if (!confirm('Remove ' + plural(going, 'item') + ' from ' + scope +
-               ', completed before ' + prettyDate(cutoff) + '?\n\nThis cannot be undone.')) return;
+               ' — everything completed before ' + prettyDate(cutoff) +
+               (wip ? ', plus unfinished items started before it' : '') +
+               '?\n\nThis cannot be undone.')) return;
 
   teams.forEach(t => { t.rows = t.rows.filter(r => !outsideWindow(r, cutoff, wip)); });
   save();
