@@ -3131,7 +3131,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         <div class="btn-row" style="justify-content:center;margin-top:var(--sp-6)">
           <button class="btn" id="btnSample" type="button">Load Sample Data</button>
         </div>
-        <p class="hint" style="margin-top:var(--sp-4)">Three teams and nine months of made-up
+        <p class="hint" style="margin-top:var(--sp-4)">Four teams and nine months of made-up
         work items, so every chart has something behind it. You can delete it later.</p>
       </div>
     </div>
@@ -25623,7 +25623,18 @@ const DEMO_TEAMS = [
 
        How many features that adds up to falls out of the quotas and this team's
        own throughput — see parentFor, which is where the arithmetic lives. */
-    featureQuotas: [6, 11, 4, 9, 14, 7, 5, 12, 8, 6, 10, 4] },
+    featureQuotas: [6, 11, 4, 9, 14, 7, 5, 12, 8, 6, 10, 4],
+    /* THE THREE WORK FIELDS (2026-09-15). This export carries all three columns,
+       mostly blank for ServiceNow — a delivery team with the odd incident — so
+       its Where Defects Came From card has both halves. Its switch is ON, so
+       those incidents stay defects. Cycled per work type in workCells, never
+       drawn from rnd(). */
+    workFields: {
+      sn: { Bug: ['', '', 'Incident'], Task: ['', '', '', 'Service Catalog Task'] },
+      bug: ['Pre Production', 'Pre Production', 'Production'],
+      kind: ['Discretionary', 'Discretionary', 'Discretionary', 'Non-Discretionary'],
+      featureKind: ['Discretionary', 'Non-Discretionary', 'Discretionary']
+    } },
   { name: 'Team Long Tail', seed: 71104, dated: true, art: true, key: 'HRN',
     weeks: 40, perWeek: [3, 6], cycle: [3, 8], tailChance: 0.18, tail: [22, 48],
     wait: [2, 9], wip: [4, 9, 13, 17, 21, 26, 31, 38, 45],
@@ -25685,7 +25696,15 @@ const DEMO_TEAMS = [
        FEWER features and each of them larger — which is what puts a real
        distance between the two boards on any feature-level figure, rather than
        leaving them differing only in the spread. */
-    featureQuotas: [9, 3, 18, 6, 26, 4, 11, 7, 21, 5, 14, 8] },
+    featureQuotas: [9, 3, 18, 6, 26, 4, 11, 7, 21, 5, 14, 8],
+    /* NO ServiceNow column at all — the face where Where Defects Came From has
+       nothing to split — while its Bug Type leaves some bugs unrecorded and its
+       Type of Work is patchy, and leans further towards work it had to do. */
+    workFields: {
+      bug: ['Production', 'Production', '', 'Pre Production'],
+      kind: ['Non-Discretionary', 'Discretionary', '', 'Non-Discretionary', 'Discretionary'],
+      featureKind: ['Non-Discretionary', 'Discretionary']
+    } },
   /* `stale` shifts every one of this team's dates back by that many days, so its
      export stops before everybody else's. Its OWN dashboard is unchanged — every
      window here hangs off the latest date in the data, so the whole picture just
@@ -25712,7 +25731,24 @@ const DEMO_TEAMS = [
     weeks: 16, perWeek: [2, 4], cycle: [2, 7], tailChance: 0.08, tail: [10, 18],
     wait: [0, 0], wip: [2, 6, 16],
     types: ['Story', 'Story', 'Story', 'Story', 'Story',
-            'Task', 'Task', 'Task', 'Spike', 'Bug'] }
+            'Task', 'Task', 'Task', 'Spike', 'Bug'] },
+  /* TEAM SUPPORT DESK (2026-09-15) — the team the incidents switch is for. Most
+     of its Bugs are ServiceNow INCIDENTS it works for other teams, so its own
+     Settings count them as support work (incidentsAsDefects: 0): its defect rate
+     drops to its own bugs, and the From ServiceNow tile states the rest. Short
+     cycle times, a Bug-heavy mix, mostly Non-Discretionary work, no train, no
+     sprints and no stages — the teams above already carry those. */
+  { name: 'Team Support Desk', seed: 4242, dated: true, key: 'SUP',
+    weeks: 16, perWeek: [5, 8], cycle: [1, 3], tailChance: 0.03, tail: [5, 9],
+    wait: [0, 2], wip: [1, 2, 4, 9],
+    incidentsAsDefects: 0,
+    types: ['Bug', 'Bug', 'Bug', 'Bug', 'Task', 'Task', 'Task', 'Story', 'Spike', 'Bug'],
+    workFields: {
+      sn: { Bug: ['Incident', 'Incident', 'Incident', ''],
+            Task: ['Service Catalog Task', 'Change Task', ''], Spike: ['Vulnerabilities'] },
+      bug: ['Production', '', 'Production', 'Pre Production'],
+      kind: ['Non-Discretionary', 'Non-Discretionary', 'Discretionary']
+    } }
 ];
 
 /* Built as PASTE TEXT and run through parsePastedRows(), not hand-assembled into
@@ -25855,6 +25891,26 @@ function demoPaste(profile) {
     kids.get(parent).push({ created, started, completed });
   };
 
+  /* ── The three work fields (2026-09-15) ───────────────────────────────────
+     DETERMINISTIC and never drawn from rnd(), the fourth field here to follow
+     that rule: a counter per list, so each work type walks its own cycle and
+     every pinned figure above stays exactly where it was. Written in Jira's own
+     export headings and appended after every other column, so each profile's
+     existing columns keep their positions. */
+  const wf = profile.workFields || null;
+  const wfCounts = Object.create(null);
+  const cycleOf = (name, list) => {
+    if (!list || !list.length) return '';
+    const n = wfCounts[name] || 0;
+    wfCounts[name] = n + 1;
+    return list[n % list.length];
+  };
+  const workCells = (type) => !wf ? [] : []
+    .concat(wf.sn ? [cycleOf('sn:' + type, wf.sn[type])] : [])
+    .concat(wf.bug ? [type === 'Bug' ? cycleOf('bug', wf.bug) : ''] : [])
+    .concat(wf.kind ? [type === 'Feature' ? cycleOf('kind:feature', wf.featureKind)
+                                          : cycleOf('kind', wf.kind)] : []);
+
   const row = (created, started, completed, type, span, wipIndex, parent) => {
     const cells = profile.dated ? [created, started, completed, type]
                                 : [started, completed, type];
@@ -25862,7 +25918,8 @@ function demoPaste(profile) {
     return (profile.key ? [key()].concat(cells) : cells)
       .concat(profile.featureQuotas ? [parent || ''] : [])
       .concat(status == null ? [] : [status])
-      .concat(stageCells(span)).join('\t');
+      .concat(stageCells(span))
+      .concat(workCells(type)).join('\t');
   };
 
   const lines = [((profile.key ? 'Issue key\t' : '')
@@ -25874,7 +25931,10 @@ function demoPaste(profile) {
                   + (profile.featureQuotas ? '\tParent key' : '')
                   + (profile.wipStatus ? '\tStatus' : '')
                   + (profile.stageCols
-                      ? '\t' + profile.stageCols.map(([h]) => h).join('\t') : ''))];
+                      ? '\t' + profile.stageCols.map(([h]) => h).join('\t') : '')
+                  + (wf && wf.sn ? '\tCustom field (ServiceNow Assignment Type)' : '')
+                  + (wf && wf.bug ? '\tCustom field (Bug Type)' : '')
+                  + (wf && wf.kind ? '\tCustom field (Type of Work)' : ''))];
 
   for (let w = profile.weeks; w >= 1; w--) {
     const n = between(profile.perWeek[0], profile.perWeek[1]);
@@ -25939,7 +25999,8 @@ function demoPaste(profile) {
         /* No stage day counts on a feature. Those are measured per work item by
            a Time in Status export, and a feature is not in a work item's
            workflow — an empty cell is "no figure", which is the truth. */
-        .concat(profile.stageCols ? profile.stageCols.map(() => '') : []).join('\t'));
+        .concat(profile.stageCols ? profile.stageCols.map(() => '') : [])
+        .concat(workCells('Feature')).join('\t'));
     }
   }
 
@@ -26086,14 +26147,18 @@ function demoThresholdCaveat() {
 
 function loadSample() {
   if (!confirm(
-      'Load the demo? Three teams and about nine months of work items, ending today. '
+      'Load the demo? Four teams and about nine months of work items, ending today. '
     + 'Each team is named for the one thing it shows.\n\n'
     + 'Team Healthy Flow is a healthy board. Team Long Tail is the one the metrics exist '
     + 'to catch — a long tail on cycle time, and ' + DEMO_AGED + ' items aged past the '
     + DEFAULT_SETTINGS.agedDays + '-day threshold. Team Bare Export is newer, and its '
     + 'export carries no created dates, so you can see what lead time does without them.\n\n'
     + 'Team Healthy Flow and Team Long Tail are grouped onto one Agile Release Train and '
-    + 'Team Bare Export is on none, so the All Teams view has something to group.\n\n'
+    + 'Team Bare Export and Team Support Desk are on none, so the All Teams view has something to group.\n\n'
+    + 'Team Support Desk is a support team: most of its bugs are ServiceNow incidents it works for '
+    + 'other teams, so its own settings count them as support work rather than defects. Its export '
+    + 'and Team Healthy Flow\u2019s carry a ServiceNow type, a Bug Type and a Type of Work; Team '
+    + 'Long Tail\u2019s has no ServiceNow column, so the Work Mix tab shows each face.\n\n'
     + 'Team Healthy Flow and Team Long Tail also carry stage times, so the Health tab can '
     + 'show where their time goes — Team Long Tail spends more of it queueing than '
     + 'building. Team Bare Export carries none.\n\n'

@@ -408,8 +408,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    scroll padding (a focus lands below the sticky chrome, pinned or not) 14.
    The three work fields (2026-09-15) brought it to 4163, typing them in on an
    item to 4173, a support team's incidents switch to 4194, the Work Mix
-   section to 4225, and the All Teams non-discretionary column to 4230. */
-const EXPECTED = 4230;
+   section to 4225, the All Teams non-discretionary column to 4230, and Team
+   Support Desk in the demo to 4242. */
+const EXPECTED = 4242;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -9968,18 +9969,18 @@ group('ARTs — the grouping, and the boundary it crosses');
   plant({ teams: [], settings: {} });
   const demo = loadDemo();
 
-  is(demo.map(t => t.name), ['Team Healthy Flow', 'Team Long Tail', 'Team Bare Export'],
-     'three teams, so the team picker itself is visible — it hides below two');
+  is(demo.map(t => t.name), ['Team Healthy Flow', 'Team Long Tail', 'Team Bare Export', 'Team Support Desk'],
+     'four teams, so the team picker itself is visible — it hides below two');
 
   /* The sprint cadence and the aged-share opt-out reach the demo too (2026-09-15
      review) — the README's demo table said neither and no check held them. */
   const demoSettings = win.tdGet().settings;
   is(demoSettings.sprintDays, 14, 'the demo sets a 14-day company sprint cadence');
   ok(/^\d{4}-\d{2}-\d{2}$/.test(demoSettings.sprintAnchor), 'with a day to count it from', demoSettings.sprintAnchor);
-  is(demo.map(t => t.usesSprints || 0), [1, 1, 0],
+  is(demo.map(t => t.usesSprints || 0), [1, 1, 0, 0],
      'Team Healthy Flow and Team Long Tail run on it and Team Bare Export runs none, so Group by offers Sprint');
-  is(demo.map(t => t.artPredictability), [null, null, 0],
-     'and Team Bare Export is held out of the aged share, so the Scorecard reads across 2 of 3 teams');
+  is(demo.map(t => t.artPredictability), [null, null, 0, null],
+     'and Team Bare Export is held out of the aged share, so the Scorecard reads across 3 of 4 teams');
 
   /* Team Long Tail is the reason this app reads the 85th percentile rather than the
      average. If its tail is ever tidied away, the app's central argument stops
@@ -10039,7 +10040,7 @@ group('ARTs — the grouping, and the boundary it crosses');
      demoConfirmText.split('\n')[2] || demoConfirmText.slice(0, 120));
   ok(demoConfirmText.includes(longTail.agedDays + '-day threshold'),
      'and names the threshold it counted against, so the sentence stands on its own terms');
-  is(demo.map(t => t.rows.filter(r => !r.completed).length), [4, 9, 3],
+  is(demo.map(t => t.rows.filter(r => !r.completed).length), [4, 9, 3, 4],
      'every team has work in progress, so WIP and net flow are never empty');
 
   ok(longTail.summary.unplannedShare >= healthy.summary.unplannedShare * 2,
@@ -10052,9 +10053,9 @@ group('ARTs — the grouping, and the boundary it crosses');
      and teach nothing. The third sets neither, which is the state every real
      browser starts in and the only way the no-line, no-verdict face is
      reachable at all. */
-  is(demo.map(t => t.wipLimit), [6, 6, null],
-     'two teams set the same work-in-progress limit, and the third sets none');
-  is(demo.map(t => t.sleDays), [10, 10, null], 'and the same cycle time target');
+  is(demo.map(t => t.wipLimit), [6, 6, null, null],
+     'two teams set the same work-in-progress limit, and the other two set none');
+  is(demo.map(t => t.sleDays), [10, 10, null, null], 'and the same cycle time target');
   const targeted = (name) => {
     const t = demoOf(demo, name);
     return TD.derive(t.rows, win.TDState.normalizeSettings({}),
@@ -10223,7 +10224,7 @@ group('ARTs — the grouping, and the boundary it crosses');
      and matching the keys its own rows carry. Team Bare Export has neither, which is
      also the "takes nothing from a split" line the dialog has to be able to
      show. */
-  is(demo.map(t => t.projectId), ['KFR', 'HRN', ''],
+  is(demo.map(t => t.projectId), ['KFR', 'HRN', '', 'SUP'],
      'the demo teams carry the project ids their own keys are built from');
   demo.filter(t => t.projectId).forEach(t => {
     ok(t.rows.every(r => TD.projectIdOf(r.key) === t.projectId),
@@ -10234,10 +10235,11 @@ group('ARTs — the grouping, and the boundary it crosses');
      feature, reachable from Load sample data with nothing else set up. */
   const demoSplit = TD.routeRowsToTeams(
     demo.flatMap(t => t.rows), demo);
-  is(demoSplit.assigned.map(a => a.name), ['Team Healthy Flow', 'Team Long Tail'],
+  is(demoSplit.assigned.map(a => a.name), ['Team Healthy Flow', 'Team Long Tail', 'Team Support Desk'],
      'a paste holding the whole demo splits back into the teams it came from');
   is(demoSplit.assigned.map(a => a.rows.length),
-     [demoOf(demo, 'Team Healthy Flow').rows.length, demoOf(demo, 'Team Long Tail').rows.length],
+     [demoOf(demo, 'Team Healthy Flow').rows.length, demoOf(demo, 'Team Long Tail').rows.length,
+      demoOf(demo, 'Team Support Desk').rows.length],
      'every one of their rows finding its way home');
   is(demoSplit.noKey, demoOf(demo, 'Team Bare Export').rows.length,
      'while Team Bare Export\u2019s keyless rows are reported as unplaceable rather than guessed at');
@@ -10281,7 +10283,8 @@ group('ARTs — the grouping, and the boundary it crosses');
   const onArt = demo.filter(t => t.artId);
   const offArt = demo.filter(t => !t.artId);
   is(onArt.map(t => t.name), ['Team Healthy Flow', 'Team Long Tail'], 'two teams on it');
-  is(offArt.map(t => t.name), ['Team Bare Export'], 'and one on none, so both groups do something');
+  is(offArt.map(t => t.name), ['Team Bare Export', 'Team Support Desk'],
+     'and two on none, so both groups do something');
   ok(onArt.every(t => t.artId === demoArts[0].id), 'both point at the train that exists');
   /* Scoping has to change a figure, or the picker is a control that appears to
      do nothing on the one dataset anybody is shown. */
@@ -10382,7 +10385,46 @@ group('ARTs — the grouping, and the boundary it crosses');
     win.TDCleanup.outsideWindow(r, win.TDCleanup.windowCutoff(demo, keep), false)).length);
   ok(goes('3').every(n => n > 0), 'a 3-month cleanup would remove items from every team',
      JSON.stringify(goes('3')));
-  is(goes('12'), [0, 0, 0], 'and a 12-month one would remove none, so both answers are visible');
+  is(goes('12'), [0, 0, 0, 0], 'and a 12-month one would remove none, so both answers are visible');
+
+  /* ── The three work fields and the incidents switch (2026-09-15) ────────────
+     Four faces over four teams: Team Healthy Flow's defects come from both
+     places; Team Long Tail's export has no ServiceNow column, some bugs with no
+     Bug Type and more work it had to do; Team Bare Export carries none of it;
+     and Team Support Desk is the team the switch exists for. */
+  {
+    const support = demoOf(demo, 'Team Support Desk');
+    is(support.incidentsAsDefects, 0, 'Team Support Desk counts its ServiceNow incidents as support work');
+    const wfSettings = win.TDState.normalizeSettings({});
+    const wfView = { filterValue: null, months: 'all', bucket: 'week' };
+    const withFacts = (teams) => Object.assign({}, wfView, { teamFacts: TD.teamFactsOf(teams) });
+    const sdOn = TD.derive(support.rows, wfSettings,
+      withFacts([Object.assign({}, support, { incidentsAsDefects: null })]));
+    const sdOff = TD.derive(support.rows, wfSettings, withFacts([support]));
+    ok(sdOff.summary.unplannedShare < sdOn.summary.unplannedShare / 2,
+       'its switch at least halves its defect rate — the finding the switch exists for',
+       sdOff.summary.unplannedShare + ' vs ' + sdOn.summary.unplannedShare);
+    ok(sdOff.summary.incidentsAsSupport > 0, 'and says how many incidents it moved',
+       String(sdOff.summary.incidentsAsSupport));
+    ok(sdOff.summary.supportShare > 0.4, 'while much of its finished work came through ServiceNow',
+       String(sdOff.summary.supportShare));
+    const healthyTeam = demoOf(demo, 'Team Healthy Flow'), longTeam = demoOf(demo, 'Team Long Tail');
+    const hfW = TD.derive(healthyTeam.rows, wfSettings, withFacts([healthyTeam]));
+    ok(hfW.summary.defectSource && hfW.summary.defectSource.jira > 0 && hfW.summary.defectSource.serviceNow > 0,
+       'Team Healthy Flow’s defects came from both places', JSON.stringify(hfW.summary.defectSource));
+    const ltW = TD.derive(longTeam.rows, wfSettings, withFacts([longTeam]));
+    is(ltW.summary.defectSource, null,
+       'Team Long Tail’s export has no ServiceNow column, so its source card shows its empty face');
+    ok(ltW.summary.defectFound && ltW.summary.defectFound.notRecorded > 0,
+       'and some of its bugs carry no Bug Type', JSON.stringify(ltW.summary.defectFound));
+    ok(ltW.summary.nonDiscShare > hfW.summary.nonDiscShare,
+       'Team Long Tail spends more of its finished work on non-discretionary work',
+       ltW.summary.nonDiscShare + ' vs ' + hfW.summary.nonDiscShare);
+    ok((healthyTeam.features || []).some(f => f.workKind), 'a feature carries a Type of Work too');
+    const bare = demoOf(demo, 'Team Bare Export');
+    is(TD.derive(bare.rows, wfSettings, withFacts([bare])).summary.nonDiscShare, null,
+       'while Team Bare Export carries none of the three fields');
+  }
 
   /* Same numbers on every device and in every run, or the demo cannot be pinned
      here and cannot be talked through twice. */
