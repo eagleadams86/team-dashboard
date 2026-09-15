@@ -409,8 +409,8 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    The three work fields (2026-09-15) brought it to 4163, typing them in on an
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
-   Support Desk in the demo to 4242. */
-const EXPECTED = 4242;
+   Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
+const EXPECTED = 4254;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -17917,6 +17917,60 @@ group('a card with no chart matches the one beside it');
        'and a team whose export carries none reads a dash, never 0%');
     is(cols.map(c => c.key).indexOf('nonDisc'), cols.map(c => c.key).indexOf('defects') + 1,
        'beside the defect rate');
+  }
+
+  group('scorecard: the Distribution card');
+  {
+    const r = (c, t, d) => Object.assign({ c, s: '2026-01-05', t }, d ? { d } : {});
+    plant({ teams: [
+      { id: 'sd1', name: 'Mixed', rows: [r('2026-01-06', 'Story', 2), r('2026-01-07', 'Story', 2),
+                                         r('2026-01-08', 'Story', 1), r('2026-01-09', 'Story')] },
+      { id: 'sd2', name: 'Plain', rows: [r('2026-01-06', 'Story', 2), r('2026-01-08', 'Story')] }
+    ], settings: {} });
+    win.renderAll();
+    win.selectTab('scorecard');
+    const dDoc = win.document;
+    const cards = [...dDoc.querySelectorAll('.sc-card')];
+    is(cards.length, 4, 'the Scorecard has four cards');
+    is([...dDoc.querySelectorAll('.sc-cat')].map(x => x.textContent),
+       ['Predictability', 'Quality', 'Flow', 'Distribution'], 'with Distribution last, as on the printed scorecard');
+    const dist = cards[3];
+    const pie = dist ? dist.querySelector('svg.sc-pie') : null;
+    ok(pie && pie.getAttribute('role') === 'img', 'it draws a pie, announced as an image');
+    is(pie ? pie.getAttribute('aria-label') : null,
+       'Work distribution: 25% Discretionary, 75% Non-Discretionary.',
+       'naming both halves, pooled across the train, and summing to 100');
+    is(pie ? pie.querySelectorAll('path, circle').length : 0, 2, 'two wedges');
+    is(dist ? [...dist.querySelectorAll('.sc-key')].map(x => x.textContent) : null,
+       ['Discretionary 25%', 'Non-Discretionary 75%'],
+       'the legend names each half with its figure, so colour is never the only signal');
+    ok(dist && /4 of 6 completed items carry a Type of Work/.test(dist.querySelector('.sc-sub').textContent),
+       'the sub-line says how much of the work carried a value',
+       dist ? dist.querySelector('.sc-sub').textContent : '');
+    ok(dist && !/\b(green|yellow|red)\b/.test(dist.className) && !dist.querySelector('.glyph, .sc-bands'),
+       'and it is not graded: no state, no glyph, no bands');
+    ok(dist && /More of it was Non-Discretionary than Discretionary/.test(dist.textContent),
+       'a plain sentence says which half is larger');
+    const full = win.workPie(1, 0, 100);
+    ok(/<circle class="nondisc"/.test(full) && !/class="disc"/.test(full),
+       'a window of all Non-Discretionary work is one whole circle, with no zero-width wedge');
+    is(win.scorecardMeans({ get: (d) => d.v, fmt: (v) => Math.round(v * 100) + '% non-discretionary',
+         dir: ['more non-discretionary', 'less non-discretionary'], moveNoun: 'points' },
+         0.75, { days: 28 }, { empty: false, v: 0.6 }, {}),
+       '15 points more non-discretionary than the previous 28 days (60% non-discretionary).',
+       'What It Means compares whole percents for a card with no grading scale');
+
+    plant({ teams: [{ id: 'sd3', name: 'A', rows: [r('2026-01-06', 'Story')] },
+                    { id: 'sd4', name: 'B', rows: [r('2026-01-07', 'Story')] }], settings: {} });
+    win.renderAll();
+    win.selectTab('scorecard');
+    const none = [...dDoc.querySelectorAll('.sc-card')][3];
+    ok(none && !none.querySelector('svg')
+         && /None of the items completed in this window carries a Type of Work/.test(none.textContent),
+       'a train whose export carries no Type of Work gets a dash and says what is missing',
+       none ? none.textContent : '');
+    win.selectTab('dashboard');
+    plant({ teams: [], settings: {} });
   }
 
   /* ────────────────────────────────────────────────────────── */

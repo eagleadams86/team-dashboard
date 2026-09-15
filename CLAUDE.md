@@ -11,6 +11,30 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## The Scorecard's Fourth Card: Distribution (2026-09-15) — no schema change
+
+Charles, with a screenshot of the printed scorecard the page is modelled on: *"let's add
+distribution to the scorecard, modeled after this screenshot"* — QUALITY, FLOW, DISTRIBUTION, the
+last a Discretionary / Non-Discretionary pie with a legend strip and a What It Means note.
+
+- **`kind: 'mix'` in `SCORECARD_CARDS` sends a card down `scorecardMixCard`.** Distribution has NO
+  `scale`: no share of discretionary work is the right one, so it is never graded — no state
+  class, no glyph, no bands, no `ragVerdict`. Every RAG helper assumes a scale, which is why the
+  branch is at the top of `scorecardCard` rather than a set of guards inside it.
+  `scorecardMeans` compares whole percents for a card with no scale (`shownOf`).
+- **The pie is an inline SVG (`workPie`), not a Chart.js canvas.** It follows the theme through CSS
+  variables, so the print swap needs no redraw and there is no registry entry for a render to
+  destroy. Wedge fills are `--series-1` / `--series-5`. The figure in each wedge sits in a
+  `--surface` chip, so its contrast is the page's own whatever series colour is under it. The
+  legend names both halves with their figures, so colour is never the only signal. The two whole
+  percents are worked out ONCE (`nd`, then `100 - nd`) so the chips, legend and label sum to 100.
+- **The printed card's What It Means is hand-written prose; this one is computed** — the app
+  stores no free text. Do not add a notes field to match the screenshot.
+- **Work items, pooled** (`derived.items`), off `summary.nonDiscShare` — only items carrying a Type
+  of Work count, and the sub-line says how many of the completed items did.
+- **Four columns split evenly**, so the grid is 4 → 2×2 → 1, where three used to go 3 → 1. The
+  breakpoints were measured with the demo loaded so no band label truncates.
+
 ## The Three Work Fields and a Support Team's Incidents (2026-09-15) — SCHEMA 19 → 20
 
 Charles, with screenshots of three Jira custom fields: *"work items can have different sub-types

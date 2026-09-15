@@ -1329,9 +1329,14 @@ select { cursor: pointer; }
    The cards are `.card` — the same one surface as a chart card, a table and a
    tile, per the rule at the top of this stylesheet. They are NOT `.tile`: a tile
    is a figure with a caption, and these carry a band strip and a paragraph. */
-.scorecard { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr));
+.scorecard { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch; margin-bottom: 18px; }
-@media (max-width: 900px) { .scorecard { grid-template-columns: 1fr; } }
+/* FOUR SINCE 2026-09-15 (Distribution), and four DOES split evenly — so a window
+   too narrow for four in a row takes two rows of two rather than a stranded card,
+   and a phone takes one column. The breakpoints are measured: below them a band
+   label in the strip starts to truncate. */
+@media (max-width: 1280px) { .scorecard { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .scorecard { grid-template-columns: 1fr; } }
 .sc-col { display: flex; flex-direction: column; min-width: 0; }
 /* The category, not the measure — PREDICTABILITY over "aged share of WIP". It
    is set like a `.tile .label` rather than like a heading, because that is what
@@ -1398,6 +1403,29 @@ select { cursor: pointer; }
 .sc-band.is-here { font-weight: 700; box-shadow: inset 0 0 0 2px currentColor; }
 .sc-band .sc-here-mark { margin-right: 4px; }
 .sc-verdict { font-size: var(--fs-xs); color: var(--text-secondary); margin-top: 8px; }
+
+/* ── The Distribution card's pie and legend (2026-09-15) ─────────────────────
+   Two wedges in the pack's series pair — never an invented colour — drawn as an
+   inline SVG sized in its own 120-unit box, so it follows the theme through the
+   CSS variables and prints without a canvas redraw. Each wedge's figure sits in
+   a surface-coloured chip, so the text contrast is the page's own and never a
+   question of which series colour it lands on; and the legend under it names
+   both halves with their figures, so colour is never the only signal. */
+.sc-pie { display: block; width: 120px; height: 120px; margin: 10px auto 2px; }
+.sc-pie .disc { fill: var(--series-1); }
+.sc-pie .nondisc { fill: var(--series-5); }
+.sc-pie path, .sc-pie circle { stroke: var(--surface); stroke-width: 2; }
+.sc-pie-chip { fill: var(--surface); }
+.sc-pie-text { fill: var(--text-primary); font-size: var(--fs-xs); font-weight: 700; }
+.sc-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px;
+  margin-top: 10px; break-inside: avoid; }
+.sc-key { display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); text-align: center;
+  padding: 5px 4px; border-radius: var(--radius-sm); background: var(--surface-alt);
+  color: var(--text-secondary); min-width: 0; }
+.sc-swatch { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 2px; }
+.sc-swatch.disc { background: var(--series-1); }
+.sc-swatch.nondisc { background: var(--series-5); }
 
 /* "What It Means" — the movement against the window before this one. A heading
    and one line, in the shape the printed scorecards it replaces use. */
@@ -2524,7 +2552,7 @@ main:focus { outline: none; }
      in — the whole of what the strip says. The ▸, the weight and the verdict
      sentence underneath still carry it if a printer drops colour anyway, which
      is why the strip was never the only signal in the first place. */
-  .sc-band { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .sc-band, .sc-swatch { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   /* Three cards side by side is exactly what this page is; keeping each whole
      matters more than keeping the row together on one sheet. */
   .sc-col, .sc-card { break-inside: avoid; }
@@ -15512,6 +15540,16 @@ const METRIC_HELP = {
     ['Lower is better \u2014 but ', b('a rate near zero in a maturing team'), ' usually means '
       + 'defects are being logged somewhere other than the board, not that there are none.'],
   ] },
+  scDistribution: { title: 'Work Distribution', body: [
+    ['How the work items the teams in scope finished in this window divide between ',
+      b('Discretionary and Non-Discretionary'), ' work, read off the Type of Work column and '
+      + 'pooled across the train.'],
+    ['Only items that carry a Type of Work count, so ', b('a patchy column'), ' is read over the '
+      + 'part that has one \u2014 the line under the name says how many.'],
+    ['It is ', b('not graded'), '. No share of discretionary work is the right one, so there are no '
+      + 'bands and no colour: the legend names each half, and What It Means says which way the '
+      + 'share moved since the window before.'],
+  ] },
   scFeatureCycle: { title: 'Average Feature Cycle Time', body: [
     ['How long a ', b('feature'), ' takes from the day work starts on it to the day it '
       + 'completes, averaged over every feature any team in scope finished in the window. '
@@ -19217,6 +19255,26 @@ const SCORECARD_CARDS = [
         + ', so there is no time from start to completion to average. A feature needs a start '
         + 'date as well as a completion date — the same two dates a work item needs.';
     }
+  },
+  {
+    /* DISTRIBUTION (2026-09-15), modelled on the printed scorecard Charles works
+       from: how the train's finished work divides between Discretionary and
+       Non-Discretionary, off the Type of Work column. NOT GRADED — there is no
+       right share, so it has no scale, no bands and no colour of its own; a
+       legend strip stands where the bands stand on the other three. `kind: 'mix'`
+       is what sends it down its own renderer. Work items, pooled, and only the
+       items that carry a Type of Work count, which the sub-line says. */
+    key: 'distribution', cat: 'Distribution', unit: 'items', kind: 'mix',
+    help: 'scDistribution',
+    name: 'Work Distribution',
+    sub: (d) => d.summary.workKindCount + ' of ' + d.summary.completedTotal
+      + ' completed items carry a Type of Work',
+    get: (d) => d.summary.nonDiscShare,
+    fmt: (v) => pct0(v) + ' non-discretionary',
+    dir: ['more non-discretionary', 'less non-discretionary'], moveNoun: 'points',
+    why: (d) => d.empty
+      ? 'Nothing was completed across the teams in scope, so there is no distribution to state.'
+      : 'None of the items completed in this window carries a Type of Work.'
   }
 ];
 
@@ -19324,7 +19382,9 @@ function scorecardMeans(card, now, prior, priorD, dNow) {
     return 'No figure for ' + label + ', so there is nothing to compare with.';
   }
   const scale = card.scale;
-  const a = ragShown(now, scale), b = ragShown(then, scale);
+  /* A card with no scale (Distribution) is a share shown to the whole percent. */
+  const shownOf = (v) => (scale ? ragShown(v, scale) : Math.round(v * 100));
+  const a = shownOf(now), b = shownOf(then);
   const was = card.fmt(then);
   if (a === b) return 'Level with ' + label + ' (' + was + ').';
   /* The gap is taken between the two SHOWN figures, so it is the movement a
@@ -19337,8 +19397,77 @@ function scorecardMeans(card, now, prior, priorD, dNow) {
   return gap + noun + ' ' + word + ' than ' + label + ' (' + was + ').';
 }
 
+/* The Distribution card's pie: two wedges from twelve o'clock, Discretionary
+   first, clockwise — the order the legend reads in. `disc` and `nd` are the two
+   whole percents printed in the chips, worked out once by the caller so the
+   chips, the legend and the label always sum to 100. */
+function workPie(nonDiscShare, disc, nd) {
+  const C = 60, R = 56;
+  const at = (f, r) => {
+    const a = 2 * Math.PI * f - Math.PI / 2;
+    return [(C + r * Math.cos(a)).toFixed(2), (C + r * Math.sin(a)).toFixed(2)];
+  };
+  const cut = 1 - nonDiscShare;
+  const wedge = (from, to, cls) => {
+    if (to - from <= 0) return '';
+    if (to - from >= 1) return '<circle class="' + cls + '" cx="60" cy="60" r="56"></circle>';
+    const [x1, y1] = at(from, R), [x2, y2] = at(to, R);
+    return '<path class="' + cls + '" d="M60 60L' + x1 + ' ' + y1 + 'A56 56 0 '
+      + (to - from > 0.5 ? 1 : 0) + ' 1 ' + x2 + ' ' + y2 + 'Z"></path>';
+  };
+  /* A wedge under 8% has no room for a chip; its figure is still in the legend. */
+  const chip = (from, to, text) => {
+    if (to - from < 0.08) return '';
+    const [x, y] = at(from + (to - from) / 2, (to - from >= 1) ? 0 : R * 0.58);
+    return '<rect class="sc-pie-chip" x="' + (Number(x) - 18).toFixed(1) + '" y="'
+      + (Number(y) - 9).toFixed(1) + '" width="36" height="18" rx="3"></rect>'
+      + '<text class="sc-pie-text" x="' + x + '" y="' + (Number(y) + 4).toFixed(1)
+      + '" text-anchor="middle">' + text + '</text>';
+  };
+  return '<svg class="sc-pie" viewBox="0 0 120 120" role="img" aria-label="'
+    + escapeHtml('Work distribution: ' + disc + '% Discretionary, ' + nd + '% Non-Discretionary.')
+    + '">' + wedge(0, cut, 'disc') + wedge(cut, 1, 'nondisc')
+    + chip(0, cut, disc + '%') + chip(cut, 1, nd + '%') + '</svg>';
+}
+
+/* The Distribution card. The same column, heading, sub-line and What It Means
+   as the graded three, with a pie where their figure is and a legend where their
+   bands are — and no grade anywhere, because no share of discretionary work is
+   the right one. */
+function scorecardMixCard(card, dNow, priorD, prior, ctx) {
+  const value = dNow.empty ? null : card.get(dNow);
+  const name = scorecardCardName(card);
+  let figure = '<div class="sc-value">&mdash;</div>', legend = '', said;
+  if (value == null) {
+    said = card.why(dNow, ctx);
+  } else {
+    const nd = Math.round(value * 100), disc = 100 - nd;
+    figure = workPie(value, disc, nd);
+    legend = '<div class="sc-legend">'
+      + '<span class="sc-key"><span class="sc-swatch disc" aria-hidden="true"></span>Discretionary '
+      + disc + '%</span>'
+      + '<span class="sc-key"><span class="sc-swatch nondisc" aria-hidden="true"></span>'
+      + 'Non-Discretionary ' + nd + '%</span></div>';
+    said = nd > disc ? 'More of it was Non-Discretionary than Discretionary.'
+      : nd < disc ? 'More of it was Discretionary than Non-Discretionary.'
+      : 'An even split.';
+  }
+  return '<section class="sc-col">'
+    + '<h3 class="sc-cat">' + escapeHtml(card.cat) + '</h3>'
+    + '<div class="card sc-card sc-mix">'
+    + '<div class="sc-name">' + escapeHtml(name) + helpBtn(card.help, name) + '</div>'
+    + '<div class="sc-sub">' + escapeHtml(dNow.empty || value == null ? '' : card.sub(dNow, ctx)) + '</div>'
+    + figure + legend
+    + '<p class="sc-verdict">' + escapeHtml(said) + '</p>'
+    + '<div class="sc-means"><div class="sc-means-h">What It Means</div><p>'
+    + escapeHtml(scorecardMeans(card, value, prior, priorD, dNow))
+    + '</p></div>'
+    + '</div></section>';
+}
+
 /* One card. */
 function scorecardCard(card, dNow, priorD, prior, ctx) {
+  if (card.kind === 'mix') return scorecardMixCard(card, dNow, priorD, prior, ctx);
   const value = dNow.empty ? null : card.get(dNow);
   const state_ = rag(value, card.scale);
   const graded = state_ !== 'none';
@@ -19548,10 +19677,10 @@ function renderScorecard() {
      scorecard nobody can argue with, and a reader arriving from the dashboard
      with a work-type filter on needs to know it was not carried over. */
   $('scorecardIntro').textContent =
-    'Three questions about the whole train, over the window above and against the window '
+    'Four questions about the whole train, over the window above and against the window '
     + 'before it. Every work type counts, whatever the filter on the other tabs is set to, '
-    + 'and the first two figures are about work items while the third is about features — '
-    + 'so the Count switch does not reach this page either.'
+    + 'and Predictability, Quality and Distribution are about work items while Flow is about '
+    + 'features — so the Count switch does not reach this page either.'
     /* "the whole train" stops being true the moment a team is ticked out of the
        first figure, and this sentence is the one that told the reader it was.
        Said here as well as on the card, because a reader who scans the intro
@@ -19560,7 +19689,7 @@ function renderScorecard() {
       ? ' The first figure reads over ' + rollupTeams.length + ' of the '
         + inScope.length + ' teams — ' + heldOut
         + (heldOut === 1 ? ' is' : ' are') + ' ticked out of it in Teams & Stages; '
-        + 'the other two read over every team.'
+        + 'the other three read over every team.'
       : '')
     /* Said once, here, rather than three times down the cards. */
     + (derived.items.prior || derived.features.prior ? ''

@@ -22,7 +22,7 @@ display-only one.
 There are three ways to read the numbers: the **Dashboard**, which is one team in detail,
 **[All Teams](#all-teams-which-one-needs-you)**, which is every team side by side over one shared
 window, and the
-**[Scorecard](#the-scorecard-the-train-in-three-figures)**, which is the whole train in three
+**[Scorecard](#the-scorecard-the-train-in-four-figures)**, which is the whole train in four
 figures with last window's beside them. The first two are driven by the same work type filter,
 date window and grouping; the Scorecard follows the date window only, and
 [says why](#what-it-deliberately-does-not-follow).
@@ -368,7 +368,7 @@ the front half of the other's. A whole train on the company cadence satisfies th
 construction, which is the other reason the cadence sits in Settings. When the option is withheld
 the note under the charts says which of the three reasons it is: some teams have none, none do,
 or they are not aligned. The Scorecard is unaffected — it aligns to whole weeks whatever *Group
-by* says, for [its own reasons](#the-scorecard-the-train-in-three-figures).
+by* says, for [its own reasons](#the-scorecard-the-train-in-four-figures).
 
 Both the company cadence and a team's answer travel in a [share link](#share-a-read-only-link),
 because between them they decide where the bars are: a link that dropped either would show the
@@ -411,7 +411,7 @@ none is perfectly normal, and nothing forces you to use the feature at all.
 and the All Teams view adds them up; grouping changes what you are looking at and never a single
 number. What it does change:
 
-- **All Teams and the [Scorecard](#the-scorecard-the-train-in-three-figures) gain a train
+- **All Teams and the [Scorecard](#the-scorecard-the-train-in-four-figures) gain a train
   picker, and you can tick more than one.** It is one picker shared by both views rather than a
   copy each — it sits above the panels, so ticking a train moves both. It lists each train by
   name with the number of teams on it, plus *No ART* if any team is un-grouped, and **All
@@ -614,7 +614,7 @@ which landed you somewhere different every time. **The keyboard arrives with you
 the focus fell to the top of the document and Tabbing carried on from nowhere. Find does the same
 thing with the result you open, for the same reason.
 
-The [Scorecard](#the-scorecard-the-train-in-three-figures) is the same scope read the other way:
+The [Scorecard](#the-scorecard-the-train-in-four-figures) is the same scope read the other way:
 this table is who to go and see, that page is the three figures you report about the lot of them.
 
 If your teams are [grouped into ARTs](#grouping-teams-into-arts), a **train picker** appears
@@ -683,19 +683,20 @@ none** in the window shows its work in progress and its export date, because "th
 stopped finishing things" is precisely what someone scanning this table is looking for. A team
 with no work items at all shows dashes throughout.
 
-## The Scorecard: the Train in Three Figures
+## The Scorecard: the Train in Four Figures
 
 The Dashboard answers *how is this team doing?* and All Teams answers *which of my teams needs
 me?* The **Scorecard** answers the third question, the one an RTE is asked once a month:
 *how is the train doing, and which way is it moving?*
 
-Three columns, one per thing a leadership team asks about:
+Four columns, one per thing a leadership team asks about:
 
 | Column | The figure | Read over |
 |---|---|---|
 | **Predictability** | **Aged share of WIP** — how much of the board has been open past your ageing threshold, averaged across the window | work items, [minus any team held out](#holding-a-team-out-of-the-aged-share) |
 | **Quality** | **Defect share of completions** — how much of what finished was defect work; a [support team's incidents](#a-support-teams-incidents) are not defects here, and the card says how many teams that covers | work items |
 | **Flow** | **Average feature cycle time** — how long a finished feature took, start to completion | **features** |
+| **Distribution** | **Work distribution** — how the finished work divides between Discretionary and Non-Discretionary, [as a pie, and not graded](#the-distribution-card) | work items that carry a Type of Work |
 
 Each card carries the figure, a **band strip** stating the three ranges you are reading it
 against with the one it falls in marked, the verdict spelled out in words, and a **What It
@@ -708,6 +709,26 @@ putting the three side by side.
 
 The tab appears once you have a **second team**, the same rule All Teams follows: a roll-up of
 one team is that team's own dashboard with three of its tiles on it.
+
+### The Distribution Card
+
+The fourth column, modelled on the printed scorecard it replaces: a **pie** of how the finished
+work items divide between **Discretionary** and **Non-Discretionary** work, read off the
+[Type of Work](#work-mix-what-kind-of-work-finished) column and pooled across the teams in scope.
+
+- **It is not graded.** No share of discretionary work is the right one, so there are no bands,
+  no colour on the card and no verdict — a **legend strip** stands where the bands stand on the
+  other three, naming each half with its figure. Each wedge carries its figure too, so colour is
+  never the only thing telling the halves apart.
+- **Only items that carry a Type of Work count**, and the line under the name says how many of
+  the completed items did. With none, the card shows a dash and says so.
+- **What It Means** is worked out, not typed — the share's movement in points against the window
+  before, the same way the other three cards say theirs. The app stores no free text, so the
+  hand-written explanation on a printed scorecard is not something it can hold.
+- The pie is drawn in the theme's own series colours and follows the theme, on screen and in print.
+
+Four cards sit in one row on a wide window, in **two rows of two** on a laptop-width one, and in
+one column on a phone.
 
 ### Holding a Team Out of the Aged Share
 
@@ -815,7 +836,7 @@ that would otherwise be stated wrongly:
 - **The work type filter.** The Quality card's denominator is *everything completed*. Filter to
   Defects and it reads 100%; filter to anything else and it reads 0%. A filter set on another tab
   two minutes ago would be a figure moving for a reason that is not on the page.
-- **The Count switch.** The page states both units at once — two cards about work items and one
+- **The Count switch.** The page states both units at once — three cards about work items and one
   about features — so neither position of that switch fits it.
 - **Group by.** The charts' axis starts at the bucket containing the window's first day, so
   grouping by month silently widens the left edge by up to a month. That is survivable on one
@@ -1319,7 +1340,7 @@ Everything the charts depend on, shared by all your teams:
   own board. See [The ageing threshold is per unit](#the-ageing-threshold-is-per-unit).
 - **Grading** — its own section, holding **three pairs of boundaries**: the ones the
   [aged share](#aged-share-of-wip-the-count-in-proportion) is graded against, and the two pairs
-  the [Scorecard](#the-scorecard-the-train-in-three-figures) adds for the defect share and the
+  the [Scorecard](#the-scorecard-the-train-in-four-figures) adds for the defect share and the
   average feature cycle time. These six are the only numbers in this app that put a colour on a
   figure. They were in *Aged Work* until September 2026, described there as the only two — the
   same kind of setting in three sections would be three places to look for one answer.
@@ -2392,7 +2413,7 @@ red** state, and the chart shades your bands behind its line. Leave either box e
 behave exactly as they always did.
 
 This was the *only* graded figure until September 2026, when the
-[Scorecard](#the-scorecard-the-train-in-three-figures) added two more scales on exactly the same
+[Scorecard](#the-scorecard-the-train-in-four-figures) added two more scales on exactly the same
 machinery — both boxes or nothing, green at or below red or nothing, the verdict written out in
 words whichever way the colour reads. Everything below is still true of the aged share; what
 changed is that it is no longer alone.
@@ -2619,7 +2640,7 @@ The switch **disappears entirely** when no team has features. A control with one
 invites a press that does nothing.
 
 **One feature-level figure is stated outside the feature view**, and it is the only one: the
-[Scorecard](#the-scorecard-the-train-in-three-figures)'s Flow card, which is the average time a
+[Scorecard](#the-scorecard-the-train-in-four-figures)'s Flow card, which is the average time a
 finished feature took. That page states both units at once and so does not follow the switch at
 all. It does **not** depend on the feature ageing threshold — that setting gates how many
 features are counted as *aged*, and this counts how long the finished ones took, so it is stated
