@@ -89,7 +89,7 @@ Two changes, and the first is a model correction rather than a layout fix:
   **Do not pin dialog LAYOUT in tests**: the app runs in a hidden iframe a few dozen pixels wide,
   so `getBoundingClientRect` there answered "42 vs 42" and a 6267px-tall dialog. The suite pins
   the computed `max-width`, which is a CSS value and viewport-independent.
-- **Every managed list gains a SECOND Add button at its foot from six rows** (`ADD_FOOT_FROM`,
+- **Every managed list gains a SECOND Add button at its foot once the section outgrows the window** (`ADD_FOOT_FROM`,
   `syncAddFoot`). Charles with sixteen teams: adding one meant scrolling back to the top. A
   DUPLICATE and not a move — the heading-row button says what the section adds before you have
   read a row of it, it is where the sibling app puts its own, and a button above and below a
@@ -4050,7 +4050,7 @@ app now holds identifiers out of a work system, and the answer to "where does th
 
 - **tests.html** (same-origin iframe over `http://localhost`, refuses to run
   anywhere else — that guard is load-bearing, don't remove it) must say "All N
-  tests passed" whenever the parser, boundaries, or metrics change; CI
+  tests pass" whenever the parser, boundaries, or metrics change; CI
   (`.github/workflows/tests.yml`) runs it headless on every push on port 8013.
   When a rule in this file changes, change the matching test in the same commit.
 - **tests.html busts its own cache, on the frames AND on the source fetches
@@ -4066,14 +4066,15 @@ app now holds identifiers out of a work system, and the answer to "where does th
   expected it to fail, check the frame's `contentWindow` has the function you
   just wrote before believing anything.** The `api.github.com` call is
   deliberately left un-busted: somebody else's endpoint, not a file we ship.
-- **A second consecutive local run of the suite fails three date tests, and it is
-  the harness, not the app (found 2026-08-22, NOT yet fixed).** The suite plants
-  data and leaves `td-view` behind, so the next run boots the app with a
-  `customFrom` already saved — and the three "the date strip is prefilled with
-  the ends of the data" tests then see the restored window instead of the
-  default one. CI never sees it because it starts from a clean profile.
-  `localStorage.removeItem('td-view')` before a run, or expect three red rows
-  that mean nothing. Same family as the ambient-state trap in Money Map.
+- **Two consecutive local runs of the suite both pass.** This note used to say a second run
+  failed three date tests because the suite left `td-view` behind with a `customFrom` saved. The
+  custom-window group has set and restored its own precondition since 2026-08-22 (`3bd1cb5`), and two
+  runs in one browser profile were confirmed green on 2026-09-15. A value a HAND-DRIVEN session left
+  in `td-view` can still surprise a run; `localStorage.removeItem('td-view')` clears it.
+- **tests.html runs in Chromium, which is what CI uses.** In WebKit the suite stops about 3,000
+  checks in (2026-09-15): `innerText` reads empty inside its hidden frame and a `::placeholder`
+  colour cannot be computed there. Neither is an app fault — the app itself was driven in WebKit by the
+  same review — so a WebKit run of this suite is not evidence either way.
 - The header/chrome is shared with Sprint Velocity — a chrome change in one repo
   is mirrored in the other, including the cross-`applink`. That link lives in the
   **footer** since 2026-08-20 (it sat in the header beside the title before), where
@@ -4197,7 +4198,7 @@ label and its box sat **32px above** the three beside them.
 - **The ambient-state trap caught me on the way through.** Measuring the layout by hand left
   `months: 'custom'` in `td-view`, and the next suite run threw at check 669 on an undefined CFD
   chart — a custom window with no dates leaves nothing plottable. It reads as a code failure and is
-  not. `localStorage.removeItem('td-view')` before a local run, as the Working Rules say.
+  not. `localStorage.removeItem('td-view')` before a local run if a hand-driven session left one behind.
 
 ### No Field Is Ever Stranded on a Short Row — `.grid.two.pairs`
 
@@ -4858,3 +4859,8 @@ proven red against the build before it. The reasoning sits here, per fix.
   held: `statusColumnUsable` skips the repetition ratio below `STATUS_RATIO_MIN_ROWS` (five rows cannot
   hold forty distinct values), so there the anchored heading, the 40-value cap and `cleanStatusLabel`
   are what guard the vocabulary. That exception was reasoned in the code and stated nowhere else.
+- **Docs caught up with the code.** CLAUDE.md said the second Add button came "from six rows" (it is a
+  measured count per section), that a second local suite run fails (fixed since 2026-08-22), and
+  quoted the summary as "tests passed"; the `featureAgedDays` comment said a "14" string reads as
+  not set (it reads as 14). The README's Files table left out six files, and its paste section now
+  says how a zoned timestamp and a version column are handled. `EXPECTED` 4043 → 4121.

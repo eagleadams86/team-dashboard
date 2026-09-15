@@ -12382,8 +12382,9 @@ function normalizeSettings(raw) {
   /* Positive or NULL, never a default and never 0 — the opposite of the line
      above it, and the difference is the whole design. There is no number this
      app is entitled to assume about somebody else's features, so a blank, a
-     zero, a negative or a hand-edited "14" typed as a string all come out as
-     "not set" rather than as a threshold the reader never chose. */
+     zero or a negative all come out as "not set" rather than as a threshold the
+     reader never chose. A digit string such as "14" — what a form hands over — is
+     read as the number, like every other numeric setting here. */
   const fa = Number(s.featureAgedDays);
   s.featureAgedDays = Number.isFinite(fa) && fa > 0 ? fa : null;
   /* The two grading boundaries, as whole percents clamped to 0-100. Anything

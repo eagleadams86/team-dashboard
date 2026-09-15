@@ -1094,10 +1094,13 @@ silently corrupt every number on the dashboard.
   because a column of bare numbers found by content alone is more often a column of Jira issue
   ids (until 2026-09-01 a default issue-navigator export with no *Resolved* column took
   *Issue id* as the completion date, and every row finished in 2012). Where `03/04/2015` is genuinely ambiguous, the app auto-detects
-  day-first vs month-first from the rest of your data — or you can force it.
+  day-first vs month-first from the columns it reads dates from — a column of version numbers
+  like `2.13.10` never gets a vote — or you can force it.
 - A **time on the end is fine** — `9/23/2025 10:21`, `23/Sep/25 4:12 PM`, `2025-09-23T10:21:00Z`.
   Jira and Excel export timestamps rather than bare dates, and every metric here works in whole
-  days, so the clock is dropped. The date underneath still decides day-first vs month-first.
+  days, so the clock is dropped. The date underneath still decides day-first vs month-first. A
+  timestamp that names its time zone (`Z`, or `-05:00`) is a moment rather than a wall-clock time,
+  so it is dated on **your** calendar: `2026-09-16T01:00:00Z` is 15 September in New York.
 
 **Work in progress belongs in the paste.** An item with a start date and no completion is not
 an error — it's work you've begun, and it counts on the net flow chart as work started.
@@ -3718,9 +3721,14 @@ right instruction — update the file too, in all four repos that carry it.
 | `theme.css` | Copy of the palette from [claude-theme-pack](https://github.com/eagleadams86/claude-theme-pack); **linked** by `index.html`, `privacy.html` and `tests.html` — since 2026-08-18 it is not also inlined, so the palette lives in one place and a pack change reaches the app |
 | `sw.js` | Service worker: keeps the app's own public files on your device so it opens offline |
 | `sw-kill.js` | The escape hatch — copy it over `sw.js` and push to uninstall every installed worker |
-| `tests.html` | Pure-function tests |
+| `tests.html` | The test suite — the pure functions, and the live app driven in a hidden frame. Runs on `localhost` only, in Chromium, as CI does |
 | `privacy.html` | Privacy policy — what the app stores and where it does (and doesn't) go |
 | `.github/workflows/tests.yml` | Runs `tests.html` headless on every push |
+| `.github/workflows/codeql.yml` | GitHub's code scanning, on every push |
+| `package.json` | Names the vendored Chart.js so Dependabot can watch it — installs nothing |
+| `build-single.py` | Builds `dist/flow-metrics.html`, the app as one self-contained file (the `dist/` folder is not committed) |
+| `.nojekyll` | Tells GitHub Pages to serve the files as they are, so no Markdown file is published as a page without a Content-Security-Policy |
+| `LICENSE`, `NOTICE` | The MIT licence, and who owns the app |
 | `favicon.ico` | Tab icon — the fallback a browser fetches from the site root on its own |
 | `manifest.webmanifest` | What makes the app [installable](#installing-it) — its name, its window and its icons |
 | `icon-192.png`, `icon-512.png` | The install icons a launcher draws the app with |
