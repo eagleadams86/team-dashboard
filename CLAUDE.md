@@ -230,6 +230,17 @@ taking all fifteen teams and reading past the ones you had not asked about.
   element outside `#artScope` closes it without moving focus. `relatedTarget` is the whole test:
   a tick replaces the focused box, and THAT blur has nowhere to go and must not close anything —
   the restore above is about to put focus back.
+- **BUT NOT FOCUS REACHING AN ANCESTOR (2026-09-15, Charles: "clicking on the art name closes the
+  dropdown instead of selecting/unselecting that art").** A train's name is text in a `<label>`,
+  which cannot take focus, so pressing it moves focus to the nearest focusable ancestor — `<main>`,
+  `tabindex="-1"` for the skip link. That is a real element outside `#artScope`, so the rule above
+  closed the menu on MOUSEDOWN, the label was gone by mouseup, and the click landed on the page
+  below: nothing ticked, and only the box itself worked. The handler now also ignores a
+  `relatedTarget` that CONTAINS the picker — focus can only get there by a press on something
+  unfocusable inside it, and a press outside is closed by the mousedown listener anyway — and the
+  change handler focuses the ticked box, so the keyboard carries on from it. Traced with real
+  clicks (focusout → `MAIN#maincontent` → close), and confirmed after. **Sprint Predictability has
+  no focusout rule and was checked with the same real click: a name ticks there already.**
 - **The closed button COUNTS, the sentences NAME — AND SO DOES THE FOOT OF THE TABLE.** One
   train is named; two or more read "2 selected". That column is 240px, and five names in it would either truncate — a control
   hiding its own value — or take the row's layout with it. So the note beside the picker gained

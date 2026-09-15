@@ -12537,6 +12537,23 @@ group('ARTs — the grouping, and the boundary it crosses');
     fkBoxes()[1].dispatchEvent(new win.Event('change', { bubbles: true }));
     is(fkMenu.hidden, false, 'a tick that rebuilds the menu leaves it open');
     is(fkDoc.activeElement && fkDoc.activeElement.dataset.artPick, 'fk2', 'with focus back on the ticked box');
+    /* PRESSING A TRAIN'S NAME (2026-09-15, Charles: "clicking on the art name
+       closes the dropdown instead of selecting/unselecting that art"). The name
+       is text in a <label>, which cannot take focus, so a press on it hands focus
+       to <main> — a real element outside the field — and the rule below closed
+       the menu on mousedown, before the click could tick anything. Focus reaching
+       an ANCESTOR of the picker is a press inside it, never the reader leaving. */
+    const fkMain = fkDoc.getElementById('maincontent');
+    ok(fkMain && fkMain.contains(fkDoc.getElementById('artScope')),
+       'the page\u2019s <main> holds the picker — it is where a press on a name sends focus');
+    fkMain.focus();
+    fkBoxes()[1].dispatchEvent(new win.FocusEvent('focusout', { bubbles: true, relatedTarget: fkMain }));
+    is(fkMenu.hidden, false, 'focus going to <main>, which is what pressing a train\u2019s NAME does, leaves the menu open');
+    fkBoxes()[0].checked = true;
+    fkBoxes()[0].dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(fkMenu.hidden, false, 'so the tick the press makes lands, with the menu still up');
+    is(fkDoc.activeElement && fkDoc.activeElement.dataset.artPick, 'fk1',
+       'and focus moves to the ticked box rather than staying on <main>, so Escape still reaches the field');
     /* ── THE FRAME MAY NOT HOLD THE BROWSER'S FOCUS ────────────────────────
        Every other check in this file reads state; these two read what the
        BROWSER does when focus moves, and that is the one thing a hidden test

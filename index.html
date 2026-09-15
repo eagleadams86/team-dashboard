@@ -20604,6 +20604,10 @@ $('artFilterBtn').addEventListener('keydown', (e) => {
 $('artFilterMenu').addEventListener('change', (e) => {
   const box = e.target.closest ? e.target.closest('input[data-art-pick]') : null;
   if (!box) return;
+  /* A tick made through its NAME leaves focus on <main> (see the focusout note
+     below). Put it on the box, so the re-render's focus restore finds it and the
+     keyboard — Escape, Space, the arrows — carries on from the train just ticked. */
+  if (document.activeElement !== box) box.focus({ preventScroll: true });
   const id = box.dataset.artPick;
   const on = new Set(Array.isArray(view.artFilter) ? view.artFilter : []);
   if (box.checked) on.add(id); else on.delete(id);
@@ -20650,7 +20654,17 @@ $('artScope').addEventListener('keydown', (e) => {
 $('artScope').addEventListener('focusout', (e) => {
   if (!artMenuOpen()) return;
   const to = e.relatedTarget;
-  if (to && !$('artScope').contains(to)) closeArtMenu();
+  /* NOT to something that CONTAINS the picker (2026-09-15, Charles: "clicking on
+     the art name closes the dropdown instead of selecting/unselecting that art").
+     A train's name is text inside a <label>, which cannot take focus, so pressing
+     it moves focus off the button to the nearest focusable ANCESTOR — <main>,
+     which carries tabindex="-1" for the skip link. That is a real element outside
+     #artScope, so this closed the menu on mousedown, and by mouseup the label was
+     gone and the click landed on the page beneath: nothing ticked. Focus can only
+     reach an ancestor by a press on something unfocusable inside it — a press
+     OUTSIDE the picker is closed by the mousedown listener below — so an ancestor
+     is never the reader leaving. Tabbing to a real control elsewhere still is. */
+  if (to && !$('artScope').contains(to) && !to.contains($('artScope'))) closeArtMenu();
 });
 /* A press anywhere else is the reader moving on — the same rule the app's
    dialogs follow, where a click on the backdrop means Cancel. Capture, so a
