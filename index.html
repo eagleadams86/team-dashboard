@@ -14826,8 +14826,11 @@ function futureNote() {
 function itemsInWindow(d) {
   const inWindow = d.windowItemCount == null ? d.itemCount : d.windowItemCount;
   const all = d.itemCount;
-  return (inWindow < all ? inWindow + ' of ' + all : String(all))
-    + ' item' + (all === 1 ? '' : 's');
+  /* The derive's OWN unit words (2026-09-15 review): with Count on Features this
+     said "22 of 49 items" over a list of features. The empty shape carries no
+     unit words, and falls back to items as futureNote's fallback does to rows. */
+  return (inWindow < all ? inWindow + ' of ' + all : String(all)) + ' '
+    + (all === 1 ? (d.unitOne || 'item') : (d.unitMany || 'items'));
 }
 
 /* What the screen says about items whose duration it has stopped counting, and

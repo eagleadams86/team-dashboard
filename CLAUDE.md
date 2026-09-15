@@ -4791,3 +4791,7 @@ proven red against the build before it. The reasoning sits here, per fix.
   Chromium and WebKit before and after, and a 300-press Shift+Tab walk still hides nothing.
   **Sprint Velocity and Money Map carry the same padding rule and were not touched** — they were
   being changed by another session; the same three lines belong in both.
+- **The window note counts in the unit on screen.** `itemsInWindow` spelt "item" out, so with Count on
+  Features the dashboard read "10 of 20 items" and All Teams "22 of 49 items across 3 teams" over
+  lists of features — the exact thing the unit words on the derive exist to stop. It reads
+  `d.unitOne`/`d.unitMany` now, falling back to items on the empty shape.

@@ -4678,6 +4678,16 @@ async function run(TD, win) {
      ARTs now do too, so no id from outside can be that key (2026-09-15 review). */
   ok(S.sanitizeTeams([{ id: '__proto__', name: 'T' }])[0].id !== '__proto__', 'a team id of __proto__ is replaced');
   ok(S.sanitizeArts([{ id: '__proto__', name: 'A' }])[0].id !== '__proto__', 'and so is an ART id');
+
+  /* The window note counts in the derive's own unit (2026-09-15 review) — it said
+     "22 of 49 items" over a list of features. */
+  is(win.itemsInWindow({ windowItemCount: 22, itemCount: 49, unitOne: 'feature', unitMany: 'features' }),
+     '22 of 49 features', 'the window note counts features in the feature view');
+  is(win.itemsInWindow({ windowItemCount: 1, itemCount: 1, unitOne: 'feature', unitMany: 'features' }),
+     '1 feature', 'one of them in the singular');
+  is(win.itemsInWindow({ windowItemCount: 67, itemCount: 190, unitOne: 'item', unitMany: 'items' }),
+     '67 of 190 items', 'and items in the item view, as it always has');
+  is(win.itemsInWindow({ itemCount: 3 }), '3 items', 'an empty shape with no unit words still reads items');
   /* Held out of the aged share is a 0 and nothing that merely coerces to one —
      Number(null), Number('') and Number(false) are all 0 (2026-09-15 review). */
   is(S.sanitizeTeams([null, '', false, 'yes', undefined].map((v, i) =>
