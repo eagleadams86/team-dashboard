@@ -4800,3 +4800,10 @@ proven red against the build before it. The reasoning sits here, per fix.
   every team ticked, including one losing nothing, and dropped the unfinished-items clause the preview
   had just stated. A team keeping features now reads "removes every item from … The team and its
   features stay", and the confirm counts only teams that lose items and carries the clause.
+- **Two loops in the Find group now count their list first.** They walked `SEARCH_VIEW_LABEL` and
+  `tdVisibleTabs()` asserting per entry and nothing about length, so an empty list passed both
+  having run neither — the green-that-proves-nothing shape. Tests only.
+- **Looked at and left alone:** a filter entry whose display and value are both non-strings
+  (`{display: {}, value: 5}`) still arrives as a blank row. The review called it a nit; the suite
+  already pins that behaviour deliberately ("non-string fields inside an entry become empty
+  strings"), so it is a decision, not a gap.

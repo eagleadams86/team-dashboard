@@ -1307,6 +1307,14 @@ async function run(TD, win) {
        .hits.map(h => h.where), ['Kestrel — team'],
      'a team whose rows are not a list still finds the team');
 
+  /* COUNTED FIRST (2026-09-15 review): both loops below walk a list the app
+     supplies and assert nothing about its length, so an empty list — a renamed
+     export, a tab list that came back [] — passed both without running either. */
+  ok(Object.keys(win.tdSearch.SEARCH_VIEW_LABEL).length >= 4,
+     'SEARCH_VIEW_LABEL has entries for the loop below to check',
+     String(Object.keys(win.tdSearch.SEARCH_VIEW_LABEL).length));
+  ok(win.tdVisibleTabs().length >= 1, 'and there are visible tabs for the loop after it',
+     String(win.tdVisibleTabs().length));
   Object.keys(win.tdSearch.SEARCH_VIEW_LABEL).forEach((v) => {
     ok(v === 'stage' || !!win.document.getElementById('tab-' + v),
        'SEARCH_VIEW_LABEL names "' + v + '", which must be a real tab (or the stage dialog)');
