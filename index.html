@@ -455,11 +455,22 @@ html[data-pin] .pinbar {
 }
 /* Nothing in the app scrolls the page to an element — every focus() it makes
    passes `preventScroll`. The BROWSER's own Tab-key scrolling does, though, and
-   it knows nothing about a pinned bar, so a control tabbed into lands behind it.
-   `--pin-clear` is the height of everything actually stuck. */
-html[data-pin] .panel :is(button, a[href], input, select, textarea, [tabindex]) {
-  scroll-margin-top: var(--pin-clear, 0px);
-}
+   it knows nothing about a sticky bar, so a control tabbed into lands behind it.
+   `--pin-clear` is the height of everything actually stuck — the header, plus
+   the band (or, under the phone rule, the tab row) while pinned — and 8px for
+   the focus ring.
+   ON THE ROOT, AND PINNED OR NOT (2026-09-14, Charles: "fix the sticky header
+   shift+tab issue too"). This was a `scroll-margin-top` on the panels'
+   controls under `html[data-pin]` only. The HEADER is sticky whether or not
+   anything is pinned, so unpinned, Shift+Tab back up the page lined each
+   control up with the top of the window, behind the header — 60 of 228 stops
+   on a sideways phone with the sample loaded — and pinned, the view controls
+   sit OUTSIDE `.panel` and had no margin at all: on a phone, where only the
+   tab row sticks, the Group by picker landed under it. Scroll padding on the
+   scrolling element covers every scroll into view the page makes, and the
+   margin rule went with it: the two would have added together. Money Map's
+   shape, to its numbers. */
+html { scroll-padding-top: var(--pin-clear, 0px); }
 /* ── A PHONE PINS THE TAB ROW AND NOTHING ELSE ──────────────────────────────
    Measured on this page rather than guessed. The band is the tab row plus the
    controls card, and the card stacks its four pickers as the window narrows:
@@ -20283,8 +20294,12 @@ function applyPin(on) {
   dressPinBtn();
   if (pinWatch) {
     pinWatch.disconnect();
+    /* The HEADER always (2026-09-14): its height is `--pin-clear` even with
+       nothing pinned now, since the root's scroll padding keeps every focus
+       scroll clear of it, and it changes depth with no resize (a longer team
+       name, the controls wrapping under the name on a phone). */
+    pinWatch.observe(document.querySelector('header'));
     if (on) {
-      pinWatch.observe(document.querySelector('header'));
       pinWatch.observe($('pinBar'));
       /* The row as well as the band: under the phone rule the row is the thing
          that is stuck, and its height is what `--pin-clear` is written from. */
@@ -20299,8 +20314,8 @@ function applyPin(on) {
 /* Both boxes change height for reasons that are not a window resize: a longer
    team name wrapping the header, the Count switch appearing when a team gains
    features, the controls strip going away on Your Data. An observer catches
-   every one without a list of call sites to keep in step. Connected only while
-   something is pinned. */
+   every one without a list of call sites to keep in step. The header is
+   watched always, the band and the row only while something is pinned. */
 const pinWatch = ('ResizeObserver' in window)
   ? new ResizeObserver(() => measurePinTop()) : null;
 

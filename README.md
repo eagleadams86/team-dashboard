@@ -91,6 +91,13 @@ is bought with vertical space and only you can make that trade; press it again t
 scroll away, and it is remembered for next time. Nothing else moves when you pin — the page is
 exactly the height it was.
 
+**Tabbing never leaves a control behind the header.** The header stays at the top of the
+window as you scroll, pinned or not, so when the keyboard moves to a control above the window
+— Shift+Tab back up the dashboard, above all — the page scrolls it into view just *below* the
+header (and below whatever is pinned) rather than underneath it. Until 14 September 2026 that
+only worked while pinned, and even then not for the control strip on a phone. Sprint
+Predictability and Money Map work the same way.
+
 **The welcome card has nothing to pin.** The card hides the tab row and the controls, so a first
 run with the pin remembered has no band, and the app's own answer to *what is stuck right now?*
 says so. (Until 2026-09-04 it reported the hidden band as stuck — a box that is not on the page

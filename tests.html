@@ -404,8 +404,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    press "All trains" before ticking. The suite had grown to 4001 by 2026-09-14,
    when the one-line header and tab bar added 19 and the floor was brought up to
    the count; the same evening the controls staying beside the name, the
-   keyboard reveal and the nudge's padding edge added 9 more. */
-const EXPECTED = 4029;
+   keyboard reveal and the nudge's padding edge added 9 more, and the root's
+   scroll padding (a focus lands below the sticky chrome, pinned or not) 14. */
+const EXPECTED = 4043;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -15969,6 +15970,88 @@ group('a card with no chart matches the one beside it');
        'the chosen tab is nudged into view when it would sit off an end',
        Math.round(tBox.left - bBox.left) + '..' + Math.round(tBox.right - bBox.right));
     is(win.scrollY, 0, 'and the page itself did not move to do it');
+
+    /* ── A focus scrolled into view lands below the sticky chrome (2026-09-14) ──
+       Charles: "fix the sticky header shift+tab issue too". The header is sticky
+       whether or not anything is pinned, and the clearance used to be a
+       scroll-margin on `.panel`'s controls under `html[data-pin]` only — so
+       unpinned, Shift+Tab back up the page lined a control up behind the header,
+       and pinned on a phone the view controls (outside `.panel`, scrolling away
+       under the stuck tab row) had no margin at all. A focus() without
+       preventScroll is the same scroll the browser makes for a Tab. A spacer at
+       the foot guarantees page to scroll past, whatever this frame holds. */
+    {
+      const spacer = pinDoc.createElement('div');
+      spacer.style.height = '3000px';
+      pinDoc.body.appendChild(spacer);
+      /* The bottom of whatever is actually stuck — the header always, then the
+         band or (under the phone rule, where the band is `display: contents`
+         with a 0×0 box) the row. */
+      const floorOf = () => Math.max(0, ...[pinDoc.querySelector('header'), bar, row]
+        .filter((el) => cs(el).position === 'sticky' && cs(el).display !== 'contents'
+          && el.getClientRects().length && rect(el).height > 0)
+        .map((el) => rect(el).bottom));
+      const panelBtn = () => [...pinDoc.querySelectorAll('#panel-dashboard button')]
+        .find((b) => b.getClientRects().length && !b.closest('.table-scroll, .tabrow, .subtabs')
+          && rect(b).top + win.scrollY > 400);
+      const reach = async (w, pinned, pick, what) => {
+        await wide(w);
+        win.tdPin.apply(pinned);
+        await new Promise((r) => setTimeout(r, 200));
+        win.scrollTo(0, 0);
+        await new Promise((r) => setTimeout(r, 50));
+        const label = w + 'px ' + (pinned ? 'pinned' : 'unpinned') + ', ' + what;
+        const target = pick();
+        ok(!!target && target.getClientRects().length > 0, label + ': there is a control to reach');
+        if (!target || !target.getClientRects().length) return;
+        /* PARKED HALFWAY DOWN THE STUCK CHROME — inside the window, behind the
+           bar. That is what Shift+Tab meets stepping up one control at a time,
+           and it is what the old rule missed: the browser skips the scroll for
+           an element it believes is already in view. A control wholly OUTSIDE
+           the window is centred by focus() and by a real Shift+Tab alike, which
+           clears any bar and proves nothing — measured on Sprint Predictability
+           before this was written. */
+        win.scrollBy(0, rect(target).top);
+        await new Promise((r) => setTimeout(r, 60));
+        win.scrollBy(0, rect(target).top - Math.round(floorOf() / 2));
+        await new Promise((r) => setTimeout(r, 60));
+        const parked = rect(target).top;
+        ok(parked >= 0 && parked < floorOf() - 1,
+           label + ': set up — it sits behind the chrome, inside the window',
+           Math.round(parked) + ' vs ' + Math.round(floorOf()));
+        target.focus();
+        await new Promise((r) => setTimeout(r, 30));
+        const floor = floorOf();
+        ok(rect(target).top >= floor - 0.5,
+           label + ': focused, it lands below the chrome, not behind it',
+           Math.round(rect(target).top) + ' vs ' + Math.round(floor));
+        target.blur();
+      };
+      /* On the Dashboard: the tab-nudge check above has just chosen the LAST
+         tab, where neither the dashboard's controls nor the strip are on the
+         page. Put back afterwards, so nothing below inherits a different tab. */
+      const wasTab = pinDoc.querySelector('.tabs .tab[aria-selected="true"]');
+      pinDoc.getElementById('tab-dashboard').click();
+      await new Promise((r) => setTimeout(r, 300));
+      try {
+        await reach(1265, false, panelBtn, 'a dashboard control');
+        await reach(1265, true, panelBtn, 'a dashboard control');
+        await reach(375, false, () => pinDoc.getElementById('bucketSel'), 'the Group by picker');
+        await reach(375, true, () => pinDoc.getElementById('bucketSel'), 'the Group by picker');
+      } finally {
+        spacer.remove();
+        if (wasTab && wasTab.id !== 'tab-dashboard') {
+          wasTab.click();
+          await new Promise((r) => setTimeout(r, 300));
+        }
+        win.scrollTo(0, 0);
+      }
+      const code = stripComments(APP_SRC);
+      ok(/html \{ scroll-padding-top: var\(--pin-clear, 0px\); \}/.test(code),
+         'the clearance is the root’s scroll padding, pinned or not');
+      ok(!/scroll-margin-top: var\(--pin-clear/.test(code),
+         'and the old per-control margin is gone — the two would add together');
+    }
 
     await wide(1265);
     win.tdPin.apply(false);

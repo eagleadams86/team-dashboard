@@ -764,6 +764,35 @@ Your Data and when the welcome card takes the page, and **an observer is
 delivered with the next rendering step, which a background window does not
 have.**
 
+**A focus scrolled into view clears the chrome, PINNED OR NOT (2026-09-14,
+Charles: "fix the sticky header shift+tab issue too").** `html {
+scroll-padding-top: var(--pin-clear, 0px) }` — root scroll padding covers every
+scroll into view the page makes. It replaced `html[data-pin] .panel :is(button, …)
+{ scroll-margin-top: var(--pin-clear) }`, which had two holes: the HEADER is sticky
+with nothing pinned, so unpinned, Shift+Tab up the page lined each control up
+behind it; and pinned, `#viewControls` sits OUTSIDE `.panel` — on a phone, where
+only the tab row sticks and the controls scroll away under it, the Group by picker
+landed behind the row. **Never put a per-control margin back beside the padding —
+the two add together.** The ResizeObserver in `applyPin()` now watches the header
+ALWAYS (band and row only while pinned), so `--pin-clear` (header + stuck band or
+row + 8px) stays current unpinned too. `stuckPin()`'s `display: contents` guard is
+what makes the phone figure right: it measures the ROW there, never the 0×0 band.
+Money Map's shape, and Sprint Predictability carries the identical change.
+**Measured** (Playwright, sample loaded, real Shift+Tab from the page end and Tab
+from the top, 300 presses): hidden under the chrome before → after, unpinned:
+1280×800 36 → 0, 390×844 35 → 0, 844×390 60 → 0; pinned: 1280×800 0 → 0,
+390×844 9 → 0 (the Group by picker), 844×390 0 → 0. Nothing else reads
+`--pin-clear`. **The failure is the NO-SCROLL case**: a control already inside the
+window but under the bar is "in view" to the browser, so stepping up onto it
+scrolls nothing; one wholly outside the window is CENTRED by `focus()` and by a
+real Shift+Tab alike, so a test that scrolls its target far above the window
+cannot go red. Checks in the pin group, on the Dashboard tab (the tab-nudge check
+above them leaves the LAST tab chosen, and they put it back): a control PARKED
+halfway down the stuck chrome, then `focus()` (no preventScroll), at 1265 (a
+dashboard button) and 375 (the Group by picker), unpinned and pinned — red on the
+old page for three of the four, the 1265 pinned case being the one the old margin
+covered.
+
 23 checks in `pinning the tabs and the view controls`. **The suite's frame is 1px
 wide, so the phone rule is the only one that ever matches in it** — the test
 resizes `#app` to 1265, measures, resizes to 375, measures, and puts it back.
