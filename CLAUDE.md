@@ -4774,3 +4774,7 @@ proven red against the build before it. The reasoning sits here, per fix.
   from the UI (deleting an ART and `hydrateState` both clear the pointer) and harmless on arrival
   (the recipient nulls it), but a link now copies an `artId` only when `state.arts` names it.
   Pinned as SOURCE: no door can put a dangling pointer into live state, so no behaviour test can.
+- **No team or ART id is `__proto__`.** `ID_OK` matches it; `sanitizeStages` and `sanitizeStatuses`
+  already refused it through `PROTO_KEY`, and `sanitizeTeams`/`sanitizeArts` did not. No plain
+  object is keyed by either id today (`groupTeamsByArt` uses a Map), so nothing was reachable — the
+  four boundaries now agree, so the next object keyed by an id cannot inherit the gap.

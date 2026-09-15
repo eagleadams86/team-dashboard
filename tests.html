@@ -4674,6 +4674,10 @@ async function run(TD, win) {
   is(objArtErr + objStageErr, '', 'neither an ART nor a stage name that is an object throws');
   is(S.sanitizeTeams([{ id: 'n1', name: 42 }])[0].name, '42', 'a number is still kept as its digits');
   is(S.sanitizeTeams([{ id: 'n2', name: ['A'] }])[0].name, 'Untitled team', 'but an array is not a name');
+  /* `__proto__` passes ID_OK. Stages and statuses already refused it; teams and
+     ARTs now do too, so no id from outside can be that key (2026-09-15 review). */
+  ok(S.sanitizeTeams([{ id: '__proto__', name: 'T' }])[0].id !== '__proto__', 'a team id of __proto__ is replaced');
+  ok(S.sanitizeArts([{ id: '__proto__', name: 'A' }])[0].id !== '__proto__', 'and so is an ART id');
   /* Held out of the aged share is a 0 and nothing that merely coerces to one —
      Number(null), Number('') and Number(false) are all 0 (2026-09-15 review). */
   is(S.sanitizeTeams([null, '', false, 'yes', undefined].map((v, i) =>

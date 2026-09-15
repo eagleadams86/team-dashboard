@@ -11910,7 +11910,8 @@ function cleanName(v, fallback) {
 function sanitizeArts(arts) {
   const seen = new Set();
   return (Array.isArray(arts) ? arts : []).map(a => {
-    let id = (a && typeof a.id === 'string' && ID_OK.test(a.id) && !seen.has(a.id)) ? a.id : newId();
+    let id = (a && typeof a.id === 'string' && ID_OK.test(a.id) && a.id !== PROTO_KEY
+      && !seen.has(a.id)) ? a.id : newId();
     seen.add(id);
     return { id, name: cleanName(a && a.name, 'Untitled ART') };
   });
@@ -11996,7 +11997,8 @@ function sanitizeStatuses(statuses) {
 function sanitizeTeams(teams) {
   const seen = new Set();
   return (Array.isArray(teams) ? teams : []).map(t => {
-    let id = (t && typeof t.id === 'string' && ID_OK.test(t.id) && !seen.has(t.id)) ? t.id : newId();
+    let id = (t && typeof t.id === 'string' && ID_OK.test(t.id) && t.id !== PROTO_KEY
+      && !seen.has(t.id)) ? t.id : newId();
     seen.add(id);
     /* Names are escaped wherever they render, so the cap is about size, not
        markup: nothing legitimate needs more, and a hand-edited copy shouldn't
