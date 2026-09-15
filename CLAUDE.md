@@ -11,6 +11,70 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+## The Three Work Fields and a Support Team's Incidents (2026-09-15) — SCHEMA 19 → 20
+
+Charles, with screenshots of three Jira custom fields: *"work items can have different sub-types
+and classifications, and bugs can be found in production or pre-prod environments. would any of
+this be good candidates"* — and then the use case that decided the design: some teams are support
+teams, and the "incidents" they get from ServiceNow are often problems they solve for OTHER teams.
+Built on branch `servicenow-work-fields` as one PR.
+
+- **Three row fields, stored as CODES.** `n` ServiceNow assignment type (1 Change Task, 2 Incident,
+  3 Service Catalog Task, 4 Vulnerabilities), `b` Bug Type (1 Production, 2 Pre Production), `d`
+  Type of Work (1 Discretionary, 2 Non-Discretionary). The words live in `SN_TYPES` / `BUG_FOUND` /
+  `WORK_KINDS`; `WORK_FIELDS` is the one table the parse, the report, the hydrate and the save
+  read. Admitted on the regex test in its strongest form — a closed list, and a row holds only a
+  number the app chose. `readEnum` forgives case, spaces and hyphens; anything else is dropped and
+  COUNTED, never echoed. `enumCode` at the storage door takes an in-range integer and nothing
+  else. Index 0 is empty so a code is never 0. Omit-when-empty on the wire, rows and features alike.
+- **HEADING ONLY, and the work fields claim their columns FIRST.** Anchored patterns
+  (`Custom field (X)` or bare `X`), no headerless fallback — a column of Production looks exactly
+  like a column of work types. `workSkip` keeps every other role, `taken()` and the headerless type
+  guess off them. **The type pattern is exact-then-loose now**: all three headings contain "type",
+  and the leftmost loose match used to win, so any of them left of Issue Type took the work type.
+  With no exact heading the loose pattern runs as before, so only pastes already reading the wrong
+  column change. Pinned both ways, Status Category included.
+- **`incidentsAsDefects` on a team**: 0 = a support team; absent = in, today's behaviour. The
+  `artPredictability` shape, raw-value check and all. Saved and carried in a share link only when
+  0 — dropping it shows a different defect rate, which is also why SCHEMA moved. `tdAdopt` names
+  the work fields (`countWorkFields`); the switch is one tick and stays out of that prompt.
+- **ONE DEFINITION OF A DEFECT: `countsAsDefect`.** Every defect reader in `derive` goes through
+  it. **Nothing marks whose problem an incident was, so the app never guesses per item** — the
+  switch is the reader stating a fact about a team. Charles confirmed nothing in their Jira marks
+  it and that issue types get changed later; do not add a per-item heuristic ("an incident with a
+  Bug Type is a real bug") without asking him.
+- **Team facts travel as Sets of ROW OBJECTS** — `teamFactsOf` → `view.teamFacts`
+  (`incidentsAsSupport`, `carriesServiceNow`) — the way `excluded` works, so identity survives
+  pooling, the filter, the window, `asOf` and the window before. Built in THREE places:
+  `deriveTrain`, `deriveTeams`, and the hand-built literal in `renderDashboard` (the documented
+  trap; a test compares the dashboard tile with the All Teams cell for a support team). A view
+  without facts gets the old definition. **A new pooled surface must build the facts too.**
+- **A blank ServiceNow type is "raised in Jira" ONLY on a team whose export carries the column**
+  (`carriesServiceNow`). A team without it is out of the source split and out of the ServiceNow
+  share's denominator — counting its blanks as Jira would split defects the export never
+  described. A bare derive with no facts falls back to "any row in this list has a value".
+- **Work Mix is a fifth Dashboard section**, between Health and Forecast, decided with Charles: the
+  defect rate moved out of Health, plus Where Defects Came From, Where Defects Were Found and
+  Non-Discretionary Share, with four tiles. **Both groups are even at four, so no card carries
+  `solo`** — the notes further down saying the defect card takes it are history. The planning-mode
+  tab list includes `'mix'`. Stacked bars use `--series-1/3/5` at different fill strengths; an
+  empty card says what is missing and destroys its canvas rather than drawing zeros. Six new help
+  entries, one per dot: the three charts and the three tiles.
+- **Null, never 0, and pooled, never meaned.** Shares count only work that carries a value; a
+  period with none is null; summary shares are sums over sums (tested against the mean of the
+  points). The defect splits and `incidentsAsSupport` are null over features — which made
+  `incidentsAsSupport` the third summary field the unit decides (the `dropUnit` test).
+- **All Teams `nonDisc`, headed "Non-disc. %"**, beside the defect rate. Measured with the demo
+  loaded: the full word put the table 53px into a sideways scroll at 1100 and a third header line
+  at 1265; "Non-disc. %" costs neither. Decided with Charles.
+- **Demo: Team Support Desk** (seed 4242, key SUP, switch off). Work-field values come from
+  per-type cycles in `workCells`, never `rnd()`, so every earlier demo pin held and the Scorecard
+  still shows one card of each state across four teams. **Two cycles of the same length line up**:
+  its Bug Type cycle was four long against its ServiceNow Bug cycle's four, so every bug left a
+  defect after the switch landed on one value and Found in production read 0%. Give co-varying
+  cycles different lengths. Found by screenshot, not by the suite.
+- EXPECTED 4121 → 4242; privacy.html lists the three fields and the switch.
+
 ## The Share Window Groups Teams by Train (2026-09-14) — no schema change
 
 Charles, with a screenshot of twenty-four teams in one column: *"include the art name next to
@@ -666,6 +730,8 @@ drew the line.** Both halves of the original argument were put to Charles and he
 so it belongs next to its own denominator, and the two ageing cards below stay side by side as
 their own comment requires. Health went 4 charts to 5, so **`#cardDefectRate` takes the `solo`
 class back** — it lost it when Health went 3 to 4, and this is the odd group the class was kept for.
+**SUPERSEDED 2026-09-15:** the defect rate moved to the Work Mix section, Health is four charts
+again and neither group carries `solo` — see The Three Work Fields.
 
 - **The line is NEVER recoloured.** It keeps `--series-1` in every band. The bands are the reader's
   scale; a line that changed colour would be the app grading their figures.
@@ -1355,9 +1421,11 @@ built-in Helvetica rather than the face the page is set in.
 - **THE WINDOW ITSELF IS PINNED, PROPERTY BY PROPERTY, AND THE SAME BLOCK IS IN ALL SIX APPS VERBATIM (2026-08-23).** 700px on 18px of padding — the Back Up & Restore window's size, the family's other fixed-width window — with the heading, the intro line, the box, the hit and its three lines, and the "Nothing matches" line all declared inside the `#searchDialog` block rather than borrowed from whatever quiet-text class the app happens to have. That borrowing is what made one window into six: 360px and 420px wide, a 320px box inside a 360px dialog, a hittab at `--fs-sm` here and `--fs-xs` there, `.04em` typed out beside `--ls-label`, and four different colours on the same sentence. A change to any of it belongs in all six. Two details worth keeping: `#searchDialog > p` is the DIRECT child only (the results list's message is a `<p>` too, and an id in that selector would out-rank `.searchresults .hint` and hand it the intro line's colour), and the block deliberately declares NO dialog chrome — backdrop, shadow, a field's touch-height floor, and the max-height Money Map divides by its own zoom all belong to the app's `dialog` rule and are shared with every other window it opens.
 - **The header buttons wear a glyph in front of the word** (2026-08-21) — plain text characters, NOT emoji and not an icon font: one more file to fetch is the last thing a header painted this early needs, and a text glyph inherits the theme's colour for free, so it can never become the thing that carries a meaning by hue. Each is `aria-hidden` — the word beside it is already the whole label. The glyphs are Money Map's own where the same button exists there (`⇩` Back up, `↗` Share, `⚙` settings), so one action looks the same in every app, and `☰` is the list/manage one the three list-managing apps share. Added to Sprint Predictability, Flow Metrics, Golf Handicap and PAPTrack in the same commit.
 - **A row is three ISO dates, one short work-type label, one issue key, one
-  status id and a set of NUMBERS keyed by stage id.
+  status id, a set of NUMBERS keyed by stage id, and — since 2026-09-15 — three
+  work-field CODES (`n`, `b`, `d`; see The Three Work Fields).
   A ROW STILL HOLDS NO WORD** — the status is an id into `state.statuses`, which
-  is where the words live; see The Status Is Stored Now.
+  is where the words live; see The Status Is Stored Now. The work fields are
+  numbers into lists that live in the code.
   What follows was written before 2026-09-01 and is left standing because the
   clause above is the only part of it that moved.
   Nothing else. There are no free-text or comment fields anywhere in this app —

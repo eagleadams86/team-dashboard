@@ -3131,7 +3131,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         <div class="btn-row" style="justify-content:center;margin-top:var(--sp-6)">
           <button class="btn" id="btnSample" type="button">Load Sample Data</button>
         </div>
-        <p class="hint" style="margin-top:var(--sp-4)">Three teams and nine months of made-up
+        <p class="hint" style="margin-top:var(--sp-4)">Four teams and nine months of made-up
         work items, so every chart has something behind it. You can delete it later.</p>
       </div>
     </div>
@@ -3192,6 +3192,8 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         aria-selected="false" tabindex="-1">Delivery</button>
       <button class="subtab" role="tab" id="stab-health" aria-controls="spanel-health"
         aria-selected="false" tabindex="-1">Health</button>
+      <button class="subtab" role="tab" id="stab-mix" aria-controls="spanel-mix"
+        aria-selected="false" tabindex="-1">Work Mix</button>
       <button class="subtab" role="tab" id="stab-forecast" aria-controls="spanel-forecast"
         aria-selected="false" tabindex="-1">Forecast</button>
     </div>
@@ -3343,23 +3345,6 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           <div class="note info" id="itemAgeNone" hidden></div>
         </div>
 
-        <!-- It gained an id and an empty face when the feature view landed: a
-             defect is a kind of WORK ITEM, so over features this chart plots a
-             flat zero for every period — a claim of perfect quality, which is
-             the most misleading thing it could possibly say. The card explains
-             itself rather than disappearing, which is the rule the lead time
-             card already follows: the answer to "where did the defect rate go?"
-             belongs on screen. -->
-        <!-- `solo`, and it has had the class before: it lost it when Health went
-             from three charts to four, and the aged share taking it to five is
-             the odd group the class was kept for. -->
-        <div class="chart-card solo" id="cardDefectRate">
-          <div class="chart-name" id="nameDefectRate"></div>
-          <div class="chart-title" id="titleDefectRate"></div>
-          <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
-          <div class="note info" id="defectRateNone" hidden></div>
-        </div>
-
         <!-- The only card in the app that is a TABLE rather than a chart, and it
              is one on purpose: five stages is five numbers, a bar chart of five
              numbers says less than the numbers do, and a table is the one thing
@@ -3412,6 +3397,50 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
            putting them up there would have every other tab carrying a pair of
            boxes that did nothing to it. They still read from the strip: team,
            work type, window and grouping all feed the sample this deals from. -->
+      <!-- WORK MIX (2026-09-15): what KIND of work finished. The defect rate moved
+           here from Health so it sits beside the two splits of the same defects,
+           and Health went back to its four flow-health charts — both groups even,
+           so no card in either needs `solo`. Every card here says what is missing
+           when an export does not carry the column it splits by. -->
+      <div class="grid charts" id="spanel-mix" role="tabpanel" aria-labelledby="stab-mix" hidden>
+        <div class="tiles group" id="tilesMix"></div>
+
+        <!-- It gained an id and an empty face when the feature view landed: a
+             defect is a kind of WORK ITEM, so over features this chart plots a
+             flat zero for every period — a claim of perfect quality, which is
+             the most misleading thing it could possibly say. The card explains
+             itself rather than disappearing, which is the rule the lead time
+             card already follows: the answer to "where did the defect rate go?"
+             belongs on screen. -->
+        <div class="chart-card" id="cardDefectRate">
+          <div class="chart-name" id="nameDefectRate"></div>
+          <div class="chart-title" id="titleDefectRate"></div>
+          <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
+          <div class="note info" id="defectRateNone" hidden></div>
+        </div>
+
+        <div class="chart-card" id="cardDefectSource">
+          <div class="chart-name" id="nameDefectSource"></div>
+          <div class="chart-title" id="titleDefectSource"></div>
+          <div class="chart-wrap"><canvas id="chartDefectSource"></canvas></div>
+          <div class="note info" id="defectSourceNone" hidden></div>
+        </div>
+
+        <div class="chart-card" id="cardDefectFound">
+          <div class="chart-name" id="nameDefectFound"></div>
+          <div class="chart-title" id="titleDefectFound"></div>
+          <div class="chart-wrap"><canvas id="chartDefectFound"></canvas></div>
+          <div class="note info" id="defectFoundNone" hidden></div>
+        </div>
+
+        <div class="chart-card" id="cardWorkKind">
+          <div class="chart-name" id="nameWorkKind"></div>
+          <div class="chart-title" id="titleWorkKind"></div>
+          <div class="chart-wrap"><canvas id="chartWorkKind"></canvas></div>
+          <div class="note info" id="workKindNone" hidden></div>
+        </div>
+      </div>
+
       <div class="grid charts" id="spanel-forecast" role="tabpanel" aria-labelledby="stab-forecast" hidden>
         <div class="forecast-ask">
           <!-- WHOSE pace is being dealt from. Its own control here rather than
@@ -4611,6 +4640,23 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     </div>
   </section>
 
+  <section class="manage-sec">
+    <div class="row spread"><strong class="manage-head">ServiceNow Incidents</strong></div>
+    <p class="manage-note">Whether this team&rsquo;s ServiceNow <strong>Incidents</strong> count as
+      defects &mdash; every team&rsquo;s do unless you untick it. Untick it for a support team,
+      whose incidents are mostly problems it solves for other teams: those items then leave its
+      defect rate on its dashboard, on All Teams and on the Scorecard, and count as support work
+      instead. Nothing else moves &mdash; they still count as delivered, and every other ServiceNow
+      type is untouched.</p>
+    <div style="margin-top:var(--sp-5)">
+      <label class="checkline" for="teamIncidents">
+        <input type="checkbox" id="teamIncidents">
+        <span>Count this team&rsquo;s ServiceNow incidents as defects</span>
+      </label>
+    </div>
+    <p class="hint" id="teamIncidentsHint" style="margin-top:var(--sp-3)"></p>
+  </section>
+
   <div class="row" style="justify-content:flex-end;margin-top:18px">
     <button class="btn primary" id="teamDialogCloseBtn" type="button">Done</button>
   </div>
@@ -4676,6 +4722,27 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     <div id="itemStageWrap" hidden>
       <label for="itemStage" id="itemStageLabel">Sitting in <span class="hint">(optional)</span></label>
       <select id="itemStage"></select>
+    </div>
+  </div>
+
+  <!-- The three work fields (2026-09-15), typed in — the other door, so every
+       chart they feed can be filled without a paste. SELECTS and never text
+       boxes: a row stores a code from a fixed list, and a box somebody types
+       into would be a way past that. Shown for a feature too, because a feature
+       is the same record and a control that is not drawn is a value the next
+       save silently drops. `pairs`, so the odd third field spans its row. -->
+  <div class="grid two pairs" style="margin-top:var(--sp-5)">
+    <div>
+      <label for="itemSnType">ServiceNow type <span class="hint">(optional)</span></label>
+      <select id="itemSnType"></select>
+    </div>
+    <div>
+      <label for="itemBugFound">Bug found in <span class="hint">(optional)</span></label>
+      <select id="itemBugFound"></select>
+    </div>
+    <div>
+      <label for="itemWorkKind">Type of work <span class="hint">(optional)</span></label>
+      <select id="itemWorkKind"></select>
     </div>
   </div>
 
@@ -5519,7 +5586,15 @@ const HEADER_PATTERNS = {
   completed: [/complet|resolv|closed|done|finish/i, /end\s*date/i],
   started:   [/start|begin|in.?progress/i, /created/i],
   created:   [/creat|raised|reported|logged|opened|submitted/i],
-  type:      [/(issue\s*)?type|kind|category/i],
+  /* EXACT FIRST, THEN LOOSE (2026-09-15). matchHeader tries these patterns in
+     order across the whole heading row, so a heading that is exactly "Type" or
+     "Issue Type" now wins over a looser match sitting to its left — "Status
+     Category", "Request Type", or a Jira custom field such as "Custom field (Bug
+     Type)". With no exact heading the loose pattern runs exactly as it always
+     did, so the only pastes this changes are ones that were reading the wrong
+     column. The three work-field headings below are also taken out of this
+     role's reach outright, in detectColumns. */
+  type:      [/^\s*(issue\s*)?type\s*$/i, /(issue\s*)?type|kind|category/i],
   /* ANCHORED, unlike every pattern above it, and that is the whole point: the
      others may match anywhere in a heading because a date column can be called
      almost anything, while the neighbours of a key column are "Issue Type",
@@ -5543,7 +5618,16 @@ const HEADER_PATTERNS = {
      every item in the file onto itself or onto its neighbour, silently, and a
      wrong parent is worse than no parent: it invents a feature breakdown that
      nobody's board has. No heading, no parent. */
-  parent:    [/^\s*parent(\s*issue)?\s*key\s*$/i]
+  parent:    [/^\s*parent(\s*issue)?\s*key\s*$/i],
+  /* The three WORK FIELDS (2026-09-15) — Jira custom fields, exported as
+     "Custom field (Bug Type)" and the like, or under their bare names. ANCHORED,
+     and with no headerless fallback, for the parent key's reason: a column of
+     "Production" or "Incident" looks exactly like a column of work types, so
+     without a heading there is nothing to tell them apart by. Each claims its
+     column BEFORE any other role is looked for — see detectColumns. */
+  snType:    [/^\s*(?:custom\s*field\s*\(\s*service\s*now\s*assignment\s*type\s*\)|service\s*now\s*assignment\s*type)\s*$/i],
+  bugFound:  [/^\s*(?:custom\s*field\s*\(\s*bug\s*type\s*\)|bug\s*type)\s*$/i],
+  workKind:  [/^\s*(?:custom\s*field\s*\(\s*type\s*of\s*work\s*\)|type\s*of\s*work)\s*$/i]
 };
 
 /* Headings whose column is prose, and which therefore may hold NO role at all.
@@ -5717,10 +5801,18 @@ function detectColumns(rows, header, order, stages, statuses) {
      worth nothing. So this exclusion has no second pass and no fallback: a role
      that can only be filled by a prose column goes unfilled. */
   const prose = proseColumns(header);
+  /* The work fields claim their columns FIRST, by anchored heading only, and
+     every other role then looks past them in every pass — the prose rule, for a
+     narrower reason: all three headings say "type", and a work-type column that
+     turned out to be the Bug Type would file "Production" as a kind of work. */
+  const workCols = {};
+  for (const f of WORK_FIELDS) workCols[f.role] = matchHeader(header, f.role, prose);
+  const workSkip = new Set(Object.values(workCols).filter(i => i >= 0));
   const skipWith = (set) => {
-    if (!prose.size) return set;
+    if (!prose.size && !workSkip.size) return set;
     const out = new Set(set);
     for (const i of prose) out.add(i);
+    for (const i of workSkip) out.add(i);
     return out;
   };
   const roleAt = (field) => {
@@ -5730,7 +5822,7 @@ function detectColumns(rows, header, order, stages, statuses) {
     }
     const clear = matchHeader(header, field, skipWith(stageSkip),
       DATE_ROLE[field] ? datey : null);
-    return clear >= 0 ? clear : matchHeader(header, field, prose);
+    return clear >= 0 ? clear : matchHeader(header, field, skipWith(new Set()));
   };
   /* Only the strict start patterns — "In Progress"/"Start"/"Begin" — so that a
      Created column can be recognised as created first, and then fall back into
@@ -5740,7 +5832,7 @@ function detectColumns(rows, header, order, stages, statuses) {
      and the commonest stage name on a board. */
   const startAt = (skip, accept) => header
     ? header.findIndex((h, i) =>
-        !skip.has(i) && !prose.has(i) && (!accept || accept(i))
+        !skip.has(i) && !prose.has(i) && !workSkip.has(i) && (!accept || accept(i))
         && /start|begin|in.?progress/i.test(String(h || '')))
     : -1;
   const startedFilled = startAt(stageSkip, dateyFilled);
@@ -5771,7 +5863,9 @@ function detectColumns(rows, header, order, stages, statuses) {
        somebody's review time to their test stage on the strength of column
        order. A stage column is only ever a column whose heading matches an alias
        the reader typed. */
-    stages: stageCols
+    stages: stageCols,
+    /* Found above, before any other role — see workCols. */
+    snType: workCols.snType, bugFound: workCols.bugFound, workKind: workCols.workKind
   };
   const createdByHeader = roleAt('created');
   if (createdByHeader >= 0 && createdByHeader !== map.completed && createdByHeader !== map.started) {
@@ -5807,7 +5901,7 @@ function detectColumns(rows, header, order, stages, statuses) {
      a stage they set up is simply reporting nothing. columnsReadHtml says which
      column and which stage. */
   const roleCols = [map.completed, map.started, map.created, map.type, map.key, map.status,
-    map.parent].filter(i => i >= 0);
+    map.parent, map.snType, map.bugFound, map.workKind].filter(i => i >= 0);
   map.stageClash = map.stages.filter(sc => roleCols.includes(sc.index));
   map.stages = map.stages.filter(sc => !roleCols.includes(sc.index));
 
@@ -5904,7 +5998,7 @@ function detectColumns(rows, header, order, stages, statuses) {
      from a column of short labels. Naming those columns as taken is what keeps
      the type detector off "Parent summary". */
   const taken = () => new Set([map.completed, map.started, map.created, map.type, map.key,
-    map.status, map.parent].filter(i => i >= 0)
+    map.status, map.parent, map.snType, map.bugFound, map.workKind].filter(i => i >= 0)
     .concat(map.stages.map(sc => sc.index), [...prose]));
 
   /* No heading, or a heading this app declined to trust: find the key column by
@@ -6026,6 +6120,47 @@ function cleanWorkType(t) {
   const s = t.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim();
   return s.length > 40 ? '' : s;
 }
+
+/* ── THE THREE WORK FIELDS (2026-09-15) — SCHEMA 19 → 20 ─────────────────────
+   ServiceNow Assignment Type, Bug Type and Type of Work: three Jira custom
+   fields whose values are a SHORT CLOSED LIST. That is what admits them under
+   the numbers-and-dates rule, and more strongly than a length cap could: the
+   words live HERE, in the code, and a row stores only the NUMBER of the one it
+   matched. A cell that is not one of these values — allowing for case, spaces
+   and hyphens — is dropped whole and counted for the paste report, which never
+   prints it. There is no input that both passes and carries prose.
+
+   Index 0 is deliberately empty, so a code is never 0: a 0 would read as set to
+   a strict test and as not set to a loose one, which is the Number(null) trap
+   wearing a different hat. */
+const SN_TYPES = [null, 'Change Task', 'Incident', 'Service Catalog Task', 'Vulnerabilities'];
+const SN_INCIDENT = 2;
+const BUG_FOUND = [null, 'Production', 'Pre Production'];
+const WORK_KINDS = [null, 'Discretionary', 'Non-Discretionary'];
+/* One table, so the parse, the report, the hydrate and the save cannot disagree
+   about which field is which: `role` is the detectColumns role AND the row
+   field, `wire` the stored letter, `name` what the paste report calls it. */
+const WORK_FIELDS = [
+  { role: 'snType',   wire: 'n', list: SN_TYPES,   name: 'ServiceNow assignment type' },
+  { role: 'bugFound', wire: 'b', list: BUG_FOUND,  name: 'Bug Type' },
+  { role: 'workKind', wire: 'd', list: WORK_KINDS, name: 'Type of Work' }
+];
+const enumNorm = (v) => String(v).toLowerCase().replace(/[\s\-_‐-―]+/g, '');
+/* A pasted cell → { code, unknown }. Blank is no value and NOT unknown: a blank
+   Bug Type is the ordinary state of every item that is not a bug. */
+function readEnum(raw, list) {
+  const t = String(raw == null ? '' : raw).trim();
+  if (!t) return { code: null, unknown: false };
+  if (t.length > 40) return { code: null, unknown: true };
+  const n = enumNorm(t);
+  for (let i = 1; i < list.length; i++) if (enumNorm(list[i]) === n) return { code: i, unknown: false };
+  return { code: null, unknown: true };
+}
+/* A stored value → a code or null. An integer in range and NOTHING else: a word,
+   a digit string, 0, a fraction or a boolean arriving on a hand-edited backup or
+   a share link is dropped, because a document this app wrote only ever holds
+   the number. */
+const enumCode = (v, list) => (Number.isInteger(v) && v >= 1 && v < list.length) ? v : null;
 
 /* How many work-type labels may mean "a feature". A board with more than a
    handful of feature-shaped issue types does not exist — Feature, Epic,
@@ -7007,6 +7142,13 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
   /* Two different orderings, two different meanings — see the checks below. */
   const startAfterDone = [], raisedAfterStart = [];
   let unfinished = 0, undated = 0;
+  /* Per work field: its column, how many KEPT rows carry a value, how many cells
+     were not a known value, and how many of each — counts for the report, which
+     names a value only out of WORK_FIELDS' own lists. */
+  const workFields = {};
+  for (const f of WORK_FIELDS) {
+    workFields[f.role] = { index: cols[f.role], read: 0, unknown: 0, byCode: f.list.map(() => 0) };
+  }
 
   /* ── A STATUS IS A FACT ABOUT THE WORKFLOW, NOT ABOUT THE ROWS THAT LOADED ──
      Reported by Charles on 2026-09-01: a `Days in Ready for Work` column he
@@ -7175,6 +7317,17 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
        loaded; a feature nobody has finished is not a work item in progress. */
     if (!completed && !isFeature) unfinished++;
 
+    /* The work fields, read only for a KEEPER — the tallies are claims about
+       what loaded, which is the status block's rule below. */
+    const work = {};
+    for (const f of WORK_FIELDS) {
+      if (cols[f.role] < 0) continue;
+      const got = readEnum(at(cells, cols[f.role]), f.list);
+      const tally = workFields[f.role];
+      if (got.code) { tally.read++; tally.byCode[got.code]++; work[f.role] = got.code; }
+      else if (got.unknown) tally.unknown++;
+    }
+
     /* ── The stage columns, read only once the row is a KEEPER ───────────────
        Everything below this line runs after the three `return`s above, and that
        position is the whole point: both figures it produces are reports about
@@ -7290,6 +7443,8 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
        which is what keeps stageOf a two-line function with no precedence rule
        to get wrong. */
     if (statusId) out.status = statusId;
+    /* Omit-when-empty, like every optional field on a row. */
+    for (const f of WORK_FIELDS) if (work[f.role]) out[f.role] = work[f.role];
     /* The split, and the whole reason features are extracted rather than
        flagged: from this line on a feature is not in `rows`, so no item-level
        figure can see it. Throughput, cycle time, the percentile, the defect
@@ -7344,6 +7499,7 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
               which it used to report as the same thing. */
            lineCount: lines.length,
            unmatchedStatus,
+           workFields,
            /* The vocabulary this paste WOULD leave behind, and the ids it put on
               rows point into it. The caller adopts the two together or neither —
               see the note on statusList above. */
@@ -7497,6 +7653,19 @@ function buildManualRow(f, stages, isFeature, statuses) {
                    nests a feature inside another one, and offering the box would
                    invite a hierarchy the joins cannot read. */
                 parentKey: isFeature ? '' : cleanIssueKey(f.parentKey) };
+  /* The three work fields, off three selects — so a code, or nothing. A value
+     that is not one of the codes cannot come from the form, and is REFUSED
+     rather than dropped: a form is one row with somebody looking at it. */
+  for (const fld of WORK_FIELDS) {
+    const text = String(f[fld.role] == null ? '' : f[fld.role]).trim();
+    if (!text) continue;
+    const code = /^[1-9]$/.test(text) ? enumCode(Number(text), fld.list) : null;
+    if (code == null) {
+      return { error: 'That ' + fld.name + ' is not one of the values offered. Pick one from '
+        + 'the list, or leave it blank.' };
+    }
+    row[fld.role] = code;
+  }
   /* A stage says where an item IS, so it belongs only to work in flight — the
      same rule the parser applies to a Status column, stated once more here
      because this is a second door onto the same field. An id nothing answers to
@@ -9780,7 +9949,16 @@ function derive(rows, settings, view, stages, statuses) {
      open, which is what every reading at an evaluation point already said. */
   const finished = items.filter(r => arrived(r.completed));
 
-  const isUnplanned = r => String(r.type || '').trim().toLowerCase() === unplannedStr;
+  /* The one definition of a defect, with this view's team facts — see
+     countsAsDefect. No facts on the view is the definition before the switch. */
+  const supportIncidents = (view.teamFacts && view.teamFacts.incidentsAsSupport instanceof Set)
+    ? view.teamFacts.incidentsAsSupport : null;
+  const isUnplanned = r =>
+    countsAsDefect(r, unplannedStr, !(supportIncidents && supportIncidents.has(r)));
+  /* The incidents that WOULD have been defects and were counted as support
+     instead — the number a card states so the move is on the page, not hidden. */
+  const isSupportIncident = r => !!supportIncidents && supportIncidents.has(r)
+    && String(r.type || '').trim().toLowerCase() === unplannedStr;
 
   /* The window hangs off the latest date in the data, not off today: a paste of
      last quarter's export should show last quarter, not an empty chart. */
@@ -10040,6 +10218,20 @@ function derive(rows, settings, view, stages, statuses) {
      exactly the set the charts above are drawn from. */
   const windowItems = [];
   let unplannedTotal = 0;
+  let incidentsAsSupportTotal = 0;
+  /* ── The Work Mix figures (2026-09-15) ────────────────────────────────────
+     Which rows can say where they came from: the team facts' set when the view
+     carries one, and otherwise — a bare derive, a test — any row at all when
+     this list holds a ServiceNow value anywhere. */
+  const snCarriers = (view.teamFacts && view.teamFacts.carriesServiceNow instanceof Set)
+    ? view.teamFacts.carriesServiceNow : null;
+  const anySn = !snCarriers && rows.some(r => r && r.snType);
+  const snCarrier = r => (snCarriers ? snCarriers.has(r) : anySn);
+  const defectsJira = [], defectsServiceNow = [], defectsProduction = [],
+        defectsPreProduction = [], defectsFoundUnknown = [], nonDiscSeries = [];
+  let defectsJiraTotal = 0, defectsServiceNowTotal = 0, defectsProdTotal = 0,
+      defectsPreTotal = 0, defectsUnknownTotal = 0, nonDiscTotal = 0, discTotal = 0,
+      snDoneTotal = 0, carrierDoneTotal = 0;
 
   for (const ws of weekStarts) {
     const key = bucketKey(ws, bucket, weekStartsOn, cad);
@@ -10057,6 +10249,30 @@ function derive(rows, settings, view, stages, statuses) {
     const planned   = done.length - unplanned;
     unplannedRate.push(unplanned > 0 ? unplanned / (planned + unplanned) : 0);
     unplannedTotal += unplanned;
+    incidentsAsSupportTotal += done.filter(isSupportIncident).length;
+
+    /* The defects just counted, split two ways — by where they were raised
+       (only on rows that can say) and by where they were found — and every
+       completion split by Type of Work, counting only the ones that carry one.
+       A period with no Type of Work anywhere is NULL, never 0: no value is not a
+       share of nought. */
+    let dj = 0, ds = 0, dp = 0, dpp = 0, du = 0;
+    for (const r of done) {
+      if (!isUnplanned(r)) continue;
+      if (snCarrier(r)) { if (r.snType) ds++; else dj++; }
+      if (r.bugFound === 1) dp++; else if (r.bugFound === 2) dpp++; else du++;
+    }
+    defectsJira.push(dj); defectsServiceNow.push(ds);
+    defectsProduction.push(dp); defectsPreProduction.push(dpp); defectsFoundUnknown.push(du);
+    defectsJiraTotal += dj; defectsServiceNowTotal += ds;
+    defectsProdTotal += dp; defectsPreTotal += dpp; defectsUnknownTotal += du;
+    let nd = 0, disc = 0;
+    for (const r of done) {
+      if (r.workKind === 2) nd++; else if (r.workKind === 1) disc++;
+      if (snCarrier(r)) { carrierDoneTotal++; if (r.snType) snDoneTotal++; }
+    }
+    nonDiscSeries.push(nd + disc ? nd / (nd + disc) : null);
+    nonDiscTotal += nd; discTotal += disc;
 
     /* Both durations for this bucket, taken from the rows rather than from a
        map filled earlier, so the excluded set can be consulted per item. An
@@ -10674,6 +10890,17 @@ function derive(rows, settings, view, stages, statuses) {
      merely naming, after the ageing threshold above. Both are the same shape of
      exception and neither is a second set of maths: the maths did run, and what
      the unit decides is whether its answer means anything. */
+  /* The Work Mix summary. POOLED over the window — sums over sums, never a mean
+     of the periods, the aged share's rule — and null wherever there is nothing
+     to divide. The two defect splits are null over features, like the rate. */
+  const defectSource = (unit === 'features' || !(defectsJiraTotal + defectsServiceNowTotal)) ? null
+    : { jira: defectsJiraTotal, serviceNow: defectsServiceNowTotal };
+  const defectFound = (unit === 'features' || !(defectsProdTotal + defectsPreTotal)) ? null
+    : { production: defectsProdTotal, preProduction: defectsPreTotal, notRecorded: defectsUnknownTotal };
+  const productionShare = defectFound ? defectsProdTotal / (defectsProdTotal + defectsPreTotal) : null;
+  const supportShare = carrierDoneTotal ? snDoneTotal / carrierDoneTotal : null;
+  const nonDiscPooled = (nonDiscTotal + discTotal) ? nonDiscTotal / (nonDiscTotal + discTotal) : null;
+  const defectLabel = settings.unplannedLabel || 'Unplanned';
   const unplannedShare = unit === 'features' ? null
     : (completedTotal > 0 ? unplannedTotal / completedTotal : null);
 
@@ -10794,6 +11021,13 @@ function derive(rows, settings, view, stages, statuses) {
       avgThroughput: wholeThroughput.length ? mean(wholeThroughput) : null,
       avgCycleTime: windowCycles.length ? mean(windowCycles) : null,
       unplannedShare,
+      /* Defect-typed ServiceNow incidents in this window that a support team's
+         switch counted as support work — null over features, like the share. */
+      incidentsAsSupport: unit === 'features' ? null : incidentsAsSupportTotal,
+      /* The Work Mix figures — see the loop. */
+      defectSource, defectFound, productionShare, supportShare,
+      serviceNowDone: snDoneTotal, serviceNowTeamDone: carrierDoneTotal,
+      nonDiscShare: nonDiscPooled, workKindCount: nonDiscTotal + discTotal,
       netFlowTotal: netFlow.reduce((a, b) => a + b, 0),
       avgLeadTime: windowLeads.length ? mean(windowLeads) : null,
       /* Over every item in the window, not the mean of the per-bucket
@@ -10927,8 +11161,14 @@ function derive(rows, settings, view, stages, statuses) {
        — the sentence in `titles` carries the detail. Cycle time follows the
        "word to use for cycle time" setting, because that setting exists to
        rename the metric itself; the rest are the standard names. */
+    /* The Work Mix series, one value per period (2026-09-15). */
+    defectsJira, defectsServiceNow, defectsProduction, defectsPreProduction, defectsFoundUnknown,
+    nonDiscShare: nonDiscSeries,
     names: {
       defectRate: 'Defect rate',
+      defectSource: 'Where ' + defectLabel.toLowerCase() + 's came from',
+      defectFound: 'Where ' + defectLabel.toLowerCase() + 's were found',
+      workKind: 'Non-discretionary share',
       cycleTime: cycleLabel,
       throughput: 'Throughput',
       netFlow: 'Net flow',
@@ -10969,6 +11209,19 @@ function derive(rows, settings, view, stages, statuses) {
       defectRate: (settings.unplannedLabel || 'Unplanned') +
                ' Percentage Rate (Overall: ' +
                (unplannedShare == null ? '—' : (unplannedShare * 100).toFixed(2) + '%') + ')',
+      /* Each says how much of what it splits could be split, so a screenshot of a
+         patchy board does not read as a complete one. */
+      defectSource: defectLabel + 's Resolved per ' + Noun + ', by Where They Were Raised'
+        + (defectSource ? ' (' + defectSource.serviceNow + ' of '
+          + (defectSource.jira + defectSource.serviceNow) + ' From ServiceNow)' : '')
+        + (incidentsAsSupportTotal ? ' — ' + incidentsAsSupportTotal + ' Incident'
+          + (incidentsAsSupportTotal === 1 ? '' : 's') + ' Counted as Support, Not ' + defectLabel + 's' : ''),
+      defectFound: defectLabel + 's Resolved per ' + Noun + ', by Where They Were Found'
+        + (defectFound ? ' (' + (defectFound.production + defectFound.preProduction) + ' of '
+          + (defectsProdTotal + defectsPreTotal + defectsUnknownTotal) + ' Carry a Bug Type)' : ''),
+      workKind: 'Share of ' + Units + ' Completed That Were Non-Discretionary, per ' + Noun
+        + (nonDiscPooled == null ? '' : ' (Overall: ' + Math.round(nonDiscPooled * 100) + '% of '
+          + (nonDiscTotal + discTotal) + ' With a Type of Work)'),
       cycleTime: cycleLabel + ' per ' + Noun + ' — Average and '
         + CYCLE_PERCENTILE + 'th Percentile',
       throughput: Units + ' Completed per ' + Noun,
@@ -11019,6 +11272,9 @@ function derive(rows, settings, view, stages, statuses) {
       /* Deliberately short: a rotated axis title gets truncated on a narrow
          screen, and the chart title above already says the rest. */
       defectRate: 'Defect rate',
+      defectSource: defectLabel + 's resolved',
+      defectFound: defectLabel + 's resolved',
+      workKind: 'Non-discretionary share',
       cycleTime: cycleLabel + ' (' + dayNoun + ')',
       throughput: 'Count of closed ' + units + ' during ' + noun,
       netFlow: Units + ' completed − ' + units + ' started',
@@ -11076,6 +11332,51 @@ function derive(rows, settings, view, stages, statuses) {
      eight percentiles, and a "total" row built that way would be quietly wrong
      in its most-read column. Deriving over the concatenated rows gives the
      train the same treatment a team gets, from the same code. */
+/* ── ONE DEFINITION OF A DEFECT (2026-09-15) ────────────────────────────────
+   An item is a defect when its work type is the defect type in Settings — the
+   rule this app has always had — UNLESS it is a ServiceNow incident on a team
+   whose incidents are support work (`incidentsAsDefects === 0`). A support
+   team's incidents are mostly problems it solves for other teams; counted as its
+   own defects they made the team doing exactly its job read as the least
+   reliable one on the train — on the defect rate, on All Teams and on the
+   Scorecard.
+
+   NOTHING IN THE DATA SAYS WHOSE PROBLEM AN INCIDENT WAS, so the app does not
+   guess per item. The switch is the reader stating a fact about a team. Every
+   reader of "is this a defect" goes through here; a second test written inline
+   somewhere is how two screens come to disagree about one team. */
+function countsAsDefect(r, defectTypeLower, incidentsAsDefects) {
+  if (!r || String(r.type || '').trim().toLowerCase() !== defectTypeLower) return false;
+  return incidentsAsDefects !== false || r.snType !== SN_INCIDENT;
+}
+
+/* The facts about TEAMS that derive() needs and must not reach for: it takes a
+   list of rows, and a pooled list has lost which team each row came from. So the
+   answer travels as a Set of the ROW OBJECTS themselves — the way `excluded`
+   works inside derive — and identity survives everything a list goes through on
+   its way in: pooling, the work-type filter, the window, asOf and the window
+   before. Built where a view is made — deriveTrain, deriveTeams and
+   renderDashboard — and a view without it gets the definition this app had
+   before the switch existed. */
+function teamFactsOf(teams) {
+  const incidentsAsSupport = new Set();
+  /* Every row of a team whose export carries a ServiceNow Assignment Type at
+     all. On such a team a BLANK means "raised in Jira"; on a team with no such
+     column a blank says nothing, and counting it as Jira would split a defect
+     the export never described. */
+  const carriesServiceNow = new Set();
+  for (const t of (Array.isArray(teams) ? teams : [])) {
+    if (!t) continue;
+    const list = (t.rows || []).concat(t.features || []);
+    if (list.some(r => r && r.snType)) list.forEach(r => carriesServiceNow.add(r));
+    if (t.incidentsAsDefects !== 0) continue;
+    for (const r of list) {
+      if (r && r.snType === SN_INCIDENT) incidentsAsSupport.add(r);
+    }
+  }
+  return { incidentsAsSupport, carriesServiceNow };
+}
+
 /* Which of a team's two lists a run is about. PURE — it reads the view it was
    handed rather than the app's, so the same rule serves the dashboard, a shared
    link and a test, and nothing here has to reach for global state. */
@@ -11110,7 +11411,9 @@ function deriveTrain(teams, settings, view, stages, statuses) {
   const cad = sharedCadence(teams, settings);
   const v = Object.assign({}, view, {
     sprintDays: cad ? cad.days : null,
-    sprintAnchor: cad ? isoOf(cad.anchor) : ''
+    sprintAnchor: cad ? isoOf(cad.anchor) : '',
+    /* Whose incidents are support work — see teamFactsOf. */
+    teamFacts: teamFactsOf(teams)
   });
   return derive(trainRowsOf(teams, v), settings, v, stages, statuses);
 }
@@ -11192,7 +11495,10 @@ function deriveTeams(teams, settings, view, stages, statuses) {
   const pooledCad = sharedCadence(list, settings);
   view = Object.assign({}, view, {
     sprintDays: pooledCad ? pooledCad.days : null,
-    sprintAnchor: pooledCad ? isoOf(pooledCad.anchor) : ''
+    sprintAnchor: pooledCad ? isoOf(pooledCad.anchor) : '',
+    /* Built once over every team, and it serves the train AND each team's row:
+       membership is by row identity, so a team's own rows find themselves in it. */
+    teamFacts: teamFactsOf(list)
   });
   const listOf = (t) => teamListOf(t, view);
   const everything = trainRowsOf(list, view);
@@ -11382,6 +11688,9 @@ window.TD = {
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
   cleanIssueKey,
+  /* The three work fields (2026-09-15). */
+  WORK_FIELDS, SN_TYPES, SN_INCIDENT, BUG_FOUND, WORK_KINDS, readEnum, enumCode,
+  countsAsDefect, teamFactsOf,
   /* The feature layer's parse-side pieces. PROSE_HEADING and proseColumns are
      exported so the storage guard can be pinned as a RULE — "no column whose
      heading is prose may hold any role" — rather than one role at a time
@@ -12138,6 +12447,13 @@ function sanitizeTeams(teams) {
                 Number('') and Number(false) are all 0, so a hand-edited null held
                 a team OUT — the reverse of what this comment promises for junk. */
              artPredictability: (t && (t.artPredictability === 0 || t.artPredictability === '0')) ? 0 : null,
+             /* Whether this team's ServiceNow INCIDENTS count as defects. 0 is no:
+                a support team, whose incidents are problems solved for other
+                teams and count as support load instead. Anything else is yes —
+                every team saved before this field existed, and what the page did
+                before. The RAW value, never its Number(), for the reason given
+                on artPredictability just above. */
+             incidentsAsDefects: (t && (t.incidentsAsDefects === 0 || t.incidentsAsDefects === '0')) ? 0 : null,
              rows: hydrateRows(t && t.rows),
              /* Its own list, never mixed into rows — see the split in
                 parsePastedRows. Rebuilt explicitly here like everything else on
@@ -12231,7 +12547,12 @@ function hydrateRow(r) {
 
          Note what is NOT here: no label, no fallback, no repair. The words live
          in exactly one place and a row can only ever point at them. */
-      status: (r && typeof r.u === 'string' && ID_OK.test(r.u)) ? r.u : ''
+      status: (r && typeof r.u === 'string' && ID_OK.test(r.u)) ? r.u : '',
+      /* `n`, `b` and `d` on the wire — the three work fields, each a code into
+         its list in WORK_FIELDS and nothing else. See enumCode. */
+      snType: enumCode(r && r.n, SN_TYPES),
+      bugFound: enumCode(r && r.b, BUG_FOUND),
+      workKind: enumCode(r && r.d, WORK_KINDS)
     };
   }
 }
@@ -12297,6 +12618,8 @@ const serializeRows = rows => rows.map(r => {
      whose export has no Parent key column saves exactly what it saved before
      this field existed. */
   if (r.parentKey) out.p = r.parentKey;
+  /* The work fields: a code under its wire letter, and no key at all without one. */
+  for (const f of WORK_FIELDS) if (enumCode(r[f.role], f.list)) out[f.wire] = r[f.role];
   return out;
 });
 
@@ -12498,6 +12821,14 @@ function normalizeSettings(raw) {
    build reading this drops the settings pair and every team falls back to weeks,
    which is well defined but is not what the sender is looking at.
 
+   SCHEMA 20 added the three WORK FIELDS on every item and feature — `n`
+   (ServiceNow assignment type), `b` (Bug Type) and `d` (Type of Work), each a
+   small code into a fixed list — and `incidentsAsDefects` on a team, 0 for a
+   support team whose ServiceNow incidents count as support rather than as
+   defects. An older build drops the switch and puts that team's incidents back
+   into its defect rate — a different figure under the same heading — so it
+   halts rather than riding in quietly.
+
    SCHEMA 18 added the PER-TEAM SPRINT CADENCE — `sprintDays` and
    `sprintAnchor`, both unset by default and read only as a pair — and
    `artPredictability`, which is 0 for a team held out of the train's aged
@@ -12551,7 +12882,7 @@ function normalizeSettings(raw) {
    push the stripped copy back on its next edit. That build also drops this
    marker, so a document arriving without one when this device holds created
    dates is exactly that case — see tdAdopt. */
-const SCHEMA = 19;
+const SCHEMA = 20;
 
 
 /* ── The copy-from-the-future check ─────────────────────────────────────────
@@ -12610,6 +12941,9 @@ function serializeState() {
          the absence of the key, so every document written before this build
          round-trips through it byte-identically. */
       if (t.artPredictability === 0) out.artPredictability = 0;
+      /* Written only for a team whose incidents are support work — the
+         non-default answer, on the opt-out's rule just above. */
+      if (t.incidentsAsDefects === 0) out.incidentsAsDefects = 0;
       /* And the features, on the same rule once more: no `features` key at all
          until this team has one, so a browser that never sets up a feature type
          writes exactly the document it wrote before the layer existed. Written
@@ -12665,6 +12999,13 @@ const countStageDays = teams =>
 const countFeatureLinks = teams =>
   teams.reduce((n, t) => n + t.rows.filter(r => r.parentKey).length
     + (t.features ? t.features.length : 0), 0);
+
+/* The three work fields, on items and features alike. Into the prompt on the
+   re-typeability test: a column pasted per item comes back only by finding the
+   export again. The team's incidents switch stays out — it is one tick. */
+const countWorkFields = teams =>
+  teams.reduce((n, t) => n + t.rows.concat(t.features || [])
+    .filter(r => r.snType || r.bugFound || r.workKind).length, 0);
 function hydrateState(raw) {
   const arts = sanitizeArts(raw && raw.arts);
   const stages = sanitizeStages(raw && raw.stages);
@@ -13092,7 +13433,7 @@ window.tdRaisesKeyboard = raisesKeyboard;
 window.TDState = { sanitizeTeams, sanitizeArts, sanitizeStages, sanitizeStatuses,
   hydrateState, normalizeSettings,
   isBackup, ID_OK, PROTO_KEY, serializeRows, hydrateRows, hydrateRow, hydrateFeatures,
-  hydrateStageDays, mergeFeatures, countFeatureLinks, SCHEMA };
+  hydrateStageDays, mergeFeatures, countFeatureLinks, countWorkFields, SCHEMA };
 /* Click-to-copy's pure part, and the entry point the suite drives. */
 window.tdDots = { dotUnder, copyDotKey, dotTipFooter, onlyTopDot };
 /* The All Teams table's column list, for the suite. It is a pure function of a
@@ -13144,17 +13485,19 @@ window.tdAdopt = (data) => {
   const hadKeys = countKeys(state.teams);
   const hadStages = countStageDays(state.teams);
   const hadFeatures = countFeatureLinks(state.teams);
+  const hadWork = countWorkFields(state.teams);
   const incoming = hydrateState(data);
   const losingCreated = hadCreated > 0 && countCreated(incoming.teams) === 0;
   const losingKeys = hadKeys > 0 && countKeys(incoming.teams) === 0;
   const losingStages = hadStages > 0 && countStageDays(incoming.teams) === 0;
   const losingFeatures = hadFeatures > 0 && countFeatureLinks(incoming.teams) === 0;
+  const losingWork = hadWork > 0 && countWorkFields(incoming.teams) === 0;
 
-  /* ONE prompt covering all four fields, not one each. They are lost together
+  /* ONE prompt covering all five fields, not one each. They are lost together
      in the case this exists for — a build that predates any of them drops the
      lot — and four dialogs in a row for the same event is how somebody learns
      to dismiss them without reading. */
-  if (losingCreated || losingKeys || losingStages || losingFeatures) {
+  if (losingCreated || losingKeys || losingStages || losingFeatures || losingWork) {
     const stale = !(data && data.schema >= SCHEMA);
     const lost = [];
     if (losingCreated) lost.push(hadCreated + ' Created date' + (hadCreated === 1 ? '' : 's'));
@@ -13163,6 +13506,8 @@ window.tdAdopt = (data) => {
       + (hadStages === 1 ? '' : 's'));
     if (losingFeatures) lost.push('the feature breakdown on ' + hadFeatures + ' row'
       + (hadFeatures === 1 ? '' : 's'));
+    if (losingWork) lost.push('the ServiceNow, Bug Type and Type of Work values on ' + hadWork
+      + ' row' + (hadWork === 1 ? '' : 's'));
     const noun = lost.join(' and ');
     const keep = !confirm(
       'The copy you are restoring is missing what this browser has: ' + noun + '.\n\n'
@@ -14042,6 +14387,101 @@ function drawCharts(d) {
     });
   }
 
+  /* ── WORK MIX (2026-09-15): where defects came from, where they were found,
+     and how much finished work was non-discretionary ──────────────────────────
+     STACKED BARS for the two defect splits: the reading is how a period's
+     resolved defects divide, and the stack's height is the count the rate above
+     is made of. A fixed stack order, a legend, and a different FILL STRENGTH per
+     band as well as a different colour, so no band is told apart by hue alone.
+     The pack's ramp in its own order — 1, 3, 5 — as the CFD takes it. A card with
+     nothing to split says what is missing, and loses its canvas rather than
+     drawing a row of zeros that would read as a finding. */
+  const mixCard = (key, empty) => {
+    const card = $('card' + key);
+    const none = $(key.charAt(0).toLowerCase() + key.slice(1) + 'None');
+    card.querySelector('.chart-wrap').hidden = !!empty;
+    card.classList.toggle('no-chart', !!empty);
+    none.hidden = !empty;
+    none.textContent = empty || '';
+    if (empty && charts['chart' + key]) { charts['chart' + key].destroy(); delete charts['chart' + key]; }
+    return !empty;
+  };
+  const defectWord = (state.settings.unplannedLabel || 'defect').toLowerCase();
+  const notFeatureLevel = 'A ' + defectWord + ' is a kind of work item, so features have no such '
+    + 'split. Set Count back to Work items to see it.';
+  const stackOpts = (yTitle) => {
+    const o = baseOptions(yTitle, int0, null, d.axisTitles.x, d.partial);
+    o.scales.x.stacked = true;
+    o.scales.y.stacked = true;
+    o.scales.y.beginAtZero = true;
+    o.scales.y.ticks.precision = 0;
+    o.plugins.legend = { display: true, position: 'top',
+      labels: { color: token('--text-secondary'), boxWidth: 18, font: { size: fsPx('xs') } } };
+    return o;
+  };
+  const band = (label, data, colour, strength) => ({
+    label, data, backgroundColor: tint(colour, strength), borderColor: colour, borderWidth: 1.5
+  });
+  const resolvedDefects = d.unit === 'features' ? 0
+    : d.defectsProduction.concat(d.defectsPreProduction, d.defectsFoundUnknown).reduce((a, v) => a + v, 0);
+  if (mixCard('DefectSource', d.unit === 'features' ? notFeatureLevel
+      : d.summary.defectSource ? ''
+      : 'No ' + defectWord + ' finished in this window on a team whose export has a ServiceNow '
+        + 'Assignment Type column, so there is nothing to split.')) {
+    renderChart('chartDefectSource', {
+      type: 'bar',
+      data: { labels: d.bucketLabels, datasets: [
+        band('Raised in Jira', d.defectsJira, seriesMain, 0.3),
+        band('From ServiceNow', d.defectsServiceNow, token('--series-3'), 0.7)] },
+      options: stackOpts(d.axisTitles.defectSource)
+    });
+  }
+  if (mixCard('DefectFound', d.unit === 'features' ? notFeatureLevel
+      : d.summary.defectFound ? ''
+      : resolvedDefects
+        ? 'None of the ' + resolvedDefects + ' ' + defectWord + (resolvedDefects === 1 ? '' : 's')
+          + ' finished in this window carries a Bug Type.'
+        : 'No ' + defectWord + ' finished in this window.')) {
+    renderChart('chartDefectFound', {
+      type: 'bar',
+      data: { labels: d.bucketLabels, datasets: [
+        band('Production', d.defectsProduction, seriesMain, 0.3),
+        band('Pre Production', d.defectsPreProduction, token('--series-3'), 0.55),
+        band('Not recorded', d.defectsFoundUnknown, seriesAlt, 0.85)] },
+      options: stackOpts(d.axisTitles.defectFound)
+    });
+  }
+  /* A LINE, not bars: a share read at each period, beside its pooled overall
+     line — drawn flat and dashed in the second colour, and named in the legend,
+     so the title's figure is somewhere on the plot. The y axis is pinned to
+     0–100% so a quiet board reads as quiet rather than as full. */
+  if (mixCard('WorkKind', d.summary.nonDiscShare == null
+      ? 'No finished ' + d.unitOne + ' in this window carries a Type of Work.' : '')) {
+    const wkOpts = baseOptions(d.axisTitles.workKind, pct0, pct0, d.axisTitles.x, d.partial);
+    wkOpts.scales.y.min = 0;
+    wkOpts.scales.y.max = 1;
+    wkOpts.plugins.legend = { display: true, position: 'top',
+      labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
+                font: { size: fsPx('xs') }, filter: item => item.text !== 'Trend' } };
+    renderChart('chartWorkKind', {
+      type: 'line',
+      data: { labels: d.bucketLabels, datasets: [{
+        label: 'Non-discretionary',
+        data: d.nonDiscShare,
+        borderColor: seriesMain, backgroundColor: seriesMain,
+        borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false,
+        spanGaps: false, order: 1
+      }, {
+        label: 'Overall',
+        data: d.nonDiscShare.map(() => d.summary.nonDiscShare),
+        borderColor: seriesAlt, backgroundColor: seriesAlt,
+        borderWidth: 1.5, borderDash: [10, 3], pointRadius: 0, pointHitRadius: 0,
+        fill: false, tension: 0, order: 2
+      }, trendDataset(d.nonDiscShare)] },
+      options: wkOpts
+    });
+  }
+
   /* ── Cycle time per week: the average, and the percentile you forecast with ──
      The average alone invites planning around a number most work beats and a
      sixth of it misses badly. The percentile line is the promise you can
@@ -14755,7 +15195,8 @@ function drawCharts(d) {
   };
   /* Both lines, so the label reads the way the card does. */
   const label = k => d.names[k] + ' — ' + d.titles[k];
-  ['defectRate', 'cycleTime', 'throughput', 'netFlow', 'cfd', 'wip']
+  ['defectRate', 'defectSource', 'defectFound', 'workKind', 'cycleTime', 'throughput', 'netFlow',
+   'cfd', 'wip']
     .forEach(k => describe('chart' + k.charAt(0).toUpperCase() + k.slice(1), label(k)));
   /* Conditional since the feature threshold landed, like the four below it: with
      no threshold set there is no aged chart, and an aria-label describing a
@@ -15091,6 +15532,48 @@ const METRIC_HELP = {
       + 'text in Settings as ', b('a share of everything completed'), '.'],
     ['Lower is better — but ', b('a rate near zero in a maturing team'), ' usually means '
       + 'defects are being logged somewhere other than the board, not that there are none.'],
+  ] },
+  defectSource: { title: 'Where Defects Came From', body: [
+    ['The defects resolved each period, split by ', b('where they were raised'), ': in Jira, or '
+      + 'through ServiceNow \u2014 read off the export\u2019s ServiceNow Assignment Type column.'],
+    ['A blank counts as raised in Jira ', b('only on a team whose export carries that column'),
+      '. A team with no such column is left out of the split, because a blank there says nothing '
+      + 'about where the work came from.'],
+    ['On a team whose incidents are ', b('support work'), ' \u2014 set in its own Settings window '
+      + '\u2014 those incidents are not defects at all, so they are not in these bars. The title '
+      + 'counts them.'],
+  ] },
+  defectFound: { title: 'Where Defects Were Found', body: [
+    ['The same resolved defects, split by the ', b('Bug Type'), ' column: found in Production, '
+      + 'found in Pre Production, or not recorded.'],
+    ['More found before production is usually the healthier shape \u2014 ', b('an escaped defect '
+      + 'costs more'), ' than one caught in testing. A tall Not recorded band means the column is '
+      + 'not being filled in, not that nothing escaped.'],
+  ] },
+  workKind: { title: 'Non-Discretionary Share', body: [
+    ['Of the finished work that carries a ', b('Type of Work'), ', how much was Non-Discretionary '
+      + '\u2014 work the team had to do, such as regulatory, compliance or keep-the-lights-on work '
+      + '\u2014 rather than work it chose.'],
+    ['Only work with a value counts, so ', b('a patchy field'), ' is read over the part that has '
+      + 'one, and the title says how many. The overall line is pooled over the whole window, not '
+      + 'an average of the points.'],
+  ] },
+  supportShare: { title: 'From ServiceNow', body: [
+    ['The share of finished work that ', b('arrived through ServiceNow'), ' \u2014 incidents, '
+      + 'catalog and change tasks, vulnerabilities \u2014 counted only on teams whose export carries '
+      + 'that column.'],
+    ['For a support team this is its main output rather than a warning sign. The foot counts the '
+      + 'incidents a team\u2019s own switch moved out of its defect rate.'],
+  ] },
+  productionShare: { title: 'Found in Production', body: [
+    ['Of the resolved defects that carry a Bug Type, the share ', b('found in production'),
+      ' rather than before it.'],
+    ['Defects with no Bug Type are left out of the share; the chart below shows how many.'],
+  ] },
+  nonDiscShare: { title: 'Non-Discretionary', body: [
+    ['The share of finished work carrying a Type of Work that was ', b('Non-Discretionary'),
+      ', pooled over the window.'],
+    ['It is the same figure as the overall line on the chart below.'],
   ] },
   forecastFigures: { title: 'The Forecast, as Figures', body: [
     ['The same answers the two cards above draw, as a table, so they can be ',
@@ -15910,6 +16393,7 @@ function renderTeamRows() {
       bits.push('Sprint \u2014 no cadence set');
     }
     if (t.artPredictability === 0) bits.push('out of aged share');
+    if (t.incidentsAsDefects === 0) bits.push('incidents as support');
     return '<td class="setup">' + (bits.length
       ? escapeHtml(bits.join(' \u00b7 '))
       : '<span class="setup-none">&mdash;</span>') + '</td>';
@@ -16270,6 +16754,12 @@ function renderDashboard() {
          reach for `state` to find out — it takes a question, not the app. */
       sprintDays: dashCad ? dashCad.days : null,
       sprintAnchor: dashCad ? isoOf(dashCad.anchor) : '',
+      /* WHOSE INCIDENTS ARE SUPPORT WORK, off the team and resolved here, like the
+         cadence. This literal is the trap the note below describes: deriveTrain
+         and deriveTeams build the same field for the pooled pages, and a team's
+         dashboard that forgot it would count incidents its own All Teams row
+         does not. */
+      teamFacts: teamFactsOf(team ? [team] : []),
       /* The forecast's other two answers. This object is a LITERAL rather than
          the view itself — derive() takes a question, not the app's state — which
          means a field added to `view` and not added here silently never arrives.
@@ -16314,7 +16804,7 @@ function renderDashboard() {
      hidden so the reader can see what this screen is — a forecast — and so the
      tab they land on is the tab that is selected; a lone panel under no strip at
      all reads as a page that lost its navigation. */
-  ['flow', 'delivery', 'health'].forEach(g => { $('stab-' + g).hidden = planning; });
+  ['flow', 'delivery', 'health', 'mix'].forEach(g => { $('stab-' + g).hidden = planning; });
   if (planning) selectChartTab('forecast');
 
   if (!plottable) {
@@ -16595,7 +17085,14 @@ function renderDashboard() {
         : ag.median == null ? d.dayNoun + ' so far'
         : d.dayNoun + ' so far, against a median of ' + num1(ag.median)
           + ' for finished work',
-      'itemAge') +
+      'itemAge');
+
+  /* The Work Mix group's own tiles (2026-09-15): the defect rate, moved here with
+     its chart, and one figure for each of the three work fields. Each foot says
+     how much of the board the figure could read, because on a patchy export the
+     share is over the part that carries a value and nothing else. */
+  const mixDefect = (state.settings.unplannedLabel || 'Unplanned').toLowerCase();
+  $('tilesMix').innerHTML =
     /* Reads a dash over features rather than 0.00%, for the reason the card
        below it carries: a defect is a kind of work item, so the figure is not
        zero, it does not exist. A dash is what this app shows for a figure it
@@ -16609,7 +17106,24 @@ function renderDashboard() {
     tile((state.settings.unplannedLabel || 'Unplanned') + ' rate',
       s.unplannedShare == null ? '—' : pct1(s.unplannedShare),
       d.unit === 'features' ? 'not a feature-level figure' : 'share of completed work',
-      'defectRate');
+      'defectRate') +
+    tile('From ServiceNow', s.supportShare == null ? '—' : pct0(s.supportShare),
+      s.supportShare == null ? 'no ' + d.unitOne + ' here carries a ServiceNow type'
+        : s.serviceNowDone + ' of ' + s.serviceNowTeamDone + ' completed ' + d.unitMany
+          + (s.incidentsAsSupport ? '; ' + s.incidentsAsSupport + ' incident'
+            + (s.incidentsAsSupport === 1 ? '' : 's') + ' counted as support, not ' + mixDefect + 's' : ''),
+      'supportShare') +
+    tile('Found in production', s.productionShare == null ? '—' : pct0(s.productionShare),
+      d.unit === 'features' ? 'not a feature-level figure'
+        : s.productionShare == null ? 'no finished ' + mixDefect + ' carries a Bug Type'
+        : 'of ' + (s.defectFound.production + s.defectFound.preProduction) + ' ' + mixDefect
+          + (s.defectFound.production + s.defectFound.preProduction === 1 ? '' : 's') + ' with a Bug Type',
+      'productionShare') +
+    tile('Non-discretionary', s.nonDiscShare == null ? '—' : pct0(s.nonDiscShare),
+      s.nonDiscShare == null ? 'no finished ' + d.unitOne + ' carries a Type of Work'
+        : s.workKindCount + ' of ' + s.completedTotal + ' completed ' + d.unitMany
+          + ' carry a Type of Work',
+      'nonDiscShare');
 
   /* ── The forecast may be about more than this team ───────────────────────
      Everything else on this screen is the team in the picker. The forecast can
@@ -17877,6 +18391,21 @@ function teamColumns(train) {
        #allTeamsNote in renderAllTeams. */
     { key: 'defects', label: defect + ' rate', desc: true,
       get: (d) => d.summary.unplannedShare, fmt: (v) => or(v, pct1) },
+    /* NON-DISCRETIONARY (2026-09-15) — the share of a team's finished work that
+       carried a Type of Work and was Non-Discretionary, pooled over the window.
+       Beside the defect rate because both are about what KIND of work a team's
+       capacity went on. Highest first: the team with the least choice about its
+       work is the one a planning conversation starts with. A dash, never 0%, for a
+       team whose export carries no Type of Work — no value is not a share of
+       nought. NO ⓘ under the rule above: its note opens from the Non-discretionary
+       tile on the dashboard.
+       "NON-DISC. %", NOT THE WHOLE WORD, and that was measured and decided with
+       Charles: with the demo loaded the full "Non-discretionary" put this table
+       53px into a sideways scroll at a 1100px window and gave the header a third
+       line at 1265, because a header cell's min-content is its longest word.
+       "Non-disc. %" costs neither — 1030px at 1100, a 56px header at 1265. */
+    { key: 'nonDisc', label: 'Non-disc. %', desc: true,
+      get: (d) => d.summary.nonDiscShare, fmt: (v) => or(v, pct0) },
     /* Ascending on the first press: the interesting end is the OLDEST export,
        which is the earliest date, which is the opposite of every column beside
        it. Stated here rather than special-cased in the sort. */
@@ -18327,6 +18856,7 @@ function renderAllTeams() {
      — nine of them put this table into a sideways scroll. So the reasons go in
      the one line under the table, next to the columns they are about. */
   const kind = escapeHtml((state.settings.unplannedLabel || 'unplanned').toLowerCase());
+  const supportTeams = inScope.filter(t => t.incidentsAsDefects === 0).length;
   $('allTeamsNote').innerHTML =
     /* NOT outlierNote(train). Every row in this table ignores its own team's
        outliers, measured against its own spread — see the comment in
@@ -18353,6 +18883,15 @@ function renderAllTeams() {
     (train.unit === 'features'
       ? '<br>The ' + kind + ' rate is not a feature-level figure &mdash; a '
         + kind + ' is a kind of work item.'
+      : '') +
+    /* WHY ONE ROW'S RATE IS NOT EVERY BUG IT HOLDS. A support team's incidents
+       leave its defect rate (see countsAsDefect), and a reader comparing rows
+       down that column is owed the reason one of them reads low. Counted, not
+       named: the Teams window says which, and this line is about the column. */
+    (supportTeams && train.unit !== 'features'
+      ? '<br>ServiceNow incidents count as support work, not ' + kind + 's, on ' + supportTeams
+        + ' of ' + inScope.length + ' team' + (inScope.length === 1 ? '' : 's')
+        + ' &mdash; set per team in Teams &amp; Stages.'
       : '');
   $('allTeamsNote').hidden = false;
 
@@ -18606,6 +19145,12 @@ const SCORECARD_CARDS = [
     scale: 'defectShare', help: 'scDefectShare',
     name: null,   /* named off the settings label; see scorecardCardName */
     sub: () => 'of everything completed in the window',
+    /* The population qualifier the aged card has, for the Quality card's own
+       reason: on a support team, incidents are not counted as defects here. */
+    pop: (d, ctx) => (ctx && ctx.supportTeams)
+      ? 'incidents are support work on ' + ctx.supportTeams + ' of ' + ctx.scope + ' team'
+        + (ctx.scope === 1 ? '' : 's')
+      : '',
     get: (d) => d.summary.unplannedShare,
     fmt: (v) => pct1(v),
     dir: ['higher', 'lower'], moveNoun: 'points',
@@ -18994,7 +19539,10 @@ function renderScorecard() {
        card can say "across 5 of 8 teams" without counting anything itself —
        and `heldOut` separates "some are out" from "all of them are", which are
        different findings and need different sentences. */
-    scope: inScope.length, scored: rollupTeams.length, heldOut: heldOut };
+    scope: inScope.length, scored: rollupTeams.length, heldOut: heldOut,
+    /* How many teams in scope count their ServiceNow incidents as support work —
+       the Quality card states it, because its figure reads fewer bugs for them. */
+    supportTeams: inScope.filter(t => t.incidentsAsDefects === 0).length };
   /* The one sentence that says what the reader is looking at and what it does
      NOT follow. Both halves matter: three figures with no unit named is a
      scorecard nobody can argue with, and a reader arriving from the dashboard
@@ -19958,7 +20506,10 @@ wireScrollRow(document.querySelector('.tabs'), document.querySelector('.tabrow >
 const CHART_GROUPS = {
   flow:     ['chartCycleTime', 'chartCycleScatter', 'chartLeadTime', 'chartFeatureSize'],
   delivery: ['chartThroughput', 'chartNetFlow'],
-  health:   ['chartWip', 'chartAgedShare', 'chartAgedWork', 'chartItemAge', 'chartDefectRate'],
+  health:   ['chartWip', 'chartAgedShare', 'chartAgedWork', 'chartItemAge'],
+  /* What KIND of work finished (2026-09-15) — the defect rate beside its two
+     splits, and the non-discretionary share. */
+  mix:      ['chartDefectRate', 'chartDefectSource', 'chartDefectFound', 'chartWorkKind'],
   /* Forecast is last because it is the only group that says anything about the
      future: the three before it are what happened, and this is what that
      implies. It is also the only one with inputs of its own. */
@@ -21455,6 +22006,37 @@ function featuresReadHtml(res) {
   return html;
 }
 
+/* What the three work fields gave — each column named by POSITION, like every
+   column in this report, and counted. A value is named only out of WORK_FIELDS'
+   own lists, so a refused cell reaches the screen as a number and never as its
+   text. Silent for a field whose column was not found: most exports have none. */
+function workFieldsReadHtml(res) {
+  const wf = res.workFields || {};
+  let html = '';
+  for (const f of WORK_FIELDS) {
+    const t = wf[f.role];
+    if (!t || t.index < 0) continue;
+    const found = [];
+    for (let c = 1; c < f.list.length; c++) {
+      if (t.byCode[c]) found.push(escapeHtml(f.list[c]) + ' ' + t.byCode[c]);
+    }
+    html += '<br>Read <strong>column ' + (t.index + 1) + '</strong> as the ' + escapeHtml(f.name) + ': '
+      + (t.read
+        ? '<strong>' + t.read + ' row' + (t.read === 1 ? '</strong> carries' : 's</strong> carry')
+          + ' one (' + found.join(', ') + ')'
+        : 'no row carries one')
+      + '. Saved as one of ' + (f.list.length - 1) + ' fixed values, never as the text in the cell.';
+    if (t.unknown) {
+      const known = f.list.slice(1).map(escapeHtml);
+      const either = known.length === 2 ? known.join(' or ')
+        : known.slice(0, -1).join(', ') + ' or ' + known[known.length - 1];
+      html += ' <strong>' + t.unknown + ' cell' + (t.unknown === 1 ? ' was' : 's were') + ' not '
+        + either + '</strong>, so ' + (t.unknown === 1 ? 'it was' : 'they were') + ' left out.';
+    }
+  }
+  return html;
+}
+
 function columnsReadHtml(res) {
   const colName = i => (i < 0 ? 'none' : 'column ' + (i + 1));
   return '<br>Read <strong>' + colName(res.columns.completed) + '</strong> as the completed date, ' +
@@ -21490,6 +22072,7 @@ function columnsReadHtml(res) {
        was NOT read from that part of the export, because the column next to
        this one is the one people worry about. */
     featuresReadHtml(res) +
+    workFieldsReadHtml(res) +
     /* The two-column case: Created is standing in as the start date, which is
        what this app has always done with it. Lead time then equals cycle time,
        and that needs saying before someone reads it as a finding. */
@@ -22608,7 +23191,7 @@ function onAddTeam() {
   const team = { id: newId(), name: 'Team ' + (state.teams.length + 1),
                  artId: null, projectId: '', wipLimit: null, sleDays: null,
                  sprintDays: null, sprintAnchor: '', artPredictability: null,
-                 rows: [], features: [] };
+                 incidentsAsDefects: null, rows: [], features: [] };
   state.teams.push(team);
   view.activeTeamId = team.id;
   save();
@@ -22696,6 +23279,25 @@ function renderTeamDialog() {
   $('teamSprintDays').value = team.sprintDays == null ? '' : team.sprintDays;
   $('teamSprintAnchor').value = team.sprintAnchor || '';
   $('teamRollup').checked = team.artPredictability !== 0;
+  $('teamIncidents').checked = team.incidentsAsDefects !== 0;
+  /* COUNTS off this team's own lists, so a reader can see what the tick would
+     move before moving it — and a team with none is told it changes nothing yet,
+     rather than left to wonder why nothing did. */
+  const defectLower = String(state.settings.unplannedType || '').trim().toLowerCase();
+  const incidents = (team.rows || []).concat(team.features || []).filter(r => r.snType === SN_INCIDENT);
+  const incidentDefects = incidents
+    .filter(r => String(r.type || '').trim().toLowerCase() === defectLower).length;
+  const defectWord = '<strong>' + escapeHtml(state.settings.unplannedType || '') + '</strong>';
+  $('teamIncidentsHint').innerHTML = !incidents.length
+    ? 'None of this team&rsquo;s items is a ServiceNow incident, so this changes nothing yet.'
+    : incidents.length === 1
+      ? 'One of this team&rsquo;s items is a ServiceNow incident, and it '
+        + (incidentDefects ? 'is' : 'is not') + ' typed ' + defectWord
+        + ' &mdash; the work type this decides about.'
+      : '<strong>' + incidents.length + '</strong> of this team&rsquo;s items are ServiceNow '
+        + 'incidents, and <strong>' + incidentDefects + '</strong> of them '
+        + (incidentDefects === 1 ? 'is' : 'are') + ' typed ' + defectWord
+        + ' &mdash; the ones this decides about.';
 
   /* WHAT THIS TEAM IS ACTUALLY ON, said as a sentence, because the select says
      what was CHOSEN and that is not the same thing: "Our cadence" with nothing
@@ -22788,6 +23390,11 @@ $('teamDialog').addEventListener('change', e => {
   }
   if (e.target.id === 'teamRollup') {
     team.artPredictability = e.target.checked ? null : 0;
+    save();
+    return;
+  }
+  if (e.target.id === 'teamIncidents') {
+    team.incidentsAsDefects = e.target.checked ? null : 0;
     save();
     return;
   }
@@ -23796,6 +24403,19 @@ function openItemDialog(index) {
   $('itemType').value = r ? r.type : '';
   $('itemKey').value = r ? r.key : '';
 
+  /* The three work fields: options straight out of the lists the parser matches
+     against, so a typed value and a pasted one are the same code. Rebuilt every
+     open — cheap, and it keeps the markup free of a second copy of the words. */
+  const fillWork = (id, list, none, code) => {
+    $(id).innerHTML = '<option value="">' + none + '</option>'
+      + list.slice(1).map((w, i) => '<option value="' + (i + 1) + '">' + escapeHtml(w) + '</option>')
+        .join('');
+    $(id).value = code ? String(code) : '';
+  };
+  fillWork('itemSnType', SN_TYPES, 'None \u2014 raised in Jira', r && r.snType);
+  fillWork('itemBugFound', BUG_FOUND, 'Not recorded', r && r.bugFound);
+  fillWork('itemWorkKind', WORK_KINDS, 'Not recorded', r && r.workKind);
+
   /* The types already in use, offered rather than imposed: a work type is free
      text within its 40-char cap, and the whole point of the filter list in
      Settings is that a team names its own. A datalist suggests without
@@ -23890,6 +24510,9 @@ $('itemSave').addEventListener('click', () => {
     parentKey: $('itemParent').value,
     type: $('itemType').value,
     key: $('itemKey').value,
+    snType: $('itemSnType').value,
+    bugFound: $('itemBugFound').value,
+    workKind: $('itemWorkKind').value,
     /* One box, so one read, and which field it lands in is decided the same way
        the dialog decided what to draw. Sent as both rather than resolved here:
        buildManualRow owns the in-flight rule and the does-it-exist check. */
@@ -24163,6 +24786,9 @@ function buildSharePayload(teamIds, win) {
        put a team back into a figure its owner deliberately took it out of, and
        the recipient would read a number the sender never saw. */
     if (t.artPredictability === 0) out.artPredictability = 0;
+    /* And whether its ServiceNow incidents count as defects: dropping it would
+       show the recipient a different defect rate from the sender's. */
+    if (t.incidentsAsDefects === 0) out.incidentsAsDefects = 0;
     /* The features travel on exactly the argument the keys and the two targets
        travel on: they are what the shared charts are drawn from once the reader
        is looking at the feature view, and a link that dropped them would show a
@@ -24997,7 +25623,18 @@ const DEMO_TEAMS = [
 
        How many features that adds up to falls out of the quotas and this team's
        own throughput — see parentFor, which is where the arithmetic lives. */
-    featureQuotas: [6, 11, 4, 9, 14, 7, 5, 12, 8, 6, 10, 4] },
+    featureQuotas: [6, 11, 4, 9, 14, 7, 5, 12, 8, 6, 10, 4],
+    /* THE THREE WORK FIELDS (2026-09-15). This export carries all three columns,
+       mostly blank for ServiceNow — a delivery team with the odd incident — so
+       its Where Defects Came From card has both halves. Its switch is ON, so
+       those incidents stay defects. Cycled per work type in workCells, never
+       drawn from rnd(). */
+    workFields: {
+      sn: { Bug: ['', '', 'Incident'], Task: ['', '', '', 'Service Catalog Task'] },
+      bug: ['Pre Production', 'Pre Production', 'Production'],
+      kind: ['Discretionary', 'Discretionary', 'Discretionary', 'Non-Discretionary'],
+      featureKind: ['Discretionary', 'Non-Discretionary', 'Discretionary']
+    } },
   { name: 'Team Long Tail', seed: 71104, dated: true, art: true, key: 'HRN',
     weeks: 40, perWeek: [3, 6], cycle: [3, 8], tailChance: 0.18, tail: [22, 48],
     wait: [2, 9], wip: [4, 9, 13, 17, 21, 26, 31, 38, 45],
@@ -25059,7 +25696,15 @@ const DEMO_TEAMS = [
        FEWER features and each of them larger — which is what puts a real
        distance between the two boards on any feature-level figure, rather than
        leaving them differing only in the spread. */
-    featureQuotas: [9, 3, 18, 6, 26, 4, 11, 7, 21, 5, 14, 8] },
+    featureQuotas: [9, 3, 18, 6, 26, 4, 11, 7, 21, 5, 14, 8],
+    /* NO ServiceNow column at all — the face where Where Defects Came From has
+       nothing to split — while its Bug Type leaves some bugs unrecorded and its
+       Type of Work is patchy, and leans further towards work it had to do. */
+    workFields: {
+      bug: ['Production', 'Production', '', 'Pre Production'],
+      kind: ['Non-Discretionary', 'Discretionary', '', 'Non-Discretionary', 'Discretionary'],
+      featureKind: ['Non-Discretionary', 'Discretionary']
+    } },
   /* `stale` shifts every one of this team's dates back by that many days, so its
      export stops before everybody else's. Its OWN dashboard is unchanged — every
      window here hangs off the latest date in the data, so the whole picture just
@@ -25086,7 +25731,28 @@ const DEMO_TEAMS = [
     weeks: 16, perWeek: [2, 4], cycle: [2, 7], tailChance: 0.08, tail: [10, 18],
     wait: [0, 0], wip: [2, 6, 16],
     types: ['Story', 'Story', 'Story', 'Story', 'Story',
-            'Task', 'Task', 'Task', 'Spike', 'Bug'] }
+            'Task', 'Task', 'Task', 'Spike', 'Bug'] },
+  /* TEAM SUPPORT DESK (2026-09-15) — the team the incidents switch is for. Most
+     of its Bugs are ServiceNow INCIDENTS it works for other teams, so its own
+     Settings count them as support work (incidentsAsDefects: 0): its defect rate
+     drops to its own bugs, and the From ServiceNow tile states the rest. Short
+     cycle times, a Bug-heavy mix, mostly Non-Discretionary work, no train, no
+     sprints and no stages — the teams above already carry those. */
+  { name: 'Team Support Desk', seed: 4242, dated: true, key: 'SUP',
+    weeks: 16, perWeek: [5, 8], cycle: [1, 3], tailChance: 0.03, tail: [5, 9],
+    wait: [0, 2], wip: [1, 2, 4, 9],
+    incidentsAsDefects: 0,
+    types: ['Bug', 'Bug', 'Bug', 'Bug', 'Task', 'Task', 'Task', 'Story', 'Spike', 'Bug'],
+    workFields: {
+      sn: { Bug: ['Incident', 'Incident', 'Incident', ''],
+            Task: ['Service Catalog Task', 'Change Task', ''], Spike: ['Vulnerabilities'] },
+      /* THREE long, against the Bug cycle's four, and that is load-bearing: two
+         cycles of the same length line up, so every bug left a defect after the
+         switch — the fourth of each four — landed on the same Bug Type and the
+         Found in production tile read 0%. */
+      bug: ['Production', 'Pre Production', ''],
+      kind: ['Non-Discretionary', 'Non-Discretionary', 'Discretionary']
+    } }
 ];
 
 /* Built as PASTE TEXT and run through parsePastedRows(), not hand-assembled into
@@ -25229,6 +25895,26 @@ function demoPaste(profile) {
     kids.get(parent).push({ created, started, completed });
   };
 
+  /* ── The three work fields (2026-09-15) ───────────────────────────────────
+     DETERMINISTIC and never drawn from rnd(), the fourth field here to follow
+     that rule: a counter per list, so each work type walks its own cycle and
+     every pinned figure above stays exactly where it was. Written in Jira's own
+     export headings and appended after every other column, so each profile's
+     existing columns keep their positions. */
+  const wf = profile.workFields || null;
+  const wfCounts = Object.create(null);
+  const cycleOf = (name, list) => {
+    if (!list || !list.length) return '';
+    const n = wfCounts[name] || 0;
+    wfCounts[name] = n + 1;
+    return list[n % list.length];
+  };
+  const workCells = (type) => !wf ? [] : []
+    .concat(wf.sn ? [cycleOf('sn:' + type, wf.sn[type])] : [])
+    .concat(wf.bug ? [type === 'Bug' ? cycleOf('bug', wf.bug) : ''] : [])
+    .concat(wf.kind ? [type === 'Feature' ? cycleOf('kind:feature', wf.featureKind)
+                                          : cycleOf('kind', wf.kind)] : []);
+
   const row = (created, started, completed, type, span, wipIndex, parent) => {
     const cells = profile.dated ? [created, started, completed, type]
                                 : [started, completed, type];
@@ -25236,7 +25922,8 @@ function demoPaste(profile) {
     return (profile.key ? [key()].concat(cells) : cells)
       .concat(profile.featureQuotas ? [parent || ''] : [])
       .concat(status == null ? [] : [status])
-      .concat(stageCells(span)).join('\t');
+      .concat(stageCells(span))
+      .concat(workCells(type)).join('\t');
   };
 
   const lines = [((profile.key ? 'Issue key\t' : '')
@@ -25248,7 +25935,10 @@ function demoPaste(profile) {
                   + (profile.featureQuotas ? '\tParent key' : '')
                   + (profile.wipStatus ? '\tStatus' : '')
                   + (profile.stageCols
-                      ? '\t' + profile.stageCols.map(([h]) => h).join('\t') : ''))];
+                      ? '\t' + profile.stageCols.map(([h]) => h).join('\t') : '')
+                  + (wf && wf.sn ? '\tCustom field (ServiceNow Assignment Type)' : '')
+                  + (wf && wf.bug ? '\tCustom field (Bug Type)' : '')
+                  + (wf && wf.kind ? '\tCustom field (Type of Work)' : ''))];
 
   for (let w = profile.weeks; w >= 1; w--) {
     const n = between(profile.perWeek[0], profile.perWeek[1]);
@@ -25313,7 +26003,8 @@ function demoPaste(profile) {
         /* No stage day counts on a feature. Those are measured per work item by
            a Time in Status export, and a feature is not in a work item's
            workflow — an empty cell is "no figure", which is the truth. */
-        .concat(profile.stageCols ? profile.stageCols.map(() => '') : []).join('\t'));
+        .concat(profile.stageCols ? profile.stageCols.map(() => '') : [])
+        .concat(workCells('Feature')).join('\t'));
     }
   }
 
@@ -25460,14 +26151,18 @@ function demoThresholdCaveat() {
 
 function loadSample() {
   if (!confirm(
-      'Load the demo? Three teams and about nine months of work items, ending today. '
+      'Load the demo? Four teams and about nine months of work items, ending today. '
     + 'Each team is named for the one thing it shows.\n\n'
     + 'Team Healthy Flow is a healthy board. Team Long Tail is the one the metrics exist '
     + 'to catch — a long tail on cycle time, and ' + DEMO_AGED + ' items aged past the '
     + DEFAULT_SETTINGS.agedDays + '-day threshold. Team Bare Export is newer, and its '
     + 'export carries no created dates, so you can see what lead time does without them.\n\n'
     + 'Team Healthy Flow and Team Long Tail are grouped onto one Agile Release Train and '
-    + 'Team Bare Export is on none, so the All Teams view has something to group.\n\n'
+    + 'Team Bare Export and Team Support Desk are on none, so the All Teams view has something to group.\n\n'
+    + 'Team Support Desk is a support team: most of its bugs are ServiceNow incidents it works for '
+    + 'other teams, so its own settings count them as support work rather than defects. Its export '
+    + 'and Team Healthy Flow\u2019s carry a ServiceNow type, a Bug Type and a Type of Work; Team '
+    + 'Long Tail\u2019s has no ServiceNow column, so the Work Mix tab shows each face.\n\n'
     + 'Team Healthy Flow and Team Long Tail also carry stage times, so the Health tab can '
     + 'show where their time goes — Team Long Tail spends more of it queueing than '
     + 'building. Team Bare Export carries none.\n\n'
@@ -25642,6 +26337,7 @@ function loadSample() {
                       on All Teams is reachable from a fresh load. */
                    usesSprints: profile.sprints ? SPRINT_COMPANY : null,
                    artPredictability: profile.artPredictability === 0 ? 0 : null,
+                   incidentsAsDefects: profile.incidentsAsDefects === 0 ? 0 : null,
                    rows: parsed.rows,
                    /* Team Bare Export has no feature quotas and so no feature
                       rows, which is the third face again and the one that makes
@@ -25663,7 +26359,7 @@ function loadSample() {
      lives — so without this the demo loads three teams of charts behind a tab the
      reader is not looking at, and appears to have done nothing. */
   selectTab('dashboard');
-  window.toast('Demo loaded — three teams, each named for what it shows', 6000);
+  window.toast('Demo loaded — four teams, each named for what it shows', 6000);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

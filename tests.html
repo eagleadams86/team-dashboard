@@ -405,8 +405,12 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    when the one-line header and tab bar added 19 and the floor was brought up to
    the count; the same evening the controls staying beside the name, the
    keyboard reveal and the nudge's padding edge added 9 more, and the root's
-   scroll padding (a focus lands below the sticky chrome, pinned or not) 14. */
-const EXPECTED = 4121;
+   scroll padding (a focus lands below the sticky chrome, pinned or not) 14.
+   The three work fields (2026-09-15) brought it to 4163, typing them in on an
+   item to 4173, a support team's incidents switch to 4194, the Work Mix
+   section to 4225, the All Teams non-discretionary column to 4230, and Team
+   Support Desk in the demo to 4242. */
+const EXPECTED = 4242;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -2063,7 +2067,7 @@ async function run(TD, win) {
   const withG = StS.serializeRows([{ completed: D(2026, 8, 9), started: D(2026, 8, 2),
                                      created: null, type: 'Story', key: '', stages: { sb: 3 } }]);
   is(withG[0].g, { sb: 3 }, 'and a row that has them writes them');
-  ok(StS.SCHEMA === 19, 'SCHEMA was bumped in the same commit as the whitelist widening');
+  ok(StS.SCHEMA === 20, 'SCHEMA was bumped in the same commit as the whitelist widening');
 
 
   /* ══════════════════════════════════════════════════════════
@@ -3007,9 +3011,9 @@ async function run(TD, win) {
      it plots — and every name must have a help entry behind it, since the ⓘ
      that opens one sits on the name. */
   is(Object.keys(d.names).sort(),
-     ['agedShare', 'agedWork', 'cfd', 'cycleScatter', 'cycleTime', 'defectRate',
-      'forecastHowMany', 'forecastWhen', 'itemAge', 'leadTime', 'netFlow', 'stageTime',
-      'throughput', 'wip'],
+     ['agedShare', 'agedWork', 'cfd', 'cycleScatter', 'cycleTime', 'defectFound', 'defectRate',
+      'defectSource', 'forecastHowMany', 'forecastWhen', 'itemAge', 'leadTime', 'netFlow',
+      'stageTime', 'throughput', 'wip', 'workKind'],
      'every chart has a name of its own');
   ok(Object.keys(d.names).every(k => d.titles[k]),
      'and a sentence under it saying what it plots');
@@ -4583,7 +4587,7 @@ async function run(TD, win) {
   const fullWire = { c: '2015-01-21', s: '2015-01-14', t: 'Story', k: '2015-01-02' };
   is(St.serializeRows(St.hydrateRows([fullWire])), [fullWire],
      'and a row with a created date round-trips whole');
-  is(St.SCHEMA, 19, 'the schema marker is 19 — the version that moved the cadence to Settings');
+  is(St.SCHEMA, 20, 'the schema marker is 20 — the version after the one that moved the cadence to Settings');
 
 
   /* ────────────────────────────────────────────────────────── */
@@ -4949,8 +4953,8 @@ async function run(TD, win) {
     const hostile = S3.hydrateFeatures([{ k: '2026-01-03', i: 'DAE-9', t: 'Feature',
       summary: 'Customer data export', assignee: 'a name' }]);
     is(Object.keys(hostile[0]).sort(),
-       ['completed', 'created', 'key', 'parentKey', 'stage', 'stages', 'started', 'status',
-        'type'],
+       ['bugFound', 'completed', 'created', 'key', 'parentKey', 'snType', 'stage', 'stages',
+        'started', 'status', 'type', 'workKind'],
        'a feature carries the row allowlist and nothing else');
   }
 
@@ -4958,10 +4962,10 @@ async function run(TD, win) {
   group('features at the storage boundary');
   {
     const S4 = win.TDState;
-    is(S4.SCHEMA, 19, 'the feature layer took the schema to 12, the feature ageing '
+    is(S4.SCHEMA, 20, 'the feature layer took the schema to 12, the feature ageing '
        + 'threshold to 13, the status vocabulary to 14, the aged share boundaries to 15, '
        + 'the Scorecard\u2019s other four to 16, the week start to 17, the sprint '
-       + 'cadence to 18 and moving that cadence to Settings to 19');
+       + 'cadence to 18, moving that cadence to Settings to 19 and the work fields to 20');
 
     const t = S4.sanitizeTeams([{ id: 'a', name: 'X', rows: [],
       features: [{ c: '2026-01-12', s: '2026-01-06', t: 'Feature', i: 'DAE-1' }] }])[0];
@@ -5084,11 +5088,15 @@ async function run(TD, win) {
        The arithmetic returns 0 over a list of features — none of them is a Bug
        — and a 0 there is a claim of perfect quality on a board that may have
        plenty of bugs. */
+    /* `incidentsAsSupport` (2026-09-15) parts company on `unplannedShare`'s own
+       reason: it counts defects a support team's switch took out, and there is
+       no defect of a feature for it to count. */
     const dropUnit = (o) => {
-      const c = Object.assign({}, o); delete c.agedNow; delete c.unplannedShare; return c;
+      const c = Object.assign({}, o); delete c.agedNow; delete c.unplannedShare;
+      delete c.incidentsAsSupport; return c;
     };
     is(JSON.stringify(dropUnit(asFeats.summary)), JSON.stringify(dropUnit(asItems.summary)),
-       'including every summary figure but the two the unit decides');
+       'including every summary figure but the three the unit decides');
     is(asItems.summary.agedNow, 0, 'which the item view states off its own defaulted threshold');
     is(asFeats.summary.agedNow, null,
        'and the feature view leaves at null, because no feature threshold is set');
@@ -7451,7 +7459,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', artId: '"><script>', rows: [] }])[0].artId,
      null, 'a hostile pointer is dropped, not swapped for a fresh id');
   is(Object.keys(win.TDState.sanitizeTeams([{ id: 'x', name: 'X', rows: [] }])[0]).sort(),
-     ['artId', 'artPredictability', 'features', 'id', 'name', 'projectId', 'rows',
+     ['artId', 'artPredictability', 'features', 'id', 'incidentsAsDefects', 'name', 'projectId', 'rows',
       'sleDays', 'sprintAnchor', 'sprintDays', 'usesSprints', 'wipLimit'],
      'and every team carries the field, set or not');
   /* THE POINT OF THE LIST ABOVE, said as its own check: a field that is not in
@@ -9961,18 +9969,18 @@ group('ARTs — the grouping, and the boundary it crosses');
   plant({ teams: [], settings: {} });
   const demo = loadDemo();
 
-  is(demo.map(t => t.name), ['Team Healthy Flow', 'Team Long Tail', 'Team Bare Export'],
-     'three teams, so the team picker itself is visible — it hides below two');
+  is(demo.map(t => t.name), ['Team Healthy Flow', 'Team Long Tail', 'Team Bare Export', 'Team Support Desk'],
+     'four teams, so the team picker itself is visible — it hides below two');
 
   /* The sprint cadence and the aged-share opt-out reach the demo too (2026-09-15
      review) — the README's demo table said neither and no check held them. */
   const demoSettings = win.tdGet().settings;
   is(demoSettings.sprintDays, 14, 'the demo sets a 14-day company sprint cadence');
   ok(/^\d{4}-\d{2}-\d{2}$/.test(demoSettings.sprintAnchor), 'with a day to count it from', demoSettings.sprintAnchor);
-  is(demo.map(t => t.usesSprints || 0), [1, 1, 0],
+  is(demo.map(t => t.usesSprints || 0), [1, 1, 0, 0],
      'Team Healthy Flow and Team Long Tail run on it and Team Bare Export runs none, so Group by offers Sprint');
-  is(demo.map(t => t.artPredictability), [null, null, 0],
-     'and Team Bare Export is held out of the aged share, so the Scorecard reads across 2 of 3 teams');
+  is(demo.map(t => t.artPredictability), [null, null, 0, null],
+     'and Team Bare Export is held out of the aged share, so the Scorecard reads across 3 of 4 teams');
 
   /* Team Long Tail is the reason this app reads the 85th percentile rather than the
      average. If its tail is ever tidied away, the app's central argument stops
@@ -10032,7 +10040,7 @@ group('ARTs — the grouping, and the boundary it crosses');
      demoConfirmText.split('\n')[2] || demoConfirmText.slice(0, 120));
   ok(demoConfirmText.includes(longTail.agedDays + '-day threshold'),
      'and names the threshold it counted against, so the sentence stands on its own terms');
-  is(demo.map(t => t.rows.filter(r => !r.completed).length), [4, 9, 3],
+  is(demo.map(t => t.rows.filter(r => !r.completed).length), [4, 9, 3, 4],
      'every team has work in progress, so WIP and net flow are never empty');
 
   ok(longTail.summary.unplannedShare >= healthy.summary.unplannedShare * 2,
@@ -10045,9 +10053,9 @@ group('ARTs — the grouping, and the boundary it crosses');
      and teach nothing. The third sets neither, which is the state every real
      browser starts in and the only way the no-line, no-verdict face is
      reachable at all. */
-  is(demo.map(t => t.wipLimit), [6, 6, null],
-     'two teams set the same work-in-progress limit, and the third sets none');
-  is(demo.map(t => t.sleDays), [10, 10, null], 'and the same cycle time target');
+  is(demo.map(t => t.wipLimit), [6, 6, null, null],
+     'two teams set the same work-in-progress limit, and the other two set none');
+  is(demo.map(t => t.sleDays), [10, 10, null, null], 'and the same cycle time target');
   const targeted = (name) => {
     const t = demoOf(demo, name);
     return TD.derive(t.rows, win.TDState.normalizeSettings({}),
@@ -10216,7 +10224,7 @@ group('ARTs — the grouping, and the boundary it crosses');
      and matching the keys its own rows carry. Team Bare Export has neither, which is
      also the "takes nothing from a split" line the dialog has to be able to
      show. */
-  is(demo.map(t => t.projectId), ['KFR', 'HRN', ''],
+  is(demo.map(t => t.projectId), ['KFR', 'HRN', '', 'SUP'],
      'the demo teams carry the project ids their own keys are built from');
   demo.filter(t => t.projectId).forEach(t => {
     ok(t.rows.every(r => TD.projectIdOf(r.key) === t.projectId),
@@ -10227,10 +10235,11 @@ group('ARTs — the grouping, and the boundary it crosses');
      feature, reachable from Load sample data with nothing else set up. */
   const demoSplit = TD.routeRowsToTeams(
     demo.flatMap(t => t.rows), demo);
-  is(demoSplit.assigned.map(a => a.name), ['Team Healthy Flow', 'Team Long Tail'],
+  is(demoSplit.assigned.map(a => a.name), ['Team Healthy Flow', 'Team Long Tail', 'Team Support Desk'],
      'a paste holding the whole demo splits back into the teams it came from');
   is(demoSplit.assigned.map(a => a.rows.length),
-     [demoOf(demo, 'Team Healthy Flow').rows.length, demoOf(demo, 'Team Long Tail').rows.length],
+     [demoOf(demo, 'Team Healthy Flow').rows.length, demoOf(demo, 'Team Long Tail').rows.length,
+      demoOf(demo, 'Team Support Desk').rows.length],
      'every one of their rows finding its way home');
   is(demoSplit.noKey, demoOf(demo, 'Team Bare Export').rows.length,
      'while Team Bare Export\u2019s keyless rows are reported as unplaceable rather than guessed at');
@@ -10274,7 +10283,8 @@ group('ARTs — the grouping, and the boundary it crosses');
   const onArt = demo.filter(t => t.artId);
   const offArt = demo.filter(t => !t.artId);
   is(onArt.map(t => t.name), ['Team Healthy Flow', 'Team Long Tail'], 'two teams on it');
-  is(offArt.map(t => t.name), ['Team Bare Export'], 'and one on none, so both groups do something');
+  is(offArt.map(t => t.name), ['Team Bare Export', 'Team Support Desk'],
+     'and two on none, so both groups do something');
   ok(onArt.every(t => t.artId === demoArts[0].id), 'both point at the train that exists');
   /* Scoping has to change a figure, or the picker is a control that appears to
      do nothing on the one dataset anybody is shown. */
@@ -10375,7 +10385,46 @@ group('ARTs — the grouping, and the boundary it crosses');
     win.TDCleanup.outsideWindow(r, win.TDCleanup.windowCutoff(demo, keep), false)).length);
   ok(goes('3').every(n => n > 0), 'a 3-month cleanup would remove items from every team',
      JSON.stringify(goes('3')));
-  is(goes('12'), [0, 0, 0], 'and a 12-month one would remove none, so both answers are visible');
+  is(goes('12'), [0, 0, 0, 0], 'and a 12-month one would remove none, so both answers are visible');
+
+  /* ── The three work fields and the incidents switch (2026-09-15) ────────────
+     Four faces over four teams: Team Healthy Flow's defects come from both
+     places; Team Long Tail's export has no ServiceNow column, some bugs with no
+     Bug Type and more work it had to do; Team Bare Export carries none of it;
+     and Team Support Desk is the team the switch exists for. */
+  {
+    const support = demoOf(demo, 'Team Support Desk');
+    is(support.incidentsAsDefects, 0, 'Team Support Desk counts its ServiceNow incidents as support work');
+    const wfSettings = win.TDState.normalizeSettings({});
+    const wfView = { filterValue: null, months: 'all', bucket: 'week' };
+    const withFacts = (teams) => Object.assign({}, wfView, { teamFacts: TD.teamFactsOf(teams) });
+    const sdOn = TD.derive(support.rows, wfSettings,
+      withFacts([Object.assign({}, support, { incidentsAsDefects: null })]));
+    const sdOff = TD.derive(support.rows, wfSettings, withFacts([support]));
+    ok(sdOff.summary.unplannedShare < sdOn.summary.unplannedShare / 2,
+       'its switch at least halves its defect rate — the finding the switch exists for',
+       sdOff.summary.unplannedShare + ' vs ' + sdOn.summary.unplannedShare);
+    ok(sdOff.summary.incidentsAsSupport > 0, 'and says how many incidents it moved',
+       String(sdOff.summary.incidentsAsSupport));
+    ok(sdOff.summary.supportShare > 0.4, 'while much of its finished work came through ServiceNow',
+       String(sdOff.summary.supportShare));
+    const healthyTeam = demoOf(demo, 'Team Healthy Flow'), longTeam = demoOf(demo, 'Team Long Tail');
+    const hfW = TD.derive(healthyTeam.rows, wfSettings, withFacts([healthyTeam]));
+    ok(hfW.summary.defectSource && hfW.summary.defectSource.jira > 0 && hfW.summary.defectSource.serviceNow > 0,
+       'Team Healthy Flow’s defects came from both places', JSON.stringify(hfW.summary.defectSource));
+    const ltW = TD.derive(longTeam.rows, wfSettings, withFacts([longTeam]));
+    is(ltW.summary.defectSource, null,
+       'Team Long Tail’s export has no ServiceNow column, so its source card shows its empty face');
+    ok(ltW.summary.defectFound && ltW.summary.defectFound.notRecorded > 0,
+       'and some of its bugs carry no Bug Type', JSON.stringify(ltW.summary.defectFound));
+    ok(ltW.summary.nonDiscShare > hfW.summary.nonDiscShare,
+       'Team Long Tail spends more of its finished work on non-discretionary work',
+       ltW.summary.nonDiscShare + ' vs ' + hfW.summary.nonDiscShare);
+    ok((healthyTeam.features || []).some(f => f.workKind), 'a feature carries a Type of Work too');
+    const bare = demoOf(demo, 'Team Bare Export');
+    is(TD.derive(bare.rows, wfSettings, withFacts([bare])).summary.nonDiscShare, null,
+       'while Team Bare Export carries none of the three fields');
+  }
 
   /* Same numbers on every device and in every run, or the demo cannot be pinned
      here and cannot be talked through twice. */
@@ -11804,7 +11853,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   const colKeys = [...win.document.querySelectorAll('#allTeamsTable thead th')]
     .map(th => { const b = th.querySelector('[data-sort]'); return b ? b.dataset.sort : null; });
   is(colKeys, ['name', 'rate', 'trend', 'p85', 'leadP85', 'wip', 'aged', 'agedPct',
-               'defects', 'dataEnd'],
+               'defects', 'nonDisc', 'dataEnd'],
      'the table’s columns, in order — no Completed and no WIP vs month');
   ok(colKeys.indexOf('agedPct') === colKeys.indexOf('aged') + 1,
      'and the share sits beside the count it is a share OF, which is what makes both readable');
@@ -13406,7 +13455,7 @@ group('ARTs — the grouping, and the boundary it crosses');
     ok(plDoc.getElementById('dashTiles').hidden
        && plDoc.getElementById('dashEmpty').hidden,
        'the flow tiles and the paste-instructions card both stay away');
-    is(['flow', 'delivery', 'health', 'forecast']
+    is(['flow', 'delivery', 'health', 'mix', 'forecast']
          .filter(g => !plDoc.getElementById('stab-' + g).hidden), ['forecast'],
        'and the only chart group on the strip is the one that can answer');
     ok(/nothing to resample/.test(plDoc.getElementById('fcHint').textContent),
@@ -13442,9 +13491,9 @@ group('ARTs — the grouping, and the boundary it crosses');
       c: '2015-0' + (i < 9 ? '1' : '2') + '-' + String((i % 9) * 3 + 2).padStart(2, '0'),
       s: '2015-01-02', t: 'Story' })) }], settings: {} });
     win.renderAll();
-    is(['flow', 'delivery', 'health', 'forecast']
+    is(['flow', 'delivery', 'health', 'mix', 'forecast']
          .filter(g => !plDoc.getElementById('stab-' + g).hidden),
-       ['flow', 'delivery', 'health', 'forecast'],
+       ['flow', 'delivery', 'health', 'mix', 'forecast'],
        'the moment a row exists the whole dashboard is back');
     ok(!plDoc.getElementById('dashTiles').hidden, 'tiles included');
     ok(!/nothing to resample/.test(plDoc.getElementById('fcHint').textContent),
@@ -15052,8 +15101,8 @@ group('a card with no chart matches the one beside it');
        'a tablist on a page that has two still needs a name of its own',
        strip.getAttribute('aria-label'));
     is([...strip.querySelectorAll('[role="tab"]')].map(t => t.textContent.trim()),
-       ['Flow', 'Delivery', 'Health', 'Forecast'],
-       'the four it names, in the order the reader meets them');
+       ['Flow', 'Delivery', 'Health', 'Work Mix', 'Forecast'],
+       'the five it names, in the order the reader meets them');
   }
 
   /* ────────────────────────────────────────────────────────── */
@@ -17451,6 +17500,423 @@ group('a card with no chart matches the one beside it');
     frame.style.cssText = wasCss;
     await new Promise((r) => setTimeout(r, 250));
     plant({ teams: [], settings: {} });
+  }
+
+
+  /* ══════════════════════════════════════════════════════════
+     THE THREE WORK FIELDS (2026-09-15) — ServiceNow Assignment Type, Bug
+     Type and Type of Work. Stored as codes into fixed lists, read only under
+     their own anchored headings, and never allowed near the work type role.
+     ══════════════════════════════════════════════════════════ */
+  group('work fields: reading the three custom columns');
+  {
+    const T = win.TD;
+    const tab = (cells) => cells.join('\t');
+    const paste = [
+      tab(['Key', 'Custom field (ServiceNow Assignment Type)', 'Custom field (Bug Type)', 'Issue Type',
+           'Custom field (Type of Work)', 'Created', 'In Progress', 'Resolved']),
+      tab(['DAE-1', 'Incident', 'Production', 'Bug', 'Non-Discretionary', '2026-01-02', '2026-01-03', '2026-01-05']),
+      tab(['DAE-2', '', 'pre-production', 'Bug', 'discretionary', '2026-01-02', '2026-01-04', '2026-01-06']),
+      tab(['DAE-3', 'service  catalog task', '', 'Story', '', '2026-01-02', '2026-01-04', '']),
+      tab(['DAE-4', 'Customer rang about login', 'Staging', 'Story', 'Mandatory', '2026-01-02', '2026-01-04', '2026-01-07'])
+    ].join('\n');
+    const res = T.parsePastedRows(paste, 'auto', [], [], []);
+    is(res.columns.type, 3, 'Issue Type is the work type, though three headings to its left say "type"');
+    is([res.columns.snType, res.columns.bugFound, res.columns.workKind], [1, 2, 4],
+       'and each custom column is claimed by its own role');
+    is(res.rows.map(r => r.type), ['Bug', 'Bug', 'Story', 'Story'], 'so the types are the types');
+    is(res.rows.map(r => r.snType || null), [T.SN_INCIDENT, null, 3, null],
+       'ServiceNow types read whatever the case and spacing; an unknown value is dropped whole');
+    is(res.rows.map(r => r.bugFound || null), [1, 2, null, null],
+       'Bug Type reads Production and a hyphenated pre-production');
+    is(res.rows.map(r => r.workKind || null), [2, 1, null, null],
+       'Type of Work tells Non-Discretionary from Discretionary');
+    ok(res.rows.every(r => !('snType' in r) || Number.isInteger(r.snType)),
+       'a parsed row carries a code or no key at all — never the word');
+    is([res.workFields.snType.read, res.workFields.snType.unknown], [2, 1],
+       'the tally counts what was read and what was refused');
+    is([res.workFields.bugFound.unknown, res.workFields.workKind.unknown], [1, 1],
+       'for every field');
+    const html = win.columnsReadHtml(res);
+    ok(/Read <strong>column 2<\/strong> as the ServiceNow assignment type: <strong>2 rows<\/strong> carry one \(Incident 1, Service Catalog Task 1\)/.test(html),
+       'the report names the column by position and counts the values', html);
+    ok(/1 cell was not Production or Pre Production/.test(html), 'and counts a refused cell', html);
+    ok(!/Customer rang|Staging|Mandatory|Custom field/.test(html),
+       'without ever echoing the refused cell, or the heading');
+    const plain = T.parsePastedRows(tab(['Key', 'Issue Type', 'Resolved', 'In Progress']) + '\n'
+      + tab(['DAE-1', 'Bug', '2026-01-05', '2026-01-03']), 'auto', [], [], []);
+    ok(!/ServiceNow|Bug Type|Type of Work/.test(win.columnsReadHtml(plain)),
+       'and an export with none of the columns gets no line about them');
+
+    const bare = T.parsePastedRows([
+      tab(['Issue Type', 'Bug Type', 'Type of Work', 'ServiceNow Assignment Type', 'Resolved', 'In Progress']),
+      tab(['Bug', 'Production', 'Discretionary', 'Change Task', '2026-01-05', '2026-01-03'])
+    ].join('\n'), 'auto', [], [], []);
+    is([bare.columns.bugFound, bare.columns.workKind, bare.columns.snType, bare.columns.type], [1, 2, 3, 0],
+       'the bare heading form is read too');
+    is([bare.rows[0].bugFound, bare.rows[0].workKind, bare.rows[0].snType], [1, 1, 1],
+       'with its values');
+
+    const headless = T.parsePastedRows([
+      tab(['2026-01-05', '2026-01-03', 'Bug', 'Production']),
+      tab(['2026-01-06', '2026-01-04', 'Bug', 'Pre Production']),
+      tab(['2026-01-07', '2026-01-05', 'Bug', 'Production'])
+    ].join('\n'), 'auto', [], [], []);
+    is([headless.columns.bugFound, headless.columns.snType, headless.columns.workKind], [-1, -1, -1],
+       'with no heading there is no work field — a column of Production looks like a column of work types');
+    ok(headless.rows.length === 3 && headless.rows.every(r => !r.bugFound), 'so nothing is stored for one');
+
+    const feat = T.parsePastedRows([
+      tab(['Key', 'Issue Type', 'Custom field (Type of Work)', 'Created']),
+      tab(['DAE-9', 'Feature', 'Non-Discretionary', '2026-01-02'])
+    ].join('\n'), 'auto', [], ['Feature'], []);
+    is(feat.features.length ? feat.features[0].workKind : 'no feature', 2, 'a feature carries a work field too');
+
+    is([T.readEnum('  NON discretionary ', T.WORK_KINDS).code, T.readEnum('', T.WORK_KINDS),
+        T.readEnum('Non-Discretionary work', T.WORK_KINDS)],
+       [2, { code: null, unknown: false }, { code: null, unknown: true }],
+       'readEnum: spacing and case forgiven, blank is not unknown, anything more is unknown');
+  }
+
+  group('work fields: a custom heading never takes the work type, run both ways');
+  {
+    const T = win.TD;
+    const LOOSE = /(issue\s*)?type|kind|category/i;
+    const rows = [['DAE-1', 'Production', 'Bug', '2026-01-02', '2026-01-05'],
+                  ['DAE-2', 'Pre Production', 'Story', '2026-01-02', '2026-01-06']];
+    const header = ['Key', 'Custom field (Bug Type)', 'Issue Type', 'Created', 'Resolved'];
+    is(header.findIndex(h => LOOSE.test(h)), 1,
+       'without the guard, the leftmost loose type match is the Bug Type column — the fault');
+    is(T.detectColumns(rows, header, 'dmy', [], []).type, 2, 'with it, Issue Type takes the role');
+    is(T.detectColumns(rows.map(r => [r[0], r[1], r[3], r[4]]),
+                       ['Key', 'Custom field (Bug Type)', 'Created', 'Resolved'], 'dmy', [], []).type, -1,
+       'an export with no Issue Type leaves the role empty — the custom column is no stand-in, '
+       + 'and the headerless guess skips it');
+    const cat = ['Key', 'Status Category', 'Issue Type', 'Created', 'Resolved'];
+    is(cat.findIndex(h => LOOSE.test(h)), 1, 'the loose pattern alone takes Status Category too');
+    is(T.detectColumns([['DAE-1', 'Done', 'Bug', '2026-01-02', '2026-01-05']], cat, 'dmy', [], []).type, 2,
+       'and an exact Issue Type now wins over it');
+    is(T.detectColumns([['DAE-1', 'Bug', '2026-01-05']], ['Key', 'Work Type', 'Resolved'], 'dmy', [], []).type, 1,
+       'while a heading that is only loosely a type is still found when nothing exact is there');
+  }
+
+  group('work fields at the storage boundary');
+  {
+    const S = win.TDState;
+    const h = S.hydrateRow({ c: '2026-01-05', s: '2026-01-03', t: 'Bug', n: 2, b: 1, d: 2 });
+    is([h.snType, h.bugFound, h.workKind], [2, 1, 2], 'codes round-trip through the hydrate');
+    is(S.serializeRows([h])[0], { c: '2026-01-05', s: '2026-01-03', t: 'Bug', n: 2, b: 1, d: 2 },
+       'and back out under their wire letters');
+    const hostile = ['Incident', '2', 0, -1, 1.5, true, null, {}, [2], 9];
+    is(hostile.map(v => S.hydrateRow({ c: '2026-01-05', t: 'Bug', n: v, b: v, d: v }))
+         .map(r => [r.snType, r.bugFound, r.workKind]),
+       hostile.map(() => [null, null, null]),
+       'a word, a digit string, 0, a fraction, a boolean or an out-of-range code is dropped');
+    is([S.hydrateRow({ c: '2026-01-05', n: 4 }).snType, S.hydrateRow({ c: '2026-01-05', b: 3 }).bugFound,
+        S.hydrateRow({ c: '2026-01-05', d: 3 }).workKind], [4, null, null],
+       'each field is held to the length of its own list');
+    is(Object.keys(S.serializeRows([S.hydrateRow({ c: '2026-01-05', s: '2026-01-03', t: 'Story' })])[0]),
+       ['c', 's', 't'], 'a row with none of them writes none — byte-identical to before');
+    is(S.hydrateFeatures([{ k: '2026-01-02', i: 'DAE-9', t: 'Feature', d: 1 }])[0].workKind, 1,
+       'a feature crosses the same door');
+
+    is(S.sanitizeTeams([0, '0', null, '', false, 1, 'no', undefined]
+         .map((v, i) => ({ id: 'ia' + i, name: 'T', incidentsAsDefects: v })))
+         .map(t => t.incidentsAsDefects),
+       [0, 0, null, null, null, null, null, null],
+       'only a real 0 makes a team’s incidents support work — null, blank and false do not');
+    plant({ teams: [{ id: 'sw1', name: 'Support', incidentsAsDefects: 0, rows: [] },
+                    { id: 'sw2', name: 'Delivery', rows: [] }], settings: {} });
+    const saved = win.tdGet().teams;
+    is([saved[0].incidentsAsDefects, saved[1].incidentsAsDefects], [0, undefined],
+       'the switch is saved only when it is off');
+    const sp = win.TDShare.buildSharePayload(['sw1', 'sw2']).teams;
+    is([sp[0].incidentsAsDefects, sp[1].incidentsAsDefects], [0, undefined],
+       'and travels in a share link on the same rule — dropping it would show a different defect rate');
+    ok(S.SCHEMA === 20, 'SCHEMA 20, in the same commit as the whitelist');
+
+    plant({ schema: S.SCHEMA, teams: [{ id: 'wf1', name: 'Work', rows: [
+      { c: '2015-01-21', s: '2015-01-14', t: 'Bug', n: 2, b: 1, d: 2 }] }], settings: {} });
+    const asked = [];
+    const realConfirm = win.confirm;
+    win.confirm = (m) => { asked.push(m); return false; };
+    const took = win.tdAdopt({ schema: 19, teams: [{ id: 'wf1', name: 'Work', rows: [
+      { c: '2015-01-21', s: '2015-01-14', t: 'Bug' }] }], settings: {} });
+    win.confirm = realConfirm;
+    is(took, false, 'a copy without the work fields asks before it replaces one with them');
+    ok(/ServiceNow, Bug Type and Type of Work values on 1 row\b/.test(asked[0] || ''),
+       'and names what would go', String(asked[0]));
+    is(win.tdGet().teams[0].rows[0].n, 2, 'so this device keeps them on Cancel');
+    plant({ teams: [], settings: {} });
+  }
+
+  group('work fields: typed in on an item');
+  {
+    const TD = win.TD;
+    const B = (f) => TD.buildManualRow(Object.assign(
+      { started: '2026-01-19', completed: '2026-01-21', type: 'Bug' }, f), []);
+    const typed = B({ snType: '2', bugFound: '1', workKind: '2' }).row;
+    is([typed.snType, typed.bugFound, typed.workKind], [2, 1, 2], 'three selects give three codes');
+    const blank = B({ snType: '', bugFound: '', workKind: '' }).row;
+    ok(!('snType' in blank) && !('bugFound' in blank) && !('workKind' in blank),
+       'a blank select adds no key at all');
+    ok(/ServiceNow assignment type/.test(B({ snType: '9' }).error || ''),
+       'a code past the end of its list is refused, naming the field');
+    ok(B({ bugFound: 'Production' }).error, 'and so is the word itself — the form sends codes');
+    ok(B({ workKind: '0' }).error, 'and a 0');
+    is(TD.buildManualRow({ created: '2026-01-01', type: 'Feature', key: 'DAE-9', workKind: '1' }, [], true)
+         .row.workKind, 1, 'a feature takes them too');
+
+    plant({ teams: [{ id: 'wi1', name: 'Typed', rows: [
+      { c: '2026-01-21', s: '2026-01-19', t: 'Bug', i: 'DAE-1', n: 2, b: 1, d: 2 }] }], settings: {} });
+    win.renderAll();
+    const wDoc = win.document;
+    win.openItemDialog(0);
+    is([wDoc.getElementById('itemSnType').value, wDoc.getElementById('itemBugFound').value,
+        wDoc.getElementById('itemWorkKind').value], ['2', '1', '2'],
+       'the editor opens on the stored values');
+    is([...wDoc.getElementById('itemSnType').options].map(o => o.textContent),
+       ['None — raised in Jira', 'Change Task', 'Incident', 'Service Catalog Task', 'Vulnerabilities'],
+       'offering exactly the list the parser matches against');
+    wDoc.getElementById('itemWorkKind').value = '1';
+    wDoc.getElementById('itemBugFound').value = '';
+    wDoc.getElementById('itemSave').click();
+    const saved = win.tdGet().teams[0].rows[0];
+    is([saved.n, saved.b, saved.d], [2, undefined, 1],
+       'a save writes what the selects say — and a cleared one takes its value out');
+    ok(!wDoc.getElementById('itemDialog').open, 'and the dialog closes on a good save');
+    plant({ teams: [], settings: {} });
+  }
+
+  group('one definition of a defect: a support team’s ServiceNow incidents');
+  {
+    const TD = win.TD, S = win.TDState;
+    const cd = TD.countsAsDefect;
+    is([cd({ type: 'Bug' }, 'bug', true), cd({ type: ' bug ' }, 'bug', true), cd({ type: 'Story' }, 'bug', true),
+        cd({ type: 'Bug', snType: 2 }, 'bug', true), cd({ type: 'Bug', snType: 2 }, 'bug', false),
+        cd({ type: 'Bug', snType: 1 }, 'bug', false), cd({ type: 'Bug' }, 'bug', false),
+        cd({ type: 'Story', snType: 2 }, 'bug', false)],
+       [true, true, false, true, false, true, true, false],
+       'countsAsDefect: the defect type decides, and only an incident on a support team is taken out');
+
+    const row = (i, t, n) => Object.assign({ c: '2026-01-' + String(6 + (i % 10)).padStart(2, '0'),
+      s: '2026-01-05', k: '2026-01-05', t, i: 'X-' + i }, n ? { n } : {});
+    const A = [row(1, 'Bug'), row(2, 'Bug', 2)].concat([3, 4, 5, 6, 7, 8, 9, 10].map(i => row(i, 'Story')));
+    const B = [row(11, 'Bug', 2), row(12, 'Bug', 2), row(13, 'Bug', 2), row(14, 'Bug', 1), row(15, 'Story', 2)]
+      .concat([16, 17, 18, 19, 20].map(i => row(i, 'Story')));
+    /* A feature on the delivery team, so the feature-view derive below has a
+       window to read rather than the empty shape. */
+    const doc = { teams: [{ id: 'dA', name: 'Delivery', rows: A,
+                            features: [{ c: '2026-01-10', s: '2026-01-05', t: 'Feature', i: 'X-99' }] },
+                          { id: 'dB', name: 'Support', incidentsAsDefects: 0, rows: B }], settings: {} };
+    const H = S.hydrateState(doc);
+    const tA = H.teams[0], tB = H.teams[1];
+    const st = S.normalizeSettings({});
+    const vw = { months: 'all', bucket: 'week', filterValue: '', forecastMode: 'off' };
+
+    const plain = win.derive(tA.rows.concat(tB.rows), st, vw);
+    near(plain.summary.unplannedShare, 0.3, 'with no team facts on the view every Bug counts, as before the switch');
+    is(win.derive(tA.rows, st, Object.assign({}, vw, { teamFacts: TD.teamFactsOf([tA]) })).unplannedRate,
+       win.derive(tA.rows, st, vw).unplannedRate,
+       'a team whose incidents count as defects derives exactly as it always did');
+    is(TD.teamFactsOf([tA, tB]).incidentsAsSupport.size, 4,
+       'the facts hold the support team’s four incidents, bug or not, and none of the other team’s');
+
+    const train = win.deriveTrain([tA, tB], st, vw);
+    near(train.summary.unplannedShare, 0.15,
+         'pooled, the train counts the delivery team’s bugs and only the support team’s own bug');
+    is(train.summary.incidentsAsSupport, 3, 'and says how many incidents it counted as support');
+    near(win.deriveTrain([tB], st, vw).summary.unplannedShare, 0.1, 'the support team alone reads its one bug');
+    const all = win.deriveTeams([tA, tB], st, vw);
+    near(all.train.summary.unplannedShare, 0.15, 'All Teams’ train agrees with the Scorecard’s pool');
+    const rowD = (id) => {
+      const x = (all.rows || []).find(r => (r.team && r.team.id) === id || r.id === id);
+      return x ? (x.d || x.derived || x) : null;
+    };
+    near(rowD('dB') && rowD('dB').summary ? rowD('dB').summary.unplannedShare : NaN, 0.1,
+         'and the support team’s row matches its own derive');
+    near(rowD('dA') && rowD('dA').summary ? rowD('dA').summary.unplannedShare : NaN, 0.2,
+         'while the delivery team’s row keeps its incident as a defect');
+    near(win.deriveTrain([tA, tB], st, Object.assign({}, vw, { filterValue: 'Bug' })).summary.unplannedShare, 0.5,
+         'a Bug filter still takes the support team’s incidents out of the defects it keeps');
+    is(win.deriveTrain([tA, tB], st, Object.assign({}, vw, { unit: 'features' })).summary.incidentsAsSupport, null,
+       'over features the count is not a figure at all');
+
+    plant(doc);
+    win.renderAll();
+    const wDoc = win.document;
+    win.openTeamDialog('dA');
+    const tick = wDoc.getElementById('teamIncidents');
+    is(tick.checked, true, 'a team nobody ticked counts its incidents as defects');
+    is(wDoc.getElementById('teamIncidentsHint').textContent,
+       'One of this team’s items is a ServiceNow incident, and it is typed Bug — the work type this decides about.',
+       'and the window counts what the tick would move');
+    tick.checked = false;
+    tick.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.tdGet().teams[0].incidentsAsDefects, 0, 'unticking makes its incidents support work');
+    tick.checked = true;
+    tick.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.tdGet().teams[0].incidentsAsDefects, undefined, 'and ticking again writes nothing at all');
+    wDoc.getElementById('teamDialog').close();
+    await new Promise(r => setTimeout(r, 0));
+    win.openTeamDialog('dB');
+    ok(/4 of this team’s items are ServiceNow incidents, and 3 of them are typed Bug/
+         .test(wDoc.getElementById('teamIncidentsHint').textContent), 'the plural reads too',
+       wDoc.getElementById('teamIncidentsHint').textContent);
+    wDoc.getElementById('teamDialog').close();
+    await new Promise(r => setTimeout(r, 0));
+    const setups = [...wDoc.querySelectorAll('#teamRows tr td.setup')].map(td => td.textContent);
+    ok(!/incidents as support/.test(setups[0] || '') && /incidents as support/.test(setups[1] || ''),
+       'the Teams row says which team counts its incidents as support', String(setups));
+
+    const sel = wDoc.getElementById('teamSel');
+    sel.value = 'dB';
+    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const filt = wDoc.getElementById('filterSel');
+    if (filt && filt.options.length) {
+      filt.selectedIndex = 0;
+      filt.dispatchEvent(new win.Event('change', { bubbles: true }));
+    }
+    win.renderAll();
+    const defTile = [...wDoc.querySelectorAll('#dashTiles .tile, .tile')]
+      .find(t => /Defect rate/.test(t.textContent));
+    ok(defTile && /10\.0%/.test(defTile.textContent),
+       'the support team’s own dashboard reads the same 10.0% its All Teams row does',
+       defTile ? defTile.textContent : 'no tile');
+    win.selectTab('allteams');
+    ok(/ServiceNow incidents count as support work, not defects, on 1 of 2 teams/
+         .test(wDoc.getElementById('allTeamsNote').textContent),
+       'All Teams says under the table why one row reads fewer defects',
+       wDoc.getElementById('allTeamsNote').textContent);
+    win.selectTab('scorecard');
+    const cols = wDoc.getElementById('scorecardCols').textContent;
+    ok(/incidents are support work on 1 of 2 teams/.test(cols) && /15\.0%/.test(cols),
+       'and the Scorecard’s Quality card states it beside the pooled 15.0%', cols);
+    win.selectTab('dashboard');
+    plant({ teams: [], settings: {} });
+  }
+
+  group('work mix: defects by source and where found, and the non-discretionary share');
+  {
+    const TD = win.TD, S = win.TDState;
+    const st = S.normalizeSettings({});
+    const vw = { months: 'all', bucket: 'week', filterValue: '', forecastMode: 'off' };
+    const r = (c, t, extra) => Object.assign({ c, s: '2026-01-05', t }, extra || {});
+    const doc = { teams: [
+      { id: 'm1', name: 'Carrier', rows: [
+          r('2026-01-06', 'Bug', { n: 2, b: 1 }), r('2026-01-06', 'Bug', { b: 2 }), r('2026-01-07', 'Bug'),
+          r('2026-01-07', 'Story', { n: 3, d: 2 }), r('2026-01-13', 'Story', { d: 1 }),
+          r('2026-01-13', 'Story', { d: 2 }), r('2026-01-14', 'Story')],
+        features: [{ c: '2026-01-13', s: '2026-01-05', t: 'Feature', i: 'C-1', d: 2, n: 1 }] },
+      { id: 'm2', name: 'No column', rows: [r('2026-01-06', 'Bug', { b: 1 }), r('2026-01-13', 'Story')] }
+    ], settings: {} };
+    const [tC, tN] = S.hydrateState(doc).teams;
+
+    const c = win.deriveTrain([tC], st, vw);
+    is(c.summary.defectSource, { jira: 2, serviceNow: 1 },
+       'on a team whose export carries the column, a blank is Jira and a value is ServiceNow');
+    is([c.defectsJira, c.defectsServiceNow], [[2, 0], [1, 0]], 'per period too');
+    is(c.summary.defectFound, { production: 1, preProduction: 1, notRecorded: 1 },
+       'where found splits the same three defects');
+    near(c.summary.productionShare, 0.5, 'and the production share leaves the unrecorded one out');
+    near(c.summary.supportShare, 2 / 7, 'two of seven completions came through ServiceNow');
+    is(c.nonDiscShare, [1, 0.5], 'the non-discretionary share per period');
+    near(c.summary.nonDiscShare, 2 / 3, 'and pooled over the window — two of three with a value');
+    ok(Math.abs(c.summary.nonDiscShare - (1 + 0.5) / 2) > 0.05,
+       'which is NOT the mean of the points (0.75): pooled, never averaged');
+    is(c.summary.workKindCount, 3, 'counting only the work that carries a Type of Work');
+
+    const n = win.deriveTrain([tN], st, vw);
+    is([n.summary.defectSource, n.summary.supportShare, n.summary.nonDiscShare], [null, null, null],
+       'a team with no ServiceNow column and no Type of Work has no split and no share — null, not 0');
+    is(n.nonDiscShare, [null, null], 'and a period with no value is a break, not a zero');
+    near(n.summary.productionShare, 1, 'while its Bug Type still reads');
+
+    const pooled = win.deriveTrain([tC, tN], st, vw);
+    is(pooled.summary.defectSource, { jira: 2, serviceNow: 1 },
+       'pooled, the team without the column is left out of the source split');
+    near(pooled.summary.supportShare, 2 / 7, 'and out of the ServiceNow share’s denominator');
+    near(pooled.summary.productionShare, 2 / 3, 'while both teams’ Bug Types count');
+    is(win.derive(tC.rows.concat(tN.rows), st, vw).summary.defectSource, { jira: 3, serviceNow: 1 },
+       'which is what the team facts buy: without them a blank anywhere reads as Jira');
+
+    const feats = win.deriveTrain([tC, tN], st, Object.assign({}, vw, { unit: 'features' }));
+    is([feats.summary.defectSource, feats.summary.defectFound, feats.summary.productionShare],
+       [null, null, null], 'over features there is no defect split');
+    is([feats.summary.nonDiscShare, feats.summary.supportShare], [1, 1],
+       'while a feature’s Type of Work and ServiceNow type still count');
+
+    plant(doc);
+    win.renderAll();
+    const wDoc = win.document;
+    is([...wDoc.querySelectorAll('#dashSubtabs .subtab')].map(x => x.id),
+       ['stab-flow', 'stab-delivery', 'stab-health', 'stab-mix', 'stab-forecast'],
+       'Work Mix sits between Health and Forecast');
+    ok(!!wDoc.querySelector('#spanel-mix #cardDefectRate') && !wDoc.querySelector('#spanel-health #cardDefectRate'),
+       'the defect rate moved into it');
+    ok(![...wDoc.querySelectorAll('#spanel-mix .chart-card, #spanel-health .chart-card')]
+         .some(x => x.classList.contains('solo')),
+       'and both groups are even, so neither carries a solo card');
+    const sel = wDoc.getElementById('teamSel');
+    sel.value = 'm1';
+    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const filt = wDoc.getElementById('filterSel');
+    if (filt && filt.options.length) { filt.selectedIndex = 0; filt.dispatchEvent(new win.Event('change', { bubbles: true })); }
+    win.renderAll();
+    wDoc.getElementById('stab-mix').click();
+    const tiles = [...wDoc.querySelectorAll('#tilesMix .tile')];
+    is(tiles.length, 4, 'four tiles: the defect rate and one for each work field');
+    const tileVal = (re) => { const t = tiles.find(x => re.test(x.textContent)); return t ? t.querySelector('.value').textContent : 'none'; };
+    is([tileVal(/From ServiceNow/), tileVal(/Found in production/), tileVal(/Non-discretionary/)],
+       ['29%', '50%', '67%'], 'stating the same three figures the derive does');
+    const ch = win.tdCharts();
+    is(ch.chartDefectSource ? ch.chartDefectSource.data.datasets.map(x => x.label) : 'no chart',
+       ['Raised in Jira', 'From ServiceNow'], 'the source chart stacks its two bands');
+    is(ch.chartDefectFound ? ch.chartDefectFound.data.datasets.map(x => x.label) : 'no chart',
+       ['Production', 'Pre Production', 'Not recorded'], 'and the where-found chart its three');
+    ok(ch.chartWorkKind && ch.chartWorkKind.data.datasets.some(x => x.label === 'Overall'
+         && Math.abs(x.data[0] - 2 / 3) < 1e-9),
+       'the share chart draws the pooled overall line flat');
+    ok(/1 of 3 From ServiceNow/.test(wDoc.getElementById('titleDefectSource').textContent),
+       'and each title says how much could be split', wDoc.getElementById('titleDefectSource').textContent);
+
+    sel.value = 'm2';
+    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    win.renderAll();
+    ok(!wDoc.getElementById('defectSourceNone').hidden
+         && /ServiceNow Assignment Type column/.test(wDoc.getElementById('defectSourceNone').textContent),
+       'a team with no ServiceNow column gets a card that says so');
+    ok(!win.tdCharts().chartDefectSource, 'and no chart of zeros under it');
+    ok(!wDoc.getElementById('workKindNone').hidden, 'the share card says there is no Type of Work');
+    ok(wDoc.getElementById('defectFoundNone').hidden, 'while its Bug Type chart still draws');
+    wDoc.getElementById('stab-flow').click();
+    plant({ teams: [], settings: {} });
+  }
+
+  group('All Teams: the non-discretionary column');
+  {
+    const S = win.TDState;
+    const st = S.normalizeSettings({});
+    const teams = S.hydrateState({ teams: [
+      { id: 'nd1', name: 'Typed', rows: [
+        { c: '2026-01-06', s: '2026-01-05', t: 'Story', d: 2 },
+        { c: '2026-01-07', s: '2026-01-05', t: 'Story', d: 1 },
+        { c: '2026-01-08', s: '2026-01-05', t: 'Story' }] },
+      { id: 'nd2', name: 'Untyped', rows: [{ c: '2026-01-06', s: '2026-01-05', t: 'Story' }] }
+    ] }).teams;
+    const all = win.deriveTeams(teams, st, { months: 'all', bucket: 'week', forecastMode: 'off' });
+    const cols = win.tdTeamColumns(all.train);
+    const col = cols.find(c => c.key === 'nonDisc');
+    ok(!!col, 'All Teams has a non-discretionary column');
+    is(col ? [col.label, col.desc, !!col.help] : null, ['Non-disc. %', true, false],
+       'headed short enough to fit at 1100px, sorted highest first, with no ⓘ of its own');
+    const rowOf = (name) => all.rows.find(r => r.name === name);
+    is(col && rowOf('Typed') ? col.fmt(col.get(rowOf('Typed').d)) : null, '50%',
+       'a team reads the share of its work that carries a Type of Work');
+    is(col && rowOf('Untyped') ? col.fmt(col.get(rowOf('Untyped').d)) : null, '—',
+       'and a team whose export carries none reads a dash, never 0%');
+    is(cols.map(c => c.key).indexOf('nonDisc'), cols.map(c => c.key).indexOf('defects') + 1,
+       'beside the defect rate');
   }
 
   /* ────────────────────────────────────────────────────────── */
