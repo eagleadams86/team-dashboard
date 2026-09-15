@@ -17798,7 +17798,7 @@ group('a card with no chart matches the one beside it');
 
   group('work mix: defects by source and where found, and the non-discretionary share');
   {
-    const TD = win.TD, S = win.TDState;
+    const S = win.TDState;
     const st = S.normalizeSettings({});
     const vw = { months: 'all', bucket: 'week', filterValue: '', forecastMode: 'off' };
     const r = (c, t, extra) => Object.assign({ c, s: '2026-01-05', t }, extra || {});
