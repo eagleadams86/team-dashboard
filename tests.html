@@ -15261,7 +15261,12 @@ group('a card with no chart matches the one beside it');
        is the longest line the note carries and wraps once in the column beside
        the fields, so this is the worst the note gets — one line over the
        field, centred, and never a row of the strip. */
-    f = await boot([{ c: '2026-12-01', s: '2026-11-02', t: 'Feature', i: 'GP-9' }]);
+    /* Built from TODAY, never a literal (2026-09-15 review): this row was dated
+       2026-12-01, which stops being "after today" on 1 December 2026 and turns CI
+       red on an app doing nothing wrong — the f84b279 fault again. Sixty days on
+       and thirty back keep it in the future and started, in every timezone. */
+    const isoIn = (days) => new Date(Date.now() + days * 864e5).toISOString().slice(0, 10);
+    f = await boot([{ c: isoIn(60), s: isoIn(-30), t: 'Feature', i: 'GP-9' }]);
     nd = f.contentDocument; nw = f.contentWindow;
     const warn = nd.getElementById('windowNote').textContent;
     ok(/1 feature dated after today/.test(warn), 'the future-dated warning is in the note', warn);

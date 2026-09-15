@@ -4753,3 +4753,8 @@ proven red against the build before it. The reasoning sits here, per fix.
   object-valued name in a restored backup stopped the restore with no message, and the same value in
   a stored copy stopped the boot and showed no teams. `cleanName(v, fallback)` takes a string, keeps a
   finite number as its digits (what `String()` always did), and treats anything else as no name.
+- **No test pins a calendar date that today will overtake.** The window-note height check planted a
+  feature completed `2026-12-01` as "dated after today"; from 1 December 2026 it is not, and CI would
+  have gone red on a correct app — the fault `f84b279` fixed for the stale-export check. It is built
+  from `Date.now()` now. Proven by running the suite with the clock pinned to 2026-12-02 (red before,
+  green after), since a default run cannot see it.
