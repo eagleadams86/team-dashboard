@@ -471,6 +471,23 @@ html[data-pin] .pinbar {
    margin rule went with it: the two would have added together. Money Map's
    shape, to its numbers. */
 html { scroll-padding-top: var(--pin-clear, 0px); }
+/* …AND A CONTROL THAT IS ITSELF STUCK CANCELS IT (2026-09-15 review). The
+   padding reserves the top `--pin-clear` pixels of the window, and the header
+   and the stuck band sit INSIDE that strip — so Chromium and WebKit both judged
+   a control there "not in view" and scrolled the page up to reveal it, and
+   because it stays stuck the next Tab found the same thing: Shift+Tab onto the
+   theme picker from half way down the page went 700 → 211 → 0. A negative
+   margin of the same size puts such a control's own snap area back where it is
+   drawn. Only what is really stuck gets it: the header always, the tab row
+   while pinned, and the rest of the band while pinned on a WIDE window — under
+   the phone rule the band is `display: contents` and its view controls scroll
+   away under the row, and those must keep the padding (an unscoped band rule
+   put the Group by picker back behind the row). Measured with real key presses
+   in both engines: no jump, and a 300-press walk still hides nothing. */
+header *, html[data-pin] .tabrow * { scroll-margin-top: calc(0px - var(--pin-clear, 0px)); }
+@media (min-width: 721px) {
+  html[data-pin] .pinbar * { scroll-margin-top: calc(0px - var(--pin-clear, 0px)); }
+}
 /* ── A PHONE PINS THE TAB ROW AND NOTHING ELSE ──────────────────────────────
    Measured on this page rather than guessed. The band is the tab row plus the
    controls card, and the card stacks its four pickers as the window narrows:

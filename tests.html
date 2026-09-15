@@ -16196,6 +16196,34 @@ group('a card with no chart matches the one beside it');
         }
         win.scrollTo(0, 0);
       }
+      /* ── …and a control that is itself stuck does not move the page ──────
+         (2026-09-15 review). The padding reserves the strip the header and the
+         band are drawn in, so a real Tab onto a control THERE scrolled the page
+         to the top, every time. A real key press cannot be sent from here and a
+         focus() does not reproduce it, so what is held is the mechanism: a stuck
+         control's scroll margin cancels the padding exactly, and a control that
+         scrolls under the chrome keeps it. */
+      const smt = (el) => parseFloat(cs(el).scrollMarginTop) || 0;
+      const clearPx = () => parseFloat(prop('--pin-clear')) || 0;
+      const cancels = (el) => clearPx() > 0 && Math.abs(smt(el) + clearPx()) < 1;
+      const settle = () => new Promise((r) => setTimeout(r, 200));
+      await wide(1265); win.tdPin.apply(false); await settle();
+      ok(cancels(pinDoc.getElementById('themeSel')),
+         '1265px unpinned: a header control cancels the scroll padding, so tabbing onto it moves nothing',
+         smt(pinDoc.getElementById('themeSel')) + ' vs ' + clearPx());
+      is(smt(pinDoc.getElementById('bucketSel')), 0, 'while a control that scrolls with the page keeps it');
+      win.tdPin.apply(true); await settle();
+      ok(cancels(pinDoc.getElementById('pinBtn')), '1265px pinned: so does a control in the stuck band',
+         smt(pinDoc.getElementById('pinBtn')) + ' vs ' + clearPx());
+      ok(cancels(pinDoc.getElementById('bucketSel')), 'the view controls included, which are in the band');
+      await wide(375); await settle();
+      ok(cancels(pinDoc.getElementById('pinBtn')), '375px pinned: a control in the stuck tab row cancels it',
+         smt(pinDoc.getElementById('pinBtn')) + ' vs ' + clearPx());
+      is(smt(pinDoc.getElementById('bucketSel')), 0,
+         'but the Group by picker, which scrolls away under the row on a phone, keeps the padding');
+      win.tdPin.apply(false); await settle();
+      await wide(1265);
+
       const code = stripComments(APP_SRC);
       ok(/html \{ scroll-padding-top: var\(--pin-clear, 0px\); \}/.test(code),
          'the clearance is the root’s scroll padding, pinned or not');

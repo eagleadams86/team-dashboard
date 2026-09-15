@@ -782,7 +782,7 @@ Money Map's shape, and Sprint Predictability carries the identical change.
 from the top, 300 presses): hidden under the chrome before → after, unpinned:
 1280×800 36 → 0, 390×844 35 → 0, 844×390 60 → 0; pinned: 1280×800 0 → 0,
 390×844 9 → 0 (the Group by picker), 844×390 0 → 0. Nothing else reads
-`--pin-clear`. **The failure is the NO-SCROLL case**: a control already inside the
+`--pin-clear`. **A stuck control cancels the padding (2026-09-15 review)** — see the fix list at the end. **The failure is the NO-SCROLL case**: a control already inside the
 window but under the bar is "in view" to the browser, so stepping up onto it
 scrolls nothing; one wholly outside the window is CENTRED by `focus()` and by a
 real Shift+Tab alike, so a test that scrolls its target far above the window
@@ -4778,3 +4778,16 @@ proven red against the build before it. The reasoning sits here, per fix.
   already refused it through `PROTO_KEY`, and `sanitizeTeams`/`sanitizeArts` did not. No plain
   object is keyed by either id today (`groupTeamsByArt` uses a Map), so nothing was reachable — the
   four boundaries now agree, so the next object keyed by an id cannot inherit the gap.
+- **A stuck control cancels the scroll padding.** `html { scroll-padding-top: var(--pin-clear) }`
+  (2026-09-14) reserves the strip the header and the stuck band are drawn in, so both engines judged
+  a control THERE out of view and scrolled the page up on a real Tab — and it stayed stuck, so the
+  next press did it again: Shift+Tab from half way down went 700 → 211 → 0 at 1280, pinned or not.
+  `header *`, `html[data-pin] .tabrow *` and, above 720px only, `html[data-pin] .pinbar *` take
+  `scroll-margin-top: calc(0px - var(--pin-clear))`, which puts a stuck control's snap area back where
+  it is drawn. The width scope is load-bearing: under the phone rule the band is `display: contents`
+  and its view controls scroll away under the row, and an unscoped rule put the Group by picker back
+  behind it. A `focus()` does not reproduce the jump, so the suite pins the margins (cancelling
+  exactly on stuck controls, 0 on the rest); the jump itself was measured with real key presses in
+  Chromium and WebKit before and after, and a 300-press Shift+Tab walk still hides nothing.
+  **Sprint Velocity and Money Map carry the same padding rule and were not touched** — they were
+  being changed by another session; the same three lines belong in both.
