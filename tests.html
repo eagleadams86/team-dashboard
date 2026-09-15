@@ -6180,6 +6180,7 @@ async function run(TD, win) {
   is(spPlainT.artPredictability, undefined, 'and a team that is in the roll-up writes nothing either');
   is(spCad.v, 1, 'SHARE_PAYLOAD_V is NOT bumped — an older build drops the fields and draws weeks');
 
+
   /* A link carries only the trains its own teams are actually on. Sharing one
      team should not publish the names of every train someone supports — a link
      is the one place this app's data leaves the browser, and an ART name is the
@@ -6539,6 +6540,15 @@ const stripComments = (src) => {
   const SW_SRC = await swRes.text();
   const KILL_SRC = await killRes.text();
   const APP_SRC = await appRes.text();
+
+  /* A share link copies a team's ART pointer only when the ART is in the state
+     it is built from (2026-09-15 review). PINNED AS SOURCE because no door can
+     put a dangling pointer into live state — plant() and every boundary prune
+     it — so the guard is defence in depth, and its comment's promise is what
+     is being held. */
+  ok(/if \(t\.artId && \(state\.arts \|\| \[\]\)\.some\(a => a\.id === t\.artId\)\) out\.artId = t\.artId;/
+       .test(stripComments(APP_SRC)),
+     'buildSharePayload copies an artId only when state.arts names it');
   const SW = stripComments(SW_SRC);
 
   const shellMatch = SW_SRC.match(/const SHELL = \[([\s\S]*?)\]/);

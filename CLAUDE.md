@@ -4769,3 +4769,8 @@ proven red against the build before it. The reasoning sits here, per fix.
   through `cleanWorkType` (dropped whole), and the defect box's `maxlength` is 40. A pre-select
   custom word of 40 or fewer is still kept, as the existing "never re-cased" check requires.
   `unplannedLabel` keeps 120: it is a label the reader types, like a team name.
+- **A share link carries only train pointers it can explain.** `buildSharePayload` copied any
+  `artId` through, while the comment on its ART list promised a dangling one is dropped. Unreachable
+  from the UI (deleting an ART and `hydrateState` both clear the pointer) and harmless on arrival
+  (the recipient nulls it), but a link now copies an `artId` only when `state.arts` names it.
+  Pinned as SOURCE: no door can put a dangling pointer into live state, so no behaviour test can.

@@ -23986,7 +23986,11 @@ function buildSharePayload(teamIds, win) {
         ? t.rows.filter(r => !outsideWindow(r, cutoff, !!(win && win.wip)))
         : t.rows)
     };
-    if (t.artId) out.artId = t.artId;
+    /* Only a pointer at a train this payload can name (2026-09-15 review) — the
+       comment on the ARTs below promises a dangling one is dropped, and it was
+       copied through; the recipient's hydrateState nulled it, so nothing showed,
+       but a link should not carry an id it cannot explain. */
+    if (t.artId && (state.arts || []).some(a => a.id === t.artId)) out.artId = t.artId;
     /* The limit and the target DO travel, where the project id deliberately
        does not, and the two are not inconsistent: a project id is a routing
        rule for a paste box the recipient does not have, where these two are
