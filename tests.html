@@ -9913,6 +9913,16 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(demo.map(t => t.name), ['Team Healthy Flow', 'Team Long Tail', 'Team Bare Export'],
      'three teams, so the team picker itself is visible — it hides below two');
 
+  /* The sprint cadence and the aged-share opt-out reach the demo too (2026-09-15
+     review) — the README's demo table said neither and no check held them. */
+  const demoSettings = win.tdGet().settings;
+  is(demoSettings.sprintDays, 14, 'the demo sets a 14-day company sprint cadence');
+  ok(/^\d{4}-\d{2}-\d{2}$/.test(demoSettings.sprintAnchor), 'with a day to count it from', demoSettings.sprintAnchor);
+  is(demo.map(t => t.usesSprints || 0), [1, 1, 0],
+     'Team Healthy Flow and Team Long Tail run on it and Team Bare Export runs none, so Group by offers Sprint');
+  is(demo.map(t => t.artPredictability), [null, null, 0],
+     'and Team Bare Export is held out of the aged share, so the Scorecard reads across 2 of 3 teams');
+
   /* Team Long Tail is the reason this app reads the 85th percentile rather than the
      average. If its tail is ever tidied away, the app's central argument stops
      being demonstrable on the one screen anybody is shown. */

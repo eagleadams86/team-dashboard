@@ -4826,3 +4826,7 @@ proven red against the build before it. The reasoning sits here, per fix.
   through `syncAddFoot`'s default, against "measure it, never copy it". In the same 734px dialog the
   ARTs section crosses at **11** (690px at 10, 749px at 11) and the filter list at **13** (731px at 12,
   779px at 13): `ADD_FOOT_FROM_ARTS` and `ADD_FOOT_FROM_FILTERS`, pinned at the number and one below.
+- **The demo's sprint cadence and aged-share opt-out are in its table and its tests.** `loadSample`
+  sets a 14-day company cadence with two teams on it and holds Team Bare Export out of the aged share,
+  and the README's demo table — which says every demo finding is listed and pinned — mentioned
+  neither. Both rows now do, and the demo group pins the settings, the two modes and the opt-out.
