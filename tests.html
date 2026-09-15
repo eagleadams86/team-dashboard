@@ -4750,6 +4750,27 @@ async function run(TD, win) {
   is(win.itemsInWindow({ windowItemCount: 67, itemCount: 190, unitOne: 'item', unitMany: 'items' }),
      '67 of 190 items', 'and items in the item view, as it always has');
   is(win.itemsInWindow({ itemCount: 3 }), '3 items', 'an empty shape with no unit words still reads items');
+
+  /* A hand-edited saved view keeps only values of the right SHAPE (2026-09-15
+     review) — the loop in loadView wrote any string back into sixteen keys. */
+  {
+    const savedView = win.localStorage.getItem('td-view');
+    win.localStorage.setItem('td-view', JSON.stringify({ bucket: '<img src=x>', teamSortDir: 'sideways',
+      forecastScope: '"><b>', countFrom: 'yesterday', scenario: { growthLo: 10, junk: 'x' }, planSizeOn: 'yes',
+      activeTeamId: { a: 1 }, forecastDate: 'soon', teamSort: 'agedPct', chartTab: 'health' }));
+    try {
+      win.tdView.reload();
+      const lv = win.tdView.now();
+      is([lv.bucket, lv.teamSortDir, lv.forecastScope, lv.countFrom, lv.planSizeOn, lv.activeTeamId, lv.forecastDate],
+         ['week', 'desc', '', 'data', false, null, ''], 'junk in a saved view falls back to each key’s default');
+      is([lv.teamSort, lv.chartTab], ['agedPct', 'health'], 'while well-shaped values are kept as they were');
+      is(lv.scenario && [lv.scenario.junk, lv.scenario.growthLo], [undefined, 10],
+         'and its scenario keeps only the keys the app knows');
+    } finally {
+      if (savedView == null) win.localStorage.removeItem('td-view'); else win.localStorage.setItem('td-view', savedView);
+      win.tdView.reload();
+    }
+  }
   /* Held out of the aged share is a 0 and nothing that merely coerces to one —
      Number(null), Number('') and Number(false) are all 0 (2026-09-15 review). */
   is(S.sanitizeTeams([null, '', false, 'yes', undefined].map((v, i) =>
@@ -5522,6 +5543,9 @@ async function run(TD, win) {
     is(TD.scenarioAssumptions(TD.scenarioFrom(null)), [],
        'and a default scenario makes no claims');
     is(TD.scenarioFrom(null), TD.DEFAULT_SCENARIO, 'null normalises to the defaults');
+    is(TD.scenarioFrom({ growthLo: 5, extra: '<b>' }).extra, undefined,
+       'a scenario key the app does not know is dropped, not carried (2026-09-15 review)');
+    is(TD.scenarioFrom({ growthLo: 5 }).growthLo, 5, 'while a known one is kept');
 
     /* THE no-op guarantee, and it is kept by DISPATCH rather than by aligned
        streams. The scoped samplers draw more per trial than the originals — a

@@ -4845,3 +4845,9 @@ proven red against the build before it. The reasoning sits here, per fix.
   The walk now runs to the end (`AXIS_WALK_GUARD` only stops one that cannot finish), the oldest past
   `AXIS_MAX_BUCKETS` are dropped, and `startDate` moves to the first period kept, so the window note
   describes what is drawn. A one-day cadence stays legal — the suite pins it as a real answer.
+- **The saved view takes a shape on the way in, and a scenario only its own keys.** `loadView` wrote any
+  string back into sixteen keys, "validated at point of use" — which held, nothing hostile ever rendered
+  — but the junk sat in storage for ever, and `scenarioFrom` carried any extra key from a share link.
+  Each view key now has a shape check falling back to its default (a word, an id, an ISO day, a boolean,
+  a direction); only shape, so a saved `'sprint'` or a sort on a hidden column is still kept and still
+  judged where it is used. `sprintDays`/`sprintAnchor` are cleared, being questions, not preferences.

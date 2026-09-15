@@ -8179,7 +8179,11 @@ const DEFAULT_SCENARIO = { growthLo: 0, growthHi: 0, extraLo: 0, extraHi: 0,
 /* Read out of `view`, where a hand-edited copy can say anything, and pinned to
    something sane at the point of use like every other view field. */
 function scenarioFrom(raw) {
-  const s = Object.assign({}, DEFAULT_SCENARIO, (raw && typeof raw === 'object') ? raw : {});
+  /* Only the keys DEFAULT_SCENARIO names (2026-09-15 review): Object.assign carried
+     any extra key from a share link or a hand-edited view straight through. */
+  const src = (raw && typeof raw === 'object') ? raw : {};
+  const s = Object.assign({}, DEFAULT_SCENARIO);
+  for (const k of Object.keys(DEFAULT_SCENARIO)) if (Object.prototype.hasOwnProperty.call(src, k)) s[k] = src[k];
   const pct = (v) => {
     const n = Number(v);
     return Number.isFinite(n) ? Math.max(0, Math.min(SCOPE_GROWTH_MAX, n)) : 0;
@@ -12937,6 +12941,31 @@ function loadView() {
     ? [...new Set(view.artFilter.filter(id => id === ART_NONE
         || (typeof id === 'string' && ID_OK.test(id))))]
     : [];
+  /* EVERY OTHER VALUE TAKES A SHAPE ON THE WAY IN (2026-09-15 review). They were
+     "validated at their point of use", which held — nothing a hostile value
+     reached ever rendered — but the loop above wrote any string straight back
+     into sixteen keys, so junk sat in storage for ever and every new reader of
+     the view had to know it might. Only the SHAPE is checked here: a saved
+     'sprint' bucket or a sort on a column nobody can see today is kept, because
+     whether it can be honoured is still decided where it is used. */
+  const shaped = (k, ok) => { if (!ok(view[k])) view[k] = DEFAULT_VIEW[k]; };
+  const word = (v) => typeof v === 'string' && /^[a-z]{1,20}$/.test(v);
+  shaped('filterDisplay', v => typeof v === 'string' && v.length <= 120);
+  shaped('activeTeamId', v => v === null || (typeof v === 'string' && ID_OK.test(v)));
+  shaped('chartTab', word); shaped('bucket', word); shaped('activeTab', word);
+  shaped('forecastItems', v => Number.isFinite(Number(v)) && Number(v) > 0 && typeof v !== 'boolean');
+  shaped('forecastDate', v => v === '' || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)));
+  shaped('planSizeLo', v => typeof v === 'number' && Number.isFinite(v) && v >= 0);
+  shaped('planSizeHi', v => typeof v === 'number' && Number.isFinite(v) && v >= 0);
+  for (const k of ['planSizeOn', 'scenarioOpen', 'planning']) shaped(k, v => v === true || v === false);
+  for (const k of ['teamSort', 'dataSort']) shaped(k, v => v === null || (typeof v === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(v)));
+  for (const k of ['teamSortDir', 'dataSortDir']) shaped(k, v => v === 'asc' || v === 'desc');
+  shaped('forecastScope', v => typeof v === 'string' && (v === '' || /^~[a-z]{1,12}$/.test(v) || ID_OK.test(v)));
+  shaped('countFrom', v => v === 'data' || v === 'today');
+  /* Not preferences — put on the view by whoever builds a question for derive(). */
+  view.sprintDays = null; view.sprintAnchor = '';
+  view.scenario = (view.scenario && typeof view.scenario === 'object' && !Array.isArray(view.scenario))
+    ? scenarioFrom(view.scenario) : null;
 }
 
 /* Both writers are view-mode chokepoints: in a shared view the state in memory
