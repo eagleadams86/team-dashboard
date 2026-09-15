@@ -407,8 +407,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    keyboard reveal and the nudge's padding edge added 9 more, and the root's
    scroll padding (a focus lands below the sticky chrome, pinned or not) 14.
    The three work fields (2026-09-15) brought it to 4163, typing them in on an
-   item to 4173, and a support team's incidents switch to 4194. */
-const EXPECTED = 4194;
+   item to 4173, a support team's incidents switch to 4194, and the Work Mix
+   section to 4225. */
+const EXPECTED = 4225;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3009,9 +3010,9 @@ async function run(TD, win) {
      it plots — and every name must have a help entry behind it, since the ⓘ
      that opens one sits on the name. */
   is(Object.keys(d.names).sort(),
-     ['agedShare', 'agedWork', 'cfd', 'cycleScatter', 'cycleTime', 'defectRate',
-      'forecastHowMany', 'forecastWhen', 'itemAge', 'leadTime', 'netFlow', 'stageTime',
-      'throughput', 'wip'],
+     ['agedShare', 'agedWork', 'cfd', 'cycleScatter', 'cycleTime', 'defectFound', 'defectRate',
+      'defectSource', 'forecastHowMany', 'forecastWhen', 'itemAge', 'leadTime', 'netFlow',
+      'stageTime', 'throughput', 'wip', 'workKind'],
      'every chart has a name of its own');
   ok(Object.keys(d.names).every(k => d.titles[k]),
      'and a sentence under it saying what it plots');
@@ -13412,7 +13413,7 @@ group('ARTs — the grouping, and the boundary it crosses');
     ok(plDoc.getElementById('dashTiles').hidden
        && plDoc.getElementById('dashEmpty').hidden,
        'the flow tiles and the paste-instructions card both stay away');
-    is(['flow', 'delivery', 'health', 'forecast']
+    is(['flow', 'delivery', 'health', 'mix', 'forecast']
          .filter(g => !plDoc.getElementById('stab-' + g).hidden), ['forecast'],
        'and the only chart group on the strip is the one that can answer');
     ok(/nothing to resample/.test(plDoc.getElementById('fcHint').textContent),
@@ -13448,9 +13449,9 @@ group('ARTs — the grouping, and the boundary it crosses');
       c: '2015-0' + (i < 9 ? '1' : '2') + '-' + String((i % 9) * 3 + 2).padStart(2, '0'),
       s: '2015-01-02', t: 'Story' })) }], settings: {} });
     win.renderAll();
-    is(['flow', 'delivery', 'health', 'forecast']
+    is(['flow', 'delivery', 'health', 'mix', 'forecast']
          .filter(g => !plDoc.getElementById('stab-' + g).hidden),
-       ['flow', 'delivery', 'health', 'forecast'],
+       ['flow', 'delivery', 'health', 'mix', 'forecast'],
        'the moment a row exists the whole dashboard is back');
     ok(!plDoc.getElementById('dashTiles').hidden, 'tiles included');
     ok(!/nothing to resample/.test(plDoc.getElementById('fcHint').textContent),
@@ -15058,8 +15059,8 @@ group('a card with no chart matches the one beside it');
        'a tablist on a page that has two still needs a name of its own',
        strip.getAttribute('aria-label'));
     is([...strip.querySelectorAll('[role="tab"]')].map(t => t.textContent.trim()),
-       ['Flow', 'Delivery', 'Health', 'Forecast'],
-       'the four it names, in the order the reader meets them');
+       ['Flow', 'Delivery', 'Health', 'Work Mix', 'Forecast'],
+       'the five it names, in the order the reader meets them');
   }
 
   /* ────────────────────────────────────────────────────────── */
@@ -17750,6 +17751,103 @@ group('a card with no chart matches the one beside it');
     ok(/incidents are support work on 1 of 2 teams/.test(cols) && /15\.0%/.test(cols),
        'and the Scorecard’s Quality card states it beside the pooled 15.0%', cols);
     win.selectTab('dashboard');
+    plant({ teams: [], settings: {} });
+  }
+
+  group('work mix: defects by source and where found, and the non-discretionary share');
+  {
+    const TD = win.TD, S = win.TDState;
+    const st = S.normalizeSettings({});
+    const vw = { months: 'all', bucket: 'week', filterValue: '', forecastMode: 'off' };
+    const r = (c, t, extra) => Object.assign({ c, s: '2026-01-05', t }, extra || {});
+    const doc = { teams: [
+      { id: 'm1', name: 'Carrier', rows: [
+          r('2026-01-06', 'Bug', { n: 2, b: 1 }), r('2026-01-06', 'Bug', { b: 2 }), r('2026-01-07', 'Bug'),
+          r('2026-01-07', 'Story', { n: 3, d: 2 }), r('2026-01-13', 'Story', { d: 1 }),
+          r('2026-01-13', 'Story', { d: 2 }), r('2026-01-14', 'Story')],
+        features: [{ c: '2026-01-13', s: '2026-01-05', t: 'Feature', i: 'C-1', d: 2, n: 1 }] },
+      { id: 'm2', name: 'No column', rows: [r('2026-01-06', 'Bug', { b: 1 }), r('2026-01-13', 'Story')] }
+    ], settings: {} };
+    const [tC, tN] = S.hydrateState(doc).teams;
+
+    const c = win.deriveTrain([tC], st, vw);
+    is(c.summary.defectSource, { jira: 2, serviceNow: 1 },
+       'on a team whose export carries the column, a blank is Jira and a value is ServiceNow');
+    is([c.defectsJira, c.defectsServiceNow], [[2, 0], [1, 0]], 'per period too');
+    is(c.summary.defectFound, { production: 1, preProduction: 1, notRecorded: 1 },
+       'where found splits the same three defects');
+    near(c.summary.productionShare, 0.5, 'and the production share leaves the unrecorded one out');
+    near(c.summary.supportShare, 2 / 7, 'two of seven completions came through ServiceNow');
+    is(c.nonDiscShare, [1, 0.5], 'the non-discretionary share per period');
+    near(c.summary.nonDiscShare, 2 / 3, 'and pooled over the window — two of three with a value');
+    ok(Math.abs(c.summary.nonDiscShare - (1 + 0.5) / 2) > 0.05,
+       'which is NOT the mean of the points (0.75): pooled, never averaged');
+    is(c.summary.workKindCount, 3, 'counting only the work that carries a Type of Work');
+
+    const n = win.deriveTrain([tN], st, vw);
+    is([n.summary.defectSource, n.summary.supportShare, n.summary.nonDiscShare], [null, null, null],
+       'a team with no ServiceNow column and no Type of Work has no split and no share — null, not 0');
+    is(n.nonDiscShare, [null, null], 'and a period with no value is a break, not a zero');
+    near(n.summary.productionShare, 1, 'while its Bug Type still reads');
+
+    const pooled = win.deriveTrain([tC, tN], st, vw);
+    is(pooled.summary.defectSource, { jira: 2, serviceNow: 1 },
+       'pooled, the team without the column is left out of the source split');
+    near(pooled.summary.supportShare, 2 / 7, 'and out of the ServiceNow share’s denominator');
+    near(pooled.summary.productionShare, 2 / 3, 'while both teams’ Bug Types count');
+    is(win.derive(tC.rows.concat(tN.rows), st, vw).summary.defectSource, { jira: 3, serviceNow: 1 },
+       'which is what the team facts buy: without them a blank anywhere reads as Jira');
+
+    const feats = win.deriveTrain([tC, tN], st, Object.assign({}, vw, { unit: 'features' }));
+    is([feats.summary.defectSource, feats.summary.defectFound, feats.summary.productionShare],
+       [null, null, null], 'over features there is no defect split');
+    is([feats.summary.nonDiscShare, feats.summary.supportShare], [1, 1],
+       'while a feature’s Type of Work and ServiceNow type still count');
+
+    plant(doc);
+    win.renderAll();
+    const wDoc = win.document;
+    is([...wDoc.querySelectorAll('#dashSubtabs .subtab')].map(x => x.id),
+       ['stab-flow', 'stab-delivery', 'stab-health', 'stab-mix', 'stab-forecast'],
+       'Work Mix sits between Health and Forecast');
+    ok(!!wDoc.querySelector('#spanel-mix #cardDefectRate') && !wDoc.querySelector('#spanel-health #cardDefectRate'),
+       'the defect rate moved into it');
+    ok(![...wDoc.querySelectorAll('#spanel-mix .chart-card, #spanel-health .chart-card')]
+         .some(x => x.classList.contains('solo')),
+       'and both groups are even, so neither carries a solo card');
+    const sel = wDoc.getElementById('teamSel');
+    sel.value = 'm1';
+    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const filt = wDoc.getElementById('filterSel');
+    if (filt && filt.options.length) { filt.selectedIndex = 0; filt.dispatchEvent(new win.Event('change', { bubbles: true })); }
+    win.renderAll();
+    wDoc.getElementById('stab-mix').click();
+    const tiles = [...wDoc.querySelectorAll('#tilesMix .tile')];
+    is(tiles.length, 4, 'four tiles: the defect rate and one for each work field');
+    const tileVal = (re) => { const t = tiles.find(x => re.test(x.textContent)); return t ? t.querySelector('.value').textContent : 'none'; };
+    is([tileVal(/From ServiceNow/), tileVal(/Found in production/), tileVal(/Non-discretionary/)],
+       ['29%', '50%', '67%'], 'stating the same three figures the derive does');
+    const ch = win.tdCharts();
+    is(ch.chartDefectSource ? ch.chartDefectSource.data.datasets.map(x => x.label) : 'no chart',
+       ['Raised in Jira', 'From ServiceNow'], 'the source chart stacks its two bands');
+    is(ch.chartDefectFound ? ch.chartDefectFound.data.datasets.map(x => x.label) : 'no chart',
+       ['Production', 'Pre Production', 'Not recorded'], 'and the where-found chart its three');
+    ok(ch.chartWorkKind && ch.chartWorkKind.data.datasets.some(x => x.label === 'Overall'
+         && Math.abs(x.data[0] - 2 / 3) < 1e-9),
+       'the share chart draws the pooled overall line flat');
+    ok(/1 of 3 From ServiceNow/.test(wDoc.getElementById('titleDefectSource').textContent),
+       'and each title says how much could be split', wDoc.getElementById('titleDefectSource').textContent);
+
+    sel.value = 'm2';
+    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    win.renderAll();
+    ok(!wDoc.getElementById('defectSourceNone').hidden
+         && /ServiceNow Assignment Type column/.test(wDoc.getElementById('defectSourceNone').textContent),
+       'a team with no ServiceNow column gets a card that says so');
+    ok(!win.tdCharts().chartDefectSource, 'and no chart of zeros under it');
+    ok(!wDoc.getElementById('workKindNone').hidden, 'the share card says there is no Type of Work');
+    ok(wDoc.getElementById('defectFoundNone').hidden, 'while its Bug Type chart still draws');
+    wDoc.getElementById('stab-flow').click();
     plant({ teams: [], settings: {} });
   }
 

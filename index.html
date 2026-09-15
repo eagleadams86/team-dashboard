@@ -3192,6 +3192,8 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         aria-selected="false" tabindex="-1">Delivery</button>
       <button class="subtab" role="tab" id="stab-health" aria-controls="spanel-health"
         aria-selected="false" tabindex="-1">Health</button>
+      <button class="subtab" role="tab" id="stab-mix" aria-controls="spanel-mix"
+        aria-selected="false" tabindex="-1">Work Mix</button>
       <button class="subtab" role="tab" id="stab-forecast" aria-controls="spanel-forecast"
         aria-selected="false" tabindex="-1">Forecast</button>
     </div>
@@ -3343,23 +3345,6 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           <div class="note info" id="itemAgeNone" hidden></div>
         </div>
 
-        <!-- It gained an id and an empty face when the feature view landed: a
-             defect is a kind of WORK ITEM, so over features this chart plots a
-             flat zero for every period — a claim of perfect quality, which is
-             the most misleading thing it could possibly say. The card explains
-             itself rather than disappearing, which is the rule the lead time
-             card already follows: the answer to "where did the defect rate go?"
-             belongs on screen. -->
-        <!-- `solo`, and it has had the class before: it lost it when Health went
-             from three charts to four, and the aged share taking it to five is
-             the odd group the class was kept for. -->
-        <div class="chart-card solo" id="cardDefectRate">
-          <div class="chart-name" id="nameDefectRate"></div>
-          <div class="chart-title" id="titleDefectRate"></div>
-          <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
-          <div class="note info" id="defectRateNone" hidden></div>
-        </div>
-
         <!-- The only card in the app that is a TABLE rather than a chart, and it
              is one on purpose: five stages is five numbers, a bar chart of five
              numbers says less than the numbers do, and a table is the one thing
@@ -3412,6 +3397,50 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
            putting them up there would have every other tab carrying a pair of
            boxes that did nothing to it. They still read from the strip: team,
            work type, window and grouping all feed the sample this deals from. -->
+      <!-- WORK MIX (2026-09-15): what KIND of work finished. The defect rate moved
+           here from Health so it sits beside the two splits of the same defects,
+           and Health went back to its four flow-health charts — both groups even,
+           so no card in either needs `solo`. Every card here says what is missing
+           when an export does not carry the column it splits by. -->
+      <div class="grid charts" id="spanel-mix" role="tabpanel" aria-labelledby="stab-mix" hidden>
+        <div class="tiles group" id="tilesMix"></div>
+
+        <!-- It gained an id and an empty face when the feature view landed: a
+             defect is a kind of WORK ITEM, so over features this chart plots a
+             flat zero for every period — a claim of perfect quality, which is
+             the most misleading thing it could possibly say. The card explains
+             itself rather than disappearing, which is the rule the lead time
+             card already follows: the answer to "where did the defect rate go?"
+             belongs on screen. -->
+        <div class="chart-card" id="cardDefectRate">
+          <div class="chart-name" id="nameDefectRate"></div>
+          <div class="chart-title" id="titleDefectRate"></div>
+          <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
+          <div class="note info" id="defectRateNone" hidden></div>
+        </div>
+
+        <div class="chart-card" id="cardDefectSource">
+          <div class="chart-name" id="nameDefectSource"></div>
+          <div class="chart-title" id="titleDefectSource"></div>
+          <div class="chart-wrap"><canvas id="chartDefectSource"></canvas></div>
+          <div class="note info" id="defectSourceNone" hidden></div>
+        </div>
+
+        <div class="chart-card" id="cardDefectFound">
+          <div class="chart-name" id="nameDefectFound"></div>
+          <div class="chart-title" id="titleDefectFound"></div>
+          <div class="chart-wrap"><canvas id="chartDefectFound"></canvas></div>
+          <div class="note info" id="defectFoundNone" hidden></div>
+        </div>
+
+        <div class="chart-card" id="cardWorkKind">
+          <div class="chart-name" id="nameWorkKind"></div>
+          <div class="chart-title" id="titleWorkKind"></div>
+          <div class="chart-wrap"><canvas id="chartWorkKind"></canvas></div>
+          <div class="note info" id="workKindNone" hidden></div>
+        </div>
+      </div>
+
       <div class="grid charts" id="spanel-forecast" role="tabpanel" aria-labelledby="stab-forecast" hidden>
         <div class="forecast-ask">
           <!-- WHOSE pace is being dealt from. Its own control here rather than
@@ -10190,6 +10219,19 @@ function derive(rows, settings, view, stages, statuses) {
   const windowItems = [];
   let unplannedTotal = 0;
   let incidentsAsSupportTotal = 0;
+  /* ── The Work Mix figures (2026-09-15) ────────────────────────────────────
+     Which rows can say where they came from: the team facts' set when the view
+     carries one, and otherwise — a bare derive, a test — any row at all when
+     this list holds a ServiceNow value anywhere. */
+  const snCarriers = (view.teamFacts && view.teamFacts.carriesServiceNow instanceof Set)
+    ? view.teamFacts.carriesServiceNow : null;
+  const anySn = !snCarriers && rows.some(r => r && r.snType);
+  const snCarrier = r => (snCarriers ? snCarriers.has(r) : anySn);
+  const defectsJira = [], defectsServiceNow = [], defectsProduction = [],
+        defectsPreProduction = [], defectsFoundUnknown = [], nonDiscSeries = [];
+  let defectsJiraTotal = 0, defectsServiceNowTotal = 0, defectsProdTotal = 0,
+      defectsPreTotal = 0, defectsUnknownTotal = 0, nonDiscTotal = 0, discTotal = 0,
+      snDoneTotal = 0, carrierDoneTotal = 0;
 
   for (const ws of weekStarts) {
     const key = bucketKey(ws, bucket, weekStartsOn, cad);
@@ -10208,6 +10250,29 @@ function derive(rows, settings, view, stages, statuses) {
     unplannedRate.push(unplanned > 0 ? unplanned / (planned + unplanned) : 0);
     unplannedTotal += unplanned;
     incidentsAsSupportTotal += done.filter(isSupportIncident).length;
+
+    /* The defects just counted, split two ways — by where they were raised
+       (only on rows that can say) and by where they were found — and every
+       completion split by Type of Work, counting only the ones that carry one.
+       A period with no Type of Work anywhere is NULL, never 0: no value is not a
+       share of nought. */
+    let dj = 0, ds = 0, dp = 0, dpp = 0, du = 0;
+    for (const r of done) {
+      if (!isUnplanned(r)) continue;
+      if (snCarrier(r)) { if (r.snType) ds++; else dj++; }
+      if (r.bugFound === 1) dp++; else if (r.bugFound === 2) dpp++; else du++;
+    }
+    defectsJira.push(dj); defectsServiceNow.push(ds);
+    defectsProduction.push(dp); defectsPreProduction.push(dpp); defectsFoundUnknown.push(du);
+    defectsJiraTotal += dj; defectsServiceNowTotal += ds;
+    defectsProdTotal += dp; defectsPreTotal += dpp; defectsUnknownTotal += du;
+    let nd = 0, disc = 0;
+    for (const r of done) {
+      if (r.workKind === 2) nd++; else if (r.workKind === 1) disc++;
+      if (snCarrier(r)) { carrierDoneTotal++; if (r.snType) snDoneTotal++; }
+    }
+    nonDiscSeries.push(nd + disc ? nd / (nd + disc) : null);
+    nonDiscTotal += nd; discTotal += disc;
 
     /* Both durations for this bucket, taken from the rows rather than from a
        map filled earlier, so the excluded set can be consulted per item. An
@@ -10825,6 +10890,17 @@ function derive(rows, settings, view, stages, statuses) {
      merely naming, after the ageing threshold above. Both are the same shape of
      exception and neither is a second set of maths: the maths did run, and what
      the unit decides is whether its answer means anything. */
+  /* The Work Mix summary. POOLED over the window — sums over sums, never a mean
+     of the periods, the aged share's rule — and null wherever there is nothing
+     to divide. The two defect splits are null over features, like the rate. */
+  const defectSource = (unit === 'features' || !(defectsJiraTotal + defectsServiceNowTotal)) ? null
+    : { jira: defectsJiraTotal, serviceNow: defectsServiceNowTotal };
+  const defectFound = (unit === 'features' || !(defectsProdTotal + defectsPreTotal)) ? null
+    : { production: defectsProdTotal, preProduction: defectsPreTotal, notRecorded: defectsUnknownTotal };
+  const productionShare = defectFound ? defectsProdTotal / (defectsProdTotal + defectsPreTotal) : null;
+  const supportShare = carrierDoneTotal ? snDoneTotal / carrierDoneTotal : null;
+  const nonDiscPooled = (nonDiscTotal + discTotal) ? nonDiscTotal / (nonDiscTotal + discTotal) : null;
+  const defectLabel = settings.unplannedLabel || 'Unplanned';
   const unplannedShare = unit === 'features' ? null
     : (completedTotal > 0 ? unplannedTotal / completedTotal : null);
 
@@ -10948,6 +11024,10 @@ function derive(rows, settings, view, stages, statuses) {
       /* Defect-typed ServiceNow incidents in this window that a support team's
          switch counted as support work — null over features, like the share. */
       incidentsAsSupport: unit === 'features' ? null : incidentsAsSupportTotal,
+      /* The Work Mix figures — see the loop. */
+      defectSource, defectFound, productionShare, supportShare,
+      serviceNowDone: snDoneTotal, serviceNowTeamDone: carrierDoneTotal,
+      nonDiscShare: nonDiscPooled, workKindCount: nonDiscTotal + discTotal,
       netFlowTotal: netFlow.reduce((a, b) => a + b, 0),
       avgLeadTime: windowLeads.length ? mean(windowLeads) : null,
       /* Over every item in the window, not the mean of the per-bucket
@@ -11081,8 +11161,14 @@ function derive(rows, settings, view, stages, statuses) {
        — the sentence in `titles` carries the detail. Cycle time follows the
        "word to use for cycle time" setting, because that setting exists to
        rename the metric itself; the rest are the standard names. */
+    /* The Work Mix series, one value per period (2026-09-15). */
+    defectsJira, defectsServiceNow, defectsProduction, defectsPreProduction, defectsFoundUnknown,
+    nonDiscShare: nonDiscSeries,
     names: {
       defectRate: 'Defect rate',
+      defectSource: 'Where ' + defectLabel.toLowerCase() + 's came from',
+      defectFound: 'Where ' + defectLabel.toLowerCase() + 's were found',
+      workKind: 'Non-discretionary share',
       cycleTime: cycleLabel,
       throughput: 'Throughput',
       netFlow: 'Net flow',
@@ -11123,6 +11209,19 @@ function derive(rows, settings, view, stages, statuses) {
       defectRate: (settings.unplannedLabel || 'Unplanned') +
                ' Percentage Rate (Overall: ' +
                (unplannedShare == null ? '—' : (unplannedShare * 100).toFixed(2) + '%') + ')',
+      /* Each says how much of what it splits could be split, so a screenshot of a
+         patchy board does not read as a complete one. */
+      defectSource: defectLabel + 's Resolved per ' + Noun + ', by Where They Were Raised'
+        + (defectSource ? ' (' + defectSource.serviceNow + ' of '
+          + (defectSource.jira + defectSource.serviceNow) + ' From ServiceNow)' : '')
+        + (incidentsAsSupportTotal ? ' — ' + incidentsAsSupportTotal + ' Incident'
+          + (incidentsAsSupportTotal === 1 ? '' : 's') + ' Counted as Support, Not ' + defectLabel + 's' : ''),
+      defectFound: defectLabel + 's Resolved per ' + Noun + ', by Where They Were Found'
+        + (defectFound ? ' (' + (defectFound.production + defectFound.preProduction) + ' of '
+          + (defectsProdTotal + defectsPreTotal + defectsUnknownTotal) + ' Carry a Bug Type)' : ''),
+      workKind: 'Share of ' + Units + ' Completed That Were Non-Discretionary, per ' + Noun
+        + (nonDiscPooled == null ? '' : ' (Overall: ' + Math.round(nonDiscPooled * 100) + '% of '
+          + (nonDiscTotal + discTotal) + ' With a Type of Work)'),
       cycleTime: cycleLabel + ' per ' + Noun + ' — Average and '
         + CYCLE_PERCENTILE + 'th Percentile',
       throughput: Units + ' Completed per ' + Noun,
@@ -11173,6 +11272,9 @@ function derive(rows, settings, view, stages, statuses) {
       /* Deliberately short: a rotated axis title gets truncated on a narrow
          screen, and the chart title above already says the rest. */
       defectRate: 'Defect rate',
+      defectSource: defectLabel + 's resolved',
+      defectFound: defectLabel + 's resolved',
+      workKind: 'Non-discretionary share',
       cycleTime: cycleLabel + ' (' + dayNoun + ')',
       throughput: 'Count of closed ' + units + ' during ' + noun,
       netFlow: Units + ' completed − ' + units + ' started',
@@ -11258,13 +11360,21 @@ function countsAsDefect(r, defectTypeLower, incidentsAsDefects) {
    before the switch existed. */
 function teamFactsOf(teams) {
   const incidentsAsSupport = new Set();
+  /* Every row of a team whose export carries a ServiceNow Assignment Type at
+     all. On such a team a BLANK means "raised in Jira"; on a team with no such
+     column a blank says nothing, and counting it as Jira would split a defect
+     the export never described. */
+  const carriesServiceNow = new Set();
   for (const t of (Array.isArray(teams) ? teams : [])) {
-    if (!t || t.incidentsAsDefects !== 0) continue;
-    for (const r of (t.rows || []).concat(t.features || [])) {
+    if (!t) continue;
+    const list = (t.rows || []).concat(t.features || []);
+    if (list.some(r => r && r.snType)) list.forEach(r => carriesServiceNow.add(r));
+    if (t.incidentsAsDefects !== 0) continue;
+    for (const r of list) {
       if (r && r.snType === SN_INCIDENT) incidentsAsSupport.add(r);
     }
   }
-  return { incidentsAsSupport };
+  return { incidentsAsSupport, carriesServiceNow };
 }
 
 /* Which of a team's two lists a run is about. PURE — it reads the view it was
@@ -14277,6 +14387,101 @@ function drawCharts(d) {
     });
   }
 
+  /* ── WORK MIX (2026-09-15): where defects came from, where they were found,
+     and how much finished work was non-discretionary ──────────────────────────
+     STACKED BARS for the two defect splits: the reading is how a period's
+     resolved defects divide, and the stack's height is the count the rate above
+     is made of. A fixed stack order, a legend, and a different FILL STRENGTH per
+     band as well as a different colour, so no band is told apart by hue alone.
+     The pack's ramp in its own order — 1, 3, 5 — as the CFD takes it. A card with
+     nothing to split says what is missing, and loses its canvas rather than
+     drawing a row of zeros that would read as a finding. */
+  const mixCard = (key, empty) => {
+    const card = $('card' + key);
+    const none = $(key.charAt(0).toLowerCase() + key.slice(1) + 'None');
+    card.querySelector('.chart-wrap').hidden = !!empty;
+    card.classList.toggle('no-chart', !!empty);
+    none.hidden = !empty;
+    none.textContent = empty || '';
+    if (empty && charts['chart' + key]) { charts['chart' + key].destroy(); delete charts['chart' + key]; }
+    return !empty;
+  };
+  const defectWord = (state.settings.unplannedLabel || 'defect').toLowerCase();
+  const notFeatureLevel = 'A ' + defectWord + ' is a kind of work item, so features have no such '
+    + 'split. Set Count back to Work items to see it.';
+  const stackOpts = (yTitle) => {
+    const o = baseOptions(yTitle, int0, null, d.axisTitles.x, d.partial);
+    o.scales.x.stacked = true;
+    o.scales.y.stacked = true;
+    o.scales.y.beginAtZero = true;
+    o.scales.y.ticks.precision = 0;
+    o.plugins.legend = { display: true, position: 'top',
+      labels: { color: token('--text-secondary'), boxWidth: 18, font: { size: fsPx('xs') } } };
+    return o;
+  };
+  const band = (label, data, colour, strength) => ({
+    label, data, backgroundColor: tint(colour, strength), borderColor: colour, borderWidth: 1.5
+  });
+  const resolvedDefects = d.unit === 'features' ? 0
+    : d.defectsProduction.concat(d.defectsPreProduction, d.defectsFoundUnknown).reduce((a, v) => a + v, 0);
+  if (mixCard('DefectSource', d.unit === 'features' ? notFeatureLevel
+      : d.summary.defectSource ? ''
+      : 'No ' + defectWord + ' finished in this window on a team whose export has a ServiceNow '
+        + 'Assignment Type column, so there is nothing to split.')) {
+    renderChart('chartDefectSource', {
+      type: 'bar',
+      data: { labels: d.bucketLabels, datasets: [
+        band('Raised in Jira', d.defectsJira, seriesMain, 0.3),
+        band('From ServiceNow', d.defectsServiceNow, token('--series-3'), 0.7)] },
+      options: stackOpts(d.axisTitles.defectSource)
+    });
+  }
+  if (mixCard('DefectFound', d.unit === 'features' ? notFeatureLevel
+      : d.summary.defectFound ? ''
+      : resolvedDefects
+        ? 'None of the ' + resolvedDefects + ' ' + defectWord + (resolvedDefects === 1 ? '' : 's')
+          + ' finished in this window carries a Bug Type.'
+        : 'No ' + defectWord + ' finished in this window.')) {
+    renderChart('chartDefectFound', {
+      type: 'bar',
+      data: { labels: d.bucketLabels, datasets: [
+        band('Production', d.defectsProduction, seriesMain, 0.3),
+        band('Pre Production', d.defectsPreProduction, token('--series-3'), 0.55),
+        band('Not recorded', d.defectsFoundUnknown, seriesAlt, 0.85)] },
+      options: stackOpts(d.axisTitles.defectFound)
+    });
+  }
+  /* A LINE, not bars: a share read at each period, beside its pooled overall
+     line — drawn flat and dashed in the second colour, and named in the legend,
+     so the title's figure is somewhere on the plot. The y axis is pinned to
+     0–100% so a quiet board reads as quiet rather than as full. */
+  if (mixCard('WorkKind', d.summary.nonDiscShare == null
+      ? 'No finished ' + d.unitOne + ' in this window carries a Type of Work.' : '')) {
+    const wkOpts = baseOptions(d.axisTitles.workKind, pct0, pct0, d.axisTitles.x, d.partial);
+    wkOpts.scales.y.min = 0;
+    wkOpts.scales.y.max = 1;
+    wkOpts.plugins.legend = { display: true, position: 'top',
+      labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
+                font: { size: fsPx('xs') }, filter: item => item.text !== 'Trend' } };
+    renderChart('chartWorkKind', {
+      type: 'line',
+      data: { labels: d.bucketLabels, datasets: [{
+        label: 'Non-discretionary',
+        data: d.nonDiscShare,
+        borderColor: seriesMain, backgroundColor: seriesMain,
+        borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false,
+        spanGaps: false, order: 1
+      }, {
+        label: 'Overall',
+        data: d.nonDiscShare.map(() => d.summary.nonDiscShare),
+        borderColor: seriesAlt, backgroundColor: seriesAlt,
+        borderWidth: 1.5, borderDash: [10, 3], pointRadius: 0, pointHitRadius: 0,
+        fill: false, tension: 0, order: 2
+      }, trendDataset(d.nonDiscShare)] },
+      options: wkOpts
+    });
+  }
+
   /* ── Cycle time per week: the average, and the percentile you forecast with ──
      The average alone invites planning around a number most work beats and a
      sixth of it misses badly. The percentile line is the promise you can
@@ -14990,7 +15195,8 @@ function drawCharts(d) {
   };
   /* Both lines, so the label reads the way the card does. */
   const label = k => d.names[k] + ' — ' + d.titles[k];
-  ['defectRate', 'cycleTime', 'throughput', 'netFlow', 'cfd', 'wip']
+  ['defectRate', 'defectSource', 'defectFound', 'workKind', 'cycleTime', 'throughput', 'netFlow',
+   'cfd', 'wip']
     .forEach(k => describe('chart' + k.charAt(0).toUpperCase() + k.slice(1), label(k)));
   /* Conditional since the feature threshold landed, like the four below it: with
      no threshold set there is no aged chart, and an aria-label describing a
@@ -15326,6 +15532,48 @@ const METRIC_HELP = {
       + 'text in Settings as ', b('a share of everything completed'), '.'],
     ['Lower is better — but ', b('a rate near zero in a maturing team'), ' usually means '
       + 'defects are being logged somewhere other than the board, not that there are none.'],
+  ] },
+  defectSource: { title: 'Where Defects Came From', body: [
+    ['The defects resolved each period, split by ', b('where they were raised'), ': in Jira, or '
+      + 'through ServiceNow \u2014 read off the export\u2019s ServiceNow Assignment Type column.'],
+    ['A blank counts as raised in Jira ', b('only on a team whose export carries that column'),
+      '. A team with no such column is left out of the split, because a blank there says nothing '
+      + 'about where the work came from.'],
+    ['On a team whose incidents are ', b('support work'), ' \u2014 set in its own Settings window '
+      + '\u2014 those incidents are not defects at all, so they are not in these bars. The title '
+      + 'counts them.'],
+  ] },
+  defectFound: { title: 'Where Defects Were Found', body: [
+    ['The same resolved defects, split by the ', b('Bug Type'), ' column: found in Production, '
+      + 'found in Pre Production, or not recorded.'],
+    ['More found before production is usually the healthier shape \u2014 ', b('an escaped defect '
+      + 'costs more'), ' than one caught in testing. A tall Not recorded band means the column is '
+      + 'not being filled in, not that nothing escaped.'],
+  ] },
+  workKind: { title: 'Non-Discretionary Share', body: [
+    ['Of the finished work that carries a ', b('Type of Work'), ', how much was Non-Discretionary '
+      + '\u2014 work the team had to do, such as regulatory, compliance or keep-the-lights-on work '
+      + '\u2014 rather than work it chose.'],
+    ['Only work with a value counts, so ', b('a patchy field'), ' is read over the part that has '
+      + 'one, and the title says how many. The overall line is pooled over the whole window, not '
+      + 'an average of the points.'],
+  ] },
+  supportShare: { title: 'From ServiceNow', body: [
+    ['The share of finished work that ', b('arrived through ServiceNow'), ' \u2014 incidents, '
+      + 'catalog and change tasks, vulnerabilities \u2014 counted only on teams whose export carries '
+      + 'that column.'],
+    ['For a support team this is its main output rather than a warning sign. The foot counts the '
+      + 'incidents a team\u2019s own switch moved out of its defect rate.'],
+  ] },
+  productionShare: { title: 'Found in Production', body: [
+    ['Of the resolved defects that carry a Bug Type, the share ', b('found in production'),
+      ' rather than before it.'],
+    ['Defects with no Bug Type are left out of the share; the chart below shows how many.'],
+  ] },
+  nonDiscShare: { title: 'Non-Discretionary', body: [
+    ['The share of finished work carrying a Type of Work that was ', b('Non-Discretionary'),
+      ', pooled over the window.'],
+    ['It is the same figure as the overall line on the chart below.'],
   ] },
   forecastFigures: { title: 'The Forecast, as Figures', body: [
     ['The same answers the two cards above draw, as a table, so they can be ',
@@ -16556,7 +16804,7 @@ function renderDashboard() {
      hidden so the reader can see what this screen is — a forecast — and so the
      tab they land on is the tab that is selected; a lone panel under no strip at
      all reads as a page that lost its navigation. */
-  ['flow', 'delivery', 'health'].forEach(g => { $('stab-' + g).hidden = planning; });
+  ['flow', 'delivery', 'health', 'mix'].forEach(g => { $('stab-' + g).hidden = planning; });
   if (planning) selectChartTab('forecast');
 
   if (!plottable) {
@@ -16837,7 +17085,14 @@ function renderDashboard() {
         : ag.median == null ? d.dayNoun + ' so far'
         : d.dayNoun + ' so far, against a median of ' + num1(ag.median)
           + ' for finished work',
-      'itemAge') +
+      'itemAge');
+
+  /* The Work Mix group's own tiles (2026-09-15): the defect rate, moved here with
+     its chart, and one figure for each of the three work fields. Each foot says
+     how much of the board the figure could read, because on a patchy export the
+     share is over the part that carries a value and nothing else. */
+  const mixDefect = (state.settings.unplannedLabel || 'Unplanned').toLowerCase();
+  $('tilesMix').innerHTML =
     /* Reads a dash over features rather than 0.00%, for the reason the card
        below it carries: a defect is a kind of work item, so the figure is not
        zero, it does not exist. A dash is what this app shows for a figure it
@@ -16851,7 +17106,24 @@ function renderDashboard() {
     tile((state.settings.unplannedLabel || 'Unplanned') + ' rate',
       s.unplannedShare == null ? '—' : pct1(s.unplannedShare),
       d.unit === 'features' ? 'not a feature-level figure' : 'share of completed work',
-      'defectRate');
+      'defectRate') +
+    tile('From ServiceNow', s.supportShare == null ? '—' : pct0(s.supportShare),
+      s.supportShare == null ? 'no ' + d.unitOne + ' here carries a ServiceNow type'
+        : s.serviceNowDone + ' of ' + s.serviceNowTeamDone + ' completed ' + d.unitMany
+          + (s.incidentsAsSupport ? '; ' + s.incidentsAsSupport + ' incident'
+            + (s.incidentsAsSupport === 1 ? '' : 's') + ' counted as support, not ' + mixDefect + 's' : ''),
+      'supportShare') +
+    tile('Found in production', s.productionShare == null ? '—' : pct0(s.productionShare),
+      d.unit === 'features' ? 'not a feature-level figure'
+        : s.productionShare == null ? 'no finished ' + mixDefect + ' carries a Bug Type'
+        : 'of ' + (s.defectFound.production + s.defectFound.preProduction) + ' ' + mixDefect
+          + (s.defectFound.production + s.defectFound.preProduction === 1 ? '' : 's') + ' with a Bug Type',
+      'productionShare') +
+    tile('Non-discretionary', s.nonDiscShare == null ? '—' : pct0(s.nonDiscShare),
+      s.nonDiscShare == null ? 'no finished ' + d.unitOne + ' carries a Type of Work'
+        : s.workKindCount + ' of ' + s.completedTotal + ' completed ' + d.unitMany
+          + ' carry a Type of Work',
+      'nonDiscShare');
 
   /* ── The forecast may be about more than this team ───────────────────────
      Everything else on this screen is the team in the picker. The forecast can
@@ -20219,7 +20491,10 @@ wireScrollRow(document.querySelector('.tabs'), document.querySelector('.tabrow >
 const CHART_GROUPS = {
   flow:     ['chartCycleTime', 'chartCycleScatter', 'chartLeadTime', 'chartFeatureSize'],
   delivery: ['chartThroughput', 'chartNetFlow'],
-  health:   ['chartWip', 'chartAgedShare', 'chartAgedWork', 'chartItemAge', 'chartDefectRate'],
+  health:   ['chartWip', 'chartAgedShare', 'chartAgedWork', 'chartItemAge'],
+  /* What KIND of work finished (2026-09-15) — the defect rate beside its two
+     splits, and the non-discretionary share. */
+  mix:      ['chartDefectRate', 'chartDefectSource', 'chartDefectFound', 'chartWorkKind'],
   /* Forecast is last because it is the only group that says anything about the
      future: the three before it are what happened, and this is what that
      implies. It is also the only one with inputs of its own. */
