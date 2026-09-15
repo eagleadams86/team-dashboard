@@ -406,8 +406,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    the count; the same evening the controls staying beside the name, the
    keyboard reveal and the nudge's padding edge added 9 more, and the root's
    scroll padding (a focus lands below the sticky chrome, pinned or not) 14.
-   The three work fields (2026-09-15) brought it to 4163. */
-const EXPECTED = 4163;
+   The three work fields (2026-09-15) brought it to 4163, and typing them in
+   on an item to 4173. */
+const EXPECTED = 4173;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -17599,6 +17600,44 @@ group('a card with no chart matches the one beside it');
     ok(/ServiceNow, Bug Type and Type of Work values on 1 row\b/.test(asked[0] || ''),
        'and names what would go', String(asked[0]));
     is(win.tdGet().teams[0].rows[0].n, 2, 'so this device keeps them on Cancel');
+    plant({ teams: [], settings: {} });
+  }
+
+  group('work fields: typed in on an item');
+  {
+    const TD = win.TD;
+    const B = (f) => TD.buildManualRow(Object.assign(
+      { started: '2026-01-19', completed: '2026-01-21', type: 'Bug' }, f), []);
+    const typed = B({ snType: '2', bugFound: '1', workKind: '2' }).row;
+    is([typed.snType, typed.bugFound, typed.workKind], [2, 1, 2], 'three selects give three codes');
+    const blank = B({ snType: '', bugFound: '', workKind: '' }).row;
+    ok(!('snType' in blank) && !('bugFound' in blank) && !('workKind' in blank),
+       'a blank select adds no key at all');
+    ok(/ServiceNow assignment type/.test(B({ snType: '9' }).error || ''),
+       'a code past the end of its list is refused, naming the field');
+    ok(B({ bugFound: 'Production' }).error, 'and so is the word itself — the form sends codes');
+    ok(B({ workKind: '0' }).error, 'and a 0');
+    is(TD.buildManualRow({ created: '2026-01-01', type: 'Feature', key: 'DAE-9', workKind: '1' }, [], true)
+         .row.workKind, 1, 'a feature takes them too');
+
+    plant({ teams: [{ id: 'wi1', name: 'Typed', rows: [
+      { c: '2026-01-21', s: '2026-01-19', t: 'Bug', i: 'DAE-1', n: 2, b: 1, d: 2 }] }], settings: {} });
+    win.renderAll();
+    const wDoc = win.document;
+    win.openItemDialog(0);
+    is([wDoc.getElementById('itemSnType').value, wDoc.getElementById('itemBugFound').value,
+        wDoc.getElementById('itemWorkKind').value], ['2', '1', '2'],
+       'the editor opens on the stored values');
+    is([...wDoc.getElementById('itemSnType').options].map(o => o.textContent),
+       ['None — raised in Jira', 'Change Task', 'Incident', 'Service Catalog Task', 'Vulnerabilities'],
+       'offering exactly the list the parser matches against');
+    wDoc.getElementById('itemWorkKind').value = '1';
+    wDoc.getElementById('itemBugFound').value = '';
+    wDoc.getElementById('itemSave').click();
+    const saved = win.tdGet().teams[0].rows[0];
+    is([saved.n, saved.b, saved.d], [2, undefined, 1],
+       'a save writes what the selects say — and a cleared one takes its value out');
+    ok(!wDoc.getElementById('itemDialog').open, 'and the dialog closes on a good save');
     plant({ teams: [], settings: {} });
   }
 

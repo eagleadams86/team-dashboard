@@ -4679,6 +4679,27 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
     </div>
   </div>
 
+  <!-- The three work fields (2026-09-15), typed in — the other door, so every
+       chart they feed can be filled without a paste. SELECTS and never text
+       boxes: a row stores a code from a fixed list, and a box somebody types
+       into would be a way past that. Shown for a feature too, because a feature
+       is the same record and a control that is not drawn is a value the next
+       save silently drops. `pairs`, so the odd third field spans its row. -->
+  <div class="grid two pairs" style="margin-top:var(--sp-5)">
+    <div>
+      <label for="itemSnType">ServiceNow type <span class="hint">(optional)</span></label>
+      <select id="itemSnType"></select>
+    </div>
+    <div>
+      <label for="itemBugFound">Bug found in <span class="hint">(optional)</span></label>
+      <select id="itemBugFound"></select>
+    </div>
+    <div>
+      <label for="itemWorkKind">Type of work <span class="hint">(optional)</span></label>
+      <select id="itemWorkKind"></select>
+    </div>
+  </div>
+
   <!-- ── Days in each stage ───────────────────────────────────────────
        The other door onto the one field that had none: the Time in Stage card
        could only ever be filled by a Time in Status export until 2026-08-22.
@@ -7586,6 +7607,19 @@ function buildManualRow(f, stages, isFeature, statuses) {
                    nests a feature inside another one, and offering the box would
                    invite a hierarchy the joins cannot read. */
                 parentKey: isFeature ? '' : cleanIssueKey(f.parentKey) };
+  /* The three work fields, off three selects — so a code, or nothing. A value
+     that is not one of the codes cannot come from the form, and is REFUSED
+     rather than dropped: a form is one row with somebody looking at it. */
+  for (const fld of WORK_FIELDS) {
+    const text = String(f[fld.role] == null ? '' : f[fld.role]).trim();
+    if (!text) continue;
+    const code = /^[1-9]$/.test(text) ? enumCode(Number(text), fld.list) : null;
+    if (code == null) {
+      return { error: 'That ' + fld.name + ' is not one of the values offered. Pick one from '
+        + 'the list, or leave it blank.' };
+    }
+    row[fld.role] = code;
+  }
   /* A stage says where an item IS, so it belongs only to work in flight — the
      same rule the parser applies to a Status column, stated once more here
      because this is a second door onto the same field. An id nothing answers to
@@ -23955,6 +23989,19 @@ function openItemDialog(index) {
   $('itemType').value = r ? r.type : '';
   $('itemKey').value = r ? r.key : '';
 
+  /* The three work fields: options straight out of the lists the parser matches
+     against, so a typed value and a pasted one are the same code. Rebuilt every
+     open — cheap, and it keeps the markup free of a second copy of the words. */
+  const fillWork = (id, list, none, code) => {
+    $(id).innerHTML = '<option value="">' + none + '</option>'
+      + list.slice(1).map((w, i) => '<option value="' + (i + 1) + '">' + escapeHtml(w) + '</option>')
+        .join('');
+    $(id).value = code ? String(code) : '';
+  };
+  fillWork('itemSnType', SN_TYPES, 'None \u2014 raised in Jira', r && r.snType);
+  fillWork('itemBugFound', BUG_FOUND, 'Not recorded', r && r.bugFound);
+  fillWork('itemWorkKind', WORK_KINDS, 'Not recorded', r && r.workKind);
+
   /* The types already in use, offered rather than imposed: a work type is free
      text within its 40-char cap, and the whole point of the filter list in
      Settings is that a team names its own. A datalist suggests without
@@ -24049,6 +24096,9 @@ $('itemSave').addEventListener('click', () => {
     parentKey: $('itemParent').value,
     type: $('itemType').value,
     key: $('itemKey').value,
+    snType: $('itemSnType').value,
+    bugFound: $('itemBugFound').value,
+    workKind: $('itemWorkKind').value,
     /* One box, so one read, and which field it lands in is decided the same way
        the dialog decided what to draw. Sent as both rather than resolved here:
        buildManualRow owns the in-flight rule and the does-it-exist check. */
