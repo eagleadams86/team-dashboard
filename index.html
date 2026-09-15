@@ -18391,6 +18391,21 @@ function teamColumns(train) {
        #allTeamsNote in renderAllTeams. */
     { key: 'defects', label: defect + ' rate', desc: true,
       get: (d) => d.summary.unplannedShare, fmt: (v) => or(v, pct1) },
+    /* NON-DISCRETIONARY (2026-09-15) — the share of a team's finished work that
+       carried a Type of Work and was Non-Discretionary, pooled over the window.
+       Beside the defect rate because both are about what KIND of work a team's
+       capacity went on. Highest first: the team with the least choice about its
+       work is the one a planning conversation starts with. A dash, never 0%, for a
+       team whose export carries no Type of Work — no value is not a share of
+       nought. NO ⓘ under the rule above: its note opens from the Non-discretionary
+       tile on the dashboard.
+       "NON-DISC. %", NOT THE WHOLE WORD, and that was measured and decided with
+       Charles: with the demo loaded the full "Non-discretionary" put this table
+       53px into a sideways scroll at a 1100px window and gave the header a third
+       line at 1265, because a header cell's min-content is its longest word.
+       "Non-disc. %" costs neither — 1030px at 1100, a 56px header at 1265. */
+    { key: 'nonDisc', label: 'Non-disc. %', desc: true,
+      get: (d) => d.summary.nonDiscShare, fmt: (v) => or(v, pct0) },
     /* Ascending on the first press: the interesting end is the OLDEST export,
        which is the earliest date, which is the opposite of every column beside
        it. Stated here rather than special-cased in the sort. */

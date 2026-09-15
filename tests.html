@@ -407,9 +407,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    keyboard reveal and the nudge's padding edge added 9 more, and the root's
    scroll padding (a focus lands below the sticky chrome, pinned or not) 14.
    The three work fields (2026-09-15) brought it to 4163, typing them in on an
-   item to 4173, a support team's incidents switch to 4194, and the Work Mix
-   section to 4225. */
-const EXPECTED = 4225;
+   item to 4173, a support team's incidents switch to 4194, the Work Mix
+   section to 4225, and the All Teams non-discretionary column to 4230. */
+const EXPECTED = 4230;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -11811,7 +11811,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   const colKeys = [...win.document.querySelectorAll('#allTeamsTable thead th')]
     .map(th => { const b = th.querySelector('[data-sort]'); return b ? b.dataset.sort : null; });
   is(colKeys, ['name', 'rate', 'trend', 'p85', 'leadP85', 'wip', 'aged', 'agedPct',
-               'defects', 'dataEnd'],
+               'defects', 'nonDisc', 'dataEnd'],
      'the table’s columns, in order — no Completed and no WIP vs month');
   ok(colKeys.indexOf('agedPct') === colKeys.indexOf('aged') + 1,
      'and the share sits beside the count it is a share OF, which is what makes both readable');
@@ -17849,6 +17849,32 @@ group('a card with no chart matches the one beside it');
     ok(wDoc.getElementById('defectFoundNone').hidden, 'while its Bug Type chart still draws');
     wDoc.getElementById('stab-flow').click();
     plant({ teams: [], settings: {} });
+  }
+
+  group('All Teams: the non-discretionary column');
+  {
+    const S = win.TDState;
+    const st = S.normalizeSettings({});
+    const teams = S.hydrateState({ teams: [
+      { id: 'nd1', name: 'Typed', rows: [
+        { c: '2026-01-06', s: '2026-01-05', t: 'Story', d: 2 },
+        { c: '2026-01-07', s: '2026-01-05', t: 'Story', d: 1 },
+        { c: '2026-01-08', s: '2026-01-05', t: 'Story' }] },
+      { id: 'nd2', name: 'Untyped', rows: [{ c: '2026-01-06', s: '2026-01-05', t: 'Story' }] }
+    ] }).teams;
+    const all = win.deriveTeams(teams, st, { months: 'all', bucket: 'week', forecastMode: 'off' });
+    const cols = win.tdTeamColumns(all.train);
+    const col = cols.find(c => c.key === 'nonDisc');
+    ok(!!col, 'All Teams has a non-discretionary column');
+    is(col ? [col.label, col.desc, !!col.help] : null, ['Non-disc. %', true, false],
+       'headed short enough to fit at 1100px, sorted highest first, with no ⓘ of its own');
+    const rowOf = (name) => all.rows.find(r => r.name === name);
+    is(col && rowOf('Typed') ? col.fmt(col.get(rowOf('Typed').d)) : null, '50%',
+       'a team reads the share of its work that carries a Type of Work');
+    is(col && rowOf('Untyped') ? col.fmt(col.get(rowOf('Untyped').d)) : null, '—',
+       'and a team whose export carries none reads a dash, never 0%');
+    is(cols.map(c => c.key).indexOf('nonDisc'), cols.map(c => c.key).indexOf('defects') + 1,
+       'beside the defect rate');
   }
 
   /* ────────────────────────────────────────────────────────── */
