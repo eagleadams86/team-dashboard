@@ -4851,3 +4851,10 @@ proven red against the build before it. The reasoning sits here, per fix.
   Each view key now has a shape check falling back to its default (a word, an id, an ISO day, a boolean,
   a direction); only shape, so a saved `'sprint'` or a sort on a hidden column is still kept and still
   judged where it is used. `sprintDays`/`sprintAnchor` are cleared, being questions, not preferences.
+- **privacy.html lists what SCHEMA 17-19 added.** It was dated September 10 and never named the week
+  start (924f2c9, later that day), the company and per-team sprint cadence, a team's sprint mode or
+  the aged-share opt-out — all stored, all carried in a share link — against its own promise to change
+  with storage. It names them now, dated September 15, and says how a paste of fewer than 20 rows is
+  held: `statusColumnUsable` skips the repetition ratio below `STATUS_RATIO_MIN_ROWS` (five rows cannot
+  hold forty distinct values), so there the anchored heading, the 40-value cap and `cleanStatusLabel`
+  are what guard the vocabulary. That exception was reasoned in the code and stated nowhere else.

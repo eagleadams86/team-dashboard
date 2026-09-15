@@ -75,7 +75,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
        is why this closes before it and why .wrap stays an ordinary <div>. -->
   <main>
   <h1>Flow Metrics — Privacy Policy</h1>
-  <p class="meta">Effective September 10, 2026</p>
+  <p class="meta">Effective September 15, 2026</p>
 
 
   <p>Flow Metrics is built to work entirely in your browser. This page explains exactly what
@@ -84,7 +84,9 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   <h2>What Flow Metrics Stores</h2>
   <p>The only data the app holds is what you paste or type in: team names, an optional
   <em>project id</em> for each team, an optional work-in-progress limit and cycle time target for
-  each team (two numbers you set, which the charts are drawn against),
+  each team (two numbers you set, which the charts are drawn against), whether each team runs sprints and
+  — for a team on a cadence of its own — that sprint's length and a date one started, whether a team
+  counts in its train's aged share,
   the names of any workflow stages you set up, the list of statuses read out of your exports
   (see below), and for each team a
   list of work items — a completed date, an optional start date, an optional created date, an
@@ -95,7 +97,8 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   marks unplanned work, the text that marks a feature, the thresholds, the six numbers the
   aged share, the defect share and the average feature cycle time are graded against,
   whether days are counted
-  Monday to Friday, whether items
+  Monday to Friday, which day a week starts on, the company's sprint length and a date one started,
+  whether items
   that took unusually long stop counting toward the duration figures, the work-type
   filter list) and your preferences
  (theme, chosen team, date window). No account
@@ -147,7 +150,10 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
     about ten statuses however many items you have; a column of summaries has a different value
     on nearly every row. So the app counts how many different values that column holds before it
     stores anything, and if it looks like free text it stores <em>nothing at all</em> from it —
-    not the short values, not a shortened version, nothing — and tells you so.</li>
+    not the short values, not a shortened version, nothing — and tells you so. A paste of fewer than 20
+    rows is too short to measure that way, so there the column is still only read when it is headed
+    exactly <em>Status</em>, and the cap of 40 different values and the label shape below are what
+    hold.</li>
     <li><strong>The list is capped at 40 and shown to you.</strong> Every entry is on screen in
     the Teams &amp; Stages window with a delete button beside it, and a status you delete is
     removed from every item that pointed at it.</li>
@@ -215,7 +221,9 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
   fields the app stores, <strong>issue keys and status names included</strong> — they are what
   names the items and the columns on the charts, and a link without them would show the
   recipient a different picture from yours. It carries stage names and day counts for the same
-  reason. Only what the link's own items need travels: the stages they spent time in, and the
+  reason. Each team's sprint settings, whether it counts in the aged share, and the company's week
+  start and sprint cadence travel too, because they decide how the recipient's charts are cut.
+  Only what the link's own items need travels: the stages they spent time in, and the
   statuses they are actually sitting in — not your whole list.</p>
 
   <h2>What Is Never Sent Anywhere</h2>
