@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4295;
+const EXPECTED = 4296;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -10440,6 +10440,9 @@ group('ARTs — the grouping, and the boundary it crosses');
   {
     const support = demoOf(demo, 'Team Support Desk');
     is(support.incidentsAsDefects, 0, 'Team Support Desk counts its ServiceNow incidents as support work');
+    ok(/four invented teams/.test(win.document.getElementById('welcomeCard').textContent)
+         && !/three invented/.test(win.document.getElementById('welcomeCard').textContent),
+       'and the welcome card says four — it said three after the fourth arrived');
     const wfSettings = win.TDState.normalizeSettings({});
     const wfView = { filterValue: null, months: 'all', bucket: 'week' };
     const withFacts = (teams) => Object.assign({}, wfView, { teamFacts: TD.teamFactsOf(teams) });

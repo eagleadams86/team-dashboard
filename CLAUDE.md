@@ -5031,4 +5031,7 @@ check proven red against the build before it.
   vote from — and said "dates as month first" of `3/Aug/26`. No figure moved; the sentence was false.
   `orderMoot` (date columns found, none of them holding a numeric date) travels on the parse result;
   `columnsReadHtml` then says the question did not arise, and `orderGuessed` is never true alongside it.
+- **The welcome card says four teams.** It still said "three invented teams" after Team Support Desk
+  joined the demo; the Your Data button's copy had been updated and this one had not. Pinned in the
+  demo group beside the team list.
 
