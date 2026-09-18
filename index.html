@@ -5858,11 +5858,27 @@ function detectColumns(rows, header, order, stages, statuses) {
      stage columns for the same reason as roleAt, and this is the role that
      needed it most: "In Progress" is both the commonest start heading there is
      and the commonest stage name on a board. */
-  const startAt = (skip, accept) => header
-    ? header.findIndex((h, i) =>
-        !skip.has(i) && !prose.has(i) && !workSkip.has(i) && (!accept || accept(i))
-        && /start|begin|in.?progress/i.test(String(h || '')))
-    : -1;
+  /* A PLANNING DATE IS NOT A START (2026-09-17). The 2026-09-15 fix below
+     demoted Jira's "Target start" and "Custom field (Start date)" only while
+     EMPTY, and one planned date in four hundred rows put the column ahead of a
+     full In Progress: twenty-seven rows started on a plan or not at all, and
+     five items in flight were dropped as "no dates at all". So a heading that
+     names a plan never takes the role — a plan is not a start, and the Created
+     fallback is the honest answer where nothing else is — and among the headings
+     left, the column holding the MOST dates wins rather than the leftmost. */
+  const PLANNING = /target|planned|\bplan\b|due|baseline|estimat|expected|forecast/i;
+  const startAt = (skip, accept) => {
+    if (!header) return -1;
+    let best = -1, bestFill = -1;
+    header.forEach((h, i) => {
+      const s = String(h || '');
+      if (skip.has(i) || prose.has(i) || workSkip.has(i) || (accept && !accept(i))) return;
+      if (!/start|begin|in.?progress/i.test(s) || PLANNING.test(s)) return;
+      const fill = stats[i] ? stats[i].filled : 0;
+      if (fill > bestFill) { best = i; bestFill = fill; }
+    });
+    return best;
+  };
   const startedFilled = startAt(stageSkip, dateyFilled);
   const startedClear = startedFilled >= 0 ? startedFilled : startAt(stageSkip, i => datey(i) && !empty(i));
   const startedStrict = startedClear >= 0 ? startedClear : startAt(new Set(), i => !empty(i));

@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4272;
+const EXPECTED = 4279;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -17635,6 +17635,32 @@ group('a card with no chart matches the one beside it');
        'SD-3\tIncident\t2025-01-04\t2025-01-12'].join('\n'), 'auto', [], [], []);
     is([itsm.columns.type, itsm.rows.map(r => r.type)], [1, ['Incident', 'Incident', 'Incident']],
        'a headerless board of nothing but Incidents keeps Incident as its work type — the list shape only loses a contest');
+  }
+
+  group('a planning date is not a start, and the fuller start column wins');
+  {
+    const T = win.TD;
+    const iso = (d) => (d == null ? null : new Date(d).toISOString().slice(0, 10));
+    /* Jira's all-fields export: Target start filled on one ticket in three, to
+       the LEFT of a full In Progress. It took the start role, so two rows had no
+       start and one started on a plan. */
+    const rows = [['DAE-1', 'Story', '2026-07-01', '2026-01-03', '2026-01-02', '2026-01-10'],
+                  ['DAE-2', 'Story', '', '2026-01-04', '2026-01-02', '2026-01-11'],
+                  ['DAE-3', 'Story', '', '2026-01-05', '2026-01-02', '2026-01-12']];
+    const head = ['Issue key', 'Issue Type', 'Target start', 'In Progress', 'Created', 'Resolved'];
+    is(T.detectColumns(rows, head, 'dmy', [], []).started, 3,
+       'Target start, filled on one row of three and to the left, does not take the start role from In Progress');
+    is(T.detectColumns(rows, ['Issue key', 'Issue Type', 'Custom field (Start date)', 'In Progress', 'Created', 'Resolved'],
+                       'dmy', [], []).started, 3,
+       'nor does a Start date field filled on one row — the column holding the most dates wins');
+    const only = T.detectColumns(rows.map(r => [r[0], r[1], r[2], r[4], r[5]]),
+                                 ['Issue key', 'Issue Type', 'Target start', 'Created', 'Resolved'], 'dmy', [], []);
+    ok(only.started !== 2, 'with no other start column a plan is still not a start', String(only.started));
+    is(only.started, only.created, 'so Created stands in, as it does for an export with no start column at all');
+    const p = T.parsePastedRows([head.join('\t')].concat(rows.map(r => r.join('\t'))).join('\n'), 'auto', [], [], []);
+    is(p.rows.length, 3, 'and through the paste every row loads');
+    is(p.rows.map(r => iso(r.started)), ['2026-01-03', '2026-01-04', '2026-01-05'], 'with its real start');
+    is(p.columns.started, 3, 'read off column 4, which the report names');
   }
 
   group('work fields at the storage boundary');

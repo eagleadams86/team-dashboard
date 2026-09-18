@@ -1130,6 +1130,11 @@ silently corrupt every number on the dashboard.
   days, so the clock is dropped. The date underneath still decides day-first vs month-first. A
   timestamp that names its time zone (`Z`, or `-05:00`) is a moment rather than a wall-clock time,
   so it is dated on **your** calendar: `2026-09-16T01:00:00Z` is 15 September in New York.
+- **A planning date is never the start.** Jira's all-fields export carries *Target start* and a
+  *Start date* custom field; a heading that names a plan (target, planned, due, baseline, estimate,
+  expected, forecast) never takes the start role, however many of its cells are filled, and where
+  more than one heading could be the start, the column holding the **most** dates wins rather than
+  the leftmost. With no start column left, *Created* stands in, as it always has.
 
 **Work in progress belongs in the paste.** An item with a start date and no completion is not
 an error — it's work you've begun, and it counts on the net flow chart as work started.

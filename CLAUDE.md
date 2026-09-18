@@ -5002,4 +5002,13 @@ check proven red against the build before it.
 - **"Carries the column" now reads "carries a ServiceNow value somewhere"** in the two help entries, the
   README and this file: `teamFactsOf` marks a carrier when some row has a value, and once codes are
   stored a wholly blank column is indistinguishable from none. The code was right; the words were not.
+- **A planning date is not a start, and the fuller start column wins.** `startAt` took the LEFTMOST
+  heading matching `/start|begin|in.?progress/` that held any date at all; the 2026-09-15 fix demoted
+  `Target start` and `Custom field (Start date)` only while EMPTY. One planned date in four hundred
+  rows put such a column ahead of a full In Progress: 27 of 28 rows started on a plan or not at all,
+  five items in flight were dropped as "no dates at all", and the cycle time read 39 days for 7.
+  `PLANNING` (target, planned, plan, due, baseline, estimat, expected, forecast) is out of the start
+  role in every pass — a plan is not a start; Created is the honest fallback — and among the rest the
+  column with the most filled cells wins, leftmost only on a tie. Found by the end-to-end reviewer
+  pasting a real all-fields export, not by reading.
 
