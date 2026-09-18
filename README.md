@@ -308,6 +308,14 @@ A few details worth knowing, each of which is there for a reason:
   finished after the window was still in flight on its last day and is drawn at the age it had
   reached then, and one started after it is not there yet. (Until 2026-09-01 that chart listed
   whatever was open *today*, so the tile beside it and the chart described different items.)
+- **Nothing dated after *To* is in the window.** The axis is drawn in whole periods and a typed
+  end usually falls inside one, so the last bar is partial ("Last week covers 2 of 7 days") and an
+  item finished later in that same week is not counted as finished — it was still in flight on the
+  window's last day, which is how the work-in-progress and ageing tiles already read it. (Until
+  2026-09-17 it was counted, so *Aug 1–31* took in a completion on 2 September.) The **first**
+  period is whole: the figures count from the start of the week or month your *From* falls in,
+  the same rule every other window follows, and the Scorecard's window before ends the day before
+  that period so the two never share a completion.
 - **Both dates are needed, and *From* must come before *To*.** Half a pair is the state you pass
   through on the way to typing the second date, so it means "no custom window" rather than an
   error — the note under the strip says so while it waits, instead of leaving two boxes that hold

@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4279;
+const EXPECTED = 4285;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -3543,6 +3543,30 @@ async function run(TD, win) {
   const cPrev = TD.derive(cRows, SAMPLE_SETTINGS,
     { months: 'custom', customFrom: '2014-12-01', customTo: '2015-01-31', bucket: 'month' });
   is(cPrev.summary.completedTotal, 1, 'the period before it counts its own, and only its own');
+
+  /* NOTHING DATED PAST THE END IS IN THE WINDOW (2026-09-17). Week buckets, and
+     a typed To that falls mid-week: Aug 31 2026 is a Monday, and Sep 2 and Sep 4
+     sit in the same bucket. Both used to count as finished in August — after the
+     as-of date the WIP tile is read at. The FIRST bucket stays whole (the
+     2026-09-10 rule two groups down), so Jul 31 is counted from its Sunday. */
+  const eRows = [
+    { completed: D(2026, 7, 31), started: D(2026, 7, 20), created: D(2026, 7, 28), type: 'Bug' },
+    { completed: D(2026, 8, 3),  started: D(2026, 7, 30), type: 'Story' },
+    { completed: D(2026, 8, 20), started: D(2026, 8, 2),  created: D(2026, 8, 1), type: 'Bug' },
+    { completed: D(2026, 9, 2),  started: D(2026, 8, 31), type: 'Story' },
+    { completed: D(2026, 9, 4),  started: D(2026, 9, 1),  type: 'Story' },
+    { started: D(2026, 8, 25), type: 'Story' }
+  ];
+  const eAug = TD.derive(eRows, SAMPLE_SETTINGS,
+    { months: 'custom', customFrom: '2026-08-01', customTo: '2026-08-31', bucket: 'week', weekStartsOn: 0 });
+  is(eAug.summary.completedTotal, 3, 'Aug 1–31 counts Jul 31 (its first whole week), Aug 3 and Aug 20 — not Sep 2 or Sep 4');
+  is(eAug.summary.startedTotal, 4, 'and the four starts up to its end — Sep 1 is past it');
+  near(eAug.summary.unplannedShare, 2 / 3, 'so the defect rate is over the window’s own three items');
+  is(eAug.inProgressCount, 2, 'while an item finished after the end was still open AT the end, as the WIP read says');
+  is(eAug.buckets.length, 6, 'and the axis is unchanged — six whole weeks, the last covering two days');
+  const eJul = TD.derive(eRows, SAMPLE_SETTINGS,
+    { months: 'custom', customFrom: '2026-07-01', customTo: '2026-07-31', bucket: 'week', weekStartsOn: 0 });
+  is(eJul.summary.completedTotal, 1, 'July counts its Jul 31 and not Aug 3, which shares its last bucket');
 
   /* THE END IS CLAMPED TO THE DATA. Work in progress and aged work are read at
      the window's end, so a To past the export would age every open item for

@@ -10183,20 +10183,34 @@ function derive(rows, settings, view, stages, statuses) {
   const defectsRaised   = new Map();   /* defects by the bucket they were RAISED in */
 
 
+  /* NOTHING DATED PAST THE END IS IN THE WINDOW (2026-09-17). The buckets are
+     whole periods and a typed To falls inside the last one, so a completion in
+     that bucket but AFTER the window's end — after the as-of date the WIP and
+     ageing tiles are read at, and the days the "covers 2 of 7 days" note says
+     are not in — was counted as finished in a window that had not reached it.
+     Aug 1–31 counted Sep 2 and Sep 4. Nothing dated past the end counts as
+     started, raised or finished; a completion past the end is still OPEN at the
+     end, which is what the WIP, ageing and flow reads already said about it.
+     The FIRST bucket stays whole, by the 2026-09-10 rule: the axis starts at the
+     bucket holding the window's first day, and the Scorecard's window before
+     ends the day before it so that nothing is counted twice. Only a typed To can
+     land here — every rolling window ends on the data, and the window before
+     ends on a bucket edge by construction. */
+  const inWindow = (dt) => dt && dt <= endDate;
   for (const r of items) {
     /* Started counts every item that has a start date, finished or not. */
-    if (r.started) {
+    if (inWindow(r.started)) {
       const sk = bucketKey(bucketStart(r.started, bucket, weekStartsOn, cad), bucket, weekStartsOn, cad);
       byStartedWeek.set(sk, (byStartedWeek.get(sk) || 0) + 1);
     }
     /* Intake keys off the created date, not the completion — a defect raised
        this month counts this month even if it is still open, which is the whole
        point of measuring what comes in against what goes out. */
-    if (r.created && isUnplanned(r)) {
+    if (inWindow(r.created) && isUnplanned(r)) {
       const rk = bucketKey(bucketStart(r.created, bucket, weekStartsOn, cad), bucket, weekStartsOn, cad);
       defectsRaised.set(rk, (defectsRaised.get(rk) || 0) + 1);
     }
-    if (!r.completed) continue;
+    if (!inWindow(r.completed)) continue;
 
     const ck = bucketKey(bucketStart(r.completed, bucket, weekStartsOn, cad), bucket, weekStartsOn, cad);
     if (!byCompletedWeek.has(ck)) byCompletedWeek.set(ck, []);

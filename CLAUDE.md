@@ -5011,4 +5011,14 @@ check proven red against the build before it.
   role in every pass — a plan is not a start; Created is the honest fallback — and among the rest the
   column with the most filled cells wins, leftmost only on a tie. Found by the end-to-end reviewer
   pasting a real all-fields export, not by reading.
+- **Nothing dated past a typed To is in the window.** The bucket loop in `derive` keyed every
+  completion, start and raised date into its bucket and the series summed whole buckets, so a To
+  inside a week counted the completions LATER in that week — after the as-of date the WIP and ageing
+  reads use, and the days the "covers 2 of 7 days" note says are not in. Aug 1–31 counted Sep 2 and
+  Sep 4; two typed months side by side summed to more than the team finished. `inWindow(dt)` =
+  `dt <= endDate` now gates all three keys. **The first bucket stays whole** — the 2026-09-10 rule
+  above ("the window before ends the day before the first whole bucket") depends on it, and every
+  rolling window shares it; the reviewer's front-side double count (Jul 31 in both Jul and Aug) is
+  that rule, now stated in the README's custom-window section. Only a typed To can land here: every
+  rolling window ends on the data and `priorWindowOf` ends on a bucket edge by construction.
 
