@@ -3476,6 +3476,14 @@ every team, their work items and your shared settings — `team-dashboard-YYYY-M
 a copy you keep, independent of this browser. It is the only copy of your data that exists
 anywhere else, and the only way back from a cleared browser.
 
+**Open twice, it stays one board.** With the app open in two tabs — or an installed window and
+a tab — a window that is sitting idle picks up the other's changes as they are saved, and a
+window that was about to save over a newer board loads that board instead and says so: *"This
+board was changed in another tab or window… Your last change here was not saved — make it
+again."* (Until 2026-09-18 the window that had not been reloaded silently wrote its old board
+over the other's work the next time it saved — a paste loaded in one window could vanish after
+a Settings change in the other.) Which tab and filters you are on stay each window's own.
+
 **Restoring replaces everything.** You're shown what the file holds against what's already
 here — *"Restore 2 teams and 3 items from this file? This replaces the 1 team and 0 items in
 this browser"* — and nothing changes until you confirm. Restoring on another device is how you

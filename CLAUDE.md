@@ -5051,3 +5051,38 @@ check proven red against the build before it.
   pooled figure lands in the MIDDLE band, because only the marked middle label is wide enough to cut;
   the first fixture's figure fell in the top band and the check passed on the broken build.
 
+## Two Open Copies No Longer Overwrite Each Other (2026-09-18)
+
+Ported from Sprint Predictability the day its review found it there (two reviewers, independently).
+`persist()` writes the WHOLE board and there was no `storage` listener, so with the app open twice
+— two tabs, or the installed window and a tab — the copy that had not been reloaded wrote its stale
+board over the other's the next time it saved anything. The exposure here is narrower than the
+sibling's, where a tab press saves: this app keeps its position in `td-view` and writes `td-state`
+only on a real edit (a paste, Settings, Teams). It is still a paste lost without a word.
+
+- **`persist()` holds storage up against `storedRaw`** — the `td-state` string this copy last read
+  (`loadState()`) or wrote — and if they differ calls `adoptOtherCopy(true)` INSTEAD of writing:
+  the newer-schema check boot makes (two windows can run different builds), `loadState()`, the
+  active-team repair boot does, every open dialog closed (its boxes were filled from the board just
+  replaced; the app's ONE `close` handler only redraws), `renderSettingsForm()`, `renderAll()`, the
+  boot's own `selectTab(...)`, and a toast saying the last change here did not land. `storedRaw` is
+  read BACK after `setItem`, so a browser that accepts a write and keeps nothing never looks like
+  another window having emptied it. `loadState()`'s own shape-repair `persist()` cannot recurse:
+  it runs with `storedRaw` freshly set from the read.
+- **`td-view` is deliberately NOT guarded.** It is this device's position — tab, filters, sorts —
+  and the last window to move wins, which is what two windows on different tabs want.
+- **A `storage` listener adopts an IDLE copy at once** (`adoptOtherCopy(false)`). Not in a shared
+  view; not while a dialog is open (a draft; `persist()` settles it); **not when the bytes that
+  landed are what this copy would write itself** — another window's boot repairing the shape — which
+  is noted in `storedRaw` and redraws nothing; and **only in a top-level window**, the
+  service-worker block's rule, because the suite's frames share this origin's storage with frames
+  that plant fixtures in it. That is why the listener is pinned as SOURCE and the `persist()` half
+  is what the suite drives, in a real frame, with this page playing the other window.
+- **The suite itself still passes untouched**, and for a reason worth knowing: everywhere it writes
+  `td-state` under the app frame it puts back the exact bytes it found, so the guard sees nothing
+  foreign. A future test that leaves different bytes behind will make the NEXT real save in the
+  shared frame adopt them — which is the guard working, not a flake.
+- Boot runs at the FOOT of this script, so unlike the sibling there is no dead zone to mind:
+  `let storedRaw` sits beside `let state`.
+- EXPECTED 4303 → 4311. The test holds storage against the other board's TEAMS, not its bytes:
+  adopting runs boot's shape repair, which writes the board back in this build's shape.

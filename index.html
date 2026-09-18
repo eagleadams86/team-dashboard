@@ -12349,6 +12349,9 @@ function haltForNewerData(found) {
 let state  = { teams: [], arts: [], stages: [], statuses: [],
                settings: Object.assign({}, DEFAULT_SETTINGS) };
 let view   = Object.assign({}, DEFAULT_VIEW);
+/* The `td-state` string this copy last READ or WROTE — what persist() holds storage
+   up against before writing over it (2026-09-18; see persist()). */
+let storedRaw = null;
 let charts = {};
 /* The All Teams throughput chart is held HERE rather than in `charts` above.
    That object is the dashboard's, and renderDashboard destroys every entry in it
@@ -13231,7 +13234,7 @@ function loadState() {
   const migrated = migrate();
   if (migrated) { state = hydrateState(migrated); persist(); return; }
   let stored = null, raw = null;
-  try { stored = localStorage.getItem(LS.state); raw = JSON.parse(stored || 'null'); }
+  try { stored = localStorage.getItem(LS.state); storedRaw = stored; raw = JSON.parse(stored || 'null'); }
   catch (e) { /* fall through */ }
   state = hydrateState(raw);
   /* If the boundary changed anything — a stray key pruned, an over-long type
@@ -13417,7 +13420,25 @@ function loadView() {
    own saved copy. UI state still moves in memory — it just isn't persisted. */
 function persist() {
   if (viewOnly) return;
-  try { localStorage.setItem(LS.state, JSON.stringify(serializeState())); }
+  try {
+    /* ── Two copies of the app open at once (2026-09-18, ported from Sprint
+       Predictability) ───────────────────────────────────────────────────────
+       This writes the WHOLE board. With the app open twice — two tabs, or the
+       installed window and a tab — the copy that had not been reloaded wrote its
+       stale board over the other's work the next time it saved anything: a paste
+       loaded for one team in window A was gone after a Settings change in window
+       B, and neither said a word. Storage is held up against what THIS copy last
+       read or wrote; if somebody else has written since, their board is adopted
+       instead of overwritten, and the one change that did not land is said out
+       loud. Losing one change, announced, beats losing a paste in silence.
+       (`td-view` is deliberately NOT guarded: it is this device's own position —
+       which tab, which filters — and the last window to move simply wins.) */
+    if (localStorage.getItem(LS.state) !== storedRaw) { adoptOtherCopy(true); return; }
+    localStorage.setItem(LS.state, JSON.stringify(serializeState()));
+    /* Read BACK rather than remembered: a browser that accepts the write and keeps
+       nothing must not look, next time, like another window having emptied it. */
+    storedRaw = localStorage.getItem(LS.state);
+  }
   catch (e) {
     /* A big paste can outgrow the browser's storage quota. The change is live
        in memory but would be gone on reload, and there is no second copy
@@ -13434,6 +13455,30 @@ function saveView() {
      storage is full. This just must not throw and abandon the caller mid-way. */
   try { localStorage.setItem(LS.view, JSON.stringify(view)); }
   catch (e) { console.warn('localStorage view save failed', e); }
+}
+
+/* Another window's board, taken in place of this one's. It goes through
+   loadState(), boot's own reader, after the same newer-schema check boot makes —
+   two windows can be running different builds, one of them from the offline
+   cache. Any open dialog is closed first: its boxes were filled from the board
+   that has just been replaced (the only `close` handler in the app redraws and
+   writes nothing). `lostChange` is persist()'s case — this copy was about to
+   write and did not — and gets the sentence that says so; the idle case (the
+   `storage` listener at the foot of the script) is only news. */
+function adoptOtherCopy(lostChange) {
+  let peek = null;
+  try { peek = JSON.parse(localStorage.getItem(LS.state) || 'null'); } catch (e) { peek = null; }
+  if (peek && typeof peek === 'object' && Number(peek.schema || 1) > SCHEMA) haltForNewerData(peek.schema);
+  loadState();
+  if (!state.teams.some(t => t.id === view.activeTeamId)) view.activeTeamId = state.teams[0].id;
+  document.querySelectorAll('dialog[open]').forEach(d => d.close());
+  renderSettingsForm();
+  renderAll();
+  selectTab((anyDataHeld() || planningOn()) ? view.activeTab : 'data');
+  window.toast(lostChange
+    ? 'This board was changed in another tab or window, so that copy is loaded here now. '
+      + 'Your last change here was not saved — make it again.'
+    : 'Updated — this board was changed in another tab or window.', 6000);
 }
 
 /* The one place a change to teams or settings is written down. It used to do
@@ -26658,6 +26703,25 @@ if (viewOnly) {
      reader never sees the panel this lands on being swapped for another one. */
   bootDone();
 }
+
+/* The other half of persist()'s two-copies guard (2026-09-18): an IDLE copy takes
+   the other window's board as soon as it lands, so what is on screen is never
+   older than what is stored. Not while a dialog is open here — its boxes are a
+   draft, and persist() settles it on the next write. Not when the bytes that
+   landed are what this copy would write itself (another window's boot repairing
+   the shape) — that is noted and nothing is redrawn. And only in a top-level
+   window: the suite's frames share this origin's storage with frames that plant
+   fixtures in it, the same rule the service-worker block below uses. */
+if (window.top === window.self) addEventListener('storage', (e) => {
+  if (viewOnly || e.storageArea !== localStorage) return;
+  if (e.key !== null && e.key !== LS.state) return;          // null is clear()
+  let there = null;
+  try { there = localStorage.getItem(LS.state); } catch (err) { return; }
+  if (there === storedRaw) return;
+  if (there !== null && there === JSON.stringify(serializeState())) { storedRaw = there; return; }
+  if (document.querySelector('dialog[open]')) return;
+  adoptOtherCopy(false);
+});
 </script>
 
 <!-- ── Cross-device sync: REMOVED 2026-08-20 ─────────────────────────────────

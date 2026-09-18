@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4303;
+const EXPECTED = 4311;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -13299,6 +13299,56 @@ group('ARTs — the grouping, and the boundary it crosses');
        'and the hold is a visibility rule, so every chart still measures its real size');
     f.remove();
     /* Put the suite's own storage back — everything after this reads it. */
+    if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
+    if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     Two copies of the app open at once (2026-09-18, ported from Sprint
+     Predictability). persist() writes the WHOLE board, so the window that had not
+     been reloaded wrote its stale board over the other's work the next time it
+     saved anything — a paste loaded in window A, gone after a Settings change in
+     window B. A real frame with the real save(): window A is the frame, and
+     "window B" is this page writing to the storage they share. */
+  {
+    const keep = { view: localStorage.getItem('td-view'), state: localStorage.getItem('td-state') };
+    const row = { c: '2015-01-21', s: '2015-01-19', t: 'Story' };
+    const board = (teams) => JSON.stringify({ v: 3, settings: {},
+      teams: teams.map((name, i) => ({ id: 't' + i, name, rows: [row] })) });
+    localStorage.setItem('td-state', board(['Alpha']));
+    const f = document.createElement('iframe');
+    f.setAttribute('data-td-tests', '');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;border:0;left:-9999px';
+    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html' + BUST + '&twocopies'; document.body.appendChild(f); });
+    const W = f.contentWindow;
+    is(W.tdGet().teams.length, 1, 'two copies: window A booted on the one-team board');
+    /* Window B loads a second team's paste. */
+    localStorage.setItem('td-state', board(['Alpha', 'Beta']));
+    /* Window A, never reloaded, changes something and saves. (Held against the
+       TEAMS, not the bytes: adopting a board runs boot's own shape repair, which
+       writes it back in this build's shape — the data is what must survive.) */
+    W.save();
+    is(JSON.parse(localStorage.getItem('td-state')).teams.map(t => t.name + ':' + t.rows.length).join(','),
+       'Alpha:1,Beta:1', 'two copies: the stale window wrote NOTHING over the other window’s board');
+    is(W.tdGet().teams.map(t => t.name).join(','), 'Alpha,Beta', 'two copies: and it is showing that board now');
+    const said = W.document.getElementById('toast').textContent;
+    ok(/another tab or window/.test(said) && /not saved/.test(said),
+       'two copies: it says what happened, and that its own change did not land', said);
+    /* From here A is current, and saves as it always did — without adopting again. */
+    W.document.getElementById('toast').textContent = '';
+    W.save();
+    is(JSON.parse(localStorage.getItem('td-state')).teams.length, 2, 'two copies: the next save is written, on top of the other board');
+    is(W.document.getElementById('toast').textContent, '', 'two copies: and raises no second notice');
+    /* The idle half cannot be driven from here — the suite's frames share this
+       origin's storage with frames that plant fixtures in it, which is exactly
+       why the listener is top-level only. Pinned as source, with the rule. */
+    const src = await (await fetch('index.html' + BUST)).text();
+    ok(/if \(window\.top === window\.self\) addEventListener\('storage'/.test(src),
+       'two copies: an idle window listens for the other one — top-level windows only');
+    ok(/if \(document\.querySelector\('dialog\[open\]'\)\) return;\s*adoptOtherCopy\(false\)/.test(src),
+       'two copies: and leaves an open window’s draft alone');
+    f.remove();
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
     if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
   }
