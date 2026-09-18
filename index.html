@@ -16427,6 +16427,16 @@ function renderTeamSelect() {
    would go stale with every keystroke. */
 function renderTeamRows() {
   const tb = $('teamRows');
+  /* FOCUS SURVIVES THE REBUILD (2026-09-17). Closing a team's editor rebuilds
+     these rows — once from the editor's own observer and again from the Teams
+     window's `close` handler, which the browser delivers a task later — and a
+     rebuilt row is a new Edit button, so the one that had focus was detached and
+     focus fell to <body> with the window still open: a keyboard user restarted
+     from nowhere. The button is re-found by its team id after the rows are
+     drawn, the sortable headings' answer to the same rebuild. Ids are
+     shape-guarded, so the selector needs no escaping beyond the quote. */
+  const hadEdit = document.activeElement && tb.contains(document.activeElement)
+    && document.activeElement.dataset ? document.activeElement.dataset.editTeam : null;
   /* The cell appears only once an ART exists. Before that it would be a picker
      with one option in it, which is a control that cannot do anything. */
   const anyArts = state.arts.length > 0;
@@ -16533,6 +16543,10 @@ function renderTeamRows() {
   });
   syncAddFoot('btnAddTeamFootRow', state.teams.length);
   renderTeamIdWarning();
+  if (hadEdit) {
+    const again = tb.querySelector('[data-edit-team="' + hadEdit + '"]');
+    if (again) again.focus();
+  }
 }
 
 /* Two teams on one project id. Not repaired automatically — which of the two
@@ -23554,12 +23568,25 @@ closeOnBackdropClick($('teamDialog'));
    and a trap for a test, and the suite yields once before reading the summary. */
 new MutationObserver(() => {
   if ($('teamDialog').open) return;
+  const closedId = teamDialogId;
   teamDialogId = null;
   renderTeamRows();
   renderTeamSelect();
   renderBucketControl();
   renderDataTable();
   renderViews();
+  /* FOCUS GOES BACK TO THE EDIT BUTTON THAT OPENED IT (2026-09-17). The browser
+     hands focus back to the element that had it before the editor opened — and
+     that element was the Edit button in a row this observer has just rebuilt, so
+     it is detached and focus fell to <body>, with the Teams window still open
+     over the page: a keyboard user restarted from nowhere. The button is
+     re-found by its team id rather than remembered — the sortable headings'
+     answer to the same rebuild. Unconditional, because this window opens from
+     that button and nowhere else. */
+  const manage = $('manageDialog');
+  const back = manage.open && closedId
+    ? manage.querySelector('[data-edit-team="' + closedId + '"]') : null;
+  if (back) back.focus();
 }).observe($('teamDialog'), { attributes: true, attributeFilter: ['open'] });
 
 /* SAVES AS YOU GO — there is no OK button, so every box writes on `input` and

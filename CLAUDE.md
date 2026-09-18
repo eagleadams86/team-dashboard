@@ -5034,4 +5034,14 @@ check proven red against the build before it.
 - **The welcome card says four teams.** It still said "three invented teams" after Team Support Desk
   joined the demo; the Your Data button's copy had been updated and this one had not. Pinned in the
   demo group beside the team list.
+- **Closing a team's editor puts focus back on its Edit button.** The browser hands focus back to
+  the element that had it before the editor opened — the Edit button — but the close rebuilds the
+  Teams window's rows, TWICE: from the editor's `open` observer (a microtask) and again from the Teams
+  window's `close` handler, which the browser delivers a task later (`close()` queues the event). Each
+  rebuild is a new button, so the focused one was detached and focus fell to <body> with the window
+  still open. Two lines of defence: the observer re-finds the button by team id after its rebuild, and
+  `renderTeamRows` itself now carries focus across ANY rebuild while a row's Edit button holds it —
+  the sortable headings' answer. The first alone failed in the suite for exactly the second reason;
+  the instrumented run that found it is worth remembering: a `focusout` listener logging
+  `new Error().stack` names the rebuild that took the focus.
 

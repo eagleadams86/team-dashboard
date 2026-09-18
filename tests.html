@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4296;
+const EXPECTED = 4298;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -7977,6 +7977,18 @@ group('ARTs — the grouping, and the boundary it crosses');
        as a microtask — so the row is still the old one on the line after
        close(). Anything asserting the summary has to yield first. */
     await new Promise(r => setTimeout(r, 0));
+    /* And focus comes back to the Edit button that opened it — re-found by team
+       id, since the row it sits in was just rebuilt. It landed on <body> before
+       2026-09-17, with the Teams window still open. */
+    /* Read after a real yield, not a microtask: the browser delivers the dialog's
+       `close` event a task later, and the Teams window's handler then rebuilds
+       the rows a second time — the rebuild that took the focus away. */
+    ok(appDoc.activeElement && appDoc.activeElement.dataset && appDoc.activeElement.dataset.editTeam === 'c1',
+       'closing the team editor puts focus back on the Edit button that opened it, and it survives the later rebuild',
+       'active=' + (appDoc.activeElement && (appDoc.activeElement.id || appDoc.activeElement.tagName)));
+    win.renderTeamRows();
+    ok(appDoc.activeElement && appDoc.activeElement.dataset && appDoc.activeElement.dataset.editTeam === 'c1',
+       'a rebuild of the rows while an Edit button has focus keeps it on that team’s button');
     const after = appDoc.querySelector('#teamRows tr td.setup').textContent;
     ok(/WIP 8/.test(after), 'the row then states the target that was set', after);
     ok(/out of aged share/.test(after), 'and that this team is out of the roll-up', after);
