@@ -5021,4 +5021,9 @@ check proven red against the build before it.
   rolling window shares it; the reviewer's front-side double count (Jul 31 in both Jul and Aug) is
   that rule, now stated in the README's custom-window section. Only a typed To can land here: every
   rolling window ends on the data and `priorWindowOf` ends on a bucket edge by construction.
+- **The separator is decided once, off the first line.** `splitCells` chose per RECORD — a tab if the
+  record held one, else a comma — so a CSV export whose one quoted Summary held a tab was cut on the
+  tab for that record alone, dropped as "no dates at all", and reported as such about a row that had
+  all three. `separatorOf(lines[0])` → `splitCellsBy(sep)` now; the single-space fallback is
+  unchanged. A paste out of a grid is one shape all the way down.
 

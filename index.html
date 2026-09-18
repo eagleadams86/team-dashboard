@@ -5519,10 +5519,22 @@ function detectDateOrder(rawRows) {
    corrupts every metric, so it has to be visible rather than quiet.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function splitCells(line) {
-  if (line.includes('\t')) return line.split('\t');
-  if (line.includes(','))  return splitCsvLine(line);
-  return line.split(/\s{2,}/);
+/* THE SEPARATOR IS DECIDED ONCE, OFF THE FIRST LINE (2026-09-17). It used to be
+   chosen per record — a tab if the record held one, else a comma, else two or
+   more spaces — so a CSV export whose one quoted Summary held a tab was cut on
+   the tab for that record alone: the row came out two cells wide, was dropped
+   as "no dates at all", and the report said so about a row that had all three.
+   A paste out of a grid is one shape all the way down, and its first line —
+   the header, or the first row — says which. A tab inside a comma-separated
+   record is then just a character in a cell. */
+function separatorOf(firstLine) {
+  const l = String(firstLine || '');
+  return l.includes('\t') ? 'tab' : l.includes(',') ? 'comma' : 'spaces';
+}
+function splitCellsBy(sep) {
+  if (sep === 'tab') return (line) => line.split('\t');
+  if (sep === 'comma') return splitCsvLine;
+  return (line) => line.split(/\s{2,}/);
 }
 
 /* A real CSV quotes any field holding a comma ("Jan 21, 2015", "Bug, urgent"),
@@ -7066,10 +7078,10 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
              cols };
   };
 
-  let read = readAs(splitCells);
+  let read = readAs(splitCellsBy(separatorOf(lines[0])));
 
   /* ── A SINGLE SPACE, but only where nothing else worked ────────────────────
-     splitCells takes a tab, then a comma, then TWO-OR-MORE spaces, and a single
+     The paste is split on a tab, else a comma, else TWO-OR-MORE spaces, and a single
      space is deliberately not a separator: a work type is "Tech Debt" and a date
      is "21 Jan 2015", so splitting on one space corrupts pastes that read
      perfectly today. That is still true and this does not change it.
@@ -11762,7 +11774,7 @@ window.TD = {
   weekdayNum, priorSunday, weekStartOn, weekNumber, weekKey, edate, workDaysBetween,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
-  cleanIssueKey,
+  cleanIssueKey, separatorOf,
   /* The three work fields (2026-09-15). */
   WORK_FIELDS, SN_TYPES, SN_INCIDENT, BUG_FOUND, WORK_KINDS, readEnum, enumCode,
   countsAsDefect, teamFactsOf,
@@ -22479,8 +22491,8 @@ function nothingLoadedHtml(res) {
     + ' pasted, but ' + (n === 1 ? 'it' : 'none of them') + ' could be read.</strong> '
     + (noDateColumn
         /* The overwhelmingly likely cause, and the one worth naming outright:
-           the separator. splitCells takes a tab, a comma, or two-or-more
-           spaces, and the fallback for a single space only fires when it can
+           the separator. The paste is split on a tab, a comma, or two-or-more
+           spaces, decided off its first line, and the fallback for a single space only fires when it can
            find a date column — so arriving here with no date column means even
            that did not help. */
         ? 'No column of dates was found. Columns are separated by a tab, a comma, or two or '

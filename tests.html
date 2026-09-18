@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4285;
+const EXPECTED = 4291;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -2077,6 +2077,27 @@ async function run(TD, win) {
      on EVERY ROW rather than in one header, which makes the storage claim
      matter more, not less: what is stored is the stage id, never the word.
      ══════════════════════════════════════════════════════════ */
+  group('the separator is decided once, off the first line');
+  {
+    /* A CSV export with a quoted Summary holding a newline, a comma and a TAB.
+       Chosen per record, the tab won for that record alone and cut it in two:
+       the row was dropped as undated and the report said it had no dates. */
+    const csv = ['Issue key,Summary,Created,In Progress,Resolved',
+                 'DAE-2001,"Login page\nbreaks, badly\ton Safari",2026-01-02,2026-01-03,2026-01-10',
+                 'DAE-2002,Plain,2026-01-02,2026-01-04,2026-01-11'].join('\n');
+    const ct = TD.parsePastedRows(csv, 'auto', []);
+    is(ct.rows.length, 2, 'a tab inside a quoted CSV cell does not cut the record');
+    is(ct.undated, 0, 'so no row is reported as having no dates');
+    is([ct.columns.completed, ct.columns.started, ct.columns.created], [4, 3, 2],
+       'and the columns are where the header says');
+    is(iso(ct.rows[0].completed), '2026-01-10', 'with the tabbed row’s own dates');
+    is(TD.separatorOf ? [TD.separatorOf('a\tb,c'), TD.separatorOf('a,b'), TD.separatorOf('a  b'), TD.separatorOf('')] : null,
+       ['tab', 'comma', 'spaces', 'spaces'], 'a tab wins, then a comma, then two-or-more spaces');
+    /* And a tab-separated paste is tabs all the way down: a comma in a cell is a comma. */
+    const tabbed = TD.parsePastedRows('Key\tType\tCreated\tResolved\nDAE-1\tBug, urgent\t2026-01-02\t2026-01-10', 'auto', []);
+    is([tabbed.rows.length, tabbed.rows[0].type], [1, 'Bug, urgent'], 'a comma inside a tab-separated cell stays in the cell');
+  }
+
   group('a paste separated by single spaces');
 
   /* Reported by Charles on 2026-08-21, typing four rows by hand:

@@ -1138,6 +1138,10 @@ silently corrupt every number on the dashboard.
   days, so the clock is dropped. The date underneath still decides day-first vs month-first. A
   timestamp that names its time zone (`Z`, or `-05:00`) is a moment rather than a wall-clock time,
   so it is dated on **your** calendar: `2026-09-16T01:00:00Z` is 15 September in New York.
+- **The separator is decided once, from the first line** — a tab if it has one, else a comma, else
+  two or more spaces — and applies to the whole paste. A tab inside a quoted CSV cell is then just
+  a character in that cell (until 2026-09-17 it cut that one row in two, which was then dropped as
+  having no dates).
 - **A planning date is never the start.** Jira's all-fields export carries *Target start* and a
   *Start date* custom field; a heading that names a plan (target, planned, due, baseline, estimate,
   expected, forecast) never takes the start role, however many of its cells are filled, and where
