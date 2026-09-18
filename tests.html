@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4260;
+const EXPECTED = 4272;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -10408,6 +10408,13 @@ group('ARTs — the grouping, and the boundary it crosses');
        String(sdOff.summary.incidentsAsSupport));
     ok(sdOff.summary.supportShare > 0.4, 'while much of its finished work came through ServiceNow',
        String(sdOff.summary.supportShare));
+    /* Two of its cycles once had the same length and lined up, so every bug left
+       after the switch read one Bug Type and Found in production said 0%. Found
+       by screenshot; pinned here so the suite sees it next time. */
+    ok(sdOff.summary.defectFound && sdOff.summary.defectFound.production > 0
+         && sdOff.summary.defectFound.preProduction > 0,
+       'and the bugs it keeps were found in BOTH places, so its Found in production tile has a figure',
+       JSON.stringify(sdOff.summary.defectFound));
     const healthyTeam = demoOf(demo, 'Team Healthy Flow'), longTeam = demoOf(demo, 'Team Long Tail');
     const hfW = TD.derive(healthyTeam.rows, wfSettings, withFacts([healthyTeam]));
     ok(hfW.summary.defectSource && hfW.summary.defectSource.jira > 0 && hfW.summary.defectSource.serviceNow > 0,
@@ -17621,6 +17628,13 @@ group('a card with no chart matches the one beside it');
       ['ABC-1\t2025-01-02\t2025-01-10\tStory', 'ABC-2\t2025-01-03\t2025-01-11\tBug',
        'ABC-3\t2025-01-04\t2025-01-12\tStory'].join('\n'), 'auto', [], [], []);
     is(plain.columns.type, 3, 'while a headerless paste with a plain type column still finds it');
+    /* And "Incident" is a real Jira issue type on a service board: with nothing
+       else that could be the type, the list-shaped column IS the type column. */
+    const itsm = T.parsePastedRows(
+      ['SD-1\tIncident\t2025-01-02\t2025-01-10', 'SD-2\tIncident\t2025-01-03\t2025-01-11',
+       'SD-3\tIncident\t2025-01-04\t2025-01-12'].join('\n'), 'auto', [], [], []);
+    is([itsm.columns.type, itsm.rows.map(r => r.type)], [1, ['Incident', 'Incident', 'Incident']],
+       'a headerless board of nothing but Incidents keeps Incident as its work type — the list shape only loses a contest');
   }
 
   group('work fields at the storage boundary');
@@ -17809,6 +17823,17 @@ group('a card with no chart matches the one beside it');
     ok(defTile && /10\.0%/.test(defTile.textContent),
        'the support team’s own dashboard reads the same 10.0% its All Teams row does',
        defTile ? defTile.textContent : 'no tile');
+    /* THE MOVE IS ON THE PAGE — what the help promises: the tile foot and the
+       source chart's title both count the incidents the switch took out. */
+    const snTile = [...wDoc.querySelectorAll('#tilesMix .tile')].find(t => /From ServiceNow/.test(t.textContent));
+    ok(snTile && /3 incidents counted as support, not defects/.test(snTile.textContent),
+       'the From ServiceNow tile’s foot counts the incidents the switch moved',
+       snTile ? snTile.textContent : 'no tile');
+    wDoc.getElementById('stab-mix').click();
+    ok(/3 Incidents Counted as Support, Not Defects/.test(wDoc.getElementById('titleDefectSource').textContent),
+       'and so does the title over Where Defects Came From',
+       wDoc.getElementById('titleDefectSource').textContent);
+    wDoc.getElementById('stab-flow').click();
     win.selectTab('allteams');
     ok(/ServiceNow incidents count as support work, not defects, on 1 of 2 teams/
          .test(wDoc.getElementById('allTeamsNote').textContent),
@@ -17883,6 +17908,9 @@ group('a card with no chart matches the one beside it');
     ok(![...wDoc.querySelectorAll('#spanel-mix .chart-card, #spanel-health .chart-card')]
          .some(x => x.classList.contains('solo')),
        'and both groups are even, so neither carries a solo card');
+    is([wDoc.querySelectorAll('#spanel-mix .chart-card').length,
+        wDoc.querySelectorAll('#spanel-health .chart-card:not(.wide)').length],
+       [4, 4], 'even meaning FOUR cards each in the grid — an absent solo class on no cards would say nothing');
     const sel = wDoc.getElementById('teamSel');
     sel.value = 'm1';
     sel.dispatchEvent(new win.Event('change', { bubbles: true }));
@@ -17892,6 +17920,9 @@ group('a card with no chart matches the one beside it');
     wDoc.getElementById('stab-mix').click();
     const tiles = [...wDoc.querySelectorAll('#tilesMix .tile')];
     is(tiles.length, 4, 'four tiles: the defect rate and one for each work field');
+    is(tiles.map(t => { const b = t.querySelector('[data-help]'); return b ? b.dataset.help : null; }),
+       ['defectRate', 'supportShare', 'productionShare', 'nonDiscShare'],
+       'each carrying its own ⓘ — helpBtn returns nothing for a key with no entry, so a renamed entry would drop one silently');
     const tileVal = (re) => { const t = tiles.find(x => re.test(x.textContent)); return t ? t.querySelector('.value').textContent : 'none'; };
     is([tileVal(/From ServiceNow/), tileVal(/Found in production/), tileVal(/Non-discretionary/)],
        ['29%', '50%', '67%'], 'stating the same three figures the derive does');
@@ -17905,6 +17936,10 @@ group('a card with no chart matches the one beside it');
        'the share chart draws the pooled overall line flat');
     ok(/1 of 3 From ServiceNow/.test(wDoc.getElementById('titleDefectSource').textContent),
        'and each title says how much could be split', wDoc.getElementById('titleDefectSource').textContent);
+    ok(/\(\d+ of \d+ Carry a Bug Type\)/.test(wDoc.getElementById('titleDefectFound').textContent),
+       'the where-found title too', wDoc.getElementById('titleDefectFound').textContent);
+    ok(/\(Overall: 67% of \d+ With a Type of Work\)/.test(wDoc.getElementById('titleWorkKind').textContent),
+       'and the share title carries the pooled figure it drew', wDoc.getElementById('titleWorkKind').textContent);
 
     sel.value = 'm2';
     sel.dispatchEvent(new win.Event('change', { bubbles: true }));
@@ -17967,6 +18002,20 @@ group('a card with no chart matches the one beside it');
        'Work distribution: 25% Discretionary, 75% Non-Discretionary.',
        'naming both halves, pooled across the train, and summing to 100');
     is(pie ? pie.querySelectorAll('path, circle').length : 0, 2, 'two wedges');
+    is(dDoc.querySelectorAll('.sc-card [data-help]').length, 4,
+       'every card has its ⓘ — a renamed help key would drop one silently');
+    is(dist && dist.querySelector('[data-help]') ? dist.querySelector('[data-help]').dataset.help : null,
+       'scDistribution', 'and Distribution’s opens its own entry');
+    /* The arc's large-arc flag: a majority wedge goes the long way round, a
+       minority the short — forced to 0, a 75% wedge draws as a 25% one and the
+       chips still say 75. */
+    const arc = (share, cls) => ((win.workPie(share, 100 - Math.round(share * 100), Math.round(share * 100))
+      .match(new RegExp('<path class="' + cls + '" d="[^"]*"')) || [''])[0].match(/A56 56 0 (\d) 1/) || [])[1];
+    is([arc(0.75, 'disc'), arc(0.75, 'nondisc'), arc(0.25, 'disc'), arc(0.25, 'nondisc')], ['0', '1', '1', '0'],
+       'a wedge over half takes the large arc and one under half the small');
+    ok(/<circle class="nondisc"/.test(win.workPie(1, 0, 100)) && !/<path/.test(win.workPie(1, 0, 100))
+         && /<circle class="disc"/.test(win.workPie(0, 100, 0)) && !/<path/.test(win.workPie(0, 100, 0)),
+       'and all of one kind is a full circle in that colour, not a path that meets itself');
     is(dist ? [...dist.querySelectorAll('.sc-key')].map(x => x.textContent) : null,
        ['Discretionary 25%', 'Non-Discretionary 75%'],
        'the legend names each half with its figure, so colour is never the only signal');

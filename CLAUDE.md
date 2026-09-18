@@ -73,8 +73,9 @@ Built on branch `servicenow-work-fields` as one PR.
   `deriveTrain`, `deriveTeams`, and the hand-built literal in `renderDashboard` (the documented
   trap; a test compares the dashboard tile with the All Teams cell for a support team). A view
   without facts gets the old definition. **A new pooled surface must build the facts too.**
-- **A blank ServiceNow type is "raised in Jira" ONLY on a team whose export carries the column**
-  (`carriesServiceNow`). A team without it is out of the source split and out of the ServiceNow
+- **A blank ServiceNow type is "raised in Jira" ONLY on a team whose export carries a ServiceNow
+  VALUE somewhere** (`carriesServiceNow` — some row has one; a wholly blank column is indistinguishable
+  from no column once codes are stored). A team without one is out of the source split and out of the ServiceNow
   share's denominator — counting its blanks as Jira would split defects the export never
   described. A bare derive with no facts falls back to "any row in this list has a value".
 - **Work Mix is a fifth Dashboard section**, between Health and Forecast, decided with Charles: the
@@ -97,7 +98,7 @@ Built on branch `servicenow-work-fields` as one PR.
   its Bug Type cycle was four long against its ServiceNow Bug cycle's four, so every bug left a
   defect after the switch landed on one value and Found in production read 0%. Give co-varying
   cycles different lengths. Found by screenshot, not by the suite.
-- EXPECTED 4121 → 4242; privacy.html lists the three fields and the switch.
+- EXPECTED 4121 → 4242 (4254 once the Distribution card's checks landed); privacy.html lists the three fields and the switch.
 
 ## The Share Window Groups Teams by Train (2026-09-14) — no schema change
 
@@ -4981,9 +4982,24 @@ check proven red against the build before it.
   that were fine. `enumShaped` in `detectColumns` drops any candidate whose every filled cell reads out
   of one of `WORK_FIELDS`' lists — the same reason the three fields have no headerless fallback, applied
   to the guess that could still land on them. Nothing pasted is echoed; the lists are the app's own.
+  **It is a preference, not a ban** (found by the figures reviewer against the first cut): "Incident" is
+  also a real Jira issue type on a service board, and a headerless paste of nothing but incidents has
+  exactly one column that could be the type. A list-shaped column loses to any plain candidate and is
+  taken when it is the only one. Both shapes pinned.
 - **The Teams window's incidents hint counts ITEMS.** It concatenated a team's features into "N of this
   team's items are ServiceNow incidents", so an incident-typed feature was counted among things the
   tick could move — and a feature is never a defect on any surface (every defect figure is null over
   features). `renderTeamDialog` counts `team.rows` alone; `teamFactsOf` still walks both lists, which
   is inert over features and left as it was.
+- **Twelve checks for behaviours a mutation run showed had none** (tests only; the suite reviewer served
+  twelve mutated copies and these stayed green): Team Support Desk's bugs found in BOTH places (the demo
+  trap the notes above record as "found by screenshot, not by the suite"); the From ServiceNow foot and
+  the source title counting the incidents a switch moved; the where-found and share titles' "(N of M …)"
+  clauses; every Work Mix tile and every Scorecard card carrying a `[data-help]` whose key exists
+  (`helpBtn` returns nothing for a missing key, so a renamed entry drops a dot silently); the pie's
+  large-arc flag and its full-circle form; and "both groups are even" counting FOUR cards each, since an
+  absent `solo` class on no cards says nothing. `EXPECTED` 4254 → 4272.
+- **"Carries the column" now reads "carries a ServiceNow value somewhere"** in the two help entries, the
+  README and this file: `teamFactsOf` marks a carrier when some row has a value, and once codes are
+  stored a wholly blank column is indistinguishable from none. The code was right; the words were not.
 

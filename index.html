@@ -6104,18 +6104,23 @@ function detectColumns(rows, header, order, stages, statuses) {
        THIS guess off them: a column of Incident repeats the way a type column
        does, and a Bug Type column with one Production in it out-scores a real
        type column of three. A column whose every filled cell reads as a value
-       out of one of WORK_FIELDS' own lists is left alone here; the lists are
-       the app's, so the test is exact and echoes nothing. */
+       out of one of WORK_FIELDS' own lists LOSES to any column that does not,
+       and is taken only when it is the sole candidate — because "Incident" is
+       also a real Jira issue type on a service board, and a headerless paste of
+       nothing but incidents has exactly one column that could be the type. The
+       lists are the app's, so the test is exact and echoes nothing. */
     const enumShaped = (c) => {
       const vals = rows.map(r => r[c]).filter(v => String(v == null ? '' : v).trim());
       return vals.length > 0 && WORK_FIELDS.some(f => vals.every(v => readEnum(v, f.list).code));
     };
-    const candidates = stats.filter(s =>
+    const all = stats.filter(s =>
       s.filled && s.dateRate < 0.6 && !taken().has(s.index) && s.distinct <= 20 &&
       /* Rejected only on positive evidence of being an identifier: every value
          distinct, over enough rows to mean something. Two rows of one type each
          are all-distinct too, and that is not grounds to throw the column away. */
-      !(s.distinct === s.filled && s.filled >= 3) && !enumShaped(s.index));
+      !(s.distinct === s.filled && s.filled >= 3));
+    const plain = all.filter(s => !enumShaped(s.index));
+    const candidates = plain.length ? plain : all;
     if (candidates.length) {
       /* Fewest distinct values wins; rightmost breaks a tie, since exports tend
          to put the type after the identifier. */
@@ -15586,9 +15591,9 @@ const METRIC_HELP = {
   defectSource: { title: 'Where Defects Came From', body: [
     ['The defects resolved each period, split by ', b('where they were raised'), ': in Jira, or '
       + 'through ServiceNow \u2014 read off the export\u2019s ServiceNow Assignment Type column.'],
-    ['A blank counts as raised in Jira ', b('only on a team whose export carries that column'),
-      '. A team with no such column is left out of the split, because a blank there says nothing '
-      + 'about where the work came from.'],
+    ['A blank counts as raised in Jira ', b('only on a team whose export carries a ServiceNow value '
+      + 'somewhere'), '. A team with none is left out of the split, because a blank there says '
+      + 'nothing about where the work came from.'],
     ['On a team whose incidents are ', b('support work'), ' \u2014 set in its own Settings window '
       + '\u2014 those incidents are not defects at all, so they are not in these bars. The title '
       + 'counts them.'],
@@ -15611,7 +15616,7 @@ const METRIC_HELP = {
   supportShare: { title: 'From ServiceNow', body: [
     ['The share of finished work that ', b('arrived through ServiceNow'), ' \u2014 incidents, '
       + 'catalog and change tasks, vulnerabilities \u2014 counted only on teams whose export carries '
-      + 'that column.'],
+      + 'a ServiceNow value somewhere.'],
     ['For a support team this is its main output rather than a warning sign. The foot counts the '
       + 'incidents a team\u2019s own switch moved out of its defect rate.'],
   ] },

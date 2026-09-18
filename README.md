@@ -2497,8 +2497,9 @@ Four tiles sit above them: the defect rate, **From ServiceNow**, **Found in prod
 - **A share counts only work that carries a value.** Every title and tile foot says how many did,
   so a patchy field reads as patchy rather than complete.
 - **No value is a dash, never 0%.** A period with no Type of Work is a gap in the line, not a zero.
-- **A blank ServiceNow type means "raised in Jira" only on a team whose export carries that
-  column.** A team without the column is left out of the source split — a blank there says
+- **A blank ServiceNow type means "raised in Jira" only on a team whose export carries a ServiceNow
+  value somewhere.** A team with none — no such column, or a column left empty, which is the same
+  thing once only the numbers are stored — is left out of the source split: a blank there says
   nothing about where the work came from.
 - Over **features** the two defect splits are not a figure — a defect is a kind of work item —
   while Type of Work and the ServiceNow share still count.
