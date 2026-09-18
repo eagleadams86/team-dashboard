@@ -4967,3 +4967,18 @@ proven red against the build before it. The reasoning sits here, per fix.
   quoted the summary as "tests passed"; the `featureAgedDays` comment said a "14" string reads as
   not set (it reads as 14). The README's Files table left out six files, and its paste section now
   says how a zoned timestamp and a version column are handled. `EXPECTED` 4043 → 4121.
+
+## Fixes From the 2026-09-17 Review
+
+Five reviewers over the code that landed after the 2026-09-15 review (work fields, incidents switch,
+Work Mix, Distribution card, demo), plus one using the app end to end. One fix per commit, each with a
+check proven red against the build before it.
+
+- **A closed-list column is not a work type.** The headerless work-type guess took the column with the
+  fewest distinct values, and a column of `Incident` — or a Bug Type column with one `Production` in it —
+  has fewer than a real type column of Story/Bug/Task. Four headerless rows stored every type as
+  "Incident", the defect rate read 0 and the report said the column was read as the work type as if
+  that were fine. `enumShaped` in `detectColumns` drops any candidate whose every filled cell reads out
+  of one of `WORK_FIELDS`' lists — the same reason the three fields have no headerless fallback, applied
+  to the guess that could still land on them. Nothing pasted is echoed; the lists are the app's own.
+

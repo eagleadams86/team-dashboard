@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4254;
+const EXPECTED = 4260;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -17598,6 +17598,29 @@ group('a card with no chart matches the one beside it');
        'and an exact Issue Type now wins over it');
     is(T.detectColumns([['DAE-1', 'Bug', '2026-01-05']], ['Key', 'Work Type', 'Resolved'], 'dmy', [], []).type, 1,
        'while a heading that is only loosely a type is still found when nothing exact is there');
+    /* HEADERLESS (2026-09-17): the fewest-distinct guess used to take a work-field
+       column — four rows all reading Incident are one distinct value against three
+       work types — and every stored type became "Incident". A column whose filled
+       cells all read out of a closed list is not a candidate at all. */
+    const hl = T.parsePastedRows(
+      ['ABC-1\t2025-01-02\t2025-01-10\tStory\tIncident',
+       'ABC-2\t2025-01-03\t2025-01-11\tBug\tIncident',
+       'ABC-3\t2025-01-04\t2025-01-12\tTask\tIncident',
+       'ABC-4\t2025-01-05\t2025-01-13\tStory\tIncident'].join('\n'), 'auto', [], [], []);
+    is(hl.columns.type, 3, 'headerless: a column of ServiceNow types does not become the work type');
+    is(hl.rows.map(r => r.type), ['Story', 'Bug', 'Task', 'Story'], 'so the four work types are kept');
+    is(hl.columns.snType, -1, 'and it is still not read as the ServiceNow type — heading only');
+    const sparse = T.parsePastedRows(
+      ['ABC-1\t2025-01-02\t2025-01-10\tStory\tProduction',
+       'ABC-2\t2025-01-03\t2025-01-11\tBug\t',
+       'ABC-3\t2025-01-04\t2025-01-12\tTask\t',
+       'ABC-4\t2025-01-05\t2025-01-13\tStory\t'].join('\n'), 'auto', [], [], []);
+    is(sparse.columns.type, 3, 'nor does a Bug Type column with one Production in it');
+    is(sparse.rows.map(r => r.type), ['Story', 'Bug', 'Task', 'Story'], 'and its work types survive');
+    const plain = T.parsePastedRows(
+      ['ABC-1\t2025-01-02\t2025-01-10\tStory', 'ABC-2\t2025-01-03\t2025-01-11\tBug',
+       'ABC-3\t2025-01-04\t2025-01-12\tStory'].join('\n'), 'auto', [], [], []);
+    is(plain.columns.type, 3, 'while a headerless paste with a plain type column still finds it');
   }
 
   group('work fields at the storage boundary');

@@ -6098,12 +6098,24 @@ function detectColumns(rows, header, order, stages, statuses) {
        rows of Story/Story/Story/Bug is a distinct-ratio of 0.5, which is a
        perfectly normal type column and was being rejected. The 20 cap keeps a
        long free-text column (a summary, a reporter) out of it. */
+    /* A CLOSED-LIST COLUMN IS NOT A WORK TYPE (2026-09-17). The three work
+       fields have no headerless fallback on purpose — a column of Production
+       looks exactly like a column of work types — and the same reason keeps
+       THIS guess off them: a column of Incident repeats the way a type column
+       does, and a Bug Type column with one Production in it out-scores a real
+       type column of three. A column whose every filled cell reads as a value
+       out of one of WORK_FIELDS' own lists is left alone here; the lists are
+       the app's, so the test is exact and echoes nothing. */
+    const enumShaped = (c) => {
+      const vals = rows.map(r => r[c]).filter(v => String(v == null ? '' : v).trim());
+      return vals.length > 0 && WORK_FIELDS.some(f => vals.every(v => readEnum(v, f.list).code));
+    };
     const candidates = stats.filter(s =>
       s.filled && s.dateRate < 0.6 && !taken().has(s.index) && s.distinct <= 20 &&
       /* Rejected only on positive evidence of being an identifier: every value
          distinct, over enough rows to mean something. Two rows of one type each
          are all-distinct too, and that is not grounds to throw the column away. */
-      !(s.distinct === s.filled && s.filled >= 3));
+      !(s.distinct === s.filled && s.filled >= 3) && !enumShaped(s.index));
     if (candidates.length) {
       /* Fewest distinct values wins; rightmost breaks a tie, since exports tend
          to put the type after the identifier. */

@@ -2469,7 +2469,9 @@ Each field is a short, closed list, so an item stores **which value it was, as a
 the text of the cell. A cell holding anything else is dropped and counted in the paste report,
 which never prints it. The columns are only ever found **by their heading**: a column of
 "Production" and "Incident" looks exactly like a column of work types, so without a heading
-nothing is guessed.
+nothing is guessed — and, for the same reason, a headerless paste never takes such a column *as*
+the work type either. A column whose every filled cell is one of these values is left out of that
+guess.
 
 All three headings contain the word *type*, and the work type column used to be found by the
 leftmost heading that loosely said "type" — so one of these to the left of *Issue Type* would have
