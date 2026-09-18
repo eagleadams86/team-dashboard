@@ -5044,4 +5044,10 @@ check proven red against the build before it.
   the sortable headings' answer. The first alone failed in the suite for exactly the second reason;
   the instrumented run that found it is worth remembering: a `focusout` listener logging
   `new Error().stack` names the rebuild that took the focus.
+- **The band strip stacks under 360px.** At 320 the three `.sc-band`s shared about 78px each and the
+  marked "▸10.2–25%" needed 82, so `text-overflow: ellipsis` hid its upper bound — on the strip whose
+  job is the two boundaries. `@media (max-width: 359px) { .sc-bands { grid-template-columns: 1fr } }`.
+  Pinned by putting the suite's 1px frame at 320 and 400 (the pin group's trick) with a fixture whose
+  pooled figure lands in the MIDDLE band, because only the marked middle label is wide enough to cut;
+  the first fixture's figure fell in the top band and the check passed on the broken build.
 

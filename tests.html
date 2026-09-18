@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4298;
+const EXPECTED = 4303;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -18118,6 +18118,38 @@ group('a card with no chart matches the one beside it');
     ok(/<circle class="nondisc"/.test(win.workPie(1, 0, 100)) && !/<path/.test(win.workPie(1, 0, 100))
          && /<circle class="disc"/.test(win.workPie(0, 100, 0)) && !/<path/.test(win.workPie(0, 100, 0)),
        'and all of one kind is a full circle in that colour, not a path that meets itself');
+
+    /* NO BAND LABEL LOSES ITS BOUND AT 320px (2026-09-17). The frame is 1px wide
+       in this suite, so it is put at a real phone width, measured, and put back —
+       the pin group's trick. A graded card is needed for a strip, so the Quality
+       card is given a boundary pair; at 320 the marked band read "▸10.1–2…". */
+    const appFrame = document.getElementById('app');
+    const wasCss = appFrame.style.cssText;
+    plant({ teams: [
+      { id: 'sd1', name: 'Mixed', rows: [r('2026-01-06', 'Story', 2), r('2026-01-07', 'Bug', 2),
+                                         r('2026-01-08', 'Story', 1), r('2026-01-09', 'Story')] },
+      { id: 'sd2', name: 'Plain', rows: [r('2026-01-06', 'Story', 2), r('2026-01-08', 'Story')] }
+    ], settings: { defectShareGreen: 10.1, defectShareRed: 25 } });
+    /* One bug in six is 16.7%, so the MARKED band is the middle one — "▸10.2–25%",
+       the widest label the strip can carry, and the one that was cut. */
+    win.renderAll();
+    win.selectTab('scorecard');
+    appFrame.style.cssText = 'position:absolute;width:320px;height:900px;opacity:0;border:0;left:-9999px';
+    await new Promise((res) => setTimeout(res, 250));
+    const bands = [...dDoc.querySelectorAll('.sc-band')];
+    ok(bands.length >= 3, 'a graded card draws its strip', String(bands.length));
+    ok(bands.some(b => /10\.2–25/.test(b.textContent) && b.classList.contains('is-here')),
+       'with the middle band marked, the widest label there is', bands.map(b => b.className + ':' + b.textContent).join(' | '));
+    is(bands.filter(b => b.scrollWidth > b.clientWidth).map(b => b.textContent), [],
+       'and at 320px no band label is cut — the strip stacks rather than hiding a boundary');
+    is(bands.length ? win.getComputedStyle(bands[0].parentElement).gridTemplateColumns.split(' ').length : 0, 1,
+       'one column under 360px');
+    appFrame.style.cssText = 'position:absolute;width:400px;height:900px;opacity:0;border:0;left:-9999px';
+    await new Promise((res) => setTimeout(res, 250));
+    is(bands.length ? win.getComputedStyle(bands[0].parentElement).gridTemplateColumns.split(' ').length : 0, 3,
+       'and three across from 360px up, as before');
+    appFrame.style.cssText = wasCss;
+    await new Promise((res) => setTimeout(res, 250));
     is(dist ? [...dist.querySelectorAll('.sc-key')].map(x => x.textContent) : null,
        ['Discretionary 25%', 'Non-Discretionary 75%'],
        'the legend names each half with its figure, so colour is never the only signal');

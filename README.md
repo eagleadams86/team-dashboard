@@ -818,6 +818,10 @@ Set a pair of boundaries under **Grading** in Settings and the card draws its sc
 so they can never overlap or contradict the grading — a printed scorecard reading *16-25* beside
 *>=25* claims 25 twice, and this cannot.
 
+On a screen narrower than 360px the three bands stack instead of sharing one line: at 320px the
+marked band's label was losing its upper bound behind an ellipsis, and a strip whose whole job is
+to show the two boundaries must not hide one.
+
 **Leave either box empty and the strip is not drawn at all.** Not greyed, not empty — a strip of
 three blank ranges is a scale nobody drew. The card states the figure, says which setting would
 grade it, and leaves the judgement to you, which is what every other figure in this app does.

@@ -1396,6 +1396,13 @@ select { cursor: pointer; }
   color: var(--text-secondary); background: var(--surface-alt); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; }
 .sc-band.green  { background: var(--green-bg); color: var(--green); }
+/* THREE ACROSS UNTIL 360px, then STACKED (2026-09-17). At 320 the three bands share
+   about 78px each and the marked one — "▸10.1–25" — needs 82, so its upper bound
+   went behind the ellipsis: a strip whose whole job is to show the two boundaries
+   was hiding one. Stacking keeps every label whole at the narrowest width the
+   app supports; the marker, the ring and the sr-only sentence still say which
+   band the figure is in. Measured with the demo loaded, not guessed. */
+@media (max-width: 359px) { .sc-bands { grid-template-columns: 1fr; } }
 .sc-band.yellow { background: var(--amber-bg); color: var(--amber); }
 .sc-band.red    { background: var(--red-bg);   color: var(--red); }
 /* The one the figure is in. The ring is inset so the strip's own geometry never
