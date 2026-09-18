@@ -23425,7 +23425,11 @@ function renderTeamDialog() {
      move before moving it — and a team with none is told it changes nothing yet,
      rather than left to wonder why nothing did. */
   const defectLower = String(state.settings.unplannedType || '').trim().toLowerCase();
-  const incidents = (team.rows || []).concat(team.features || []).filter(r => r.snType === SN_INCIDENT);
+  /* ITEMS ONLY, as the sentence says: a feature is never a defect on any surface
+     (every defect figure is null over features), so an incident-typed feature is
+     nothing this tick can move, and counting it would put a number on screen the
+     dashboard cannot show. */
+  const incidents = (team.rows || []).filter(r => r.snType === SN_INCIDENT);
   const incidentDefects = incidents
     .filter(r => String(r.type || '').trim().toLowerCase() === defectLower).length;
   const defectWord = '<strong>' + escapeHtml(state.settings.unplannedType || '') + '</strong>';

@@ -4981,4 +4981,9 @@ check proven red against the build before it.
   that were fine. `enumShaped` in `detectColumns` drops any candidate whose every filled cell reads out
   of one of `WORK_FIELDS`' lists — the same reason the three fields have no headerless fallback, applied
   to the guess that could still land on them. Nothing pasted is echoed; the lists are the app's own.
+- **The Teams window's incidents hint counts ITEMS.** It concatenated a team's features into "N of this
+  team's items are ServiceNow incidents", so an incident-typed feature was counted among things the
+  tick could move — and a feature is never a defect on any surface (every defect figure is null over
+  features). `renderTeamDialog` counts `team.rows` alone; `teamFactsOf` still walks both lists, which
+  is inert over features and left as it was.
 
