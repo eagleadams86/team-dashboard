@@ -1132,7 +1132,9 @@ silently corrupt every number on the dashboard.
   ids (until 2026-09-01 a default issue-navigator export with no *Resolved* column took
   *Issue id* as the completion date, and every row finished in 2012). Where `03/04/2015` is genuinely ambiguous, the app auto-detects
   day-first vs month-first from the columns it reads dates from — a column of version numbers
-  like `2.13.10` never gets a vote — or you can force it.
+  like `2.13.10` never gets a vote — or you can force it. When no date in the paste could be read
+  either way round (every one names its month, or is ISO), the report says the question did not
+  arise rather than stating an order.
 - A **time on the end is fine** — `9/23/2025 10:21`, `23/Sep/25 4:12 PM`, `2025-09-23T10:21:00Z`.
   Jira and Excel export timestamps rather than bare dates, and every metric here works in whole
   days, so the clock is dropped. The date underneath still decides day-first vs month-first. A

@@ -5026,4 +5026,9 @@ check proven red against the build before it.
   tab for that record alone, dropped as "no dates at all", and reported as such about a row that had
   all three. `separatorOf(lines[0])` → `splitCellsBy(sep)` now; the single-space fallback is
   unchanged. A paste out of a grid is one shape all the way down.
+- **The report states a date order only where one arose.** With no numeric date in the date columns
+  `readAs` fell back to the paste-wide vote — the version column the 2026-09-15 fix had just taken the
+  vote from — and said "dates as month first" of `3/Aug/26`. No figure moved; the sentence was false.
+  `orderMoot` (date columns found, none of them holding a numeric date) travels on the parse result;
+  `columnsReadHtml` then says the question did not arise, and `orderGuessed` is never true alongside it.
 

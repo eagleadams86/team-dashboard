@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4291;
+const EXPECTED = 4295;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -17599,6 +17599,22 @@ group('a card with no chart matches the one beside it');
       + tab(['DAE-1', 'Bug', '2026-01-05', '2026-01-03']), 'auto', [], [], []);
     ok(!/ServiceNow|Bug Type|Type of Work/.test(win.columnsReadHtml(plain)),
        'and an export with none of the columns gets no line about them');
+    /* Month-name dates beside a version column: the report used to say "dates as
+       month first" off the versions — the one column the order must not come
+       from — about dates that never posed the question. */
+    const moot = T.parsePastedRows(tab(['Issue key', 'Fix versions', 'Created', 'In Progress', 'Resolved']) + '\n'
+      + tab(['DAE-1', '2.13.10', '3/Aug/26 9:00 AM', '5/Aug/26 9:00 AM', '12/Aug/26 4:00 PM']) + '\n'
+      + tab(['DAE-2', '3.14.12', '4/Aug/26 9:00 AM', '6/Aug/26 9:00 AM', '20/Aug/26 4:00 PM']), 'auto', [], [], []);
+    is([moot.orderMoot, moot.orderGuessed, moot.rows.length], [true, false, 2],
+       'dates that all name their month leave the order moot, not guessed');
+    const mootHtml = win.columnsReadHtml(moot);
+    ok(!/dates as <strong>/.test(mootHtml) && /did not arise/.test(mootHtml),
+       'and the report says so rather than stating an order it took off a version column', mootHtml);
+    const numeric = T.parsePastedRows(tab(['Key', 'Issue Type', 'Resolved', 'In Progress']) + '\n'
+      + tab(['DAE-1', 'Bug', '21/01/2015', '19/01/2015']), 'auto', [], [], []);
+    ok(/dates as <strong>day first<\/strong>/.test(win.columnsReadHtml(numeric)),
+       'while numeric dates still have their order stated');
+    is(plain.orderMoot, true, 'and ISO dates never posed the question either');
 
     const bare = T.parsePastedRows([
       tab(['Issue Type', 'Bug Type', 'Type of Work', 'ServiceNow Assignment Type', 'Resolved', 'In Progress']),

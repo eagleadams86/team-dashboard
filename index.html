@@ -7051,6 +7051,12 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
        the columns are read again under it. `evidence` goes out with it, so the
        guessed-order warning is judged on the same cells. */
     let evidence = dateEvidence(rows);
+    /* WHEN EVERY DATE NAMES ITS MONTH THE ORDER NEVER AROSE (2026-09-17). With no
+       numeric date in the date columns the paste-wide vote is all that is left,
+       and on a trimmed export that vote is the version column — so the report
+       said "dates as month first" about 3/Aug/26, a false statement off the very
+       column the 2026-09-15 fix silenced. No figure moved; the sentence did. */
+    let orderMoot = false;
     if (!order || order === 'auto') {
       /* A HEADING that names a date, where there is a header. Content alone cannot
          tell a version from a date: under a month-first first guess 2.13.10 IS a
@@ -7062,13 +7068,14 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
         .filter((i, k, a) => i >= 0 && a.indexOf(i) === k)
         .filter(i => !head || DATE_HEADING.test(String(head[i] || '')));
       const own = dateIdx.length ? dateEvidence(rows, dateIdx) : null;
+      orderMoot = !!own && own.dayFirst + own.monthFirst + own.ambiguous === 0;
       if (own && own.dayFirst + own.monthFirst + own.ambiguous > 0) {
         evidence = own;
         const byOwn = own.monthFirst > own.dayFirst ? 'mdy' : 'dmy';
         if (byOwn !== ord) { ord = byOwn; cols = detectColumns(rows, head, ord, stages, statusList); }
       }
     }
-    return { rows, header: head, skippedHeader: skipped, resolved: ord, evidence,
+    return { rows, header: head, skippedHeader: skipped, resolved: ord, evidence, orderMoot,
              /* `statusList`, which is the vocabulary this paste STARTED from —
                 not what it will leave behind. A status adopted by this very
                 paste cannot retroactively claim a heading in it: the tick that
@@ -7120,7 +7127,8 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
      it never said is that it was a guess. Only true when the picker is on
      Auto-detect: a reader who chose an order is not guessing. */
   const ev = read.evidence;
-  const orderGuessed = (!order || order === 'auto')
+  const orderMoot = !!read.orderMoot;
+  const orderGuessed = (!order || order === 'auto') && !orderMoot
     && ev.dayFirst === 0 && ev.monthFirst === 0 && ev.ambiguous > 0;
 
   const at = (cells, i) => (i >= 0 && cells[i] != null ? String(cells[i]).trim() : '');
@@ -7566,7 +7574,7 @@ function parsePastedRows(text, order, stages, featureTypes, statuses) {
 
   return { rows, features, featuresNoKey,
            badCompleted, badStarted, badCreated, startAfterDone, raisedAfterStart,
-           unfinished, undated, skippedHeader, dateOrder: resolved, orderGuessed, columns: cols,
+           unfinished, undated, skippedHeader, dateOrder: resolved, orderGuessed, orderMoot, columns: cols,
            /* How many non-empty lines were in the box. The note under the paste
               needs it to tell "nothing was pasted" from "nothing could be read",
               which it used to report as the same thing. */
@@ -22232,7 +22240,12 @@ function columnsReadHtml(res) {
     (res.columns.created >= 0 && res.columns.created !== res.columns.started
       ? ', <strong>' + colName(res.columns.created) + '</strong> as the created date' : '') +
     ' and <strong>' + colName(res.columns.type) + '</strong> as the work type; ' +
-    'dates as <strong>' + (res.dateOrder === 'mdy' ? 'month first' : 'day first') + '</strong>.' +
+    /* A paste whose dates all name their month, or are ISO, has no day-first or
+       month-first question to answer, and saying "month first" of one was a
+       false statement taken off a version column (2026-09-17). */
+    (res.orderMoot
+      ? 'no date in it reads either way round, so day first or month first did not arise.'
+      : 'dates as <strong>' + (res.dateOrder === 'mdy' ? 'month first' : 'day first') + '</strong>.') +
     /* And whether that was read off the data or fallen back to. Nothing in a
        paste of 1/1/26 and 1/3/26 can settle it, and the difference between the
        two readings is a two-day cycle time against a fifty-nine-day one — which
