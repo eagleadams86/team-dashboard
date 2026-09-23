@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4311;
+const EXPECTED = 4317;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -10604,6 +10604,24 @@ group('ARTs — the grouping, and the boundary it crosses');
      'but NO value labels — two sets of numbers over one half-width card is unreadable');
   ok(win.tdCharts().chartLeadTime.options.plugins.legend.display,
      'and it gains the legend a two-line card needs');
+
+  /* A PERCENTILE PRINTS WHOLE (2026-09-23). percentileOf is nearest-rank, so the
+     figure is one real item's duration — whole days — and "28.0" was precision it
+     never had. The average beside it keeps its decimal; that one is real. Read on
+     the tile AND the tooltip, since each has its own formatter. */
+  const leadVal = (i) => flowTiles[i].querySelector('.value').textContent.trim();
+  ok(/^\d+$/.test(leadVal(2)), 'the percentile lead time tile prints whole days, no ".0"', leadVal(2));
+  ok(/^\d+\.\d$/.test(leadVal(1)), 'while the average lead time keeps its one decimal', leadVal(1));
+  const leadTip = win.tdCharts().chartLeadTime.options.plugins.tooltip.callbacks.label;
+  is(leadTip({ dataset: leadSets[1], parsed: { y: 10 } }), '85th percentile: 10',
+     'the percentile line’s tooltip reads whole too');
+  is(leadTip({ dataset: leadSets[0], parsed: { y: 10 } }), 'Avg lead time: 10.0',
+     'and the average line’s keeps num1');
+  const cycleTip = win.tdCharts().chartCycleTime.options.plugins.tooltip.callbacks.label;
+  is(cycleTip({ dataset: cycleSets[1], parsed: { y: 4 } }), '85th percentile: 4',
+     'the cycle time chart’s percentile tooltip likewise');
+  is(cycleTip({ dataset: cycleSets[1], parsed: { y: 0.5 } }), '85th percentile: 0.5',
+     'but a fractional same-day value still shows its decimal');
 
   /* ────────────────────────────────────────────────────────── */
   group('the aged share is the one tile that grades — and only when asked to');

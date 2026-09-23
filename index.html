@@ -10636,7 +10636,6 @@ function derive(rows, settings, view, stages, statuses) {
   const ageMedian = percentileOf(windowCycles, 50);
 
   const ageP85 = percentileOf(windowCycles, CYCLE_PERCENTILE);
-  const ageShort = (v) => Number.isInteger(v) ? String(v) : num1(v);
 
   /* ── Every item that finished, at the time it took ─────────────────────────
      The counterpart of the work item age chart, and the other half of the same
@@ -10688,9 +10687,9 @@ function derive(rows, settings, view, stages, statuses) {
      progress, and nothing on this chart is still in progress. */
   const scatterLines = [];
   if (ageMedian != null) scatterLines.push({ key: 'median', value: ageMedian,
-    text: 'half took under ' + ageShort(ageMedian) });
+    text: 'half took under ' + numRank(ageMedian) });
   if (ageP85 != null) scatterLines.push({ key: 'p85', value: ageP85,
-    text: CYCLE_PERCENTILE + '% took under ' + ageShort(ageP85) });
+    text: CYCLE_PERCENTILE + '% took under ' + numRank(ageP85) });
   /* The promise, where the team has made one — and the only line on either
      scatter that is not something this data did. That is exactly why it is
      worth drawing: the percentile line says what the team achieves and this
@@ -10700,7 +10699,7 @@ function derive(rows, settings, view, stages, statuses) {
      this morning is worth more than reading it next month. Last in the list so
      it draws over the two it is being compared with. */
   if (sleDays != null) scatterLines.push({ key: 'sle', value: sleDays,
-    text: 'target ' + ageShort(sleDays) });
+    text: 'target ' + numRank(sleDays) });
   /* The fence, where one is in force. It goes on the scatter and nowhere else:
      this is the only chart drawing one dot per item, so it is the only one where
      a horizontal line at the cutoff says something a reader can act on — every
@@ -10708,7 +10707,7 @@ function derive(rows, settings, view, stages, statuses) {
      and they are all still drawn. On the AGE chart the same line would be a
      claim about work in progress, which this setting never touches. */
   if (outlierCutoff != null) scatterLines.push({ key: 'outlier', value: outlierCutoff,
-    text: 'ignoring over ' + ageShort(outlierCutoff) });
+    text: 'ignoring over ' + numRank(outlierCutoff) });
 
 
   /* Written before the points leave derive, so how crowded a dot is is a pinned
@@ -14359,6 +14358,12 @@ function renderChart(id, config) {
 const pct1 = v => (v * 100).toFixed(1) + '%';        /* tooltips */
 const pct0 = v => Math.round(v * 100) + '%';         /* axis ticks — whole percents */
 const num1 = v => (Math.round(v * 10) / 10).toFixed(1);
+/* A cycle or lead time PERCENTILE (the 85th, the median). percentileOf is
+   nearest-rank, so the answer is always one real item's duration — a whole
+   number of days — and num1's ".0" on every one of them only read as false
+   precision. The decimal survives for the single case that can produce one: a
+   fractional same-day value in Settings. Averages stay on num1; theirs is real. */
+const numRank = v => Number.isInteger(v) ? String(v) : num1(v);
 const int0 = v => String(Math.round(v));
 
 /* ── The two forecast histograms ───────────────────────────────────────────
@@ -14638,6 +14643,9 @@ function drawCharts(d) {
   const respOpts = baseOptions(d.axisTitles.cycleTime, num1, null, d.axisTitles.x, d.partial);
   respOpts.scales.y.beginAtZero = true;
   respOpts.plugins.valueLabels = { enabled: true, color: token('--text-muted'), format: num1 };
+  /* The percentile line's tooltip reads whole, like its tile; the average keeps num1. */
+  respOpts.plugins.tooltip.callbacks.label = c => c.dataset.label + ': '
+    + (c.dataset.data === d.p85CycleTime ? numRank : num1)(c.parsed.y);
   respOpts.plugins.legend = {
     display: true, position: 'top',
     labels: { color: token('--text-secondary'), usePointStyle: true, boxWidth: 18,
@@ -14723,6 +14731,8 @@ function drawCharts(d) {
   if (d.hasCreated) {
     const leadOpts = baseOptions(d.axisTitles.leadTime, num1, null, d.axisTitles.x, d.partial);
     leadOpts.scales.y.beginAtZero = true;
+    leadOpts.plugins.tooltip.callbacks.label = c => c.dataset.label + ': '
+      + (c.dataset.data === d.p85LeadTime ? numRank : num1)(c.parsed.y);
     /* The card carries two lines now, so it needs the legend the cycle time card
        already has — and the SAME legend, filtering the trend out, because these
        two cards are the same pair of questions asked of two spans and a reader
@@ -14895,8 +14905,8 @@ function drawCharts(d) {
         ? 'Nothing has finished in this window to measure against yet.'
         : 'For scale: features that finished in this window took '
           + (d.summary.medianCycleTime == null ? ''
-            : num1(d.summary.medianCycleTime) + ' ' + d.dayNoun + ' at the median and ')
-          + num1(d.summary.p85CycleTime) + ' ' + d.dayNoun + ' at the '
+            : numRank(d.summary.medianCycleTime) + ' ' + d.dayNoun + ' at the median and ')
+          + numRank(d.summary.p85CycleTime) + ' ' + d.dayNoun + ' at the '
           + d.cyclePercentile + 'th percentile. Set yours below that, so a feature '
           + 'is flagged while there is still time to act on it.');
 
@@ -17100,9 +17110,9 @@ function renderDashboard() {
           + (s.wholePeriods === 1 ? d.bucketNoun : d.bucketNounPlural),
       'throughput') +
     tile(d.cyclePercentile + 'th percentile ' + (state.settings.cycleTimeLabel || 'cycle time').toLowerCase(),
-      s.p85CycleTime == null ? '—' : num1(s.p85CycleTime),
+      s.p85CycleTime == null ? '—' : numRank(s.p85CycleTime),
       d.cyclePercentile + '% of ' + d.unitMany + ' finished within this'
-        + (s.medianCycleTime == null ? '' : '; half within ' + num1(s.medianCycleTime))
+        + (s.medianCycleTime == null ? '' : '; half within ' + numRank(s.medianCycleTime))
         + outlierFoot(d)
 
         /* The promise, stated in WORDS and never in a colour. Nothing in this
@@ -17119,7 +17129,7 @@ function renderDashboard() {
            screen, and a number here that matched neither would raise a question
            instead of answering one. */
         + (s.sleMet == null ? ''
-          : '; target ' + num1(s.sleDays) + (s.sleMet ? ' — met' : ' — not met')
+          : '; target ' + numRank(s.sleDays) + (s.sleMet ? ' — met' : ' — not met')
             + (s.sleJudgedIncludesIgnored ? ', counting the ignored items' : '')),
 
 
@@ -17176,7 +17186,7 @@ function renderDashboard() {
        sits further from the item somebody is actually waiting on here than it
        does on cycle time. */
     tile(CYCLE_PERCENTILE + 'th percentile lead time',
-      s.p85LeadTime == null ? '—' : num1(s.p85LeadTime),
+      s.p85LeadTime == null ? '—' : numRank(s.p85LeadTime),
       s.p85LeadTime == null ? 'no created dates in this window'
         : d.dayNoun + ' — ' + CYCLE_PERCENTILE + '% of requests were delivered within it'
           + outlierFoot(d),
@@ -17254,7 +17264,7 @@ function renderDashboard() {
     tile('Oldest in progress', ag.oldest == null ? '—' : String(ag.oldest),
       ag.oldest == null ? 'nothing is in progress'
         : ag.median == null ? d.dayNoun + ' so far'
-        : d.dayNoun + ' so far, against a median of ' + num1(ag.median)
+        : d.dayNoun + ' so far, against a median of ' + numRank(ag.median)
           + ' for finished work',
       'itemAge');
 
@@ -18493,7 +18503,7 @@ function teamColumns(train) {
       get: (d) => { const t = throughputTrend(d); return t ? t.change : null; },
       fmt: (v) => or(v, num1) },
     { key: 'p85', label: train.cyclePercentile + 'th ' + cycle.toLowerCase(), desc: true,
-      get: (d) => d.summary.p85CycleTime, fmt: (v) => or(v, num1) },
+      get: (d) => d.summary.p85CycleTime, fmt: (v) => or(v, numRank) },
     /* IMMEDIATELY BESIDE THE CYCLE TIME PERCENTILE, and the adjacency is the
        whole reason this column exists rather than a placement preference. The
        column to its left measures from the moment work STARTED, so it cannot see
@@ -18516,7 +18526,7 @@ function teamColumns(train) {
        measured at 1100, 1265 and 1500 with long team names and a renamed cycle
        time label. */
     { key: 'leadP85', label: train.cyclePercentile + 'th lead time', desc: true,
-      get: (d) => d.summary.p85LeadTime, fmt: (v) => or(v, num1) },
+      get: (d) => d.summary.p85LeadTime, fmt: (v) => or(v, numRank) },
     /* THE TRACE IS IN THIS CELL AND THE SORT IS STILL THE COUNT — see wipCell
        for both halves of that. `get` is untouched, so a saved sort on `wip` from
        before 2026-09-10 means what it always did. */
@@ -19079,7 +19089,7 @@ function renderAllTeams() {
       'across every team, over ' + s.wholePeriods + ' whole '
         + (s.wholePeriods === 1 ? train.bucketNoun : train.bucketNounPlural), 'throughput') +
     tile(train.cyclePercentile + 'th percentile ' + (state.settings.cycleTimeLabel || 'cycle time').toLowerCase(),
-      s.p85CycleTime == null ? '&mdash;' : num1(s.p85CycleTime),
+      s.p85CycleTime == null ? '&mdash;' : numRank(s.p85CycleTime),
       'over every item any team completed, not an average of theirs', 'trainPercentile') +
     tile('Work in progress', String(s.currentWip),
       'open across every team as of ' + prettyDate(s.asOf), 'wip') +

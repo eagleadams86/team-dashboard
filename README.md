@@ -504,7 +504,7 @@ for three weeks before anybody picked it up. The lead time column measures from 
 raised. **The gap between the two cells is that team's queue** — readable along the row without
 doing any arithmetic, and normally the cheapest thing on this table to act on, because closing a
 queue takes scheduling rather than anyone working faster. In the demo, Team Healthy Flow reads
-6.0 against 9.0 and Team Long Tail 23.0 against 30.0.
+6 against 9 and Team Long Tail 23 against 30.
 
 It reads as a dash for a team whose export carries no **Created** column — a real and ordinary
 state rather than a fault, and the same shape the defect rate column already has in the feature
@@ -1468,7 +1468,7 @@ What they do:
 - The **limit** is drawn flat across the work in progress chart, and the *Work in progress* tile
   says whether today is inside it and by how much: *limit 6 — over by 3*.
 - The **target** is drawn on both scatter charts — every finished item, and work item age — and
-  the *85th percentile* tile says *target 10.0 — met* or *not met*. It is compared with the
+  the *85th percentile* tile says *target 10 — met* or *not met*. It is compared with the
   percentile rather than with the average deliberately: a target is a promise about the next
   item, which is the one question an average cannot answer. On the age chart it means something
   slightly different and equally useful — an item still open above that line has already blown
@@ -1596,7 +1596,7 @@ If you've set an [85% ≤ target](#your-own-limit-and-your-own-target), the **me
 counts the ignored items. A target is a promise about real work, and the items that broke it are
 exactly the ones an outlier rule takes out — read over the fenced pool, a promise would start
 passing the moment somebody flipped a switch in Settings. So the percentile on the tile and the
-verdict beside it can legitimately disagree, and the tile says which is which: *"7.0 … target 10.0
+verdict beside it can legitimately disagree, and the tile says which is which: *"7 … target 10
 — not met, counting the ignored items"*.
 
 ### On All Teams, Each Team Gets Its Own Fence
@@ -1814,7 +1814,9 @@ worth knowing:
   asking than raw speed.
 - **Percentiles are nearest-rank, never interpolated.** The figure is always a duration some
   real item actually took, so "85% finished within 17 days" is a true statement about work you
-  shipped. The window figure pools every item in the window rather than averaging the
+  shipped — which is also why it prints without a decimal (*28*, not *28.0*); only a
+  fractional same-day value in Settings can give it one, while the averages beside it keep theirs.
+  The window figure pools every item in the window rather than averaging the
   per-period percentiles, because a percentile of percentiles is not a percentile.
 - **The same 85 governs the delivery band.** The steady-delivery tile reads the 15th and 85th
   percentiles of the per-period counts, mirrored around the middle so one convention serves
