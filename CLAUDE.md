@@ -5086,3 +5086,22 @@ only on a real edit (a paste, Settings, Teams). It is still a paste lost without
   `let storedRaw` sits beside `let state`.
 - EXPECTED 4303 → 4311. The test holds storage against the other board's TEAMS, not its bytes:
   adopting runs boot's shape repair, which writes the board back in this build's shape.
+- **What happens AROUND a refused save (2026-09-23, from a review the same day).** Three faults,
+  all in the callers rather than the guard:
+  - **`persist()` and `save()` RETURN whether the write landed.** `doLoad` wrote "Loaded 40
+    items" before saving and emptied the paste box after, so a refused paste was reported as
+    loaded and the text to redo it was gone — the exact paste the guard exists for. Both paste
+    paths now check `!save() && writeRefused`, keep the box and say `pasteRefusedHtml()`; the
+    multi-team window is reopened (adopting closes every dialog) with the plan re-checked
+    against the board now loaded.
+  - **`writeRefused` holds every toast for the rest of the TASK.** Six handlers toast success
+    straight after `save()` ("Deleted Team X"), and `window.toast` replaces the text in one
+    element, so the warning vanished under a claim about a change that did not happen. One flag
+    in `window.toast`, set by `adoptOtherCopy(true)` and lifted in a MICROTASK (a timer is
+    throttled in a background tab), rather than a check in each handler. The adoption toast
+    clears the flag first, so the warning itself is never the one held back.
+  - **The foreign check is OUTSIDE persist's try.** `haltForNewerData` stops by throwing; inside
+    the try it was caught as a quota error, toasting "Storage is full" under the halt card while
+    the caller rendered on. Out there the halt stops the handler, as it stops boot.
+  - EXPECTED 4317 → 4325; all six new checks were red against the build before. A test that
+    drives two refusals must `await` between them — in the app every press is its own task.

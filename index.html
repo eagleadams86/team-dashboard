@@ -12351,6 +12351,9 @@ let view   = Object.assign({}, DEFAULT_VIEW);
 /* The `td-state` string this copy last READ or WROTE — what persist() holds storage
    up against before writing over it (2026-09-18; see persist()). */
 let storedRaw = null;
+/* True for the rest of the task in which persist() adopted another window's board
+   instead of writing this one's — see adoptOtherCopy. */
+let writeRefused = false;
 let charts = {};
 /* The All Teams throughput chart is held HERE rather than in `charts` above.
    That object is the dashboard's, and renderDashboard destroys every entry in it
@@ -13418,9 +13421,8 @@ function loadView() {
    is someone else's snapshot, and it must never be written over the visitor's
    own saved copy. UI state still moves in memory — it just isn't persisted. */
 function persist() {
-  if (viewOnly) return;
-  try {
-    /* ── Two copies of the app open at once (2026-09-18, ported from Sprint
+  if (viewOnly) return false;
+  /* ── Two copies of the app open at once (2026-09-18, ported from Sprint
        Predictability) ───────────────────────────────────────────────────────
        This writes the WHOLE board. With the app open twice — two tabs, or the
        installed window and a tab — the copy that had not been reloaded wrote its
@@ -13431,12 +13433,23 @@ function persist() {
        instead of overwritten, and the one change that did not land is said out
        loud. Losing one change, announced, beats losing a paste in silence.
        (`td-view` is deliberately NOT guarded: it is this device's own position —
-       which tab, which filters — and the last window to move simply wins.) */
-    if (localStorage.getItem(LS.state) !== storedRaw) { adoptOtherCopy(true); return; }
+       which tab, which filters — and the last window to move simply wins.)
+     RETURNS whether the write landed (2026-09-23), so a caller can stop before
+     announcing a change that was just thrown away — see adoptOtherCopy.
+     The check sits OUTSIDE the try below, and that is load-bearing: adopting a
+     board from a newer build halts the app by THROWING (haltForNewerData), and
+     inside the try that throw was caught as a full-storage error — the reader
+     was told to delete old items under the halt card, and the caller carried
+     on rendering. Out here the halt stops the handler, as it stops boot. */
+  let foreign = false;
+  try { foreign = localStorage.getItem(LS.state) !== storedRaw; } catch (e) { foreign = false; }
+  if (foreign) { adoptOtherCopy(true); return false; }
+  try {
     localStorage.setItem(LS.state, JSON.stringify(serializeState()));
     /* Read BACK rather than remembered: a browser that accepts the write and keeps
        nothing must not look, next time, like another window having emptied it. */
     storedRaw = localStorage.getItem(LS.state);
+    return true;
   }
   catch (e) {
     /* A big paste can outgrow the browser's storage quota. The change is live
@@ -13445,6 +13458,7 @@ function persist() {
        the load note has already said "Loaded". */
     console.warn('localStorage save failed', e);
     window.toast('⚠️ Storage is full — this change is on screen but could not be saved in this browser. Remove old items and try again.');
+    return false;
   }
 }
 function saveView() {
@@ -13474,10 +13488,25 @@ function adoptOtherCopy(lostChange) {
   renderSettingsForm();
   renderAll();
   selectTab((anyDataHeld() || planningOn()) ? view.activeTab : 'data');
+  writeRefused = false;   // this sentence is never the one held back
   window.toast(lostChange
     ? 'This board was changed in another tab or window, so that copy is loaded here now. '
       + 'Your last change here was not saved — make it again.'
     : 'Updated — this board was changed in another tab or window.', 6000);
+  /* THE REST OF THIS TASK IS ABOUT A CHANGE THAT DID NOT HAPPEN (2026-09-23).
+     persist() runs inside the handler that made the change, and nearly every
+     such handler toasts its success straight after saving — "Deleted Team X" —
+     which replaced the sentence above in the same element, so the reader was
+     told a delete had happened that had just been thrown away, and never saw
+     the warning. Rather than teach six handlers (and every later one) to check,
+     the toast is held for the rest of this task: whatever a handler says after
+     its save was refused is a claim about the change that did not land. Lifted
+     in a MICROTASK, not a timer — the handler's own synchronous tail is what has
+     to be silenced, and a timer is throttled in a background tab. */
+  if (lostChange) {
+    writeRefused = true;
+    queueMicrotask(() => { writeRefused = false; });
+  }
 }
 
 /* The one place a change to teams or settings is written down. It used to do
@@ -13486,8 +13515,8 @@ function adoptOtherCopy(lostChange) {
    marks is still load-bearing: persist() is a shape repair, save() is a real
    edit. loadState() relies on that difference. */
 function save() {
-  if (viewOnly) return;   // someone else's data — never write it over your own
-  persist();
+  if (viewOnly) return false;   // someone else's data — never write it over your own
+  return persist();
 }
 
 function activeTeam() {
@@ -13710,6 +13739,8 @@ function dropToast(el) {
 /* ms is optional: 2.6s suits a confirmation, and nothing like long enough for a
    warning about data being lost on another device. */
 window.toast = (msg, ms) => {
+  /* A success line from a handler whose save was just refused — see adoptOtherCopy. */
+  if (writeRefused) return;
   const el = $('toast');
   clearTimeout(toastTimer);
   clearTimeout(toastHideTimer);
@@ -22652,6 +22683,16 @@ function adoptStatuses(res) {
   });
 }
 
+/* What both paste boxes say when the save was refused because another tab or
+   window had written the board first (2026-09-23). The toast is not enough on
+   its own: it fades, and the report under the box would otherwise go on saying
+   "Loaded". Fixed words — nothing out of the paste is repeated. */
+function pasteRefusedHtml() {
+  return '<div class="note err"><strong>Nothing from this paste was saved.</strong> This board '
+    + 'was changed in another tab or window, so that copy is loaded here now. Your paste is '
+    + 'still in the box \u2014 load it again.</div>';
+}
+
 function doLoad(mode) {
   const team = activeTeam();
   if (!team) return;
@@ -22685,7 +22726,14 @@ function doLoad(mode) {
       ? mergeFeatures(team.features, res.features)
       : res.features;
   }
-  save();
+  /* A save refused because another window wrote first (2026-09-23): that board
+     is on screen now and this paste is not in it. The "Loaded" report above is
+     withdrawn and the box is KEPT — clearing it threw away the one paste the
+     two-copies guard exists to protect, under a note saying it had loaded. */
+  if (!save() && writeRefused) {
+    $('parseNote').innerHTML = pasteRefusedHtml();
+    return;
+  }
   renderAll();
   if (mode !== 'append') $('pasteBox').value = '';
 }
@@ -22988,7 +23036,15 @@ function runMulti(mode) {
         });
       }
     }
-    save();
+    /* Refused, as in doLoad. Adopting closed this window with every other one
+       (its plan was drawn against the board just replaced), so it is opened
+       again: the box still holds the paste, the plan is re-checked against the
+       board now loaded, and the refusal is said above it. */
+    if (!save() && writeRefused) {
+      openMultiDialog();
+      $('multiNote').insertAdjacentHTML('afterbegin', pasteRefusedHtml());
+      return;
+    }
     renderAll();
     const total = route.assigned.reduce((n, a) => n + a.rows.length, 0);
     const featTotal = featureRoute.assigned.reduce((n, a) => n + a.rows.length, 0);

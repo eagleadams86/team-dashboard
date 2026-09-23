@@ -3485,6 +3485,12 @@ board was changed in another tab or window… Your last change here was not save
 again."* (Until 2026-09-18 the window that had not been reloaded silently wrote its old board
 over the other's work the next time it saved — a paste loaded in one window could vanish after
 a Settings change in the other.) Which tab and filters you are on stay each window's own.
+A paste that was turned away this way stays in its box with *"Nothing from this paste was
+saved"* under it, so it can be loaded again; and nothing a button says afterwards — *"Deleted
+Team X"* — covers up the warning. (Until 2026-09-23 the paste box was emptied under a report
+saying it had loaded, and the success message replaced the warning.) If the other window is
+running a newer version of the app, this one stops with its out-of-date notice rather than
+claiming storage is full.
 
 **Restoring replaces everything.** You're shown what the file holds against what's already
 here — *"Restore 2 teams and 3 items from this file? This replaces the 1 team and 0 items in
