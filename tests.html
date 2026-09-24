@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4325;
+const EXPECTED = 4331;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -18289,6 +18289,68 @@ group('a card with no chart matches the one beside it');
        none ? none.textContent : '');
     win.selectTab('dashboard');
     plant({ teams: [], settings: {} });
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     Fixes from the 2026-09-24 accessibility audit. Each was found by pressing
+     real keys and reading where focus ended up, which no automated checker does.
+     ══════════════════════════════════════════════════════════ */
+  group('2026-09-24: the two-tabs guard keeps the keyboard where it was');
+  {
+    /* adoptOtherCopy() rebuilds everything, and a focused sort heading or ⓘ dot
+       went with it — focus fell to <body> in a window the reader had not touched.
+       Its own frame, the two-copies group's shape, with this page as the other
+       window; the idle case is called directly, as the storage listener would. */
+    const keep = { view: localStorage.getItem('td-view'), state: localStorage.getItem('td-state') };
+    const rows = [0, 1, 2, 3, 4, 5].map(i => ({ c: '2015-01-2' + i, s: '2015-01-1' + i, t: 'Story' }));
+    const board = (names) => JSON.stringify({ v: 3, settings: {},
+      teams: names.map((name, i) => ({ id: 'fa' + i, name, rows })) });
+    localStorage.setItem('td-state', board(['Alpha', 'Beta']));
+    localStorage.removeItem('td-view');
+    const f = document.createElement('iframe');
+    f.setAttribute('data-td-tests', '');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:absolute;width:1024px;height:800px;opacity:0;border:0;left:-9999px';
+    await new Promise((resolve) => { f.onload = resolve; f.src = 'index.html' + BUST + '&adoptfocus'; document.body.appendChild(f); });
+    const W = f.contentWindow, aDoc = W.document;
+    const where = () => { const a = aDoc.activeElement;
+      return !a || a === aDoc.body ? 'BODY' : a.tagName + ' ' + (a.id || JSON.stringify(Object.assign({}, a.dataset))); };
+    W.selectTab('allteams');
+    const head = aDoc.querySelector('#panel-allteams [data-sort="name"]');
+    ok(head, 'adopt focus: All Teams draws its Team heading');
+    if (head) head.focus();
+    localStorage.setItem('td-state', board(['Alpha', 'Beta', 'Gamma']));
+    W.adoptOtherCopy(false);
+    ok(aDoc.activeElement !== head && aDoc.activeElement && aDoc.activeElement.dataset
+         && aDoc.activeElement.dataset.sort === 'name',
+       'adopt focus: a sort heading is rebuilt, and focus lands on its new copy', where());
+    W.selectTab('dashboard');
+    const dot = [...aDoc.querySelectorAll('#panel-dashboard .tile-help')].find(x => x.getClientRects().length);
+    const key = dot ? dot.dataset.help : null;
+    ok(dot, 'adopt focus: the dashboard draws an ⓘ dot');
+    if (dot) dot.focus();
+    localStorage.setItem('td-state', board(['Alpha', 'Beta']));
+    W.adoptOtherCopy(false);
+    ok(aDoc.activeElement !== dot && aDoc.activeElement && aDoc.activeElement.dataset
+         && aDoc.activeElement.dataset.help === key,
+       'adopt focus: and so is an ⓘ dot, by its help key', where());
+    /* The control has no counterpart at all: the Scorecard is not offered below
+       two teams, so the tab it was on is gone. The panel on screen takes it. */
+    W.selectTab('scorecard');
+    const scDot = [...aDoc.querySelectorAll('#panel-scorecard [data-help]')].find(x => x.getClientRects().length);
+    ok(scDot, 'adopt focus: the Scorecard draws its dots with two teams');
+    if (scDot) scDot.focus();
+    localStorage.setItem('td-state', board(['Alpha']));
+    W.adoptOtherCopy(false);
+    const landed = aDoc.activeElement;
+    /* The Dashboard's cards head themselves — its only h2s belong to empty
+       states — so there it is the tab that names the view. */
+    ok(landed && (landed === aDoc.getElementById('tab-dashboard')
+         || (landed.tagName === 'H2' && !landed.closest('section.panel').hidden)),
+       'adopt focus: with nothing to return to, the view on screen takes it, not <body>', where());
+    f.remove();
+    if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
+    if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
   }
 
   /* ────────────────────────────────────────────────────────── */

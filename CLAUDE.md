@@ -5105,3 +5105,26 @@ only on a real edit (a paste, Settings, Teams). It is still a paste lost without
     the caller rendered on. Out there the halt stops the handler, as it stops boot.
   - EXPECTED 4317 → 4325; all six new checks were red against the build before. A test that
     drives two refusals must `await` between them — in the app every press is its own task.
+
+## Fixes From the 2026-09-24 Accessibility Audit
+
+The 2026-09-23 pass (axe at 1440/390/320 in all four themes, then thousands of real Tab and Enter
+presses reading `activeElement` after each) found eight things; all fixed on
+`a11y-fixes-2026-09-24`, one per commit, each with a check proven red against the build before it.
+Nothing here stores anything new — the whitelist is untouched.
+
+- **One helper carries the keyboard across a rebuild: `focusMark()` / `focusReturn()`.** Most
+  handlers end in `renderAll()`, which rebuilds the control the key press landed on, so focus fell
+  to <body>. The sortable headings, `moveInList` and `renderTeamRows` had each grown their own
+  answer; the rest share this one. The mark is the control's id, else its data-* attributes (plus a
+  tick box's value), searched for again ONLY inside the nearest ancestor with an id — the same help
+  key on another tab is a different place. A delete takes the control with it, so the mark also
+  keeps its position among its kind there: the neighbour that moved into its place, then the one
+  before, then the caller's fallback. `focusReturn` does nothing when focus is already somewhere
+  shown — a closing dialog has handed it to a surviving trigger. `focusView()` is the last resort:
+  the panel's first DRAWN h2, or on the Dashboard (whose only h2s belong to hidden empty states)
+  the tab that names it. `focusPanel` now skips a hidden h2 too — it used to pick the Dashboard's
+  "No Data Yet" heading and focus nothing.
+- **The two-tabs guard keeps the keyboard where it was.** `adoptOtherCopy()` marks before
+  `loadState()` and returns after `selectTab`. In the idle case this was a window the reader had
+  not touched losing its place.

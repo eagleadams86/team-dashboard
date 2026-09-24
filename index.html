@@ -13482,12 +13482,18 @@ function adoptOtherCopy(lostChange) {
   let peek = null;
   try { peek = JSON.parse(localStorage.getItem(LS.state) || 'null'); } catch (e) { peek = null; }
   if (peek && typeof peek === 'object' && Number(peek.schema || 1) > SCHEMA) haltForNewerData(peek.schema);
+  /* WHERE THE KEYBOARD WAS (2026-09-24): everything below is rebuilt, so a focused
+     sort heading or ⓘ dot is detached and focus fell to <body> — in a window the
+     reader had not even touched, for the idle case. Its replacement is found again
+     afterwards; failing that, the view on screen (focusView). */
+  const mark = focusMark();
   loadState();
   if (!state.teams.some(t => t.id === view.activeTeamId)) view.activeTeamId = state.teams[0].id;
   document.querySelectorAll('dialog[open]').forEach(d => d.close());
   renderSettingsForm();
   renderAll();
   selectTab((anyDataHeld() || planningOn()) ? view.activeTab : 'data');
+  focusReturn(mark, focusView);
   writeRefused = false;   // this sentence is never the one held back
   window.toast(lostChange
     ? 'This board was changed in another tab or window, so that copy is loaded here now. '
@@ -23212,6 +23218,64 @@ $('welcomePlanBtn').addEventListener('click', () => {
 });
 $('btnLoad').addEventListener('click', () => doLoad('replace'));
 $('btnAppend').addEventListener('click', () => doLoad('append'));
+/* ── THE KEYBOARD'S PLACE, CARRIED ACROSS A REBUILD (2026-09-24) ──────────────
+   Most handlers here end in renderAll(), which rebuilds every row, chip and heading
+   from the board — so the control a key press landed on is detached and focus falls
+   to <body>, the top of the document, with any dialog still open over it. The
+   sortable headings, moveInList and the Teams window's Edit button each grew their
+   own answer; this is the one the rest share, so a new handler needs two lines, not
+   a fourth copy.
+
+   `focusMark()` notes WHICH control has focus, by what the rebuild will draw again:
+   its id, or else its data-* attributes (plus the value of a tick box, whose data-*
+   names only its stage) — ids here are shape-guarded, and CSS.escape covers the
+   rest. It also notes the nearest ancestor with an id, and where the control sat
+   among its kind there, because a DELETE takes the control with it: the neighbour
+   that moved into its place is the one to land on, then the one before it when the
+   last went, then `fallback` (the list's Add button, or the panel) when none are left.
+
+   `focusReturn()` does nothing when focus is still somewhere real — a dialog that
+   closed has already handed it back to a surviving trigger, and a handler that chose
+   a landing of its own keeps it. `preventScroll`, like every other focus() here. */
+function focusMark(el) {
+  el = el === undefined ? document.activeElement : el;
+  if (!el || el === document.body || !el.isConnected) return null;
+  const tag = el.tagName.toLowerCase();
+  const data = [...el.attributes].filter(a => a.name.startsWith('data-'));
+  const own = data.map(a => '[' + a.name + '="' + CSS.escape(a.value) + '"]').join('')
+    + ((el.type === 'checkbox' || el.type === 'radio') ? '[value="' + CSS.escape(el.value) + '"]' : '');
+  const sel = el.id ? '#' + CSS.escape(el.id) : (data.length ? tag + own : null);
+  const kind = data.length ? tag + data.map(a => '[' + a.name + ']').join('') : null;
+  const scope = el.parentElement ? el.parentElement.closest('[id]') : null;
+  return { el, sel, kind, scope: scope ? scope.id : null,
+    at: kind && scope ? [...scope.querySelectorAll(kind)].indexOf(el) : -1,
+    ring: el.matches(':focus-visible') };
+}
+function focusReturn(mark, fallback) {
+  if (!mark) return;
+  const shown = x => !!x && x.isConnected && !x.disabled && x.getClientRects().length > 0;
+  if (shown(document.activeElement) && document.activeElement !== document.body) return;
+  /* Searched for only where it was: the same key elsewhere on the page — a help
+     topic on another tab — is a different place, not the one the reader was in. */
+  const root = mark.scope ? document.getElementById(mark.scope) : document;
+  let to = shown(mark.el) ? mark.el : null;
+  if (!to && root && mark.sel) to = [...root.querySelectorAll(mark.sel)].find(shown) || null;
+  if (!to && root && mark.kind && root !== document) {
+    const all = [...root.querySelectorAll(mark.kind)].filter(shown);
+    if (all.length) to = all[Math.min(Math.max(mark.at, 0), all.length - 1)];
+  }
+  if (to) to.focus({ preventScroll: true });
+  else if (typeof fallback === 'function') fallback(mark.ring);
+  else if (shown(fallback)) fallback.focus({ preventScroll: true });
+}
+/* The last resort: the heading of the panel on screen, or — on the Dashboard,
+   whose cards head themselves and whose only h2s belong to empty states — the
+   tab that names it. */
+function focusView(ring) {
+  const panel = document.querySelector('section.panel:not([hidden])');
+  if (panel && [...panel.querySelectorAll('h2')].some(h => h.getClientRects().length)) focusPanel(panel.id, ring);
+  else if ($('tab-' + activeTab)) $('tab-' + activeTab).focus({ preventScroll: true });
+}
 /* Move focus into a panel when the control the user was standing on has gone — either
    removed by a re-render or hidden because it has nothing left to do. `fromKeyboard`
    comes from the click event's `detail`: 0 when a button was activated with Enter or
@@ -23220,7 +23284,11 @@ $('btnAppend').addEventListener('click', () => doLoad('append'));
    set here rather than in the markup, so the heading is a focus target only for the
    moment it is landed on and never joins the tab order. */
 function focusPanel(panelId, fromKeyboard) {
-  const h = document.getElementById(panelId)?.querySelector('h2');
+  /* The first heading actually drawn: a panel's empty-state card carries one of
+     its own, hidden while there is data, and a hidden heading cannot take focus. */
+  const panel = document.getElementById(panelId);
+  const h = panel && ([...panel.querySelectorAll('h2')].find(x => x.getClientRects().length)
+    || panel.querySelector('h2'));
   if (!h) return;
   h.tabIndex = -1;
   h.classList.add('landing');

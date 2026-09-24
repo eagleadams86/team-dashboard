@@ -4005,6 +4005,16 @@ best-practice rules, in all four themes, with data loaded, on every tab and in e
 through every view reading the focus ring, every window opened from the keyboard and closed
 with Esc, hover colours, a 320px-wide window, widened text spacing and reduced motion.
 
+### Fixes From the 2026-09-24 Accessibility Audit
+
+A second pass the same way, this time pressing real keys on every control and reading where
+the keyboard ended up. What changed:
+
+- **The other window's changes no longer throw the keyboard back to the top.** When a second
+  tab's save is picked up here, everything is redrawn — and a sort heading or ⓘ dot you were
+  standing on went with it, so focus fell to the start of the page. It lands on the new copy of
+  the same control now, or on the view you are looking at when that control is gone.
+
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)
 
