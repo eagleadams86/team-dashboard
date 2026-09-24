@@ -4005,6 +4005,53 @@ best-practice rules, in all four themes, with data loaded, on every tab and in e
 through every view reading the focus ring, every window opened from the keyboard and closed
 with Esc, hover colours, a 320px-wide window, widened text spacing and reduced motion.
 
+### Fixes From the 2026-09-24 Accessibility Audit
+
+A second pass the same way, this time pressing real keys on every control and reading where
+the keyboard ended up. What changed:
+
+- **The other window's changes no longer throw the keyboard back to the top.** When a second
+  tab's save is picked up here, everything is redrawn — and a sort heading or ⓘ dot you were
+  standing on went with it, so focus fell to the start of the page. It lands on the new copy of
+  the same control now, or on the view you are looking at when that control is gone.
+- **"Edit" is called "Edit".** Each team's Edit button in Teams & Stages was announced as
+  "Settings for Team X", so a voice-control user saying the word on the button reached nothing.
+  It is "Edit settings for Team X" now.
+- **A status tick box under a stage is named by its status first** — "Code Review, grouped under
+  the stage in row 1", where it used to start "Group Code Review…".
+- **The train picker no longer calls itself a menu.** It opens a list of tick boxes, but told a
+  screen reader it had a menu, whose keys it does not use. It says whether it is open and which
+  list it opens, as Sprint Predictability's identical picker does.
+- **Pressing something inside a window keeps you in that window.** Ticking a status under a
+  stage, choosing a team's ART, deleting a team, ART, stage, status or work-type row, and Save
+  Item or Delete This Item all redraw the list they are in — and the keyboard used to fall to
+  the top of the page with the window still open. It now lands on the same control again, or
+  after a delete on the one that moved into its place (the list's Add button when nothing is
+  left); after Save Item or Delete This Item, back on the row in the table.
+- **A window the keyboard lands on shows the focus ring.** When a window is taller than the
+  screen the browser makes the window itself a Tab stop, and Tab wrapping onto it showed no ring
+  at all. It draws the ring just inside its edge now; opening a window with a tap still shows none.
+- **Wide tables with nothing to press can be scrolled from the keyboard.** On a phone, Time in
+  Stage, Feature Progress, the forecast's figures and the feature schedule are wider than the
+  screen, and nothing in them could take the keyboard to scroll across. Each table's box is a Tab
+  stop of its own now, named by its card's title; the arrow keys scroll it.
+- **Share and Clean Up Old Data fit a 320px screen.** Their two-column form rows asked for at
+  least 260px each, more than a window that narrow has inside it, so both scrolled 7px sideways.
+  A column is never wider than the room it is given now; nothing changes on a wider screen.
+- **The team you are on is marked in All Teams in words too.** Its row was picked out by a
+  shaded fill and a coloured edge alone, which Windows' high-contrast mode removes. It is marked
+  as the current row for a screen reader and for high contrast now. The tabs, sub-tabs and tick
+  lists already said which one was chosen.
+- **The "saved by a newer version" card takes over the page.** If another tab running a newer
+  version saves while a window is open here, the app stops and shows a card asking you to reload —
+  but the open window sat on top of it, so Reload could not be pressed or reached with the keyboard,
+  and a screen reader never heard the card. The card now closes every window, keeps any later
+  message from covering it, shuts off everything behind it, puts the keyboard on Reload and is
+  announced as an alert. The same happens when the card appears as the app opens.
+- **Windows' high-contrast mode shows what is selected.** The theme pack's new rule 19 fills the
+  chosen tab, sub-tab, switch or ticked option with the system's highlight colour; high contrast
+  used to strip the shading that marked it.
+
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)
 

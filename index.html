@@ -578,8 +578,18 @@ header *, html[data-pin] .tabrow * { scroll-margin-top: calc(0px - var(--pin-cle
    not a control anybody is about to operate, so the ring says nothing and reads as a
    mistake. Same exemption `main:focus` already carries, for the same reason.
    A fine pointer never takes that path, which is why no desktop ever shows it — found
-   on an iPhone. Fixed across the whole family in one pass; PAPTrack led. */
-dialog:focus { outline: none; }
+   on an iPhone. Fixed across the whole family in one pass; PAPTrack led.
+   BUT A KEYBOARD CAN LAND ON A WINDOW TOO (2026-09-24 audit). A window tall enough
+   to scroll is a Tab stop of its own in Chromium, and Tab wraps onto it past the
+   last control, where `dialog:focus` left no ring at all. `:not(:focus-visible)`
+   cannot tell the two apart: the phone's scripted focus MATCHES :focus-visible,
+   which is the whole reason this rule exists. `tabindex="-1"` can: openModal() sets
+   it before that focus, and it also takes the window out of the Tab order, so a
+   window carrying it is only ever focused as the mechanism. Every other keyboard
+   focus of a window draws the ring INSIDE its edge. Same rule as Sprint
+   Predictability's. */
+dialog[tabindex="-1"]:focus { outline: none; }
+dialog:focus-visible { outline: 2px solid var(--focus-border); outline-offset: -2px; }
 /* WHERE FOCUS GOES WHEN THE CONTROL YOU PRESSED DISAPPEARS (2026-08-22). Clearing a
    team's rows leaves nothing to clear, so the button that was just pressed hides itself
    — and a focused element that becomes display:none drops focus to <body>, the top of
@@ -587,7 +597,7 @@ dialog:focus { outline: none; }
    apps have; the effect on a keyboard or screen-reader user is the same. `focusPanel()`
    moves focus to the heading of the panel instead, which is also what now says there is
    nothing there.
-   The ring is OPT IN and keyboard-only, the same rule as `dialog:focus` above. */
+   The ring is OPT IN and keyboard-only, the same idea as the dialog rule above. */
 .landing:focus { outline: none; }
 .landing.ring-focus:focus { outline: 2px solid var(--focus-border); outline-offset: 2px; }
 /* .grid sets display:grid, which beats the UA rule for [hidden] — force it. */
@@ -691,7 +701,9 @@ select { cursor: pointer; }
 .card .hint { color: var(--text-secondary); font-size: var(--fs-xs); }
 
 .grid { display: grid; gap: 16px; }
-.grid.two { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: end; }
+/* min(260px, 100%) (2026-09-24): a bare 260px floor is wider than a 320px screen's
+   dialog has to give, and Share and Clean Up Old Data scrolled 7px sideways. */
+.grid.two { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); align-items: end; }
 /* Labels wrap to different heights; bottom-align each cell so the inputs in a
    row still line up. */
 .grid.two > div { display: flex; flex-direction: column; justify-content: flex-end; }
@@ -1654,6 +1666,16 @@ body.maxi-open { overflow: hidden; }
    before, and the ring now has somewhere to be drawn. The 8px top margin plus
    4px of padding is the 12px this div used to carry inline. */
 #manageDialog .table-scroll { margin: 8px -4px 0; padding: 4px; }
+/* A WIDE TABLE WITH NOTHING TO PRESS IS ITSELF A TAB STOP (2026-09-24). Time in
+   Stage, Feature Progress, the forecast figures and the feature schedule are wider
+   than a phone and hold no control, so a keyboard could not scroll to their
+   right-hand columns (axe scrollable-region-focusable). Those four boxes carry
+   tabindex="0" role="region" and the card title as their name, in the markup and
+   unconditionally — as in Sprint Predictability — since "only while it overflows"
+   would need re-checking on every render and resize for one extra stop on a
+   desktop. The ring is drawn INSIDE the box: the card around it is where an
+   outside ring would be cut. */
+.table-scroll[tabindex]:focus-visible { outline-offset: -2px; }
 table.data { width: 100%; border-collapse: collapse; font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums; }
 table.data th, table.data td { text-align: left; padding: 8px 12px;
@@ -2903,7 +2925,7 @@ main:focus { outline: none; }
       <div class="field art-pick">
         <span class="art-pick-lbl" id="artFilterLbl">Agile Release Trains</span>
         <button type="button" class="art-pick-btn" id="artFilterBtn"
-                aria-haspopup="true" aria-expanded="false" aria-controls="artFilterMenu"
+                aria-expanded="false" aria-controls="artFilterMenu"
                 aria-labelledby="artFilterLbl artFilterNow">
           <span class="art-pick-now" id="artFilterNow">All trains</span>
           <span class="art-pick-caret" aria-hidden="true"></span>
@@ -3394,7 +3416,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <span></span>
             <span id="stageTimeExport"></span>
           </div>
-          <div class="table-scroll">
+          <div class="table-scroll" tabindex="0" role="region" aria-labelledby="titleStageTime">
             <table class="data" id="stageTimeTable"></table>
           </div>
           <div class="note info" id="stageTimeNone" hidden></div>
@@ -3418,7 +3440,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <span></span>
             <span id="featureProgressExport"></span>
           </div>
-          <div class="table-scroll">
+          <div class="table-scroll" tabindex="0" role="region" aria-labelledby="titleFeatureProgress">
             <table class="data" id="featureProgressTable"></table>
           </div>
           <div class="note info" id="featureProgressNone" hidden></div>
@@ -3772,7 +3794,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <span></span>
             <span id="forecastFiguresExport"></span>
           </div>
-          <div class="table-scroll">
+          <div class="table-scroll" tabindex="0" role="region" aria-labelledby="titleForecastFigures">
             <table class="data" id="forecastFiguresTable"></table>
           </div>
         </div>
@@ -3790,7 +3812,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <span></span>
             <span id="scheduleExport"></span>
           </div>
-          <div class="table-scroll">
+          <div class="table-scroll" tabindex="0" role="region" aria-labelledby="titleSchedule">
             <table class="data" id="scheduleTable"></table>
           </div>
           <p class="note info" id="scheduleNote"></p>
@@ -12281,6 +12303,20 @@ function haltForNewerData(found) {
      lift the hold. Lifted here, so the page underneath the card is the app as
      it stands rather than an empty frame waiting on the two-second backstop. */
   bootDone();
+  /* THE CARD IS THE ONLY THING LEFT ON THE PAGE (2026-09-24 accessibility audit).
+     Reached from the two-tabs guard, the halt came while a window was open — and a
+     modal <dialog> sits in the top layer, OVER this card, so Reload could not be
+     clicked or reached by Tab and a screen reader never heard the card. At boot the
+     dead page behind it stayed in the Tab order. So: every window and the toast
+     closed, no later toast raised (a popover is top layer too), everything but the
+     card made inert, and focus put on Reload. Sprint Predictability's halt does the
+     same. `window.tdHalted` rather than a `let`: this can run before any later
+     declaration in the script has been reached. */
+  window.tdHalted = true;
+  document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+  const toastEl = document.getElementById('toast');
+  try { if (toastEl && toastEl.matches(':popover-open')) toastEl.hidePopover(); }
+  catch (e) { /* no popover support: it is inert below all the same */ }
   const wrap = document.createElement('div');
   wrap.setAttribute('style', 'position:fixed;inset:0;z-index:99999;display:flex;'
     + 'align-items:center;justify-content:center;padding:24px;'
@@ -12289,10 +12325,16 @@ function haltForNewerData(found) {
   const card = document.createElement('div');
   card.setAttribute('style', 'max-width:34em;border:1px solid var(--border,#262f4a);'
     + 'border-radius:12px;padding:24px 26px;background:var(--surface,#121829)');
+  card.setAttribute('role', 'alertdialog');
+  card.setAttribute('aria-modal', 'true');
+  card.setAttribute('aria-labelledby', 'haltTitle');
+  card.setAttribute('aria-describedby', 'haltWhy');
   const h = document.createElement('h1');
+  h.id = 'haltTitle';
   h.setAttribute('style', 'margin:0 0 12px;font-size:var(--fs-lg)');
   h.textContent = 'This Data Was Saved by a Newer Version';
   const p1 = document.createElement('p');
+  p1.id = 'haltWhy';
   p1.setAttribute('style', 'margin:0 0 12px');
   p1.textContent = 'Your saved data uses format ' + String(found)
     + ', and the copy of the app running here only understands ' + String(SCHEMA)
@@ -12336,7 +12378,11 @@ function haltForNewerData(found) {
   });
   card.append(h, p1, p2, p3, btn);
   wrap.appendChild(card);
-  const attach = () => document.body.appendChild(wrap);
+  const attach = () => {
+    document.body.appendChild(wrap);
+    for (const el of document.body.children) if (el !== wrap) el.inert = true;
+    btn.focus();
+  };
   if (document.body) attach();
   else document.addEventListener('DOMContentLoaded', attach, { once: true });
   throw new Error('td: saved data schema ' + found + ' is newer than this build (' + SCHEMA + ')');
@@ -13482,12 +13528,18 @@ function adoptOtherCopy(lostChange) {
   let peek = null;
   try { peek = JSON.parse(localStorage.getItem(LS.state) || 'null'); } catch (e) { peek = null; }
   if (peek && typeof peek === 'object' && Number(peek.schema || 1) > SCHEMA) haltForNewerData(peek.schema);
+  /* WHERE THE KEYBOARD WAS (2026-09-24): everything below is rebuilt, so a focused
+     sort heading or ⓘ dot is detached and focus fell to <body> — in a window the
+     reader had not even touched, for the idle case. Its replacement is found again
+     afterwards; failing that, the view on screen (focusView). */
+  const mark = focusMark();
   loadState();
   if (!state.teams.some(t => t.id === view.activeTeamId)) view.activeTeamId = state.teams[0].id;
   document.querySelectorAll('dialog[open]').forEach(d => d.close());
   renderSettingsForm();
   renderAll();
   selectTab((anyDataHeld() || planningOn()) ? view.activeTab : 'data');
+  focusReturn(mark, focusView);
   writeRefused = false;   // this sentence is never the one held back
   window.toast(lostChange
     ? 'This board was changed in another tab or window, so that copy is loaded here now. '
@@ -13741,6 +13793,9 @@ function dropToast(el) {
 window.toast = (msg, ms) => {
   /* A success line from a handler whose save was just refused — see adoptOtherCopy. */
   if (writeRefused) return;
+  /* Nor anything once the app has stopped: a popover is in the top layer, over
+     the stop card — see haltForNewerData. */
+  if (window.tdHalted) return;
   const el = $('toast');
   clearTimeout(toastTimer);
   clearTimeout(toastHideTimer);
@@ -16627,7 +16682,7 @@ function renderTeamRows() {
          team. A word rather than a glyph because there is no header row to say
          what a pencil would mean. */
       '<td class="edit"><button class="btn small" data-edit-team="' + escapeHtml(t.id) + '"' +
-        ' aria-label="Settings for ' + escapeHtml(t.name) + '">Edit</button></td>' +
+        ' aria-label="Edit settings for ' + escapeHtml(t.name) + '">Edit</button></td>' +
       /* The count carries its own noun, the way the sibling's rows do. With no
          header row there is nothing else to say what the number is. */
       '<td class="count">' + t.rows.length + (t.rows.length === 1 ? ' item' : ' items') + '</td>' +
@@ -16721,7 +16776,7 @@ function stagePickHtml(st, i) {
   return '<div class="stagepick">' + state.statuses.map(x =>
     '<label><input type="checkbox" data-stagepick="' + escapeHtml(st.id) + '" value="' +
     escapeHtml(x.id) + '"' + (mine.has(x.id) ? ' checked' : '') +
-    ' aria-label="Group ' + escapeHtml(x.label) + ' under the stage in row ' + (i + 1) +
+    ' aria-label="' + escapeHtml(x.label) + ', grouped under the stage in row ' + (i + 1) +
     '">' + escapeHtml(x.label) + '</label>').join('') + '</div>';
 }
 
@@ -19227,9 +19282,13 @@ function renderAllTeams() {
     return figure(escapeHtml(c.fmt(c.get(r.d))));
   };
 
+  /* aria-current (2026-09-24): the current team's row is marked by a fill and an
+     inset edge alone, and forced colours drop both. The theme pack's forced-colours
+     rule marks [aria-current], and a screen reader says "current" as well. */
   const body = '<tbody>' + rows.map(r =>
     '<tr class="' + (r.id === view.activeTeamId ? 'is-current' : '')
-      + (r.d.empty ? ' no-data' : '') + '">'
+      + (r.d.empty ? ' no-data' : '') + '"'
+      + (r.id === view.activeTeamId ? ' aria-current="true"' : '') + '>'
     + cols.map(c => cell(c, r)).join('') + '</tr>').join('') + '</tbody>';
 
   /* The train, in a tfoot: a summary of the rows above rather than one more of
@@ -23212,6 +23271,68 @@ $('welcomePlanBtn').addEventListener('click', () => {
 });
 $('btnLoad').addEventListener('click', () => doLoad('replace'));
 $('btnAppend').addEventListener('click', () => doLoad('append'));
+/* ── THE KEYBOARD'S PLACE, CARRIED ACROSS A REBUILD (2026-09-24) ──────────────
+   Most handlers here end in renderAll(), which rebuilds every row, chip and heading
+   from the board — so the control a key press landed on is detached and focus falls
+   to <body>, the top of the document, with any dialog still open over it. The
+   sortable headings, moveInList and the Teams window's Edit button each grew their
+   own answer; this is the one the rest share, so a new handler needs two lines, not
+   a fourth copy.
+
+   `focusMark()` notes WHICH control has focus, by what the rebuild will draw again:
+   its id, or else its data-* attributes (plus the value of a tick box, whose data-*
+   names only its stage) — ids here are shape-guarded, and CSS.escape covers the
+   rest. It also notes the nearest ancestor with an id, and where the control sat
+   among its kind there, because a DELETE takes the control with it: the neighbour
+   that moved into its place is the one to land on, then the one before it when the
+   last went, then `fallback` (the list's Add button, or the panel) when none are left.
+
+   `focusReturn()` does nothing when focus is still somewhere real — a dialog that
+   closed has already handed it back to a surviving trigger, and a handler that chose
+   a landing of its own keeps it. `preventScroll`, like every other focus() here. */
+function focusMark(el) {
+  el = el === undefined ? document.activeElement : el;
+  if (!el || el === document.body || !el.isConnected) return null;
+  const tag = el.tagName.toLowerCase();
+  const data = [...el.attributes].filter(a => a.name.startsWith('data-'));
+  const own = data.map(a => '[' + a.name + '="' + CSS.escape(a.value) + '"]').join('')
+    + ((el.type === 'checkbox' || el.type === 'radio') ? '[value="' + CSS.escape(el.value) + '"]' : '');
+  const sel = el.id ? '#' + CSS.escape(el.id) : (data.length ? tag + own : null);
+  const kind = data.length ? tag + data.map(a => '[' + a.name + ']').join('') : null;
+  const scope = el.parentElement ? el.parentElement.closest('[id]') : null;
+  return { el, sel, kind, scope: scope ? scope.id : null,
+    at: kind && scope ? [...scope.querySelectorAll(kind)].indexOf(el) : -1,
+    ring: el.matches(':focus-visible') };
+}
+function focusReturn(mark, fallback) {
+  if (!mark) return;
+  const shown = x => !!x && x.isConnected && !x.disabled && x.getClientRects().length > 0;
+  if (shown(document.activeElement) && document.activeElement !== document.body) return;
+  /* Searched for only where it was: the same key elsewhere on the page — a help
+     topic on another tab — is a different place, not the one the reader was in. */
+  const root = mark.scope ? document.getElementById(mark.scope) : document;
+  let to = shown(mark.el) ? mark.el : null;
+  if (!to && root && mark.sel) to = [...root.querySelectorAll(mark.sel)].find(shown) || null;
+  if (!to && root && mark.kind && root !== document) {
+    const all = [...root.querySelectorAll(mark.kind)].filter(shown);
+    if (all.length) to = all[Math.min(Math.max(mark.at, 0), all.length - 1)];
+  }
+  if (to) to.focus({ preventScroll: true });
+  else if (typeof fallback === 'function') fallback(mark.ring);
+  else if (shown(fallback)) fallback.focus({ preventScroll: true });
+}
+/* The last resort: the heading of the panel on screen; on the Dashboard, whose
+   cards head themselves and whose only h2s belong to empty states, the tab that
+   names it; and with nothing left at all — the tabs go with the data — the
+   welcome card's heading, which is what is on screen then. */
+function focusView(ring) {
+  const drawn = x => !!x && x.getClientRects().length > 0;
+  const panel = document.querySelector('section.panel:not([hidden])');
+  const tab = $('tab-' + activeTab);
+  if (panel && [...panel.querySelectorAll('h2')].some(drawn)) focusPanel(panel.id, ring);
+  else if (drawn(tab)) tab.focus({ preventScroll: true });
+  else if (drawn($('welcomeCard'))) focusPanel('welcomeCard', ring);
+}
 /* Move focus into a panel when the control the user was standing on has gone — either
    removed by a re-render or hidden because it has nothing left to do. `fromKeyboard`
    comes from the click event's `detail`: 0 when a button was activated with Enter or
@@ -23220,7 +23341,11 @@ $('btnAppend').addEventListener('click', () => doLoad('append'));
    set here rather than in the markup, so the heading is a focus target only for the
    moment it is landed on and never joins the tab order. */
 function focusPanel(panelId, fromKeyboard) {
-  const h = document.getElementById(panelId)?.querySelector('h2');
+  /* The first heading actually drawn: a panel's empty-state card carries one of
+     its own, hidden while there is data, and a hidden heading cannot take focus. */
+  const panel = document.getElementById(panelId);
+  const h = panel && ([...panel.querySelectorAll('h2')].find(x => x.getClientRects().length)
+    || panel.querySelector('h2'));
   if (!h) return;
   h.tabIndex = -1;
   h.classList.add('landing');
@@ -23314,6 +23439,9 @@ $('artRows').addEventListener('click', e => {
   if (!id) return;
   const i = state.arts.findIndex(a => a.id === id);
   if (i < 0) return;
+  /* Taken before the confirm: after it, the neighbour's delete — or Add an ART
+     when none are left — is where the keyboard goes (2026-09-24). */
+  const mark = focusMark();
   const art = state.arts[i];
   const on = state.teams.filter(t => t.artId === id);
   /* The cheapest delete in the app, and the confirm says so: it takes no team
@@ -23334,6 +23462,7 @@ $('artRows').addEventListener('click', e => {
   }
   save();
   renderAll();
+  focusReturn(mark, $('btnAddArt'));
   window.toast('Deleted ' + art.name);
 });
 
@@ -23410,8 +23539,11 @@ $('stageRows').addEventListener('change', e => {
   save();
   /* Everything, not just this dialog: the age chart's axis, its columns and the
      Time in stage card all read the grouping, and this is the change that was
-     impossible before — every item already pasted moves with it. */
+     impossible before — every item already pasted moves with it. The box is
+     rebuilt too, so the keyboard is put back on its new copy (2026-09-24). */
+  const mark = focusMark();
   renderAll();
+  focusReturn(mark);
 });
 
 /* Deleting a status. The vocabulary is the only list in this app whose entries
@@ -23427,6 +23559,7 @@ $('statusList').addEventListener('click', e => {
   if (!id) return;
   const status = state.statuses.find(x => x.id === id);
   if (!status) return;
+  const mark = focusMark();
   let on = 0;
   const eachRecord = (fn) =>
     state.teams.forEach(t => { t.rows.forEach(fn); (t.features || []).forEach(fn); });
@@ -23446,6 +23579,8 @@ $('statusList').addEventListener('click', e => {
   eachRecord(r => { if (r.status === id) r.status = ''; });
   save();
   renderAll();
+  /* The next chip's delete; with no statuses left, the next control down. */
+  focusReturn(mark, $('btnAddStage'));
   window.toast('Deleted ' + status.label);
 });
 
@@ -23456,6 +23591,7 @@ $('stageRows').addEventListener('click', e => {
   if (!id) return;
   const i = state.stages.findIndex(st => st.id === id);
   if (i < 0) return;
+  const mark = focusMark();
   const stage = state.stages[i];
   /* Unlike deleting an ART, this DOES take data with it: the day counts stored
      against this stage have nowhere to live once its name is gone, and
@@ -23517,6 +23653,7 @@ $('stageRows').addEventListener('click', e => {
   });
   save();
   renderAll();
+  focusReturn(mark, $('btnAddStage'));
   window.toast('Deleted ' + stage.name);
 });
 
@@ -23777,7 +23914,10 @@ $('teamRows').addEventListener('change', e => {
   if (!team) return;
   team.artId = e.target.value || null;
   save();
+  /* The picker is rebuilt with its row; found again by its id (2026-09-24). */
+  const mark = focusMark();
   renderAll();
+  focusReturn(mark);
 });
 
 $('teamRows').addEventListener('click', e => {
@@ -23787,6 +23927,7 @@ $('teamRows').addEventListener('click', e => {
   if (!id) return;
   const i = state.teams.findIndex(t => t.id === id);
   if (i < 0 || state.teams.length === 1) return;
+  const mark = focusMark();
   const team = state.teams[i];
   /* Both lists are named, because both go with the team. A team holding twenty
      features and no items used to be deleted under a bare "Delete X?" — the
@@ -23805,6 +23946,8 @@ $('teamRows').addEventListener('click', e => {
   if (view.activeTeamId === id) { view.activeTeamId = state.teams[0].id; saveView(); }
   save();
   renderAll();
+  /* The last team has no delete, so one team left lands on Add a Team. */
+  focusReturn(mark, $('btnAddTeam'));
   window.toast('Deleted ' + team.name);
 });
 
@@ -24289,11 +24432,15 @@ $('filterRows').addEventListener('click', e => {
     moveFilter(+btn.dataset.movefilter, Number(btn.dataset.dir));
     return;
   }
+  /* The rows are keyed by position, so the same key is the row that moved up
+     into this one's place — the neighbour — and Add a Type when none are left. */
+  const mark = focusMark();
   state.settings.filters.splice(+btn.dataset.del, 1);
   save();
   renderFilterRows();
   renderFilterSelect();
   renderDashboard();
+  focusReturn(mark, $('btnAddFilter'));
 });
 function onAddFilter() {
   state.settings.filters.push({ display: '', value: '' });
@@ -24710,6 +24857,17 @@ $('clearBtn').addEventListener('click', () => {
    markup and this is a position in an array that a render can renumber. It is
    cleared on every open, so it can never outlive the row it points at. */
 let editingItem = null;
+/* The control that opened the item window. Closing it hands focus back to that
+   control — which Save and Delete then rebuild with the table, so it is found
+   again by its key: the same row, the row that took its place, or Add. */
+let itemOpener = null;
+function focusAfterItem() {
+  focusReturn(itemOpener, (ring) => {
+    const add = [$('btnAddItem2'), $('btnAddItem')].find(b => b && b.getClientRects().length);
+    if (add) add.focus({ preventScroll: true }); else focusView(ring);
+  });
+  itemOpener = null;
+}
 
 function openItemDialog(index) {
   const team = activeTeam();
@@ -24720,6 +24878,7 @@ function openItemDialog(index) {
      of features and writing into the items would be the worst kind of wrong,
      silently correct-looking. */
   const editingFeature = featureUnit();
+  itemOpener = focusMark();
   const list = editingFeature ? (team.features || (team.features = [])) : team.rows;
   const One = editingFeature ? 'Feature' : 'Work Item';
   const one = editingFeature ? 'feature' : 'item';
@@ -24889,6 +25048,7 @@ $('itemSave').addEventListener('click', () => {
   $('itemDialog').close();
   $('parseNote').innerHTML = '';
   renderAll();
+  focusAfterItem();
   window.toast((editingItem === null ? (savingFeature ? 'Feature' : 'Item') + ' added'
                                      : (savingFeature ? 'Feature' : 'Item') + ' updated'));
 });
@@ -24914,6 +25074,7 @@ $('itemDelete').addEventListener('click', () => {
   save();
   $('itemDialog').close();
   renderAll();
+  focusAfterItem();
   window.toast(delFeature ? 'Feature deleted' : 'Item deleted');
 });
 

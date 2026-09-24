@@ -5105,3 +5105,91 @@ only on a real edit (a paste, Settings, Teams). It is still a paste lost without
     the caller rendered on. Out there the halt stops the handler, as it stops boot.
   - EXPECTED 4317 → 4325; all six new checks were red against the build before. A test that
     drives two refusals must `await` between them — in the app every press is its own task.
+
+## Fixes From the 2026-09-24 Accessibility Audit
+
+The 2026-09-23 pass (axe at 1440/390/320 in all four themes, then thousands of real Tab and Enter
+presses reading `activeElement` after each) found eight things; all fixed on
+`a11y-fixes-2026-09-24`, one per commit, each with a check proven red against the build before it.
+Nothing here stores anything new — the whitelist is untouched.
+
+- **One helper carries the keyboard across a rebuild: `focusMark()` / `focusReturn()`.** Most
+  handlers end in `renderAll()`, which rebuilds the control the key press landed on, so focus fell
+  to <body>. The sortable headings, `moveInList` and `renderTeamRows` had each grown their own
+  answer; the rest share this one. The mark is the control's id, else its data-* attributes (plus a
+  tick box's value), searched for again ONLY inside the nearest ancestor with an id — the same help
+  key on another tab is a different place. A delete takes the control with it, so the mark also
+  keeps its position among its kind there: the neighbour that moved into its place, then the one
+  before, then the caller's fallback. `focusReturn` does nothing when focus is already somewhere
+  shown — a closing dialog has handed it to a surviving trigger. `focusView()` is the last resort:
+  the panel's first DRAWN h2, or on the Dashboard (whose only h2s belong to hidden empty states)
+  the tab that names it. `focusPanel` now skips a hidden h2 too — it used to pick the Dashboard's
+  "No Data Yet" heading and focus nothing.
+- **The two-tabs guard keeps the keyboard where it was.** `adoptOtherCopy()` marks before
+  `loadState()` and returns after `selectTab`. In the idle case this was a window the reader had
+  not touched losing its place.
+- **The Teams window's Edit button is named "Edit settings for X"** (2.5.3 — the accessible name
+  starts with the words on screen; it was "Settings for X"). The family rule from
+  the 2026-08-26 range-box fix: the name starts with the visible words and only adds to them.
+- **A stage's status tick boxes are named "<status>, grouped under the stage in row N"** — the
+  same rule; "Group <status> under…" put the visible word third.
+- **`#artFilterBtn` lost `aria-haspopup="true"`** (4.1.2). `true` means `menu`, and what opens is a
+  `role="group"` of checkboxes with no menu keys; `aria-expanded` + `aria-controls` say what it is.
+  Sprint Predictability's picker is the same markup and took the same change the same day — keep
+  them identical.
+- **Nine handlers that rebuild the control they were pressed on now use the helper**: the status
+  tick box under a stage (`stageRows` change), a team's ART picker, and the ART / status / stage /
+  team / work-type-row deletes — each `focusMark()` BEFORE its confirm (a native confirm moves
+  nothing) and `focusReturn(mark, <the list's Add button>)` after the render — plus Save Item and
+  Delete This Item, which mark the control that OPENED the item window (`itemOpener`, set in
+  `openItemDialog`) because closing the window hands focus back to that row and the render then
+  detaches it. Work-type rows are keyed by position (`data-del="<index>"`), so the same key after a
+  delete IS the neighbour. The status list has no Add button; its fallback is the next control
+  down, Add a Stage. Deleting the last item empties the board, the tabs go with the data, and
+  `focusView()` lands on the welcome card's heading.
+- **`dialog:focus { outline: none }` is `dialog[tabindex="-1"]:focus` now, plus a
+  `dialog:focus-visible` ring** (2.4.7) — `2px solid var(--focus-border)`, offset **-2px** so the
+  dialog's own edge cannot clip it. Chromium makes a scrolling dialog a Tab stop, and Tab wrapping
+  onto one drew nothing. **Not `:not(:focus-visible)`** — the first version of this fix used it and
+  was corrected before merge: the coarse-pointer `openModal()` path focuses the dialog from script,
+  and that scripted focus MATCHES :focus-visible on a phone, so the ring would have come back on
+  every iPhone. `tabindex="-1"` is what tells the two apart — openModal sets it before that focus,
+  and it also takes the window out of the Tab order. Identical to Sprint Predictability's rule.
+  Pinned by cascade in the suite, never by focusing.
+- **Four `.table-scroll` boxes are Tab stops: Time in Stage, Feature Progress, the forecast figures
+  and the feature schedule** (2.1.1, axe `scrollable-region-focusable` at 390/320 — the audit saw
+  the first and third; a survey of every `.table-scroll` in every view, items and features, found
+  the other two in the same state). `tabindex="0" role="region" aria-labelledby="<card title id>"`,
+  in the markup and unconditional, as Sprint Predictability does; the ring is
+  `.table-scroll[tabindex]:focus-visible { outline-offset: -2px }`. All Teams, Your Data and the
+  four dialog tables hold buttons, so they were left alone. A new wide table with no control in
+  it takes the same three attributes.
+- **`.grid.two` is `repeat(auto-fit, minmax(min(260px, 100%), 1fr))`** (1.4.10). A bare 260px floor
+  exceeds a 320px screen's dialog content box (286px less padding), so Share and Clean Up Old Data
+  scrolled 7px sideways. Every dialog was re-measured at 320 afterwards: none scrolls. Identical at
+  any width that has 260px to give.
+- **Pack contract check — every selected state is exposed, not only painted.** The theme pack is
+  gaining a forced-colours rule that marks `[aria-selected="true"]`, `[aria-pressed="true"]`,
+  `[aria-checked="true"]`, `[aria-current]` (not "false") and a `label` round a `:checked` box. A
+  survey of every view and dialog comparing same-class siblings whose paint differs: tabs and
+  sub-tabs carry `aria-selected`; the train picker's and a stage's tick lists are labels round real
+  checkboxes; the sort state is `aria-sort` plus an arrow glyph; the pin button changes its icon and
+  name (deliberately no aria-pressed — see dressPinBtn); a Scorecard band is marked by a ▸ glyph
+  and an sr-only sentence. **One gap: All Teams' current-team row** (`tr.is-current`, a fill and an
+  inset box-shadow, both dropped in forced colours) — it carries `aria-current="true"` now. No
+  app-level forced-colors CSS; the pack owns that. A new selected state must carry one of those
+  attributes or it vanishes in high contrast.
+
+EXPECTED 4325 → 4371 over the eight commits.
+- **The newer-schema halt card is modal** (2.1.1/2.4.3/4.1.3 — not in the audit's FM list; found
+  when Sprint Predictability's identical card was fixed, and ported). Reached from `adoptOtherCopy()`
+  with a `<dialog>` open, the dialog stayed in the top layer OVER the card: Reload unreachable, card
+  never announced. `haltForNewerData()` now closes every open dialog, hides the toast popover, sets
+  `window.tdHalted` (a WINDOW flag, not a `let` — the halt can run at boot before a later declaration
+  is reached, and a `let` read there is a TDZ throw) which `window.toast` refuses on, makes every body
+  child but the card `inert`, marks the card `role=alertdialog aria-modal` labelled by its heading
+  and described by the format sentence, and focuses Reload. Tests: the boot frame (alertdialog,
+  focus, inert — `<script>` children skipped, inert means nothing to them) and the two-copies frame
+  (Settings open → closed, focus on Reload, a late toast refused).
+- **Theme pack rule 19 (forced colours) is taken** — `theme.css` copied from the pack; no app-level
+  `forced-colors` block, and the pack's `check_consumers.py` flags one that restyles selected states.
