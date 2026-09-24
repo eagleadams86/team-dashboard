@@ -5133,3 +5133,7 @@ Nothing here stores anything new — the whitelist is untouched.
   the 2026-08-26 range-box fix: the name starts with the visible words and only adds to them.
 - **A stage's status tick boxes are named "<status>, grouped under the stage in row N"** — the
   same rule; "Group <status> under…" put the visible word third.
+- **`#artFilterBtn` lost `aria-haspopup="true"`** (4.1.2). `true` means `menu`, and what opens is a
+  `role="group"` of checkboxes with no menu keys; `aria-expanded` + `aria-controls` say what it is.
+  Sprint Predictability's picker is the same markup and took the same change the same day — keep
+  them identical.

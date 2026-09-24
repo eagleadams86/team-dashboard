@@ -4019,6 +4019,9 @@ the keyboard ended up. What changed:
   It is "Edit settings for Team X" now.
 - **A status tick box under a stage is named by its status first** — "Code Review, grouped under
   the stage in row 1", where it used to start "Group Code Review…".
+- **The train picker no longer calls itself a menu.** It opens a list of tick boxes, but told a
+  screen reader it had a menu, whose keys it does not use. It says whether it is open and which
+  list it opens, as Sprint Predictability's identical picker does.
 
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)

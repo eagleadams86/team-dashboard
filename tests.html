@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4337;
+const EXPECTED = 4340;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -18387,6 +18387,21 @@ group('a card with no chart matches the one beside it');
     ok(ticks[0] && /row 1/.test(ticks[0].getAttribute('aria-label')),
        'tick names: and still says which stage row it belongs to', ticks[0] && ticks[0].getAttribute('aria-label'));
     plant({ teams: [], settings: {} });
+  }
+
+  group('2026-09-24: the train picker does not promise a menu');
+  {
+    /* aria-haspopup="true" means a MENU, with menu keys, and what opens is a
+       group of tick boxes — a screen reader announced a menu that then was not
+       one. Expanded and controls say what it is; Sprint Predictability's
+       identical picker says the same. */
+    const btn = win.document.getElementById('artFilterBtn');
+    const menu = win.document.getElementById('artFilterMenu');
+    ok(btn && !btn.hasAttribute('aria-haspopup'), 'train picker: no aria-haspopup on the button',
+       btn && btn.getAttribute('aria-haspopup'));
+    ok(btn && btn.hasAttribute('aria-expanded') && btn.getAttribute('aria-controls') === 'artFilterMenu',
+       'train picker: it still says whether it is open, and which list it opens');
+    is(menu && menu.getAttribute('role'), 'group', 'train picker: and that list is a group of tick boxes');
   }
 
   /* ────────────────────────────────────────────────────────── */
