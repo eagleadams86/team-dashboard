@@ -5128,3 +5128,6 @@ Nothing here stores anything new — the whitelist is untouched.
 - **The two-tabs guard keeps the keyboard where it was.** `adoptOtherCopy()` marks before
   `loadState()` and returns after `selectTab`. In the idle case this was a window the reader had
   not touched losing its place.
+- **The Teams window's Edit button is named "Edit settings for X"** (2.5.3 — the accessible name
+  starts with the words on screen; it was "Settings for X"). The family rule from
+  the 2026-08-26 range-box fix: the name starts with the visible words and only adds to them.

@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4331;
+const EXPECTED = 4334;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -18351,6 +18351,23 @@ group('a card with no chart matches the one beside it');
     f.remove();
     if (keep.view === null) localStorage.removeItem('td-view'); else localStorage.setItem('td-view', keep.view);
     if (keep.state === null) localStorage.removeItem('td-state'); else localStorage.setItem('td-state', keep.state);
+  }
+
+  group('2026-09-24: a control’s name starts with the words on it');
+  {
+    /* WCAG 2.5.3: a voice-control user says what they can see. The Teams window's
+       row button reads "Edit" and was named "Settings for Team X", so "click Edit"
+       reached nothing. */
+    plant({ teams: [{ id: 'ln1', name: 'Team Named', rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] },
+                    { id: 'ln2', name: 'Team Other', rows: [] }], settings: {} });
+    win.renderAll();
+    const lDoc = win.document;
+    const edits = [...lDoc.querySelectorAll('#teamRows [data-edit-team]')];
+    is(edits.length, 2, 'label in name: one Edit button per team row');
+    is(edits.filter(b => !b.getAttribute('aria-label').startsWith(b.textContent.trim())).map(b => b.getAttribute('aria-label')), [],
+       'label in name: every Edit button’s name starts with “Edit”');
+    ok(edits[0] && /Team Named/.test(edits[0].getAttribute('aria-label')),
+       'label in name: and still says which team', edits[0] && edits[0].getAttribute('aria-label'));
   }
 
   /* ────────────────────────────────────────────────────────── */

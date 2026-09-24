@@ -4014,6 +4014,9 @@ the keyboard ended up. What changed:
   tab's save is picked up here, everything is redrawn — and a sort heading or ⓘ dot you were
   standing on went with it, so focus fell to the start of the page. It lands on the new copy of
   the same control now, or on the view you are looking at when that control is gone.
+- **"Edit" is called "Edit".** Each team's Edit button in Teams & Stages was announced as
+  "Settings for Team X", so a voice-control user saying the word on the button reached nothing.
+  It is "Edit settings for Team X" now.
 
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)
