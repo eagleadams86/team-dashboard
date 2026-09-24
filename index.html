@@ -12303,6 +12303,20 @@ function haltForNewerData(found) {
      lift the hold. Lifted here, so the page underneath the card is the app as
      it stands rather than an empty frame waiting on the two-second backstop. */
   bootDone();
+  /* THE CARD IS THE ONLY THING LEFT ON THE PAGE (2026-09-24 accessibility audit).
+     Reached from the two-tabs guard, the halt came while a window was open — and a
+     modal <dialog> sits in the top layer, OVER this card, so Reload could not be
+     clicked or reached by Tab and a screen reader never heard the card. At boot the
+     dead page behind it stayed in the Tab order. So: every window and the toast
+     closed, no later toast raised (a popover is top layer too), everything but the
+     card made inert, and focus put on Reload. Sprint Predictability's halt does the
+     same. `window.tdHalted` rather than a `let`: this can run before any later
+     declaration in the script has been reached. */
+  window.tdHalted = true;
+  document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+  const toastEl = document.getElementById('toast');
+  try { if (toastEl && toastEl.matches(':popover-open')) toastEl.hidePopover(); }
+  catch (e) { /* no popover support: it is inert below all the same */ }
   const wrap = document.createElement('div');
   wrap.setAttribute('style', 'position:fixed;inset:0;z-index:99999;display:flex;'
     + 'align-items:center;justify-content:center;padding:24px;'
@@ -12311,10 +12325,16 @@ function haltForNewerData(found) {
   const card = document.createElement('div');
   card.setAttribute('style', 'max-width:34em;border:1px solid var(--border,#262f4a);'
     + 'border-radius:12px;padding:24px 26px;background:var(--surface,#121829)');
+  card.setAttribute('role', 'alertdialog');
+  card.setAttribute('aria-modal', 'true');
+  card.setAttribute('aria-labelledby', 'haltTitle');
+  card.setAttribute('aria-describedby', 'haltWhy');
   const h = document.createElement('h1');
+  h.id = 'haltTitle';
   h.setAttribute('style', 'margin:0 0 12px;font-size:var(--fs-lg)');
   h.textContent = 'This Data Was Saved by a Newer Version';
   const p1 = document.createElement('p');
+  p1.id = 'haltWhy';
   p1.setAttribute('style', 'margin:0 0 12px');
   p1.textContent = 'Your saved data uses format ' + String(found)
     + ', and the copy of the app running here only understands ' + String(SCHEMA)
@@ -12358,7 +12378,11 @@ function haltForNewerData(found) {
   });
   card.append(h, p1, p2, p3, btn);
   wrap.appendChild(card);
-  const attach = () => document.body.appendChild(wrap);
+  const attach = () => {
+    document.body.appendChild(wrap);
+    for (const el of document.body.children) if (el !== wrap) el.inert = true;
+    btn.focus();
+  };
   if (document.body) attach();
   else document.addEventListener('DOMContentLoaded', attach, { once: true });
   throw new Error('td: saved data schema ' + found + ' is newer than this build (' + SCHEMA + ')');
@@ -13769,6 +13793,9 @@ function dropToast(el) {
 window.toast = (msg, ms) => {
   /* A success line from a handler whose save was just refused — see adoptOtherCopy. */
   if (writeRefused) return;
+  /* Nor anything once the app has stopped: a popover is in the top layer, over
+     the stop card — see haltForNewerData. */
+  if (window.tdHalted) return;
   const el = $('toast');
   clearTimeout(toastTimer);
   clearTimeout(toastHideTimer);

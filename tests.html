@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4372;
+const EXPECTED = 4378;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -7268,6 +7268,14 @@ const stripComments = (src) => {
   ok(!!card, 'a card is drawn over the app rather than a blank page');
   ok(!!card && /Newer Version/.test(card.textContent), 'and it says why: ' + (card ? card.textContent.slice(0, 40) : ''));
   ok(!!card && card.querySelector('button'), 'with a Reload button on it');
+  /* 2026-09-24: the card is modal — announced, focused, nothing live behind it. */
+  const haltCard = card && card.querySelector('[role="alertdialog"]');
+  ok(!!haltCard && haltCard.getAttribute('aria-modal') === 'true'
+     && /Newer Version/.test((w3.document.getElementById(haltCard.getAttribute('aria-labelledby')) || {}).textContent || ''),
+     'the halt card is an alertdialog named by its heading');
+  ok(!!card && w3.document.activeElement === card.querySelector('button'), 'and focus is on Reload');
+  ok(!!card && [...w3.document.body.children].every(el => el === card || el.inert || el.tagName === 'SCRIPT'),
+     'and everything else on the page is inert');
   const after = JSON.parse(localStorage.getItem('td-state'));
   is(after.fieldFromTheFuture, 'must survive',
      'the newer document is untouched — the whole point of stopping');
@@ -13403,8 +13411,16 @@ group('ARTs — the grouping, and the boundary it crosses');
     localStorage.setItem('td-state', JSON.stringify({ schema: 9999, v: 3, settings: {}, teams: [] }));
     toastEl.textContent = '';
     let halted = false;
+    /* 2026-09-24: reached with a window open, the halt closes it — a modal
+       dialog is top layer, over the card, and Reload could not be reached. */
+    W.document.getElementById('settingsDialog').showModal();
     try { W.save(); } catch (e) { halted = /newer than this build/.test(String(e)); }
     ok(halted, 'two copies: a newer build’s board halts the save by throwing, as it halts boot');
+    ok(!W.document.querySelector('dialog[open]'), 'two copies: the halt closes the open window, which would cover its card');
+    const haltBtn = W.document.querySelector('[role="alertdialog"] button');
+    ok(!!haltBtn && W.document.activeElement === haltBtn, 'two copies: and puts focus on Reload');
+    W.toast('A late line');
+    ok(!/A late line/.test(toastEl.textContent), 'two copies: and no later toast is raised over the card', toastEl.textContent);
     ok(!/Storage is full/.test(toastEl.textContent),
        'two copies: and does not tell the reader their storage is full', toastEl.textContent);
     f.remove();

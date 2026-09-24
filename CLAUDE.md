@@ -5181,3 +5181,15 @@ Nothing here stores anything new — the whitelist is untouched.
   attributes or it vanishes in high contrast.
 
 EXPECTED 4325 → 4371 over the eight commits.
+- **The newer-schema halt card is modal** (2.1.1/2.4.3/4.1.3 — not in the audit's FM list; found
+  when Sprint Predictability's identical card was fixed, and ported). Reached from `adoptOtherCopy()`
+  with a `<dialog>` open, the dialog stayed in the top layer OVER the card: Reload unreachable, card
+  never announced. `haltForNewerData()` now closes every open dialog, hides the toast popover, sets
+  `window.tdHalted` (a WINDOW flag, not a `let` — the halt can run at boot before a later declaration
+  is reached, and a `let` read there is a TDZ throw) which `window.toast` refuses on, makes every body
+  child but the card `inert`, marks the card `role=alertdialog aria-modal` labelled by its heading
+  and described by the format sentence, and focuses Reload. Tests: the boot frame (alertdialog,
+  focus, inert — `<script>` children skipped, inert means nothing to them) and the two-copies frame
+  (Settings open → closed, focus on Reload, a late toast refused).
+- **Theme pack rule 19 (forced colours) is taken** — `theme.css` copied from the pack; no app-level
+  `forced-colors` block, and the pack's `check_consumers.py` flags one that restyles selected states.

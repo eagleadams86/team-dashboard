@@ -4042,6 +4042,15 @@ the keyboard ended up. What changed:
   shaded fill and a coloured edge alone, which Windows' high-contrast mode removes. It is marked
   as the current row for a screen reader and for high contrast now. The tabs, sub-tabs and tick
   lists already said which one was chosen.
+- **The "saved by a newer version" card takes over the page.** If another tab running a newer
+  version saves while a window is open here, the app stops and shows a card asking you to reload —
+  but the open window sat on top of it, so Reload could not be pressed or reached with the keyboard,
+  and a screen reader never heard the card. The card now closes every window, keeps any later
+  message from covering it, shuts off everything behind it, puts the keyboard on Reload and is
+  announced as an alert. The same happens when the card appears as the app opens.
+- **Windows' high-contrast mode shows what is selected.** The theme pack's new rule 19 fills the
+  chosen tab, sub-tab, switch or ticked option with the system's highlight colour; high contrast
+  used to strip the shading that marked it.
 
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)
