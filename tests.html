@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4367;
+const EXPECTED = 4371;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -18579,6 +18579,29 @@ group('a card with no chart matches the one beside it');
        'reflow: a .grid.two column is at most the width it is given', gridRule);
     appFrame.style.cssText = wasCss;
     await new Promise((res) => setTimeout(res, 250));
+    plant({ teams: [], settings: {} });
+  }
+
+  group('2026-09-24: every selected state is said, not only painted');
+  {
+    /* The theme pack's forced-colours rule marks the selected state on
+       [aria-selected|pressed|checked="true"], [aria-current] and a label round a
+       checked box — a fill alone is dropped in Windows high-contrast. The tabs,
+       sub-tabs and pickers already carried theirs; All Teams' current-team row
+       was a fill and an inset edge only. */
+    plant({ teams: [{ id: 'cs1', name: 'Current', rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] },
+                    { id: 'cs2', name: 'Other', rows: [{ c: '2015-01-22', s: '2015-01-19', t: 'Story' }] }], settings: {} });
+    win.renderAll();
+    win.selectTab('allteams');
+    const cDoc = win.document;
+    const cur = [...cDoc.querySelectorAll('#allTeamsTable tbody tr.is-current')];
+    is(cur.length, 1, 'selected state: All Teams marks one row as the current team');
+    is(cur.map(tr => tr.getAttribute('aria-current')), ['true'], 'selected state: and says so with aria-current');
+    is([...cDoc.querySelectorAll('#allTeamsTable tbody tr[aria-current]:not(.is-current)')].length, 0,
+       'selected state: on that row only');
+    ok([...cDoc.querySelectorAll('[role="tab"]')].every(t => /^(true|false)$/.test(t.getAttribute('aria-selected'))),
+       'selected state: every tab and sub-tab states aria-selected');
+    win.selectTab('dashboard');
     plant({ teams: [], settings: {} });
   }
 

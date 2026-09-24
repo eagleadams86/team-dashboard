@@ -19251,9 +19251,13 @@ function renderAllTeams() {
     return figure(escapeHtml(c.fmt(c.get(r.d))));
   };
 
+  /* aria-current (2026-09-24): the current team's row is marked by a fill and an
+     inset edge alone, and forced colours drop both. The theme pack's forced-colours
+     rule marks [aria-current], and a screen reader says "current" as well. */
   const body = '<tbody>' + rows.map(r =>
     '<tr class="' + (r.id === view.activeTeamId ? 'is-current' : '')
-      + (r.d.empty ? ' no-data' : '') + '">'
+      + (r.d.empty ? ' no-data' : '') + '"'
+      + (r.id === view.activeTeamId ? ' aria-current="true"' : '') + '>'
     + cols.map(c => cell(c, r)).join('') + '</tr>').join('') + '</tbody>';
 
   /* The train, in a tfoot: a summary of the rows above rather than one more of

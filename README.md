@@ -4038,6 +4038,10 @@ the keyboard ended up. What changed:
 - **Share and Clean Up Old Data fit a 320px screen.** Their two-column form rows asked for at
   least 260px each, more than a window that narrow has inside it, so both scrolled 7px sideways.
   A column is never wider than the room it is given now; nothing changes on a wider screen.
+- **The team you are on is marked in All Teams in words too.** Its row was picked out by a
+  shaded fill and a coloured edge alone, which Windows' high-contrast mode removes. It is marked
+  as the current row for a screen reader and for high contrast now. The tabs, sub-tabs and tick
+  lists already said which one was chosen.
 
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)

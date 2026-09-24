@@ -5166,3 +5166,16 @@ Nothing here stores anything new — the whitelist is untouched.
   exceeds a 320px screen's dialog content box (286px less padding), so Share and Clean Up Old Data
   scrolled 7px sideways. Every dialog was re-measured at 320 afterwards: none scrolls. Identical at
   any width that has 260px to give.
+- **Pack contract check — every selected state is exposed, not only painted.** The theme pack is
+  gaining a forced-colours rule that marks `[aria-selected="true"]`, `[aria-pressed="true"]`,
+  `[aria-checked="true"]`, `[aria-current]` (not "false") and a `label` round a `:checked` box. A
+  survey of every view and dialog comparing same-class siblings whose paint differs: tabs and
+  sub-tabs carry `aria-selected`; the train picker's and a stage's tick lists are labels round real
+  checkboxes; the sort state is `aria-sort` plus an arrow glyph; the pin button changes its icon and
+  name (deliberately no aria-pressed — see dressPinBtn); a Scorecard band is marked by a ▸ glyph
+  and an sr-only sentence. **One gap: All Teams' current-team row** (`tr.is-current`, a fill and an
+  inset box-shadow, both dropped in forced colours) — it carries `aria-current="true"` now. No
+  app-level forced-colors CSS; the pack owns that. A new selected state must carry one of those
+  attributes or it vanishes in high contrast.
+
+EXPECTED 4325 → 4371 over the eight commits.
