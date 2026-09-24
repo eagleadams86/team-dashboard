@@ -5147,3 +5147,10 @@ Nothing here stores anything new — the whitelist is untouched.
   delete IS the neighbour. The status list has no Add button; its fallback is the next control
   down, Add a Stage. Deleting the last item empties the board, the tabs go with the data, and
   `focusView()` lands on the welcome card's heading.
+- **`dialog:focus { outline: none }` is `dialog:focus:not(:focus-visible)` now, plus a
+  `dialog:focus-visible` ring** (2.4.7) — `2px solid var(--focus-border)`, offset **-2px** so the
+  dialog's own edge cannot clip it. The rule was written for the coarse-pointer `openModal()` path
+  (a tap is not :focus-visible, so that is unchanged), but Chromium makes a scrolling dialog a Tab
+  stop, and Tab wrapping onto one drew nothing. Pinned by cascade in the suite, never by focusing
+  ([family-css-gotchas]: whether programmatic focus is :focus-visible differs in CI). Sprint
+  Predictability carries the same rule and is being fixed the same way.

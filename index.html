@@ -578,8 +578,14 @@ header *, html[data-pin] .tabrow * { scroll-margin-top: calc(0px - var(--pin-cle
    not a control anybody is about to operate, so the ring says nothing and reads as a
    mistake. Same exemption `main:focus` already carries, for the same reason.
    A fine pointer never takes that path, which is why no desktop ever shows it — found
-   on an iPhone. Fixed across the whole family in one pass; PAPTrack led. */
-dialog:focus { outline: none; }
+   on an iPhone. Fixed across the whole family in one pass; PAPTrack led.
+   NARROWED TO :not(:focus-visible) (2026-09-24). Unqualified, it also took the ring off
+   when the KEYBOARD lands on a dialog: Chromium makes a dialog whose content scrolls a
+   Tab stop of its own, and Tab wrapping onto it showed nothing at all. A tap-opened
+   dialog is not :focus-visible, so the phone case is unchanged; a keyboard-reached one
+   gets the pack's ring, inset because the dialog's own edge is where it would clip. */
+dialog:focus:not(:focus-visible) { outline: none; }
+dialog:focus-visible { outline: 2px solid var(--focus-border); outline-offset: -2px; }
 /* WHERE FOCUS GOES WHEN THE CONTROL YOU PRESSED DISAPPEARS (2026-08-22). Clearing a
    team's rows leaves nothing to clear, so the button that was just pressed hides itself
    — and a focused element that becomes display:none drops focus to <body>, the top of
@@ -587,7 +593,7 @@ dialog:focus { outline: none; }
    apps have; the effect on a keyboard or screen-reader user is the same. `focusPanel()`
    moves focus to the heading of the panel instead, which is also what now says there is
    nothing there.
-   The ring is OPT IN and keyboard-only, the same rule as `dialog:focus` above. */
+   The ring is OPT IN and keyboard-only, the same idea as the dialog rule above. */
 .landing:focus { outline: none; }
 .landing.ring-focus:focus { outline: 2px solid var(--focus-border); outline-offset: 2px; }
 /* .grid sets display:grid, which beats the UA rule for [hidden] — force it. */

@@ -4028,6 +4028,9 @@ the keyboard ended up. What changed:
   the top of the page with the window still open. It now lands on the same control again, or
   after a delete on the one that moved into its place (the list's Add button when nothing is
   left); after Save Item or Delete This Item, back on the row in the table.
+- **A window the keyboard lands on shows the focus ring.** When a window is taller than the
+  screen the browser makes the window itself a Tab stop, and Tab wrapping onto it showed no ring
+  at all. It draws the ring just inside its edge now; opening a window with a tap still shows none.
 
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)
