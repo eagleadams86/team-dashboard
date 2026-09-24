@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4371;
+const EXPECTED = 4372;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -6764,7 +6764,7 @@ const stripComments = (src) => {
      dialog match the :focus-visible rule, and every phone and tablet drew a 2px ring around
      the whole window until 2026-08-22. A fine pointer never takes that path, so no desktop
      and no CI run will ever show this coming back; the source is the only guard. */
-  ok(/dialog:focus:not\(:focus-visible\) \{ outline: none/.test(APP_SRC),
+  ok(/dialog\[tabindex="-1"\]:focus \{ outline: none/.test(APP_SRC),
      'without this the whole dialog rings itself on every phone and tablet');
   ok(/dlg\.tabIndex = -1;\s*\n\s*dlg\.focus\(\);/.test(APP_SRC),
      'and that container focus is still how the keyboard is kept down');
@@ -18522,7 +18522,11 @@ group('a card with no chart matches the one beside it');
     const bySel = (sel) => rules.filter(r => r.selectorText === sel);
     is(bySel('dialog:focus').filter(r => r.style.outlineStyle === 'none' || /outline:\s*none/.test(r.cssText)).length, 0,
        'dialog ring: no rule takes the outline off a focused dialog outright');
-    ok(bySel('dialog:focus:not(:focus-visible)').some(r => /outline:\s*none/.test(r.cssText)),
+    /* NOT :not(:focus-visible) — the phone's scripted container focus matches
+       :focus-visible, so only openModal's tabindex="-1" can tell the tap case apart. */
+    is(bySel('dialog:focus:not(:focus-visible)').length, 0,
+       'dialog ring: the tap exemption is not keyed on :focus-visible, which a scripted focus can match');
+    ok(bySel('dialog[tabindex="-1"]:focus').some(r => /outline:\s*none/.test(r.cssText)),
        'dialog ring: a dialog focused as a container after a tap still draws none');
     const ring = bySel('dialog:focus-visible').map(r => r.cssText).join(' ');
     ok(/outline:\s*2px solid var\(--focus-border\)/.test(ring) && /outline-offset:\s*-2px/.test(ring),

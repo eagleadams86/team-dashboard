@@ -5147,13 +5147,15 @@ Nothing here stores anything new — the whitelist is untouched.
   delete IS the neighbour. The status list has no Add button; its fallback is the next control
   down, Add a Stage. Deleting the last item empties the board, the tabs go with the data, and
   `focusView()` lands on the welcome card's heading.
-- **`dialog:focus { outline: none }` is `dialog:focus:not(:focus-visible)` now, plus a
+- **`dialog:focus { outline: none }` is `dialog[tabindex="-1"]:focus` now, plus a
   `dialog:focus-visible` ring** (2.4.7) — `2px solid var(--focus-border)`, offset **-2px** so the
-  dialog's own edge cannot clip it. The rule was written for the coarse-pointer `openModal()` path
-  (a tap is not :focus-visible, so that is unchanged), but Chromium makes a scrolling dialog a Tab
-  stop, and Tab wrapping onto one drew nothing. Pinned by cascade in the suite, never by focusing
-  ([family-css-gotchas]: whether programmatic focus is :focus-visible differs in CI). Sprint
-  Predictability carries the same rule and is being fixed the same way.
+  dialog's own edge cannot clip it. Chromium makes a scrolling dialog a Tab stop, and Tab wrapping
+  onto one drew nothing. **Not `:not(:focus-visible)`** — the first version of this fix used it and
+  was corrected before merge: the coarse-pointer `openModal()` path focuses the dialog from script,
+  and that scripted focus MATCHES :focus-visible on a phone, so the ring would have come back on
+  every iPhone. `tabindex="-1"` is what tells the two apart — openModal sets it before that focus,
+  and it also takes the window out of the Tab order. Identical to Sprint Predictability's rule.
+  Pinned by cascade in the suite, never by focusing.
 - **Four `.table-scroll` boxes are Tab stops: Time in Stage, Feature Progress, the forecast figures
   and the feature schedule** (2.1.1, axe `scrollable-region-focusable` at 390/320 — the audit saw
   the first and third; a survey of every `.table-scroll` in every view, items and features, found

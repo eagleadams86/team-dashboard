@@ -579,12 +579,16 @@ header *, html[data-pin] .tabrow * { scroll-margin-top: calc(0px - var(--pin-cle
    mistake. Same exemption `main:focus` already carries, for the same reason.
    A fine pointer never takes that path, which is why no desktop ever shows it — found
    on an iPhone. Fixed across the whole family in one pass; PAPTrack led.
-   NARROWED TO :not(:focus-visible) (2026-09-24). Unqualified, it also took the ring off
-   when the KEYBOARD lands on a dialog: Chromium makes a dialog whose content scrolls a
-   Tab stop of its own, and Tab wrapping onto it showed nothing at all. A tap-opened
-   dialog is not :focus-visible, so the phone case is unchanged; a keyboard-reached one
-   gets the pack's ring, inset because the dialog's own edge is where it would clip. */
-dialog:focus:not(:focus-visible) { outline: none; }
+   BUT A KEYBOARD CAN LAND ON A WINDOW TOO (2026-09-24 audit). A window tall enough
+   to scroll is a Tab stop of its own in Chromium, and Tab wraps onto it past the
+   last control, where `dialog:focus` left no ring at all. `:not(:focus-visible)`
+   cannot tell the two apart: the phone's scripted focus MATCHES :focus-visible,
+   which is the whole reason this rule exists. `tabindex="-1"` can: openModal() sets
+   it before that focus, and it also takes the window out of the Tab order, so a
+   window carrying it is only ever focused as the mechanism. Every other keyboard
+   focus of a window draws the ring INSIDE its edge. Same rule as Sprint
+   Predictability's. */
+dialog[tabindex="-1"]:focus { outline: none; }
 dialog:focus-visible { outline: 2px solid var(--focus-border); outline-offset: -2px; }
 /* WHERE FOCUS GOES WHEN THE CONTROL YOU PRESSED DISAPPEARS (2026-08-22). Clearing a
    team's rows leaves nothing to clear, so the button that was just pressed hides itself
