@@ -16727,7 +16727,7 @@ function stagePickHtml(st, i) {
   return '<div class="stagepick">' + state.statuses.map(x =>
     '<label><input type="checkbox" data-stagepick="' + escapeHtml(st.id) + '" value="' +
     escapeHtml(x.id) + '"' + (mine.has(x.id) ? ' checked' : '') +
-    ' aria-label="Group ' + escapeHtml(x.label) + ' under the stage in row ' + (i + 1) +
+    ' aria-label="' + escapeHtml(x.label) + ', grouped under the stage in row ' + (i + 1) +
     '">' + escapeHtml(x.label) + '</label>').join('') + '</div>';
 }
 

@@ -5131,3 +5131,5 @@ Nothing here stores anything new — the whitelist is untouched.
 - **The Teams window's Edit button is named "Edit settings for X"** (2.5.3 — the accessible name
   starts with the words on screen; it was "Settings for X"). The family rule from
   the 2026-08-26 range-box fix: the name starts with the visible words and only adds to them.
+- **A stage's status tick boxes are named "<status>, grouped under the stage in row N"** — the
+  same rule; "Group <status> under…" put the visible word third.

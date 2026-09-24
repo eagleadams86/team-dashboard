@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4334;
+const EXPECTED = 4337;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -18368,6 +18368,25 @@ group('a card with no chart matches the one beside it');
        'label in name: every Edit button’s name starts with “Edit”');
     ok(edits[0] && /Team Named/.test(edits[0].getAttribute('aria-label')),
        'label in name: and still says which team', edits[0] && edits[0].getAttribute('aria-label'));
+  }
+
+  group('2026-09-24: a status tick box is named by the status it shows');
+  {
+    /* The tick list under a stage: each box shows a status name, and was named
+       "Group <status> under the stage in row 1" — the visible word third. */
+    plant({ statuses: [{ id: 'tn1', label: 'Code Review' }, { id: 'tn2', label: 'Testing' }],
+            stages: [{ id: 'tns', name: 'Review', match: [], statuses: ['tn1'] }],
+            teams: [{ id: 'tnt', name: 'T', rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story', u: 'tn1' }] }],
+            settings: {} });
+    win.renderAll();
+    const ticks = [...win.document.querySelectorAll('#stageRows [data-stagepick]')];
+    is(ticks.length, 2, 'tick names: one box per status under the stage');
+    is(ticks.filter(b => !b.getAttribute('aria-label').startsWith(b.closest('label').textContent.trim()))
+         .map(b => b.getAttribute('aria-label')), [],
+       'tick names: every box’s name starts with the status it shows');
+    ok(ticks[0] && /row 1/.test(ticks[0].getAttribute('aria-label')),
+       'tick names: and still says which stage row it belongs to', ticks[0] && ticks[0].getAttribute('aria-label'));
+    plant({ teams: [], settings: {} });
   }
 
   /* ────────────────────────────────────────────────────────── */

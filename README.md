@@ -4017,6 +4017,8 @@ the keyboard ended up. What changed:
 - **"Edit" is called "Edit".** Each team's Edit button in Teams & Stages was announced as
   "Settings for Team X", so a voice-control user saying the word on the button reached nothing.
   It is "Edit settings for Team X" now.
+- **A status tick box under a stage is named by its status first** — "Code Review, grouped under
+  the stage in row 1", where it used to start "Group Code Review…".
 
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)
