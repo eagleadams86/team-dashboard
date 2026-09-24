@@ -5154,3 +5154,11 @@ Nothing here stores anything new — the whitelist is untouched.
   stop, and Tab wrapping onto one drew nothing. Pinned by cascade in the suite, never by focusing
   ([family-css-gotchas]: whether programmatic focus is :focus-visible differs in CI). Sprint
   Predictability carries the same rule and is being fixed the same way.
+- **Four `.table-scroll` boxes are Tab stops: Time in Stage, Feature Progress, the forecast figures
+  and the feature schedule** (2.1.1, axe `scrollable-region-focusable` at 390/320 — the audit saw
+  the first and third; a survey of every `.table-scroll` in every view, items and features, found
+  the other two in the same state). `tabindex="0" role="region" aria-labelledby="<card title id>"`,
+  in the markup and unconditional, as Sprint Predictability does; the ring is
+  `.table-scroll[tabindex]:focus-visible { outline-offset: -2px }`. All Teams, Your Data and the
+  four dialog tables hold buttons, so they were left alone. A new wide table with no control in
+  it takes the same three attributes.

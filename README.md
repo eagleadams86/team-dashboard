@@ -4031,6 +4031,10 @@ the keyboard ended up. What changed:
 - **A window the keyboard lands on shows the focus ring.** When a window is taller than the
   screen the browser makes the window itself a Tab stop, and Tab wrapping onto it showed no ring
   at all. It draws the ring just inside its edge now; opening a window with a tap still shows none.
+- **Wide tables with nothing to press can be scrolled from the keyboard.** On a phone, Time in
+  Stage, Feature Progress, the forecast's figures and the feature schedule are wider than the
+  screen, and nothing in them could take the keyboard to scroll across. Each table's box is a Tab
+  stop of its own now, named by its card's title; the arrow keys scroll it.
 
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)

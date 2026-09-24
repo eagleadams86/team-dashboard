@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4359;
+const EXPECTED = 4364;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -18527,6 +18527,27 @@ group('a card with no chart matches the one beside it');
     const ring = bySel('dialog:focus-visible').map(r => r.cssText).join(' ');
     ok(/outline:\s*2px solid var\(--focus-border\)/.test(ring) && /outline-offset:\s*-2px/.test(ring),
        'dialog ring: and one the keyboard reaches draws the pack’s focus ring, inset so the edge cannot clip it', ring);
+  }
+
+  group('2026-09-24: a wide table with nothing to press can be scrolled from the keyboard');
+  {
+    /* axe scrollable-region-focusable at 390 and 320: these four tables are
+       wider than a phone and hold no control, so a keyboard could not reach
+       their right-hand columns. Every other wide table has sort buttons or row
+       buttons in it. Named by the card title on screen, so the name follows it. */
+    const rDoc = win.document;
+    [['stageTimeTable', 'titleStageTime'], ['featureProgressTable', 'titleFeatureProgress'],
+     ['forecastFiguresTable', 'titleForecastFigures'], ['scheduleTable', 'titleSchedule']].forEach(([tid, title]) => {
+      const box = rDoc.getElementById(tid) && rDoc.getElementById(tid).closest('.table-scroll');
+      ok(box && box.getAttribute('tabindex') === '0' && box.getAttribute('role') === 'region'
+           && box.getAttribute('aria-labelledby') === title && rDoc.getElementById(title),
+         'scroll region: ' + tid + ' sits in a focusable region named by its card title',
+         box ? [box.getAttribute('tabindex'), box.getAttribute('role'), box.getAttribute('aria-labelledby')].join(' ') : 'no box');
+    });
+    const ring = [...rDoc.styleSheets].flatMap(sh => { try { return [...sh.cssRules]; } catch (e) { return []; } })
+      .filter(r => r.selectorText === '.table-scroll[tabindex]:focus-visible').map(r => r.cssText).join(' ');
+    ok(/outline-offset:\s*-2px/.test(ring),
+       'scroll region: its ring is drawn inside the box, so the card edge cannot clip it', ring);
   }
 
   /* ────────────────────────────────────────────────────────── */

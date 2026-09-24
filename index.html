@@ -1660,6 +1660,16 @@ body.maxi-open { overflow: hidden; }
    before, and the ring now has somewhere to be drawn. The 8px top margin plus
    4px of padding is the 12px this div used to carry inline. */
 #manageDialog .table-scroll { margin: 8px -4px 0; padding: 4px; }
+/* A WIDE TABLE WITH NOTHING TO PRESS IS ITSELF A TAB STOP (2026-09-24). Time in
+   Stage, Feature Progress, the forecast figures and the feature schedule are wider
+   than a phone and hold no control, so a keyboard could not scroll to their
+   right-hand columns (axe scrollable-region-focusable). Those four boxes carry
+   tabindex="0" role="region" and the card title as their name, in the markup and
+   unconditionally — as in Sprint Predictability — since "only while it overflows"
+   would need re-checking on every render and resize for one extra stop on a
+   desktop. The ring is drawn INSIDE the box: the card around it is where an
+   outside ring would be cut. */
+.table-scroll[tabindex]:focus-visible { outline-offset: -2px; }
 table.data { width: 100%; border-collapse: collapse; font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums; }
 table.data th, table.data td { text-align: left; padding: 8px 12px;
@@ -3400,7 +3410,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <span></span>
             <span id="stageTimeExport"></span>
           </div>
-          <div class="table-scroll">
+          <div class="table-scroll" tabindex="0" role="region" aria-labelledby="titleStageTime">
             <table class="data" id="stageTimeTable"></table>
           </div>
           <div class="note info" id="stageTimeNone" hidden></div>
@@ -3424,7 +3434,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <span></span>
             <span id="featureProgressExport"></span>
           </div>
-          <div class="table-scroll">
+          <div class="table-scroll" tabindex="0" role="region" aria-labelledby="titleFeatureProgress">
             <table class="data" id="featureProgressTable"></table>
           </div>
           <div class="note info" id="featureProgressNone" hidden></div>
@@ -3778,7 +3788,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <span></span>
             <span id="forecastFiguresExport"></span>
           </div>
-          <div class="table-scroll">
+          <div class="table-scroll" tabindex="0" role="region" aria-labelledby="titleForecastFigures">
             <table class="data" id="forecastFiguresTable"></table>
           </div>
         </div>
@@ -3796,7 +3806,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
             <span></span>
             <span id="scheduleExport"></span>
           </div>
-          <div class="table-scroll">
+          <div class="table-scroll" tabindex="0" role="region" aria-labelledby="titleSchedule">
             <table class="data" id="scheduleTable"></table>
           </div>
           <p class="note info" id="scheduleNote"></p>
