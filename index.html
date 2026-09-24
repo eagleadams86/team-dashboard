@@ -23268,13 +23268,17 @@ function focusReturn(mark, fallback) {
   else if (typeof fallback === 'function') fallback(mark.ring);
   else if (shown(fallback)) fallback.focus({ preventScroll: true });
 }
-/* The last resort: the heading of the panel on screen, or — on the Dashboard,
-   whose cards head themselves and whose only h2s belong to empty states — the
-   tab that names it. */
+/* The last resort: the heading of the panel on screen; on the Dashboard, whose
+   cards head themselves and whose only h2s belong to empty states, the tab that
+   names it; and with nothing left at all — the tabs go with the data — the
+   welcome card's heading, which is what is on screen then. */
 function focusView(ring) {
+  const drawn = x => !!x && x.getClientRects().length > 0;
   const panel = document.querySelector('section.panel:not([hidden])');
-  if (panel && [...panel.querySelectorAll('h2')].some(h => h.getClientRects().length)) focusPanel(panel.id, ring);
-  else if ($('tab-' + activeTab)) $('tab-' + activeTab).focus({ preventScroll: true });
+  const tab = $('tab-' + activeTab);
+  if (panel && [...panel.querySelectorAll('h2')].some(drawn)) focusPanel(panel.id, ring);
+  else if (drawn(tab)) tab.focus({ preventScroll: true });
+  else if (drawn($('welcomeCard'))) focusPanel('welcomeCard', ring);
 }
 /* Move focus into a panel when the control the user was standing on has gone — either
    removed by a re-render or hidden because it has nothing left to do. `fromKeyboard`
@@ -23382,6 +23386,9 @@ $('artRows').addEventListener('click', e => {
   if (!id) return;
   const i = state.arts.findIndex(a => a.id === id);
   if (i < 0) return;
+  /* Taken before the confirm: after it, the neighbour's delete — or Add an ART
+     when none are left — is where the keyboard goes (2026-09-24). */
+  const mark = focusMark();
   const art = state.arts[i];
   const on = state.teams.filter(t => t.artId === id);
   /* The cheapest delete in the app, and the confirm says so: it takes no team
@@ -23402,6 +23409,7 @@ $('artRows').addEventListener('click', e => {
   }
   save();
   renderAll();
+  focusReturn(mark, $('btnAddArt'));
   window.toast('Deleted ' + art.name);
 });
 
@@ -23478,8 +23486,11 @@ $('stageRows').addEventListener('change', e => {
   save();
   /* Everything, not just this dialog: the age chart's axis, its columns and the
      Time in stage card all read the grouping, and this is the change that was
-     impossible before — every item already pasted moves with it. */
+     impossible before — every item already pasted moves with it. The box is
+     rebuilt too, so the keyboard is put back on its new copy (2026-09-24). */
+  const mark = focusMark();
   renderAll();
+  focusReturn(mark);
 });
 
 /* Deleting a status. The vocabulary is the only list in this app whose entries
@@ -23495,6 +23506,7 @@ $('statusList').addEventListener('click', e => {
   if (!id) return;
   const status = state.statuses.find(x => x.id === id);
   if (!status) return;
+  const mark = focusMark();
   let on = 0;
   const eachRecord = (fn) =>
     state.teams.forEach(t => { t.rows.forEach(fn); (t.features || []).forEach(fn); });
@@ -23514,6 +23526,8 @@ $('statusList').addEventListener('click', e => {
   eachRecord(r => { if (r.status === id) r.status = ''; });
   save();
   renderAll();
+  /* The next chip's delete; with no statuses left, the next control down. */
+  focusReturn(mark, $('btnAddStage'));
   window.toast('Deleted ' + status.label);
 });
 
@@ -23524,6 +23538,7 @@ $('stageRows').addEventListener('click', e => {
   if (!id) return;
   const i = state.stages.findIndex(st => st.id === id);
   if (i < 0) return;
+  const mark = focusMark();
   const stage = state.stages[i];
   /* Unlike deleting an ART, this DOES take data with it: the day counts stored
      against this stage have nowhere to live once its name is gone, and
@@ -23585,6 +23600,7 @@ $('stageRows').addEventListener('click', e => {
   });
   save();
   renderAll();
+  focusReturn(mark, $('btnAddStage'));
   window.toast('Deleted ' + stage.name);
 });
 
@@ -23845,7 +23861,10 @@ $('teamRows').addEventListener('change', e => {
   if (!team) return;
   team.artId = e.target.value || null;
   save();
+  /* The picker is rebuilt with its row; found again by its id (2026-09-24). */
+  const mark = focusMark();
   renderAll();
+  focusReturn(mark);
 });
 
 $('teamRows').addEventListener('click', e => {
@@ -23855,6 +23874,7 @@ $('teamRows').addEventListener('click', e => {
   if (!id) return;
   const i = state.teams.findIndex(t => t.id === id);
   if (i < 0 || state.teams.length === 1) return;
+  const mark = focusMark();
   const team = state.teams[i];
   /* Both lists are named, because both go with the team. A team holding twenty
      features and no items used to be deleted under a bare "Delete X?" — the
@@ -23873,6 +23893,8 @@ $('teamRows').addEventListener('click', e => {
   if (view.activeTeamId === id) { view.activeTeamId = state.teams[0].id; saveView(); }
   save();
   renderAll();
+  /* The last team has no delete, so one team left lands on Add a Team. */
+  focusReturn(mark, $('btnAddTeam'));
   window.toast('Deleted ' + team.name);
 });
 
@@ -24357,11 +24379,15 @@ $('filterRows').addEventListener('click', e => {
     moveFilter(+btn.dataset.movefilter, Number(btn.dataset.dir));
     return;
   }
+  /* The rows are keyed by position, so the same key is the row that moved up
+     into this one's place — the neighbour — and Add a Type when none are left. */
+  const mark = focusMark();
   state.settings.filters.splice(+btn.dataset.del, 1);
   save();
   renderFilterRows();
   renderFilterSelect();
   renderDashboard();
+  focusReturn(mark, $('btnAddFilter'));
 });
 function onAddFilter() {
   state.settings.filters.push({ display: '', value: '' });
@@ -24778,6 +24804,17 @@ $('clearBtn').addEventListener('click', () => {
    markup and this is a position in an array that a render can renumber. It is
    cleared on every open, so it can never outlive the row it points at. */
 let editingItem = null;
+/* The control that opened the item window. Closing it hands focus back to that
+   control — which Save and Delete then rebuild with the table, so it is found
+   again by its key: the same row, the row that took its place, or Add. */
+let itemOpener = null;
+function focusAfterItem() {
+  focusReturn(itemOpener, (ring) => {
+    const add = [$('btnAddItem2'), $('btnAddItem')].find(b => b && b.getClientRects().length);
+    if (add) add.focus({ preventScroll: true }); else focusView(ring);
+  });
+  itemOpener = null;
+}
 
 function openItemDialog(index) {
   const team = activeTeam();
@@ -24788,6 +24825,7 @@ function openItemDialog(index) {
      of features and writing into the items would be the worst kind of wrong,
      silently correct-looking. */
   const editingFeature = featureUnit();
+  itemOpener = focusMark();
   const list = editingFeature ? (team.features || (team.features = [])) : team.rows;
   const One = editingFeature ? 'Feature' : 'Work Item';
   const one = editingFeature ? 'feature' : 'item';
@@ -24957,6 +24995,7 @@ $('itemSave').addEventListener('click', () => {
   $('itemDialog').close();
   $('parseNote').innerHTML = '';
   renderAll();
+  focusAfterItem();
   window.toast((editingItem === null ? (savingFeature ? 'Feature' : 'Item') + ' added'
                                      : (savingFeature ? 'Feature' : 'Item') + ' updated'));
 });
@@ -24982,6 +25021,7 @@ $('itemDelete').addEventListener('click', () => {
   save();
   $('itemDialog').close();
   renderAll();
+  focusAfterItem();
   window.toast(delFeature ? 'Feature deleted' : 'Item deleted');
 });
 

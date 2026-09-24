@@ -4022,6 +4022,12 @@ the keyboard ended up. What changed:
 - **The train picker no longer calls itself a menu.** It opens a list of tick boxes, but told a
   screen reader it had a menu, whose keys it does not use. It says whether it is open and which
   list it opens, as Sprint Predictability's identical picker does.
+- **Pressing something inside a window keeps you in that window.** Ticking a status under a
+  stage, choosing a team's ART, deleting a team, ART, stage, status or work-type row, and Save
+  Item or Delete This Item all redraw the list they are in — and the keyboard used to fall to
+  the top of the page with the window still open. It now lands on the same control again, or
+  after a delete on the one that moved into its place (the list's Add button when nothing is
+  left); after Save Item or Delete This Item, back on the row in the table.
 
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)

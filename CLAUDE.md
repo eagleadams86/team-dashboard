@@ -5137,3 +5137,13 @@ Nothing here stores anything new — the whitelist is untouched.
   `role="group"` of checkboxes with no menu keys; `aria-expanded` + `aria-controls` say what it is.
   Sprint Predictability's picker is the same markup and took the same change the same day — keep
   them identical.
+- **Nine handlers that rebuild the control they were pressed on now use the helper**: the status
+  tick box under a stage (`stageRows` change), a team's ART picker, and the ART / status / stage /
+  team / work-type-row deletes — each `focusMark()` BEFORE its confirm (a native confirm moves
+  nothing) and `focusReturn(mark, <the list's Add button>)` after the render — plus Save Item and
+  Delete This Item, which mark the control that OPENED the item window (`itemOpener`, set in
+  `openItemDialog`) because closing the window hands focus back to that row and the render then
+  detaches it. Work-type rows are keyed by position (`data-del="<index>"`), so the same key after a
+  delete IS the neighbour. The status list has no Add button; its fallback is the next control
+  down, Add a Stage. Deleting the last item empties the board, the tabs go with the data, and
+  `focusView()` lands on the welcome card's heading.

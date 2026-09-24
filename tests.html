@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4340;
+const EXPECTED = 4356;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -18402,6 +18402,112 @@ group('a card with no chart matches the one beside it');
     ok(btn && btn.hasAttribute('aria-expanded') && btn.getAttribute('aria-controls') === 'artFilterMenu',
        'train picker: it still says whether it is open, and which list it opens');
     is(menu && menu.getAttribute('role'), 'group', 'train picker: and that list is a group of tick boxes');
+  }
+
+  group('2026-09-24: a press inside a window that rebuilds it keeps the keyboard there');
+  {
+    /* Each of these ends in a render that rebuilds the control it was pressed on,
+       with the window still open over the page — and focus fell to <body>. The
+       same control's new copy takes it; after a delete, the neighbour that moved
+       into its place, then the list's Add button when none are left. */
+    const kDoc = win.document;
+    const realConfirm = win.confirm;
+    win.confirm = () => true;
+    const at = () => { const a = kDoc.activeElement;
+      return !a || a === kDoc.body ? 'BODY' : a.tagName + ' ' + (a.id || JSON.stringify(Object.assign({}, a.dataset))); };
+    const row = (i) => ({ c: '2015-01-2' + i, s: '2015-01-1' + i, t: 'Story', u: 'ku1' });
+    plant({ teams: [{ id: 'kt1', name: 'One', rows: [row(1), row(2), row(3)] },
+                    { id: 'kt2', name: 'Two', rows: [row(4)] }, { id: 'kt3', name: 'Three', rows: [] }],
+            arts: [{ id: 'ka1', name: 'Train A' }, { id: 'ka2', name: 'Train B' }],
+            statuses: [{ id: 'ku1', label: 'Doing' }, { id: 'ku2', label: 'Review' }, { id: 'ku3', label: 'Test' }],
+            stages: [{ id: 'ks1', name: 'Build', match: [], statuses: ['ku1'] },
+                     { id: 'ks2', name: 'Check', match: [], statuses: [] }],
+            settings: { filters: [{ display: 'All', value: 'All' }, { display: 'Defects', value: 'Bug' },
+                                  { display: 'Stories', value: 'Story' }] } });
+    win.renderAll();
+    kDoc.getElementById('manageBtn').click();
+    const press = (el) => { if (!el) return null; el.focus(); el.click(); return el; };
+
+    /* The tick box under a stage. */
+    const tick = kDoc.querySelector('#stageRows [data-stagepick="ks2"][value="ku2"]');
+    if (tick) { tick.focus(); tick.checked = true; tick.dispatchEvent(new win.Event('change', { bubbles: true })); }
+    const t2 = kDoc.activeElement;
+    ok(tick && t2 !== tick && t2.dataset && t2.dataset.stagepick === 'ks2' && t2.value === 'ku2',
+       'keep focus: ticking a status under a stage lands on the new copy of that box', at());
+    /* A team's ART picker. */
+    const pick = kDoc.getElementById('art-of-kt1');
+    if (pick) { pick.focus(); pick.value = 'ka1'; pick.dispatchEvent(new win.Event('change', { bubbles: true })); }
+    ok(pick && kDoc.activeElement !== pick && kDoc.activeElement.id === 'art-of-kt1',
+       'keep focus: choosing a team’s ART lands on that team’s new picker', at());
+    /* Deletes: the neighbour, then Add. */
+    const d1 = press(kDoc.querySelector('[data-delart="ka1"]'));
+    ok(d1 && kDoc.activeElement.dataset && kDoc.activeElement.dataset.delart === 'ka2',
+       'keep focus: deleting an ART lands on the next ART’s delete', at());
+    press(kDoc.querySelector('[data-delart="ka2"]'));
+    ok(kDoc.activeElement === kDoc.getElementById('btnAddArt'),
+       'keep focus: and deleting the last one lands on Add an ART', at());
+    press(kDoc.querySelector('[data-delstatus="ku1"]'));
+    ok(kDoc.activeElement.dataset && kDoc.activeElement.dataset.delstatus === 'ku2',
+       'keep focus: deleting a status lands on the next status’s delete', at());
+    press(kDoc.querySelector('[data-delstage="ks1"]'));
+    ok(kDoc.activeElement.dataset && kDoc.activeElement.dataset.delstage === 'ks2',
+       'keep focus: deleting a stage lands on the next stage’s delete', at());
+    press(kDoc.querySelector('[data-delstage="ks2"]'));
+    ok(kDoc.activeElement === kDoc.getElementById('btnAddStage'),
+       'keep focus: and deleting the last stage lands on Add a Stage', at());
+    press(kDoc.querySelector('[data-delteam="kt2"]'));
+    ok(kDoc.activeElement.dataset && kDoc.activeElement.dataset.delteam === 'kt3',
+       'keep focus: deleting a team lands on the next team’s delete', at());
+    press(kDoc.querySelector('[data-delteam="kt3"]'));
+    ok(kDoc.activeElement === kDoc.getElementById('btnAddTeam'),
+       'keep focus: and with one team left, which has no delete, on Add a Team', at());
+    kDoc.getElementById('manageDialog').close();
+
+    /* Settings: removing a work-type row. */
+    kDoc.getElementById('settingsBtn').click();
+    const types = kDoc.querySelectorAll('#filterRows [data-del]').length;
+    /* The first row that can go — the All row cannot. */
+    const rm = [...kDoc.querySelectorAll('#filterRows [data-del]')].find(b => !b.disabled);
+    const rmAt = rm ? rm.dataset.del : null;
+    press(rm);
+    ok(types > 1 && kDoc.activeElement !== rm && kDoc.activeElement.dataset && kDoc.activeElement.dataset.del === rmAt
+         && kDoc.querySelectorAll('#filterRows [data-del]').length === types - 1,
+       'keep focus: removing a work-type row lands on the row that moved into its place', at());
+    press(kDoc.querySelector('#filterRows [data-del="' + rmAt + '"]'));
+    ok(kDoc.activeElement === kDoc.getElementById('btnAddFilter'),
+       'keep focus: and removing the last one that can go lands on Add a Type', at());
+    kDoc.getElementById('settingsDialog').close();
+
+    /* The item window: Save and Delete rebuild the row that opened it. */
+    win.selectTab('data');
+    const opener = kDoc.querySelector('button.rowbtn[data-item="1"]');
+    press(opener);
+    ok(kDoc.getElementById('itemDialog').open, 'keep focus: a row opens its item window');
+    press(kDoc.getElementById('itemSave'));
+    ok(!kDoc.getElementById('itemDialog').open && kDoc.activeElement !== opener
+         && kDoc.activeElement.matches && kDoc.activeElement.matches('button.rowbtn[data-item="1"]'),
+       'keep focus: Save Item lands back on that row, rebuilt', at());
+    press(kDoc.querySelector('button.rowbtn[data-item="1"]'));
+    press(kDoc.getElementById('itemDelete'));
+    ok(kDoc.activeElement.matches && kDoc.activeElement.matches('button.rowbtn'),
+       'keep focus: Delete This Item lands on the row that took its place', at());
+    while (win.tdGet().teams[0].rows && win.tdGet().teams[0].rows.length) {
+      const before = win.tdGet().teams[0].rows.length;
+      press(kDoc.querySelector('button.rowbtn'));
+      press(kDoc.getElementById('itemDelete'));
+      if ((win.tdGet().teams[0].rows || []).length === before) break;
+    }
+    /* With the board empty the tabs and both Add buttons go with the data, and
+       the welcome card is what is on screen. */
+    const wel = kDoc.getElementById('welcomeCard');
+    ok(win.tdGet().teams[0].rows === undefined || win.tdGet().teams[0].rows.length === 0,
+       'keep focus: every item deleted', JSON.stringify(win.tdGet().teams[0].rows));
+    ok(['btnAddItem', 'btnAddItem2'].includes(kDoc.activeElement.id)
+         || (wel && !wel.hidden && wel.contains(kDoc.activeElement)),
+       'keep focus: and deleting the last item lands on Add, or on the welcome card once nothing is left', at());
+    win.confirm = realConfirm;
+    win.selectTab('dashboard');
+    plant({ teams: [], arts: [], stages: [], statuses: [], settings: {} });
   }
 
   /* ────────────────────────────────────────────────────────── */
