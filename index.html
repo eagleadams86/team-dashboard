@@ -697,7 +697,9 @@ select { cursor: pointer; }
 .card .hint { color: var(--text-secondary); font-size: var(--fs-xs); }
 
 .grid { display: grid; gap: 16px; }
-.grid.two { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: end; }
+/* min(260px, 100%) (2026-09-24): a bare 260px floor is wider than a 320px screen's
+   dialog has to give, and Share and Clean Up Old Data scrolled 7px sideways. */
+.grid.two { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); align-items: end; }
 /* Labels wrap to different heights; bottom-align each cell so the inputs in a
    row still line up. */
 .grid.two > div { display: flex; flex-direction: column; justify-content: flex-end; }

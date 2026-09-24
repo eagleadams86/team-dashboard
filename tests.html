@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4364;
+const EXPECTED = 4367;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -18548,6 +18548,38 @@ group('a card with no chart matches the one beside it');
       .filter(r => r.selectorText === '.table-scroll[tabindex]:focus-visible').map(r => r.cssText).join(' ');
     ok(/outline-offset:\s*-2px/.test(ring),
        'scroll region: its ring is drawn inside the box, so the card edge cannot clip it', ring);
+  }
+
+  group('2026-09-24: no window scrolls sideways at 320px');
+  {
+    /* `.grid.two` asked for a 260px column come what may, and inside a 320px
+       window's dialog there are not 260px to give — Share and Clean Up Old Data
+       scrolled 7px sideways (1.4.10). The app frame is put at a phone width,
+       measured and put back, the pin group's trick. */
+    const appFrame = document.getElementById('app');
+    const wasCss = appFrame.style.cssText;
+    const gDoc = win.document;
+    plant({ teams: [{ id: 'rf1', name: 'Reflow', rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' }] },
+                    { id: 'rf2', name: 'Other', rows: [{ c: '2015-01-22', s: '2015-01-19', t: 'Story' }] }], settings: {} });
+    win.renderAll();
+    appFrame.style.cssText = 'position:absolute;width:320px;height:900px;opacity:0;border:0;left:-9999px';
+    await new Promise((res) => setTimeout(res, 250));
+    const over = (id) => { const d = gDoc.getElementById(id); return d && d.open ? d.scrollWidth - d.clientWidth : null; };
+    gDoc.getElementById('shareBtn').click();
+    await new Promise((res) => setTimeout(res, 100));
+    is(over('shareDialog'), 0, 'reflow: the Share window fits a 320px screen without scrolling sideways');
+    gDoc.getElementById('shareDialog').close();
+    win.openCleanup();
+    await new Promise((res) => setTimeout(res, 100));
+    is(over('cleanupDialog'), 0, 'reflow: and so does Clean Up Old Data');
+    gDoc.getElementById('cleanupDialog').close();
+    const gridRule = [...gDoc.styleSheets].flatMap(sh => { try { return [...sh.cssRules]; } catch (e) { return []; } })
+      .filter(r => r.selectorText === '.grid.two').map(r => r.cssText).join(' ');
+    ok(/minmax\(min\(260px,\s*100%\),\s*1fr\)/.test(gridRule),
+       'reflow: a .grid.two column is at most the width it is given', gridRule);
+    appFrame.style.cssText = wasCss;
+    await new Promise((res) => setTimeout(res, 250));
+    plant({ teams: [], settings: {} });
   }
 
   /* ────────────────────────────────────────────────────────── */

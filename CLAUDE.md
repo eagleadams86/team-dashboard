@@ -5162,3 +5162,7 @@ Nothing here stores anything new — the whitelist is untouched.
   `.table-scroll[tabindex]:focus-visible { outline-offset: -2px }`. All Teams, Your Data and the
   four dialog tables hold buttons, so they were left alone. A new wide table with no control in
   it takes the same three attributes.
+- **`.grid.two` is `repeat(auto-fit, minmax(min(260px, 100%), 1fr))`** (1.4.10). A bare 260px floor
+  exceeds a 320px screen's dialog content box (286px less padding), so Share and Clean Up Old Data
+  scrolled 7px sideways. Every dialog was re-measured at 320 afterwards: none scrolls. Identical at
+  any width that has 260px to give.

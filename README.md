@@ -4035,6 +4035,9 @@ the keyboard ended up. What changed:
   Stage, Feature Progress, the forecast's figures and the feature schedule are wider than the
   screen, and nothing in them could take the keyboard to scroll across. Each table's box is a Tab
   stop of its own now, named by its card's title; the arrow keys scroll it.
+- **Share and Clean Up Old Data fit a 320px screen.** Their two-column form rows asked for at
+  least 260px each, more than a window that narrow has inside it, so both scrolled 7px sideways.
+  A column is never wider than the room it is given now; nothing changes on a wider screen.
 
 
 ## A Box Is as Wide as What Goes In It (2026-08-27)
