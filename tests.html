@@ -12984,6 +12984,18 @@ group('ARTs — the grouping, and the boundary it crosses');
     const opts = [...win.document.getElementById('teamSel').options].map(o => o.textContent);
     ok(opts.includes('Features Only') && opts.includes('Nothing (empty)'),
        'a features-only team is not tagged (empty); a truly empty one is', opts.join(' | '));
+    /* A features-only team still offers the clear button (it lives on the
+       always-shown paste card), and the Teams window counts its features. */
+    win.document.getElementById('teamSel').value = 'cl2';
+    win.document.getElementById('teamSel').dispatchEvent(new win.Event('change', { bubbles: true }));
+    win.selectTab('data');
+    ok(!clearBtn.hidden, 'a team holding only features still shows the clear button');
+    win.renderTeamRows && win.renderTeamRows();
+    const counts = [...win.document.querySelectorAll('#teamRows .count')].map(c => c.textContent);
+    is(counts, ['1 item', '0 items1 feature', '0 items'],
+       'the Teams window counts features too, and only where there are any');
+    win.document.getElementById('teamSel').value = 'cl4';
+    win.document.getElementById('teamSel').dispatchEvent(new win.Event('change', { bubbles: true }));
     /* That fixture leaves the view on features — put it back once more. */
     uSel.value = wasUnit;
     uSel.dispatchEvent(new win.Event('change', { bubbles: true }));

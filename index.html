@@ -16685,7 +16685,11 @@ function renderTeamRows() {
         ' aria-label="Edit settings for ' + escapeHtml(t.name) + '">Edit</button></td>' +
       /* The count carries its own noun, the way the sibling's rows do. With no
          header row there is nothing else to say what the number is. */
-      '<td class="count">' + t.rows.length + (t.rows.length === 1 ? ' item' : ' items') + '</td>' +
+      '<td class="count">' + t.rows.length + (t.rows.length === 1 ? ' item' : ' items') +
+        /* And the features, on a line of their own, only when there are any —
+           a team holding twenty features read "0 items" and looked empty. */
+        ((t.features || []).length ? '<br>' + t.features.length
+          + (t.features.length === 1 ? ' feature' : ' features') : '') + '</td>' +
       '<td>' + rowActs('team', t.id, t.name, i, state.teams.length, only) + '</td>';
     tb.appendChild(tr);
   });
@@ -20473,7 +20477,10 @@ function renderEmptyState() {
      buttons doing one thing is clutter on a working app. */
   $('btnAddItem').hidden = !!rows;
   $('btnAppend').hidden  = !rows;
-  $('btnClear').hidden   = !rows;
+  /* On the whole TEAM, not the list on screen: it clears both lists, so a team
+     holding only features must still offer it (2026-10-13). */
+  { const t = activeTeam();
+    $('btnClear').hidden = !t || !(t.rows.length + (t.features || []).length); }
   $('loadedCard').hidden = !rows;
   $('cleanupCard').hidden = !state.teams.some(t => t.rows.length);
   /* The demo is a first-run affordance, so it goes the moment ANY team holds

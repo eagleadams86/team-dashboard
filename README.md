@@ -2713,7 +2713,8 @@ and its settings — name, train, WIP limit, SLE, sprint cadence — are kept, s
 team and then using **Back Up** gives a clean copy of a train that other people can load and fill
 with their own data. (Before 2026-10-13 it took only the list on screen, which left features
 behind a "cleared" team.) A team with neither list reads *(empty)* in the team picker; one holding
-only features no longer does.
+only features no longer does, the Teams window counts a team's features under its items, and the
+button shows for any team holding either list.
 
 ### What It Costs You
 
