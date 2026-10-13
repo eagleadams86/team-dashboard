@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4404;
+const EXPECTED = 4408;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -17542,6 +17542,26 @@ group('a card with no chart matches the one beside it');
   const pBt = TD.parsePastedRows(brokenTab, 'auto');
   is(pBt.rows.map(r => r.key), ['DAE-1', 'DAE-2'], 'the same paste out of Excel, tab-separated');
   is(pBt.rows.map(r => iso(r.completed)), ['2026-08-10', '2026-08-12']);
+
+  /* A quoted cell may hold TABS, too (2026-10-13). Excel quotes a cell with a
+     tab in it on the way to the clipboard; split on every tab, Charles's
+     FCB-4582 moved two cells right — its Created time read as RESOLVED, a
+     Backlog item counted as finished, "created unreadable · started unreadable".
+     This is that row's shape. */
+  const tabbed = 'Issue Type\tIssue key\tIssue id\tSummary\tStatus\tCreated\tActual start\tResolved\n'
+    + 'Task\tFCB-4582\t6345455\t"Case - FPF one\ttwo\tthree"\tBacklog\t7/16/2026 14:42\t\t\n'
+    + 'Task\tFCB-4581\t6345448\tCase - FPF plain\tDone\t7/16/2026 14:35\t7/17/2026 0:00\t7/20/2026 9:00';
+  const pTb = TD.parsePastedRows(tabbed, 'mdy');
+  const r4582 = pTb.rows.find(r => r.key === 'FCB-4582');
+  ok(!r4582 || !r4582.completed,
+     'a tab inside an Excel-quoted cell does not move the row: the Backlog item is not finished');
+  is(pTb.badCompleted.length + pTb.badStarted.length + (pTb.badCreated || []).length, 0,
+     'and no date in it is reported unreadable');
+  is(iso(pTb.rows.find(r => r.key === 'FCB-4581').completed), '2026-07-20',
+     'while the row under it reads as it always did');
+  is(TD.parsePastedRows('Key\tType\tResolved\tStarted\nDAE-1\t"Story\t2026-08-10\t2026-08-01', 'auto')
+       .rows.map(r => iso(r.completed)), ['2026-08-10'],
+     'a quote that never closes on its line is cut on plain tabs, as before');
 
   /* The line number the report points at is the PHYSICAL line, so a record
      below a multi-line one is still found in the export. */

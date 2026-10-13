@@ -5511,7 +5511,7 @@ function separatorOf(firstLine) {
   return l.includes('\t') ? 'tab' : l.includes(',') ? 'comma' : 'spaces';
 }
 function splitCellsBy(sep) {
-  if (sep === 'tab') return (line) => line.split('\t');
+  if (sep === 'tab') return splitTabLine;
   if (sep === 'comma') return splitCsvLine;
   return (line) => line.split(/\s{2,}/);
 }
@@ -5520,7 +5520,26 @@ function splitCellsBy(sep) {
    so a plain split(',') breaks exactly the rows that needed the quotes.
    Minimal state machine: a quote at the start of a field opens quoting, ""
    inside quotes is a literal quote. Unquoted fields pass through unchanged. */
-function splitCsvLine(line) {
+function splitCsvLine(line) { return splitQuoted(line, ','); }
+
+/* AND SO DOES A COPY OUT OF EXCEL (2026-10-13). Its clipboard text is tab-
+   separated, and a cell holding a tab, a line break or a quote goes out wrapped
+   in quotes — the same rule, with a tab for the comma. A plain split('\t') cut
+   such a cell at every tab inside it: Charles's FCB-4582 had a Summary with two
+   tabs in it, so every cell after it moved two to the right, its Created time
+   was read as the RESOLVED date, and a Backlog item was counted as finished on
+   the day it was raised. splitRecords already read those quotes to keep a
+   multi-line cell in one record; the cells now read them too.
+   A quote that never closes on its line is not a quote — the record is cut on
+   plain tabs, as before, rather than one stray " swallowing the cells after it. */
+function splitTabLine(line) {
+  const cells = splitQuoted(line, '\t');
+  return cells === null ? line.split('\t') : cells;
+}
+
+/* Returns null when a quote opened and never closed, so a caller can choose
+   what an unbalanced line means; splitCsvLine keeps its old reading of one. */
+function splitQuoted(line, sep) {
   const cells = [];
   let cur = '', inQuotes = false;
   for (let i = 0; i < line.length; i++) {
@@ -5532,10 +5551,11 @@ function splitCsvLine(line) {
       } else cur += ch;
     } else if (ch === '"' && cur === '') {
       inQuotes = true;
-    } else if (ch === ',') {
+    } else if (ch === sep) {
       cells.push(cur); cur = '';
     } else cur += ch;
   }
+  if (inQuotes && sep === '\t') return null;
   cells.push(cur);
   return cells;
 }

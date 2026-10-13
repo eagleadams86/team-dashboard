@@ -1129,7 +1129,11 @@ silently corrupt every number on the dashboard.
   stays one cell rather than becoming a second row that shifts every column after it. (Until
   2026-09-01 such a row lost its key and had its start date read as its completion date, with
   nothing in the report to say so.) The line number a problem row is reported at is the physical
-  line it starts on, so a row below a multi-line one is still where the report says.
+  line it starts on, so a row below a multi-line one is still where the report says — which is
+  why that number can run a little ahead of the spreadsheet's row number. A quoted cell with a
+  **tab inside it** stays one cell in a paste out of Excel too. (Until 2026-10-13 it did not: the
+  row moved over by a cell for each tab, so its Created time could be read as its resolved date
+  and a Backlog item counted as finished.)
 - Dates can be ISO (`2015-01-21`), numeric (`21/01/2015`), month-name (`21 Jan 2015`) or a raw
   day-count serial (`42043`) — a serial only under a heading that names the column as a date,
   because a column of bare numbers found by content alone is more often a column of Jira issue
