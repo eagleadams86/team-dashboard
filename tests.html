@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4408;
+const EXPECTED = 4412;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -12725,6 +12725,40 @@ group('ARTs — the grouping, and the boundary it crosses');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('the train picker sits an even gap under the controls');
+
+  {
+    /* The hidden welcome card in front of #artScope is still a .card, so
+       `.card + .card` added 18px to the control strip's own 18px — and the
+       strip is in .pinbar, a flex column, where margins never collapse. The gap
+       above the picker was twice the gap below it (Charles, 2026-10-13). */
+    plant({ arts: [{ id: 'gp1', name: 'Payments' }],
+            teams: [
+              { id: 'gpm1', name: 'One', artId: 'gp1', rows: [{ c: '2015-05-01', s: '2015-04-28', t: 'Story' }] },
+              { id: 'gpm2', name: 'Two', rows: [{ c: '2015-05-02', s: '2015-04-28', t: 'Story' }] }
+            ], settings: {} });
+    const gpDoc = win.document;
+    /* At desktop width: the suite's frame is 1px wide, where the phone rule
+       makes .pinbar `display: contents` and the margins collapse anyway — so a
+       narrow frame passes on the broken page. */
+    const gpFrame = document.getElementById('app');
+    const gpWas = gpFrame.style.cssText;
+    gpFrame.style.cssText = 'position:absolute;width:1265px;height:900px;opacity:0;border:0;left:-9999px';
+    await new Promise((r) => setTimeout(r, 250));
+    win.renderAll();
+    for (const tab of ['allteams', 'scorecard']) {
+      win.selectTab(tab);
+      const strip = gpDoc.getElementById('viewControls').getBoundingClientRect();
+      const pick = gpDoc.getElementById('artScope').getBoundingClientRect();
+      const panel = gpDoc.getElementById('panel-' + tab).getBoundingClientRect();
+      ok(pick.height > 0, tab + ': the train picker is on screen to measure');
+      is(Math.round(pick.top - strip.bottom), Math.round(panel.top - pick.bottom),
+         tab + ': the gap above the train picker matches the gap below it');
+    }
+    gpFrame.style.cssText = gpWas;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
   group('tabbing out of the train menu closes it');
 
   {

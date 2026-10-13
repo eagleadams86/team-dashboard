@@ -2912,8 +2912,13 @@ main:focus { outline: none; }
 
        Absent entirely until an ART exists — a picker with one option is a
        control that cannot do anything — and taken away on the two tabs it means
-       nothing to, by selectTab. -->
-  <div class="card" id="artScope" hidden style="margin-bottom:18px">
+       nothing to, by selectTab.
+
+       margin-top:0 (2026-10-13): the hidden welcome card in front of it is still
+       a .card, so `.card + .card` gave it 18px on top of the control strip's own
+       18px — and the strip sits in .pinbar, a flex column, where margins never
+       collapse. The gap above it was twice the gap below it. -->
+  <div class="card" id="artScope" hidden style="margin-top:0;margin-bottom:18px">
     <div class="artscope-row">
       <div class="field art-pick">
         <span class="art-pick-lbl" id="artFilterLbl">Agile Release Trains</span>
