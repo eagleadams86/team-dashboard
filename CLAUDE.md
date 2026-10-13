@@ -11,6 +11,17 @@ non-negotiable rule sets below. The sibling app is Sprint Velocity
 conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
+
+## Clear This Team's Data Takes Both Lists (2026-10-13) — no schema change, DECIDED WITH CHARLES
+
+Charles was building a clean JSON of his train (every team and setting, no data) and found that
+clearing a team left its features behind. The red button on Your Data now empties `rows` AND
+`features` from either view; the team's own settings stay. This REVERSES the 2026-08-25 "takes the
+list on screen" rule below — that fault was a confirm quoting a list the reader could not see, and
+the new confirm names BOTH counts, so the cure for it still holds. The team picker's "(empty)" now
+reads both lists too (the share and clean-up lists still count items only, and clean-up is still
+items-only on purpose).
+
 ## The Scorecard's Fourth Card: Distribution (2026-09-15) — no schema change
 
 Charles, with a screenshot of the printed scorecard the page is modelled on: *"let's add

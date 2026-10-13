@@ -12940,36 +12940,31 @@ group('ARTs — the grouping, and the boundary it crosses');
       return said;
     };
 
+    /* Since 2026-10-13 the button takes BOTH lists from either view: clearing
+       only the visible one left features behind a "cleared" team. The confirm
+       names both counts, which is what keeps this clear of the 2026-08-25 fault
+       (a question about a list the reader could not see). */
     setUnit('items');
-    is(clearBtn.textContent, 'Clear This Team\u2019s Items',
-       'in the item view the button names the items');
+    is(clearBtn.textContent, 'Clear This Team\u2019s Data',
+       'in the item view the button says it takes the team\u2019s data');
 
     setUnit('features');
     is(win.document.getElementById('dataHeading').firstChild.textContent, 'Loaded Features ',
        'the fixture really does put the feature list on screen');
-    is(clearBtn.textContent, 'Clear This Team\u2019s Features',
-       'and the button follows the heading rather than contradicting it');
+    is(clearBtn.textContent, 'Clear This Team\u2019s Data',
+       'and the same words in the feature view, because it does the same thing');
 
-    const featSaid = pressClear();
-    ok(/Delete all 1 feature for Both Lists\?/.test(featSaid),
-       'the confirm counts what is ON SCREEN, not the list behind it \u2014 and says "feature"',
-       featSaid);
-    ok(/work items are left alone/.test(featSaid),
-       'and says the items survive, as the single-feature delete already does', featSaid);
+    const said = pressClear();
+    ok(/Delete 2 work items and 1 feature for Both Lists\?/.test(said),
+       'the confirm names BOTH lists, with their counts and singulars', said);
+    ok(/settings are kept/.test(said), 'and says the team itself survives', said);
 
-    const afterFeat = win.tdGet();
-    is((afterFeat.teams[0].features || []).length, 0, 'the features are the ones that went');
-    is(afterFeat.teams[0].rows.length, 2, 'and every work item is still there');
-
-    /* With no features left, featureUnit() falls back to items on its own — the
-       guard that exists so a saved 'features' cannot outlive the data it named. */
-    win.selectTab('data');
-    is(clearBtn.textContent, 'Clear This Team\u2019s Items',
-       'with the feature list emptied the view falls back, and so does the label');
-    const itemSaid = pressClear();
-    ok(/Delete all 2 items for Both Lists\?/.test(itemSaid),
-       'and the item view still clears the items', itemSaid);
-    is(win.tdGet().teams[0].rows.length, 0, 'which are gone');
+    const after = win.tdGet();
+    is(after.teams.length, 1, 'the team is still there');
+    is((after.teams[0].features || []).length, 0, 'its features are gone');
+    is(after.teams[0].rows.length, 0, 'and so are its work items');
+    ok(/\(empty\)$/.test(win.document.getElementById('teamSel').options[0].textContent),
+       'and the picker now calls it empty');
 
     /* Put the view back, and ASSERT the restore: this group is the only one that
        touches `view.unit`, and td-view outlives the run. */
@@ -12977,6 +12972,23 @@ group('ARTs — the grouping, and the boundary it crosses');
     uSel.dispatchEvent(new win.Event('change', { bubbles: true }));
     is(win.document.getElementById('unitSel').value, wasUnit,
        'the unit is put back, so nothing after this group reads a feature list');
+
+    /* The picker's "(empty)" reads BOTH lists: a team holding only features
+       is not empty, and said so before this fix. */
+    plant({ teams: [{ id: 'cl4', name: 'Has Items',
+      rows: [{ c: '2026-03-10', s: '2026-03-01', t: 'Story' }] },
+      { id: 'cl2', name: 'Features Only',
+      rows: [], features: [{ c: '2026-03-12', s: '2026-03-01', t: 'Feature', i: 'DAE-91' }] },
+      { id: 'cl3', name: 'Nothing', rows: [] }],
+      settings: { featureTypes: ['Feature'] } });
+    const opts = [...win.document.getElementById('teamSel').options].map(o => o.textContent);
+    ok(opts.includes('Features Only') && opts.includes('Nothing (empty)'),
+       'a features-only team is not tagged (empty); a truly empty one is', opts.join(' | '));
+    /* That fixture leaves the view on features — put it back once more. */
+    uSel.value = wasUnit;
+    uSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    is(win.document.getElementById('unitSel').value, wasUnit,
+       'and the unit is put back after the picker check too');
   }
 
   /* ────────────────────────────────────────────────────────── */
@@ -13027,8 +13039,8 @@ group('ARTs — the grouping, and the boundary it crosses');
     fire(here, 'features');
     is(heading(), 'Loaded Features ', 'throwing it here changes the list on this tab');
     is(strip.value, 'features', 'and moves the strip’s copy with it');
-    is(d.getElementById('btnClear').textContent, 'Clear This Team’s Features',
-       'everything the heading governs follows too');
+    is(d.getElementById('btnClear').textContent, 'Clear This Team’s Data',
+       'the clear button takes both lists, so its label does not follow the switch');
 
     fire(strip, 'items');
     is(here.value, 'items', 'and throwing the strip’s copy moves this one back');

@@ -3083,7 +3083,7 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         <!-- Named for the list it clears, and renderData rewrites it with the
              unit: this card shows one of a team's two lists, and the button
              beside it has to say which one it takes. -->
-        <button class="btn danger" id="btnClear" hidden>Clear This Team&rsquo;s Items</button>
+        <button class="btn danger" id="btnClear" hidden>Clear This Team&rsquo;s Data</button>
       </div>
       <!-- role="status": the result of a load — including its data errors — is
            announced to a screen reader, the same promise the cleanup preview
@@ -16544,7 +16544,7 @@ function renderTeamSelect() {
   const option = (t) => {
     const o = document.createElement('option');
     o.value = t.id;
-    o.textContent = t.name + (t.rows.length ? '' : ' (empty)');
+    o.textContent = t.name + (t.rows.length || (t.features || []).length ? '' : ' (empty)');
     return o;
   };
   /* Grouped by ART once there are any, so a train's teams sit together in the
@@ -20037,9 +20037,10 @@ function renderDataTable() {
      reader exactly where it was. That is the fault the item dialog's own rule
      already names ("the form decides its list once on the way in"), arriving on
      a button instead of a form, and it is worse here because nothing was open
-     to re-read: the confirm quoted a count off the invisible list. The label
-     names the list now, and so does the handler. */
-  $('btnClear').textContent = feature ? 'Clear This Team’s Features' : 'Clear This Team’s Items';
+     to re-read: the confirm quoted a count off the invisible list. Since
+     2026-10-13 it takes BOTH lists and its confirm names both, so the label
+     says "Data" again — truthfully this time. */
+  $('btnClear').textContent = 'Clear This Team’s Data';
 
   if (!rows.length) {
     $('dataTable').innerHTML = '<div class="note info">'
@@ -23358,25 +23359,23 @@ function focusPanel(panelId, fromKeyboard) {
 
 $('btnClear').addEventListener('click', (e) => {
   const team = activeTeam();
-  /* The list ON SCREEN, decided the same way the item dialog decides its own —
-     see the label in renderData. Clearing the other one would empty a table the
-     reader cannot see while leaving the one they are looking at untouched. */
-  const clearFeatures = featureUnit();
-  const list = !team ? [] : (clearFeatures ? (team.features || []) : team.rows);
-  if (!team || !list.length) return;
-  /* Deleting features leaves the items alone, exactly as the single-feature
-     delete does, and for the same reason: they are work that was really done.
-     Said in the confirm because it is the question a reader has at that moment. */
-  const many = list.length + (clearFeatures
-    ? (list.length === 1 ? ' feature' : ' features')
-    : (list.length === 1 ? ' item' : ' items'));
-  if (!confirm(clearFeatures
-      ? 'Delete all ' + many + ' for ' + team.name + '?\n\nIts work items are left alone — '
-        + 'they keep the keys they carry and simply stop being joined to anything. '
-        + 'This cannot be undone.'
-      : 'Delete all ' + many + ' for ' + team.name + '?\n\nThis cannot be undone.'))
+  /* BOTH lists, whichever one is on screen (Charles, 2026-10-13). Clearing only
+     the visible one left the features behind a cleared team, so a "clean" copy
+     of a train — every team and setting, no data — could not be made from it.
+     The 2026-08-25 fault was a confirm that quoted the list NOT on screen; this
+     one names both counts, so nothing goes that the question did not mention.
+     The team's own settings (WIP limit, SLE, cadence…) are not data and stay. */
+  const items = team ? team.rows.length : 0;
+  const feats = team ? (team.features || []).length : 0;
+  if (!team || !(items + feats)) return;
+  const parts = [];
+  if (items) parts.push(items + (items === 1 ? ' work item' : ' work items'));
+  if (feats) parts.push(feats + (feats === 1 ? ' feature' : ' features'));
+  if (!confirm('Delete ' + parts.join(' and ') + ' for ' + team.name + '?\n\n'
+      + 'The team itself and its settings are kept. This cannot be undone.'))
     return;
-  if (clearFeatures) team.features = []; else team.rows = [];
+  team.rows = [];
+  team.features = [];
   save();
   $('parseNote').innerHTML = '';
   renderAll();

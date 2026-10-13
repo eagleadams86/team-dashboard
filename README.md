@@ -909,7 +909,7 @@ shared by every team — one place to say what a "defect" is.
 The picker only appears once there are **two or more** teams: with one team it is not a
 choice. It is part of a wider rule — nothing shows until there is something behind it, so a
 first run is the [welcome card](#the-first-thing-you-see) and nothing else. The **Loaded data** card,
-the **Clean up old data** card and the **Append to existing** / **Clear this team's items**
+the **Clean up old data** card and the **Append to existing** / **Clear this team's data**
 buttons all appear the moment rows exist (`renderEmptyState()`).
 
 **The Dashboard tab follows the same rule**: it isn't there until something has data, and a
@@ -2706,13 +2706,14 @@ The work item form gained a **Part of feature** box for the same reason, so the 
 built by hand and not only pasted. Deleting a feature **leaves its items alone**: they are work
 that was really done, and they keep the key they carried.
 
-**Every control on that card names the list it is looking at**, and the red one included: with
-Count on Features it reads *Clear This Team's Features* and takes the features, and with Count on
-Work items it reads *Clear This Team's Items* and takes the items. It used to say *Clear This
-Team's Data* and empty the work items whichever list was on screen — so pressing it under a table
-of twenty features asked about a hundred and ninety items you could not see, and left the twenty
-in front of you afterwards. Clearing the features leaves the work items exactly where they are,
-the same promise deleting one feature makes.
+**The red button clears the whole team's data — both lists.** *Clear This Team's Data* deletes
+every work item **and** every feature the team holds, whichever list is on screen, and its
+confirm names both counts (*"Delete 190 work items and 20 features for …?"*). The team itself
+and its settings — name, train, WIP limit, SLE, sprint cadence — are kept, so clearing every
+team and then using **Back Up** gives a clean copy of a train that other people can load and fill
+with their own data. (Before 2026-10-13 it took only the list on screen, which left features
+behind a "cleared" team.) A team with neither list reads *(empty)* in the team picker; one holding
+only features no longer does.
 
 ### What It Costs You
 
