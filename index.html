@@ -2326,13 +2326,6 @@ dialog { background: var(--surface); color: var(--text-primary);
    column six deep, and the filter list's Display and Value are two full-width
    boxes on one row. */
 #settingsDialog { max-width: 1100px; }
-/* The multi-team paste needs the same room, and for the same reason: it holds a
-   paste box, a plan listing every team the export names and a list of the
-   project ids nothing claims. At 560 the plan wraps into a column of fragments.
-   Its textarea is taller than the tab's, because what goes in it is several
-   teams' worth of export rather than one. */
-#multiDialog { max-width: 1100px; }
-#multiDialog textarea { min-height: 240px; }
 
 @media (min-width: 760px) {
   /* THE SAME WIDTH AS MONEY MAP'S, which is the family's share window: 1100px,
@@ -3036,8 +3029,9 @@ main:focus { outline: none; }
         space, where it leaves a column of dates behind — and a header row
         is skipped. An <strong>issue key</strong> column like <em>DAE-1552</em> is picked up
         if there is one, and it names the dots on the charts.
-        One export covering several teams goes in through <strong>Paste several teams</strong>
-        instead, which splits it by the project id at the front of each key.
+        An export covering <strong>several teams</strong> goes in here too: it is split by the
+        project id at the front of each key — <em>DAE</em>-1552 goes to whichever team is set to
+        DAE — and the plan is shown below as you paste, before anything is written.
         Items that are started but not finished belong here too: they count as work started.
         A <strong>created date</strong> is optional and adds lead time.
       </p>
@@ -3045,8 +3039,8 @@ main:focus { outline: none; }
         <label for="pasteBox">Pasted rows</label>
         <textarea id="pasteBox" spellcheck="false" placeholder="Issue key&#9;Created&#9;In Progress&#9;Resolved&#9;Issue Type
 DAE-1552&#9;2015-01-02&#9;2015-01-14&#9;2015-01-21&#9;Story
-DAE-1551&#9;2015-01-09&#9;2015-01-14&#9;2015-01-26&#9;Bug
-DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
+KFR-207&#9;2015-01-09&#9;2015-01-14&#9;2015-01-26&#9;Bug
+HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       </div>
       <div class="grid two" style="margin-top:var(--sp-5)">
         <div>
@@ -3058,13 +3052,21 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
           </select>
         </div>
       </div>
+      <!-- ── ONE BOX, SPLIT BY PROJECT ID (2026-10-13, decided with Charles) ──
+           The several-teams paste had its own dialog, on the reasoning that the
+           single-team paste was the common case. It stopped being: a whole
+           train's export is what gets pasted. So this box reads the keys and
+           decides — pasteDestination() — and the plan is drawn under it as you
+           paste. The id map is closed by default: the plan already names the
+           teams THIS paste reaches, and twenty-odd teams above the box every
+           time is a wall nobody reads. -->
+      <details id="pasteIdMap" style="margin-top:var(--sp-5)">
+        <summary>Every team&rsquo;s project id</summary>
+        <div id="pasteIdMapBody" class="note info" style="margin-top:var(--sp-4)"></div>
+      </details>
       <div class="btn-row" style="margin-top:var(--sp-6)">
         <button class="btn primary" id="btnLoad">Load Pasted Rows</button>
         <button class="btn" id="btnAppend" hidden>Append to Existing</button>
-        <!-- Always offered, unlike Append and Clear: this is the button that
-             makes sense BEFORE there is any data — one export covering the whole
-             train, split into teams that may not exist yet. -->
-        <button class="btn" id="btnMultiOpen" type="button">Paste Several Teams&hellip;</button>
         <!-- The demo is offered on BOTH empty surfaces, because there are two and
              either can be the first one you see: a first run opens on this tab
              (selectTab at boot picks 'data' when there are no rows), while
@@ -4495,58 +4497,6 @@ DAE-1550&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <div class="row spread" style="margin-top:20px">
     <button class="btn danger" id="btnResetSettings" type="button">Reset Settings to Defaults</button>
     <button class="btn primary" id="settingsCloseBtn" type="button">Done</button>
-  </div>
-</dialog>
-
-<!-- ── One export, several teams ─────────────────────────────────────────────
-     Its own dialog rather than a mode on the paste box: the single-team paste is
-     the common case and should not grow a switch, and this one has a plan to
-     show and teams to offer to create before it can do anything. Every row is
-     routed by the project id at the front of its issue key — see
-     routeRowsToTeams — and anything that cannot be placed is named rather than
-     dropped or guessed at. -->
-<dialog id="multiDialog" aria-labelledby="multiTitle">
-  <h2 id="multiTitle">Paste Several Teams at Once</h2>
-  <p style="margin:0">
-    One export covering more than one team, split by the <strong>project id</strong> at the front
-    of each issue key — <em>DAE</em>-1552 goes to whichever team is set to DAE. It is read once,
-    as one export, so every team is read the same way. Nothing is written until you press one of
-    the load buttons, and a team this paste does not name is never touched.
-  </p>
-
-  <div id="multiTeamIds" class="note info" style="margin-top:var(--sp-5)"></div>
-
-  <div style="margin-top:var(--sp-5)">
-    <label for="multiPasteBox">Pasted rows</label>
-    <textarea id="multiPasteBox" spellcheck="false" placeholder="Issue key&#9;Created&#9;In Progress&#9;Resolved&#9;Issue Type
-DAE-1552&#9;2015-01-02&#9;2015-01-14&#9;2015-01-21&#9;Story
-KFR-207&#9;2015-01-09&#9;2015-01-14&#9;2015-01-26&#9;Bug
-HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
-  </div>
-
-  <div class="grid two" style="margin-top:var(--sp-5)">
-    <div>
-      <label for="multiDateOrder">Ambiguous dates like 03/04/2015 are&hellip;</label>
-      <select id="multiDateOrder">
-        <option value="auto">Auto-detect</option>
-        <option value="dmy">Day first — 3 April</option>
-        <option value="mdy">Month first — 4 March</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="btn-row" style="margin-top:var(--sp-6)">
-    <button class="btn" id="btnMultiCheck" type="button">Check This Paste</button>
-    <button class="btn primary" id="btnMultiLoad" type="button">Split into Teams</button>
-    <button class="btn" id="btnMultiAppend" type="button">Append to Each Team</button>
-  </div>
-
-  <!-- role="status", like the paste report on the tab: what a load did, and what
-       it could not place, is announced rather than only drawn. -->
-  <div id="multiNote" role="status" style="margin-top:var(--sp-6)"></div>
-
-  <div class="row" style="justify-content:flex-end;margin-top:18px">
-    <button class="btn" id="multiCloseBtn" type="button">Close</button>
   </div>
 </dialog>
 
@@ -7940,6 +7890,32 @@ function soleProjectId(rows) {
   });
   if (ids.size !== 1 || keyed < PROJECT_ID_ADOPT_MIN) return '';
   return [...ids][0];
+}
+
+/* Where the ONE paste box sends a paste (2026-10-13, decided with Charles): to
+   the team in the picker ('single'), or split across teams by project id
+   ('split'). Read off the keys, with no switch to set — a switch is a control
+   that can be in the wrong position, and the keys already say.
+   - No key column, or ONE project id that no team answers to: 'single', exactly
+     the team-at-a-time load this box always did, sole-id adoption included.
+   - Several project ids and no team answering to any of them: 'split'. That is
+     the first run with a whole train's export, and the split is what offers
+     to create every team it names.
+   - Every routed row belongs to the team in the picker and nothing is
+     unclaimed or contested: 'single' too — the same write as a split, with the
+     report the reader already knows.
+   - Anything else: 'split'. Once one id is claimed the keys are the address, so
+     an unclaimed id is offered a team of its own rather than quietly landing in
+     whichever team happens to be picked. A contested id is a split as well: the
+     clash is the thing to say, and the single load would hide it. */
+function pasteDestination(res, route, featureRoute, activeTeamId) {
+  if (!res || !res.columns || !(res.columns.key >= 0) || !route) return 'single';
+  const named = new Set(route.assigned.map(a => a.teamId)
+    .concat((featureRoute ? featureRoute.assigned : []).map(a => a.teamId)));
+  if (!named.size && !route.ambiguous.length && route.unclaimed.length < 2) return 'single';
+  if (named.size === 1 && named.has(activeTeamId)
+      && !route.unclaimed.length && !route.ambiguous.length) return 'single';
+  return 'split';
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -11824,7 +11800,7 @@ window.TD = {
   filterTypes, cleanFilterValue, FILTER_TYPES_MAX, FILTER_VALUE_MAX,
   /* The project id and the routing it drives — pure, so the split can be pinned
      without a paste box or a team list on screen. */
-  dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams,
+  dateEvidence, buildManualRow, cleanProjectId, projectIdOf, projectIdIndex, duplicateProjectIds, routeRowsToTeams, pasteDestination,
   soleProjectId, PROJECT_ID_ADOPT_MIN,
   buildForecast,
   paceDefaultOn, scenarioWithPaceDefault,
@@ -12394,6 +12370,13 @@ function haltForNewerData(found) {
 let state  = { teams: [], arts: [], stages: [], statuses: [],
                settings: Object.assign({}, DEFAULT_SETTINGS) };
 let view   = Object.assign({}, DEFAULT_VIEW);
+/* What the paste box's two buttons say right now, and whether the note under
+   it is a live plan rather than a load's report — see pastePlan(). Declared up
+   here because renderTitle and renderEmptyState read them at boot. */
+let pastePlanned = 'single';
+let pasteSplitTeams = 0;
+let pasteNoteIsPlan = false;
+let pastePlanTimer = 0;
 /* The `td-state` string this copy last READ or WROTE — what persist() holds storage
    up against before writing over it (2026-09-18; see persist()). */
 let storedRaw = null;
@@ -15680,7 +15663,10 @@ function currentFilterValue() {
 function renderTitle() {
   const t = activeTeam();
   const name = t ? t.name.trim() : '';
-  $('pasteTeamName').textContent = name || 'This Team';
+  $('pasteTeamName').textContent = pastePlanned === 'split'
+    ? pasteSplitTeams + ' Team' + (pasteSplitTeams === 1 ? '' : 's')
+    : (name || 'This Team');
+  renderMultiTeamIds();
 }
 
 /* ── ⓘ help — the sibling app's pattern ─────────────────────────────────────
@@ -20476,7 +20462,7 @@ function renderEmptyState() {
      carries its own "+ Add item" in the place you would look for it. Two live
      buttons doing one thing is clutter on a working app. */
   $('btnAddItem').hidden = !!rows;
-  $('btnAppend').hidden  = !rows;
+  $('btnAppend').hidden  = !rows && pastePlanned !== 'split';
   /* On the whole TEAM, not the list on screen: it clears both lists, so a team
      holding only features must still offer it (2026-10-13). */
   { const t = activeTeam();
@@ -21750,7 +21736,11 @@ $('settingsCloseBtn').addEventListener('click', () => $('settingsDialog').close(
    handler above), so the dashboard behind this dialog catches up when it closes
    — including on a backdrop click or Escape, which is why this hangs off the
    dialog's own close event rather than off the Done button. */
-$('manageDialog').addEventListener('close', () => renderAll());
+$('manageDialog').addEventListener('close', () => {
+  renderAll();
+  /* A project id typed in that window changes where a paste in the box goes. */
+  if ($('pasteBox').value.trim()) pastePlan();
+});
 
 /* ── Opening a dialog on a touch screen ─────────────────────────────────────
    `showModal()` runs the spec's dialog focusing steps: focus the `autofocus`
@@ -21909,7 +21899,7 @@ function closeOnBackdropClick(dlg) {
    reconciliation dialog, which refused to be dismissed because picking which
    copy of your data to keep had to be a choice — and it went with sync on
    2026-08-20, so the rule is now simply "every dialog". */
-['dataDialog', 'clearDialog', 'helpDialog', 'manageDialog', 'multiDialog', 'itemDialog',
+['dataDialog', 'clearDialog', 'helpDialog', 'manageDialog', 'itemDialog',
  'settingsDialog', 'searchDialog']
   .forEach(id => closeOnBackdropClick($(id)));
 
@@ -22697,6 +22687,7 @@ function nothingLoadedHtml(res) {
    something that was asked for. */
 function showParseNote(res, mode, team, adopted) {
   const el = $('parseNote');
+  pasteNoteIsPlan = false;
   const probs = parseProblemsHtml(res);
 
   if (!res.rows.length && !probs.problems) {
@@ -22802,7 +22793,7 @@ function doLoad(mode) {
     return;
   }
   renderAll();
-  if (mode !== 'append') $('pasteBox').value = '';
+  if (mode !== 'append') { $('pasteBox').value = ''; pastePlan(); }
 }
 
 /* Appending features is not appending rows, and the difference is the key. Two
@@ -22819,14 +22810,14 @@ function mergeFeatures(existing, incoming) {
 }
 
 /* ── One paste, several teams ────────────────────────────────────────────────
-   Its own dialog rather than a mode on the box above, deliberately: the
-   single-team paste is the common case and gains nothing from a switch it has
-   to be in the right position of, and this one has a plan to show and teams to
-   create before it can run. routeRowsToTeams does the thinking; everything here
+   The SAME box as the team-at-a-time paste since 2026-10-13 — it had its own
+   dialog while the single-team paste was the common case, and Charles's common
+   case is now a whole train. pasteDestination decides which of the two loads a
+   paste gets; routeRowsToTeams does the thinking for a split; everything here
    is about saying what it decided before anything is written. */
 
 function multiParse() {
-  const res = parsePastedRows($('multiPasteBox').value, view.dateOrder, state.stages,
+  const res = parsePastedRows($('pasteBox').value, view.dateOrder, state.stages,
     state.settings.featureTypes, state.statuses);
   return { res, route: routeRowsToTeams(res.rows, state.teams),
            /* Features route by the SAME rule the items do — a feature's key
@@ -22846,15 +22837,15 @@ const teamItemCount = (id) => {
 };
 
 function showMultiNote(res, route, mode, featureRoute) {
-  const el = $('multiNote');
+  const el = $('parseNote');
+  pasteNoteIsPlan = mode === 'check';
   /* Redrawn here rather than only when the dialog opens: creating a team from
      the report below changes who claims what, and a header still listing the
      old answer directly above a plan built on the new one is the kind of
      disagreement that makes somebody distrust both. */
   renderMultiTeamIds();
-  if (!$('multiPasteBox').value.trim()) {
-    el.innerHTML = '<div class="note info">Nothing pasted yet — paste an export covering '
-      + 'several teams and press <strong>Check this paste</strong>.</div>';
+  if (!$('pasteBox').value.trim()) {
+    el.innerHTML = '';
     return;
   }
   const probs = parseProblemsHtml(res);
@@ -22875,8 +22866,7 @@ function showMultiNote(res, route, mode, featureRoute) {
     html += '<div class="note err" style="margin-top:var(--sp-4)">'
       + '<strong>No issue key column in this paste.</strong> A split is made from the project id '
       + 'at the front of each key — the <em>DAE</em> in DAE-1552 — so there is nothing here to '
-      + 'split by. Export a <em>Key</em> column alongside the dates, or paste this into one team '
-      + 'on the <strong>Your Data</strong> tab.'
+      + 'split by. Export a <em>Key</em> column alongside the dates.'
       + columnsReadHtml(res).replace(/^<br>/, '<br><br>') + '</div>';
     el.innerHTML = html;
     return;
@@ -22937,8 +22927,8 @@ function showMultiNote(res, route, mode, featureRoute) {
             + teams + ' team' + (teams === 1 ? '' : 's') + '.</strong>')
       + '<ul class="plain">' + named.map(teamLine).join('') + '</ul>'
       + (mode === 'check'
-          ? 'Nothing has been loaded yet. <strong>Split into teams</strong> replaces what each of '
-            + 'these teams holds'
+          ? 'Nothing has been loaded yet. <strong>Split into ' + teams + ' Team'
+            + (teams === 1 ? '' : 's') + '</strong> replaces what each of these teams holds'
             + (featuresOn
                 ? ' — items and features both, so a team this paste names with no features in '
                   + 'it is left holding none'
@@ -22961,8 +22951,8 @@ function showMultiNote(res, route, mode, featureRoute) {
     const n = route.unclaimed.length;
     html += '<div class="note caution" style="margin-top:var(--sp-4)">'
       + '<strong>' + n + ' project id' + (n === 1 ? '' : 's') + ' no team claims.</strong> '
-      + (n === 1 ? 'Its rows were' : 'Their rows were')
-      + ' not loaded — nothing here can say which team they belong to.'
+      + (n === 1 ? 'Its rows ' : 'Their rows ') + (mode === 'check' ? 'will not be' : 'were not')
+      + ' loaded — nothing here can say which team they belong to.'
       + '<ul class="plain">' + route.unclaimed.map(u => '<li><strong>' + escapeHtml(u.projectId) + '</strong> — '
           + u.count + parsePlural(u.count)
           + ' <button class="btn small" type="button" data-create-team="' + escapeHtml(u.projectId)
@@ -22970,8 +22960,8 @@ function showMultiNote(res, route, mode, featureRoute) {
       + (n > 1 ? '<div style="margin-top:var(--sp-4)"><button class="btn small" type="button" '
           + 'data-create-team="*">Create All ' + n + ' Teams</button></div>' : '')
       + '<div style="margin-top:var(--sp-4)">Or give one of these ids to a team you already have, '
-      + 'under <strong>Teams &amp; Stages</strong>. Either way the paste stays in the box — check it again '
-      + 'and they will be included.</div>'
+      + 'under <strong>Teams &amp; Stages</strong>. Either way the paste stays in the box, and the plan '
+      + 'takes them in as soon as a team answers to them.</div>'
       + '</div>';
   }
 
@@ -22982,8 +22972,9 @@ function showMultiNote(res, route, mode, featureRoute) {
     const n = route.ambiguous.length;
     html += '<div class="note err" style="margin-top:var(--sp-4)">'
       + '<strong>' + n + ' project id' + (n === 1 ? ' is' : 's are') + ' on more than one team.</strong> '
-      + 'Nothing can decide which team those rows belong to, so they were not loaded. Change one '
-      + 'of the ids under <strong>Teams &amp; Stages</strong> and check again.'
+      + 'Nothing can decide which team those rows belong to, so they '
+      + (mode === 'check' ? 'will not be' : 'were not') + ' loaded. Change one of the ids under '
+      + '<strong>Teams &amp; Stages</strong>.'
       + '<ul class="plain">' + route.ambiguous.map(a => '<li><strong>' + escapeHtml(a.projectId) + '</strong> — '
           + a.count + parsePlural(a.count) + ', claimed by '
           + a.names.map(escapeHtml).join(' and ') + '</li>').join('') + '</ul>'
@@ -23001,9 +22992,8 @@ function showMultiNote(res, route, mode, featureRoute) {
        same fix the missing-key sentence below already asks for. */
     + (route.noKey ? ' <strong>' + route.noKey + '</strong> item'
         + (route.noKey === 1 ? ' had' : 's had') + ' no readable issue key, so '
-        + (route.noKey === 1 ? 'it' : 'they') + ' could not be sent anywhere — paste '
-        + (route.noKey === 1 ? 'it' : 'them') + ' into a team by hand on the '
-        + '<strong>Your Data</strong> tab.' : '')
+        + (route.noKey === 1 ? 'it' : 'they') + ' could not be sent anywhere and '
+        + (route.noKey === 1 ? 'was' : 'were') + ' left out.' : '')
     + columnsReadHtml(res)
     + '</div>';
 
@@ -23024,8 +23014,8 @@ function runMulti(mode) {
 
   if (mode !== 'check' && (route.assigned.length || featureRoute.assigned.length)) {
     /* The one confirm in this flow, and only where it is earned: replacing
-       several teams at once is the single most destructive thing this dialog
-       can do, and unlike the team-at-a-time box above it can do it to boards
+       several teams at once is the single most destructive thing this box
+       can do, and unlike the team-at-a-time load it can do it to boards
        nobody is looking at. It names each one and what it stands to lose. */
     if (mode === 'replace') {
       /* Counted over BOTH routings and both lists, because a replace writes
@@ -23103,13 +23093,12 @@ function runMulti(mode) {
         });
       }
     }
-    /* Refused, as in doLoad. Adopting closed this window with every other one
-       (its plan was drawn against the board just replaced), so it is opened
-       again: the box still holds the paste, the plan is re-checked against the
-       board now loaded, and the refusal is said above it. */
+    /* Refused, as in doLoad. The plan was drawn against the board just
+       replaced, so it is drawn again: the box still holds the paste, the plan is
+       re-checked against the board now loaded, and the refusal is said above it. */
     if (!save() && writeRefused) {
-      openMultiDialog();
-      $('multiNote').insertAdjacentHTML('afterbegin', pasteRefusedHtml());
+      pastePlan();
+      $('parseNote').insertAdjacentHTML('afterbegin', pasteRefusedHtml());
       return;
     }
     renderAll();
@@ -23137,12 +23126,15 @@ function runMulti(mode) {
      was pasted" from "nothing could be loaded", and clearing first made a
      successful load report that nothing had been pasted at all. */
   if (mode === 'replace' && route.assigned.length
-      && !route.unclaimed.length && !route.ambiguous.length) $('multiPasteBox').value = '';
+      && !route.unclaimed.length && !route.ambiguous.length) {
+    $('pasteBox').value = '';
+    pastePlan();
+  }
 }
 
 /* Creating a team from the report. It takes the project id it was created for,
    which is the whole point — the next check sends those rows to it. */
-$('multiNote').addEventListener('click', e => {
+$('parseNote').addEventListener('click', e => {
   const btn = e.target.closest ? e.target.closest('[data-create-team]') : null;
   if (!btn) return;
   const want = btn.dataset.createTeam;
@@ -23173,28 +23165,19 @@ $('multiNote').addEventListener('click', e => {
   save();
   renderAll();
   window.toast(made.length === 1
-    ? 'Created Team ' + made[0] + ' — check the paste again to load its items'
-    : 'Created ' + made.length + ' teams — check the paste again to load their items', 6000);
+    ? 'Created Team ' + made[0] + ' — the plan below now includes it'
+    : 'Created ' + made.length + ' teams — the plan below now includes them', 6000);
   /* Straight back to the plan, which now has somewhere to put those rows. Not
      loaded outright: pressing "create" is agreeing to the team, not to a
      replace of everything else the paste names. */
-  runMulti('check');
+  pastePlan();
 });
 
-function openMultiDialog() {
-  $('multiDateOrder').value = view.dateOrder;
-  renderMultiTeamIds();
-  const { res, route, featureRoute } = multiParse();
-  showMultiNote(res, route, 'check', featureRoute);
-  openModal($('multiDialog'));
-}
-
-/* Which team answers to what, at the top of the dialog — the setting the whole
-   feature rests on, shown where it is about to be used rather than behind
-   another button. A team with no id is listed too: "it takes nothing" is the
+/* Which team answers to what, in the closed disclosure over the paste buttons —
+   the setting the whole feature rests on, one press away where it is used. A team with no id is listed too: "it takes nothing" is the
    thing somebody needs to know, and an absence is invisible if it is left out. */
 function renderMultiTeamIds() {
-  const el = $('multiTeamIds');
+  const el = $('pasteIdMapBody');
   const withId = state.teams.filter(t => cleanProjectId(t.projectId));
   const without = state.teams.filter(t => !cleanProjectId(t.projectId));
   if (!withId.length) {
@@ -23209,7 +23192,7 @@ function renderMultiTeamIds() {
      this is the line somebody reads to check the setup before pasting. */
   const dupes = duplicateProjectIds(state.teams);
   el.className = dupes.length ? 'note caution' : 'note info';
-  el.innerHTML = '<strong>Where rows will go:</strong> '
+  el.innerHTML = '<strong>A split sends rows to:</strong> '
     + withId.map(t => escapeHtml(t.projectId) + ' → ' + escapeHtml(t.name)).join(' · ')
     + (dupes.length
         ? '<div style="margin-top:var(--sp-4)"><strong>' + dupes.map(escapeHtml).join(', ') + '</strong> '
@@ -23221,20 +23204,6 @@ function renderMultiTeamIds() {
           + ' nothing from a split: ' + without.map(t => escapeHtml(t.name)).join(', ') + '.</div>'
         : '');
 }
-
-$('btnMultiOpen').addEventListener('click', openMultiDialog);
-$('multiCloseBtn').addEventListener('click', () => $('multiDialog').close());
-$('btnMultiCheck').addEventListener('click', () => runMulti('check'));
-$('btnMultiLoad').addEventListener('click', () => runMulti('replace'));
-$('btnMultiAppend').addEventListener('click', () => runMulti('append'));
-/* One date-order choice, two boxes that need it — kept in step both ways, so
-   the answer to "are these dates day first?" cannot depend on which paste
-   surface you happened to set it on. */
-$('multiDateOrder').addEventListener('change', e => {
-  view.dateOrder = e.target.value;
-  saveView();
-  $('dateOrder').value = view.dateOrder;
-});
 
 [$('btnSample'), $('btnSampleData')].forEach(b => b.addEventListener('click', loadSample));
 /* The welcome card's three. Start Fresh writes nothing — it dismisses the card
@@ -23277,8 +23246,93 @@ $('welcomePlanBtn').addEventListener('click', () => {
      answer — the one thing on the screen that is asking them a question. */
   $('scEstLo').focus();
 });
-$('btnLoad').addEventListener('click', () => doLoad('replace'));
-$('btnAppend').addEventListener('click', () => doLoad('append'));
+/* ── The live plan ──────────────────────────────────────────────────────────
+   The box is read a moment after the typing stops, and the plan is drawn under
+   it: which teams a split reaches and with how much, or which one team takes
+   the lot and why. The two buttons are RELABELLED by textContent rather than
+   rebuilt, so a button with the keyboard on it keeps it. */
+/* Its state (pastePlanned and the rest) is declared up beside `state`. */
+const PASTE_PLAN_DELAY = 300;
+
+function dressPasteButtons() {
+  const split = pastePlanned === 'split';
+  $('btnLoad').textContent = split
+    ? 'Split into ' + pasteSplitTeams + ' Team' + (pasteSplitTeams === 1 ? '' : 's')
+    : 'Load Pasted Rows';
+  $('btnAppend').textContent = split ? 'Append to Each Team' : 'Append to Existing';
+  $('btnAppend').hidden = !split && !activeRows().length;
+  renderTitle();
+}
+
+/* The one-team half of the plan: a line saying where the rows go and why a
+   paste with keys in it is NOT being split, so the reader is never left to
+   guess which of the two loads a press will make. */
+function singlePlanHtml(res, route, team) {
+  const name = '<strong>' + escapeHtml(team ? team.name : 'this team') + '</strong>';
+  const n = res.rows.length;
+  const items = n + ' item' + (n === 1 ? '' : 's');
+  const why = res.columns.key < 0
+    ? 'There is no issue key column to split by, so '
+    : (route.assigned.length
+        ? 'Every key here belongs to ' + name + ', so '
+        : 'No team answers to the project id on these keys, so ');
+  const sole = (team && !team.projectId && n) ? soleProjectId(res.rows) : '';
+  const adopt = (sole && !state.teams.some(t => cleanProjectId(t.projectId) === sole))
+    ? ' Every key starts <strong>' + escapeHtml(sole) + '</strong>, which becomes this team\u2019s '
+      + 'project id when you load.'
+    : '';
+  return '<div class="note info">' + why + (n === 1 ? 'its one item goes' : 'all ' + items + ' go')
+    + ' into ' + name + '. Nothing is written until you press <strong>Load Pasted Rows</strong>.'
+    + adopt + '</div>';
+}
+
+function pastePlan() {
+  clearTimeout(pastePlanTimer);
+  pastePlanTimer = 0;
+  const team = activeTeam();
+  if (!$('pasteBox').value.trim()) {
+    pastePlanned = 'single';
+    pasteSplitTeams = 0;
+    if (pasteNoteIsPlan) { $('parseNote').innerHTML = ''; pasteNoteIsPlan = false; }
+    dressPasteButtons();
+    return { dest: 'single' };
+  }
+  const { res, route, featureRoute } = multiParse();
+  const dest = pasteDestination(res, route, featureRoute, team && team.id);
+  pastePlanned = dest;
+  pasteSplitTeams = new Set(route.assigned.map(a => a.teamId)
+    .concat(featureRoute.assigned.map(a => a.teamId))).size;
+  if (dest === 'split') {
+    showMultiNote(res, route, 'check', featureRoute);
+  } else {
+    pasteNoteIsPlan = true;
+    const probs = parseProblemsHtml(res);
+    $('parseNote').innerHTML = (!res.rows.length && !res.features.length && !probs.problems)
+      ? nothingLoadedHtml(res)
+      : probs.html + singlePlanHtml(res, route, team);
+  }
+  dressPasteButtons();
+  return { dest };
+}
+
+$('pasteBox').addEventListener('input', () => {
+  clearTimeout(pastePlanTimer);
+  pastePlanTimer = setTimeout(pastePlan, PASTE_PLAN_DELAY);
+});
+
+/* A press reads the box afresh. If the paste changed what the button should
+   say — pasted and pressed inside the delay — the label is put right and
+   NOTHING is written: the reader pressed a label that was no longer true. */
+function pressPaste(mode) {
+  const shown = pastePlanned;
+  const { dest } = pastePlan();
+  if (dest !== shown) return;
+  if (dest === 'split') runMulti(mode); else doLoad(mode);
+}
+/* The suite's way to "stop typing" without waiting out the delay. */
+window.tdPastePlan = pastePlan;
+$('btnLoad').addEventListener('click', () => pressPaste('replace'));
+$('btnAppend').addEventListener('click', () => pressPaste('append'));
 /* ── THE KEYBOARD'S PLACE, CARRIED ACROSS A REBUILD (2026-09-24) ──────────────
    Most handlers here end in renderAll(), which rebuilds every row, chip and heading
    from the board — so the control a key press landed on is detached and focus falls
@@ -23393,7 +23447,7 @@ $('btnClear').addEventListener('click', (e) => {
 $('dateOrder').addEventListener('change', e => {
   view.dateOrder = e.target.value;
   saveView();
-  $('multiDateOrder').value = view.dateOrder;   /* one choice, two boxes */
+  if ($('pasteBox').value.trim()) pastePlan();
 });
 
 /* teams */
@@ -23401,7 +23455,10 @@ $('teamSel').addEventListener('change', e => {
   view.activeTeamId = e.target.value;
   saveView();
   $('parseNote').innerHTML = '';
+  pasteNoteIsPlan = false;
   renderAll();
+  /* The plan names the picked team, so a different pick is a different plan. */
+  if ($('pasteBox').value.trim()) pastePlan();
   /* Switching team is navigation, not editing — nothing to save or push. */
 });
 
@@ -26833,9 +26890,9 @@ function loadSample() {
        age chart splits one status into two columns. */
     adoptStatuses(parsed);
     /* The demo's teams carry the project ids their own keys are built from, so
-       "Paste several teams" is reachable from Load sample data rather than only
+       a paste covering several teams splits from Load sample data rather than only
        after somebody types three ids in. Team Bare Export has no keys and so no id —
-       which is also the state the dialog has to be able to explain, and it
+       which is also the state the id map has to be able to explain, and it
        appears in its "takes nothing from a split" line. */
     const team = { id: newId(), name: profile.name,
                    artId: profile.art ? demoArt.id : null,

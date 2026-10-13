@@ -12,6 +12,36 @@ conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
 
+## One Paste Box Splits by Project Id (2026-10-13) — no schema change, DECIDED WITH CHARLES
+
+Charles: *"i mostly paste several teams now. how might we simplify that experience so it doesn't
+require an extra window?"* The several-teams paste had its own dialog (`#multiDialog`) on the
+reasoning that the single-team paste was the common case. **That premise is gone, so the dialog
+is gone**: the Your Data box reads the keys and decides. He chose all three of: no switch (the
+keys decide), the plan drawn live (no Check button), and the id map behind a closed `<details>`.
+
+- **`pasteDestination(res, route, featureRoute, activeTeamId)` is the one rule**, pure and pinned:
+  `single` for no key column, for ONE project id nobody claims (so sole-id adoption still has its
+  moment), and for a paste whose every routed row is the picked team's with nothing unclaimed or
+  contested. Everything else is `split` — including **several ids nobody claims**, which is the
+  first run with a whole train's export and has to offer *Create All N Teams*. Once one id is
+  claimed the keys are the address: an unclaimed id is offered a team rather than landing in the
+  picked one. A contested id is a split, so the clash is said rather than hidden in a one-team load.
+- **The plan is drawn by `pastePlan()`**, 300ms after the last `input`, on a date-order change, a
+  team change, and when the Teams window closes (an id typed there moves the plan). The buttons
+  are RELABELLED by `textContent` (*Split into N Teams* / *Append to Each Team*), never rebuilt, so
+  the keyboard stays on them; the heading follows ("for N Teams").
+- **A press re-plans first and acts only if the label was already true** (`pressPaste`). Pasted
+  and pressed inside the delay, a split would otherwise have loaded everything into the picked
+  team under a button that said so a moment too late.
+- **`pasteNoteIsPlan`** tells a live plan in `#parseNote` from a load's report: emptying the box
+  clears a plan and leaves a report alone. The plan's `let`s sit up beside `state`, because
+  `renderTitle` and `renderEmptyState` read them at boot.
+- `window.tdPastePlan` is the suite's way to "stop typing" without waiting out the delay.
+- The split code (`multiParse`, `showMultiNote`, `runMulti`, the Create Team listener) is unchanged
+  in substance and now reads `#pasteBox` and writes `#parseNote`; the refused-save branch re-plans
+  instead of reopening a window. Sprint Velocity has no several-teams paste, so nothing to mirror.
+
 ## Clear This Team's Data Takes Both Lists (2026-10-13) — no schema change, DECIDED WITH CHARLES
 
 Charles was building a clean JSON of his train (every team and setting, no data) and found that
@@ -3396,7 +3426,8 @@ thing the key made possible that is not a label on a chart.
   app cannot answer, and picking one would silently move somebody's throughput.
 - **The whole paste goes through `parsePastedRows` ONCE.** One export has one column layout;
   detecting columns per team would let the same file be read two different ways.
-- **Check before load.** `runMulti('check')` writes nothing and says so; the replace names every
+- **Check before load.** The plan (`runMulti`'s check mode, drawn live since 2026-10-13 — see One
+  Paste Box above) writes nothing and says so; the replace names every
   team it would overwrite and what each loses. This is the one surface that can destroy data on
   boards nobody is looking at, which the team-at-a-time box cannot.
 - **The box is cleared only when there is nothing left to do with it** — with an unclaimed id
