@@ -1088,9 +1088,9 @@ can't reach is a feature nobody you share this with will find.
 ## Getting Your Data In
 
 The **Your Data** tab takes a paste from Jira, a CSV or any other export and loads it into the
-team currently selected in the header. One export covering *several* teams goes in through
-[**Paste several teams…**](#pasting-several-teams-at-once) instead, which splits it by the
-project id at the front of each issue key. Paste the export as it comes — a Jira export looks
+team currently selected in the header — or, when its keys belong to several teams, splits it
+between them by the project id at the front of each issue key (see
+[Pasting Several Teams at Once](#pasting-several-teams-at-once)). Paste the export as it comes — a Jira export looks
 like this and works unchanged:
 
 ```
@@ -1279,30 +1279,41 @@ There's no inline row editing — to fix something, correct it at the source and
 ## Pasting Several Teams at Once
 
 A real Jira export is usually a whole train, not one board. Splitting it by hand — filter, copy,
-switch team, paste, repeat — is the chore that stops a dashboard being kept current, so
-**Paste several teams…** on the Your Data tab takes the whole export in one go and routes each
-row to the team it belongs to.
+switch team, paste, repeat — is the chore that stops a dashboard being kept current, so the
+**same paste box on the Your Data tab** takes the whole export in one go and routes each row to
+the team it belongs to. There is no separate window and no switch to set: the box reads the keys
+and decides.
 
 **The routing is the project id at the front of each issue key.** Each team is one Jira project,
 so `DAE-1552` belongs to whichever team is set to `DAE`. You set that id once per team, in the
 **Teams & Stages** window — or let the app fill it in for you: when a team with no id yet is given a
-single-team paste whose keys are *unanimously* one project, that project becomes its id and the
-paste report says so. Unanimity is the bar, not a majority: a paste that is 90% one project is a
-question, not a fact.
+paste whose keys are *unanimously* one project nobody else answers to, that project becomes its id
+and the plan says so before you press anything. Unanimity is the bar, not a majority: a paste that
+is 90% one project is a question, not a fact. The full id → team map sits under **Every team's
+project id**, closed until you open it.
+
+**Which load a paste gets** is read off the keys:
+
+| The paste | What happens |
+|---|---|
+| No key column, or one project id no team answers to | It all goes into the team in the picker, as a one-team paste always has |
+| Every key belongs to the team in the picker | The same, with the ordinary report |
+| Keys another team answers to, several teams, several unclaimed ids, or claimed and unclaimed ids together | A **split**: the buttons read **Split into N Teams** and **Append to Each Team** |
+
+**The plan is drawn as you paste** — a moment after you stop — so you see which teams the export
+reaches, how many items each would take and how many each holds now, before anything is written.
+If you paste and press inside that moment and the paste turns out to be a split, the press only
+puts the button's label right; press again to load.
 
 The whole export is parsed **once**, as one export, so every team is read with the same column
 map and the same date convention — detecting the columns per team would let one file be read two
 different ways.
 
-Three buttons, and the first of them writes nothing:
-
-- **Check this paste** shows the plan — which teams the export splits into, how many items each
-  would take, and how many each holds now. Nothing is loaded.
-- **Split into teams** replaces what each team the paste names holds — **items and features
+- **Split into N Teams** replaces what each team the paste names holds — **items and features
   both**, so a team this paste names with no feature rows in it is left holding none, exactly as
   a single-team paste does. A team the paste does *not* name is left exactly as it is. Where
   that would overwrite anything it asks first, naming each team and what it stands to lose.
-- **Append to each team** adds to what is already there instead.
+- **Append to Each Team** adds to what is already there instead.
 
 **Anything the app cannot place is named, never guessed at** — a row in the wrong team's
 throughput is a wrong number nobody can see, while a homeless row is a message on screen. There
@@ -1314,9 +1325,9 @@ are three ways a row can fail to land, and they have three different fixes:
 | *N project ids are on more than one team* | Two teams share an id, so nothing can decide | Change one of them in **Teams & Stages** |
 | *N items had no readable issue key* | Nothing to route by | Add a `Key` column to the export |
 
-When something is still unplaced, the paste **stays in the box** — create the team, press
-**Check this paste** again, and those rows are included. A paste with no key column at all is
-refused with that reason rather than reported as a split into nothing.
+When something is still unplaced, the paste **stays in the box** — create the team and the
+plan takes those rows in straight away. A paste with no key column at all has nothing to split
+by, so it goes into the team in the picker and the plan says why.
 
 The project id is a **label and an address, never a level of maths** — the same rule ARTs and
 issue keys follow. Nothing counts, groups, filters or sorts by it. It also never travels in a

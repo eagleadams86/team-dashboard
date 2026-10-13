@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4378;
+const EXPECTED = 4404;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -7650,24 +7650,27 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(Object.keys(spProj).sort(), ['forecast', 'label', 'settings', 'sharedAt', 'teams', 'v'],
      'so a link from this build carries no project id anywhere in it');
 
-  /* ── The dialog ───────────────────────────────────────────── */
+  /* ── One box (2026-10-13) — the split lives in the Your Data paste box ── */
   plant({ arts: [],
           teams: [{ id: 'd1', name: 'Kingfisher', projectId: 'KFR', rows: [] },
                   { id: 'd2', name: 'Heron', projectId: 'HRN', rows: [] },
                   { id: 'd3', name: 'Wagtail', rows: [] }],
           settings: {} });
   const appDoc = win.document;
-  appDoc.getElementById('btnMultiOpen').click();
-  ok(appDoc.getElementById('multiDialog').open, 'the multi-team paste has its own dialog');
-  ok(/KFR → Kingfisher/.test(appDoc.getElementById('multiTeamIds').innerText),
-     'which opens by saying where rows will go');
-  ok(/Wagtail/.test(appDoc.getElementById('multiTeamIds').innerText),
+  ok(!appDoc.getElementById('multiDialog') && !appDoc.getElementById('btnMultiOpen'),
+     'there is no separate several-teams window any more — one box takes both');
+  const idMap = appDoc.getElementById('pasteIdMap');
+  ok(idMap && idMap.tagName === 'DETAILS' && !idMap.open,
+     'the full id map is a disclosure, closed until somebody asks for it');
+  ok(/KFR → Kingfisher/.test(appDoc.getElementById('pasteIdMapBody').textContent),
+     'which says where a split sends each id');
+  ok(/Wagtail/.test(appDoc.getElementById('pasteIdMapBody').textContent),
      'and names the team that has no id, since an absence is invisible if left out');
 
   const multiPaste = (text) => {
-    appDoc.getElementById('multiPasteBox').value = text;
-    appDoc.getElementById('btnMultiCheck').click();
-    return appDoc.getElementById('multiNote').innerText;
+    appDoc.getElementById('pasteBox').value = text;
+    win.tdPastePlan();
+    return appDoc.getElementById('parseNote').innerText;
   };
   const wholeTrain = ['Issue key\tIn Progress\tResolved\tIssue Type',
     'KFR-1\t2015-01-14\t2015-01-21\tStory',
@@ -7676,15 +7679,23 @@ group('ARTs — the grouping, and the boundary it crosses');
     'ZZZ-1\t2015-01-17\t2015-01-24\tTask'].join('\n');
 
   const checked = multiPaste(wholeTrain);
-  ok(/splits into 2 teams/.test(checked), 'a check says how the paste splits', checked.slice(0, 200));
+  ok(/splits into 2 teams/.test(checked), 'the plan says how the paste splits', checked.slice(0, 200));
+  is(appDoc.getElementById('btnLoad').textContent, 'Split into 2 Teams',
+     'and the load button says it will split, and into how many');
+  is(appDoc.getElementById('btnAppend').textContent, 'Append to Each Team',
+     'with its append beside it');
+  ok(!appDoc.getElementById('btnAppend').hidden,
+     'offered even though the team in the picker is empty — a split appends to others');
+  ok(/for 2 Teams/.test(appDoc.querySelector('#panel-data h2').textContent),
+     'and the card heading stops naming one team');
   ok(/Nothing has been loaded yet/.test(checked), 'and says plainly that nothing was written');
   is(win.tdGet().teams.map(t => t.rows.length), [0, 0, 0],
-     'which is true — checking a paste writes nothing at all');
+     'which is true — drawing the plan writes nothing at all');
   ok(/no team claims/.test(checked), 'the id nobody claims is reported rather than dropped quietly');
 
   /* Offered, not done: a paste is not a reason to invent teams in somebody's
      dashboard, and an export with a stray project in it is ordinary. */
-  const makeBtn = appDoc.querySelector('#multiNote [data-create-team="ZZZ"]');
+  const makeBtn = appDoc.querySelector('#parseNote [data-create-team="ZZZ"]');
   ok(makeBtn, 'with one press to create the team it wants');
   makeBtn.click();
   is(win.tdGet().teams.map(t => t.name), ['Kingfisher', 'Heron', 'Wagtail', 'Team ZZZ'],
@@ -7692,7 +7703,7 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(win.tdGet().teams[3].projectId, 'ZZZ', 'with the id already set — that was the point');
   is(win.tdGet().teams[3].rows.length, 0,
      'and NOT loaded — agreeing to the team is not agreeing to replace three others');
-  ok(appDoc.getElementById('multiPasteBox').value.length > 0,
+  ok(appDoc.getElementById('pasteBox').value.length > 0,
      'the paste is still in the box, so the split can simply be run again');
 
 
@@ -7701,21 +7712,23 @@ group('ARTs — the grouping, and the boundary it crosses');
   const realConfirm = win.confirm;
   let asked = '';
   win.confirm = (m) => { asked = m; return true; };
-  appDoc.getElementById('btnMultiLoad').click();
+  win.tdPastePlan();
+  appDoc.getElementById('btnLoad').click();
   win.confirm = realConfirm;
   is(win.tdGet().teams.map(t => [t.name, t.rows.length]),
      [['Kingfisher', 2], ['Heron', 1], ['Wagtail', 0], ['Team ZZZ', 1]],
      'the split lands every row in its own team, and leaves the team it does not name alone');
   is(asked, '', 'no confirm was needed — every team it touched was empty');
-  ok(/Loaded 4 items into 3 teams/.test(appDoc.getElementById('multiNote').innerText),
+  ok(/Loaded 4 items into 3 teams/.test(appDoc.getElementById('parseNote').innerText),
      'and the report says what happened, in the same words afterwards as before');
 
   /* Replacing over data is the one destructive thing this dialog can do, and it
      can do it to boards nobody is looking at — so it names them and what they
      lose before anything is written. */
   win.confirm = (m) => { asked = m; return false; };
-  appDoc.getElementById('multiPasteBox').value = wholeTrain;
-  appDoc.getElementById('btnMultiLoad').click();
+  appDoc.getElementById('pasteBox').value = wholeTrain;
+  win.tdPastePlan();
+  appDoc.getElementById('btnLoad').click();
   win.confirm = realConfirm;
   ok(/Replace what 3 teams hold\?/.test(asked), 'a replace over existing data asks first', asked);
   ok(/Kingfisher — loses 2 items, takes 2 items/.test(asked),
@@ -7739,11 +7752,12 @@ group('ARTs — the grouping, and the boundary it crosses');
       { id: 'wg', name: 'Wagtail', projectId: 'WAG', rows: [],
         features: [{ c: '2015-01-20', s: '2015-01-02', t: 'Feature', i: 'WAG-100' }] }],
     settings: { featureTypes: ['Feature'] } });
-  appDoc.getElementById('multiPasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+  appDoc.getElementById('pasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
     'KFR-1\t2015-01-14\t2015-01-21\tStory',
     'HRN-1\t2015-01-16\t2015-01-23\tFeature'].join('\n');
   win.confirm = (m) => { asked = m; return true; };
-  appDoc.getElementById('btnMultiLoad').click();
+  win.tdPastePlan();
+  appDoc.getElementById('btnLoad').click();
   win.confirm = realConfirm;
   /* `features` is omitted from a serialised team when the list is empty — the
      same omit-when-empty rule `artId` and the two targets follow — so an
@@ -7762,10 +7776,11 @@ group('ARTs — the grouping, and the boundary it crosses');
   plant({ teams: [{ id: 'kf', name: 'Kingfisher', projectId: 'KFR', rows: [],
         features: [{ c: '2015-01-20', s: '2015-01-02', t: 'Feature', i: 'KFR-100' }] }],
     settings: { featureTypes: [] } });
-  appDoc.getElementById('multiPasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+  appDoc.getElementById('pasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
     'KFR-1\t2015-01-14\t2015-01-21\tStory'].join('\n');
   win.confirm = () => true;
-  appDoc.getElementById('btnMultiLoad').click();
+  win.tdPastePlan();
+  appDoc.getElementById('btnLoad').click();
   win.confirm = realConfirm;
   is(win.tdGet().teams[0].features.map(f => f.i), ['KFR-100'],
      'with the feature layer off, a split leaves a stored feature list alone');
@@ -7783,43 +7798,95 @@ group('ARTs — the grouping, and the boundary it crosses');
     settings: {} });
 
   /* Append is the other half of the pair the single-team box already offers. */
-  appDoc.getElementById('multiPasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
-    'KFR-9\t2015-02-14\t2015-02-21\tStory'].join('\n');
-  appDoc.getElementById('btnMultiAppend').click();
-  is(win.tdGet().teams.map(t => t.rows.length), [3, 1, 0, 1],
-     'append adds to the team it names and touches no other');
+  appDoc.getElementById('pasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+    'KFR-9\t2015-02-14\t2015-02-21\tStory',
+    'HRN-9\t2015-02-15\t2015-02-22\tStory'].join('\n');
+  win.tdPastePlan();
+  appDoc.getElementById('btnAppend').click();
+  is(win.tdGet().teams.map(t => t.rows.length), [3, 2, 0, 1],
+     'append adds to each team it names and touches no other');
 
-  /* Without a key column there is no project id, and so nothing to split by.
-     Said plainly rather than reported as a split of zero teams. */
+  /* Without a key column there is no project id, and so nothing to split by —
+     the paste goes to the team in the picker, and the plan says why. */
   const noKeyNote = multiPaste(['In Progress\tResolved\tIssue Type',
     '2015-01-14\t2015-01-21\tStory'].join('\n'));
-  ok(/No issue key column in this paste/.test(noKeyNote),
-     'a paste with no key column is refused with the reason, not with an empty plan');
-  is(win.tdGet().teams.map(t => t.rows.length), [3, 1, 0, 1], 'and nothing moves');
-  appDoc.getElementById('multiDialog').close();
+  ok(/no issue key column to split by/.test(noKeyNote) && /Kingfisher/.test(noKeyNote),
+     'a paste with no key column goes to the picked team, and the plan says why', noKeyNote);
+  is(appDoc.getElementById('btnLoad').textContent, 'Load Pasted Rows',
+     'and the button goes back to an ordinary load');
+  is(win.tdGet().teams.map(t => t.rows.length), [3, 2, 0, 1], 'and nothing moves until it is pressed');
+  /* Emptying the box takes the plan away and puts the wording back. */
+  appDoc.getElementById('pasteBox').value = '';
+  win.tdPastePlan();
+  is(appDoc.getElementById('parseNote').innerText.trim(), '', 'an emptied box leaves no plan behind');
+  ok(/for Kingfisher/.test(appDoc.querySelector('#panel-data h2').textContent),
+     'and the heading names the picked team again');
+
+  /* Where a paste goes, as the pure rule — pasteDestination. */
+  {
+    const D = win.TD.pasteDestination;
+    const keyed = { columns: { key: 0 } }, keyless = { columns: { key: -1 } };
+    const R = (teamIds, unclaimed, ambiguous) => ({
+      assigned: teamIds.map(id => ({ teamId: id, rows: [{}] })),
+      unclaimed: (unclaimed || []).map(p => ({ projectId: p, count: 1 })),
+      ambiguous: (ambiguous || []).map(p => ({ projectId: p, count: 1, names: [] })), noKey: 0 });
+    const none = R([]);
+    is(D(keyless, none, none, 'a'), 'single', 'no key column: the picked team takes it');
+    is(D(keyed, R([], ['ZZZ']), none, 'a'), 'single', 'one id nobody claims: the picked team takes it');
+    is(D(keyed, R([], ['KFR', 'HRN']), none, 'a'), 'split',
+       'several ids nobody claims: a split, which offers to create the teams');
+    is(D(keyed, R(['a']), none, 'a'), 'single', 'every key the picked team\u2019s own: an ordinary load');
+    is(D(keyed, R(['b']), none, 'a'), 'split', 'keys another team answers to: a split');
+    is(D(keyed, R(['a', 'b']), none, 'a'), 'split', 'two teams named: a split');
+    is(D(keyed, R(['a'], ['ZZZ']), none, 'a'), 'split',
+       'claimed and unclaimed together: a split, so the stray id is offered a team');
+    is(D(keyed, R([], [], ['DUP']), none, 'a'), 'split', 'a contested id: a split, so the clash is said');
+    is(D(keyed, none, R(['b']), 'a'), 'split', 'features alone can name the teams of a split');
+  }
+
+  /* Pasted and pressed inside the delay: the label was not yet true, so the
+     press puts it right and writes NOTHING. And the relabel keeps the keyboard. */
+  {
+    appDoc.getElementById('pasteBox').value = '';
+    win.tdPastePlan();
+    const before = JSON.stringify(win.tdGet().teams.map(t => (t.rows || []).length));
+    const loadBtn = appDoc.getElementById('btnLoad');
+    loadBtn.focus();
+    appDoc.getElementById('pasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+      'KFR-20\t2015-03-14\t2015-03-21\tStory', 'HRN-20\t2015-03-15\t2015-03-22\tStory'].join('\n');
+    loadBtn.click();
+    is(JSON.stringify(win.tdGet().teams.map(t => (t.rows || []).length)), before,
+       'a press on a label the paste has outrun writes nothing');
+    is(loadBtn.textContent, 'Split into 2 Teams', 'and the label is put right for the next press');
+    ok(appDoc.getElementById('btnLoad') === loadBtn && appDoc.activeElement === loadBtn,
+       'the button is relabelled, not rebuilt — the keyboard stays on it');
+    appDoc.getElementById('pasteBox').value = '';
+    win.tdPastePlan();
+  }
 
   /* The first-run path, which is the one that makes this feature worth having:
      an empty app, one whole-train export, teams created from what is in it. The
      auto-created "My team" goes with them — the same clean-up loadSample() does,
      and only while it is untouched. */
   plant({ teams: [{ id: 'mt', name: 'My team', rows: [] }], settings: {} });
-  appDoc.getElementById('multiPasteBox').value = wholeTrain;
-  appDoc.getElementById('btnMultiCheck').click();
-  appDoc.querySelector('#multiNote [data-create-team="*"]').click();
+  appDoc.getElementById('pasteBox').value = wholeTrain;
+  win.tdPastePlan();
+  appDoc.querySelector('#parseNote [data-create-team="*"]').click();
   is(win.tdGet().teams.map(t => t.name), ['Team KFR', 'Team HRN', 'Team ZZZ'],
      'a first run creates every team the export names, and the empty My team goes with them');
   ok(win.tdGet().teams.some(t => t.id === appDoc.getElementById('teamSel').value),
      'and the team on screen is one that still exists');
-  appDoc.getElementById('btnMultiLoad').click();
+  win.tdPastePlan();
+  appDoc.getElementById('btnLoad').click();
   is(win.tdGet().teams.map(t => t.rows.length), [2, 1, 1],
      'so one paste fills a dashboard that had nothing in it at all');
 
   /* A team someone has renamed or pasted into is theirs, whatever it holds. */
   plant({ teams: [{ id: 'mt', name: 'My team',
                     rows: [{ c: '2015-01-21', s: '2015-01-14', t: 'Story' }] }], settings: {} });
-  appDoc.getElementById('multiPasteBox').value = wholeTrain;
-  appDoc.getElementById('btnMultiCheck').click();
-  appDoc.querySelector('#multiNote [data-create-team="ZZZ"]').click();
+  appDoc.getElementById('pasteBox').value = wholeTrain;
+  win.tdPastePlan();
+  appDoc.querySelector('#parseNote [data-create-team="ZZZ"]').click();
   is(win.tdGet().teams.map(t => t.name), ['My team', 'Team ZZZ'],
      'while a My team with items in it is left exactly where it is');
 
@@ -7832,6 +7899,11 @@ group('ARTs — the grouping, and the boundary it crosses');
     'KFR-1\t2015-01-14\t2015-01-21\tStory',
     'KFR-2\t2015-01-15\t2015-01-22\tBug',
     'KFR-3\t2015-01-16\t2015-01-23\tTask'].join('\n');
+  win.tdPastePlan();
+  ok(/No team answers to the project id/.test(appDoc.getElementById('parseNote').innerText),
+     'keys no team claims go to the picked team, and the plan says why');
+  ok(/becomes this team/.test(appDoc.getElementById('parseNote').innerText),
+     'and says, before the press, that the id will be adopted');
   appDoc.getElementById('btnLoad').click();
   is(win.tdGet().teams[0].projectId, 'KFR',
      'a team with no id takes it from its own export — the setup step nobody would do');
@@ -7843,6 +7915,7 @@ group('ARTs — the grouping, and the boundary it crosses');
     'DAE-1\t2015-01-14\t2015-01-21\tStory',
     'DAE-2\t2015-01-15\t2015-01-22\tBug',
     'DAE-3\t2015-01-16\t2015-01-23\tTask'].join('\n');
+  win.tdPastePlan();
   appDoc.getElementById('btnLoad').click();
   is(win.tdGet().teams[0].projectId, 'KFR', 'and never overwrites one that is already set');
 
@@ -7856,11 +7929,15 @@ group('ARTs — the grouping, and the boundary it crosses');
     'HRN-1\t2015-01-14\t2015-01-21\tStory',
     'HRN-2\t2015-01-15\t2015-01-22\tBug',
     'HRN-3\t2015-01-16\t2015-01-23\tTask'].join('\n');
+  win.tdPastePlan();
   appDoc.getElementById('btnLoad').click();
   /* tdGet() is serializeState — an empty id is written as no key at all, which is
      the "nothing until there is something to write" rule seen from the outside. */
   is(win.tdGet().teams[0].projectId, undefined,
      'a paste never adopts an id another team already answers to');
+  /* And since one box splits, keys another team answers to go to THAT team. */
+  is(win.tdGet().teams.map(t => t.rows ? t.rows.length : 0), [0, 3],
+     'the rows go to the team that answers to their id, not the one in the picker');
 
   /* ── The Teams dialog's own guard ─────────────────────────── */
   plant({ teams: [{ id: 'g1', name: 'Alpha', projectId: 'KFR', rows: [] },
