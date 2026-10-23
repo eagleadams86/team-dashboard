@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4412;
+const EXPECTED = 4416;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -14638,6 +14638,26 @@ group('ARTs — the grouping, and the boundary it crosses');
 
   is(spinProbe((box) => { focusIn(box); }), false,
      'and a focus with no press behind it guards nothing — a Tab has no caret to place');
+
+  /* A focused number box ignores the mouse wheel. Chrome steps a focused number
+     box on every wheel tick over it: in Wine Cellar, scrolling down to Save
+     turned Bottles 2 into 0 (2026-10-23). The wheel must take the focus away
+     before it can step anything — and only from the box under it. Same guard in
+     every app in the family. */
+  {
+    const wheelBox = win.document.createElement('input');
+    wheelBox.type = 'number'; wheelBox.value = '2';
+    win.document.body.appendChild(wheelBox);
+    wheelBox.focus();
+    ok(win.document.activeElement === wheelBox, 'a focused number box: the box has the focus');
+    win.document.body.dispatchEvent(new win.WheelEvent('wheel', { deltaY: 100, bubbles: true }));
+    ok(win.document.activeElement === wheelBox, 'a wheel over something else leaves the number box focused');
+    wheelBox.dispatchEvent(new win.WheelEvent('wheel', { deltaY: 100, bubbles: true }));
+    ok(win.document.activeElement !== wheelBox,
+       'the first wheel tick over a focused number box takes the focus away, so nothing steps');
+    is(wheelBox.value, '2', 'and the number box keeps its value');
+    wheelBox.remove();
+  }
 
   /* ────────────────────────────────────────────────────────── */
   group('one work item, typed in by hand');

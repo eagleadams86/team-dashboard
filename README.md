@@ -228,6 +228,8 @@ Two things worth knowing:
   loud. A paste is hundreds of rows from a system nobody here controls, so it drops the bad cell
   and reports the line; a form is one row with you looking straight at it.
 
+**Scrolling never changes a number box.** A browser steps a number box you have just typed in every time the mouse wheel or trackpad scrolls over it, so scrolling a window down past it used to change the figure without a word. The box now lets go of the cursor the moment you scroll over it, and the page scrolls instead; click it again to carry on typing.
+
 ### How Many Items the Window Covers
 
 The window note under the date range reads **"14 weeks · 67 of 190 items (9 in progress)"** when
