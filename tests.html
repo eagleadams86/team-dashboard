@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4416;
+const EXPECTED = 4422;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -14583,6 +14583,17 @@ group('ARTs — the grouping, and the boundary it crosses');
   is(RK({ tagName: 'SELECT' }), false, 'a picker does not — iOS answers it with a wheel');
   is(RK({ tagName: 'DIALOG' }), false, 'nor the dialog itself, once focus lands there');
   is(RK(null), false, 'nothing focused is not a keyboard');
+
+  /* iOS 26 opens a focused <select>'s menu at once: Wine Cellar's Share and
+     Settings windows opened with their first dropdown already down (Charles,
+     iPhone, 2026-10-23). openModal() asks opensOnFocus(), not raisesKeyboard(). */
+  const OF = win.tdOpensOnFocus;
+  ok(OF({ tagName: 'SELECT' }), 'a select');
+  ok(OF({ tagName: 'INPUT', type: 'time' }), 'a time picker');
+  ok(OF({ tagName: 'INPUT', type: 'text' }), 'and everything that raises the keyboard');
+  ok(!OF({ tagName: 'INPUT', type: 'checkbox' }), 'a checkbox opens nothing');
+  ok(!OF({ tagName: 'BUTTON' }), 'nor a button');
+  ok(!OF(null), 'nor nothing focused');
 
   group('Select-on-focus versus a number field’s spin arrows');
 

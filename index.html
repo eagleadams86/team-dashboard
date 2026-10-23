@@ -2085,7 +2085,7 @@ table.filters input[readonly] { cursor: not-allowed; }
 
 /* footer notes — the sibling app's .privacy: lined up with the text inside the
    last card (18px of card padding + its 1px border), not with the card edge. */
-.privacy { font-size: var(--fs-xs); color: var(--text-muted); margin: 28px 0 0; padding-left: 19px; }
+.privacy { font-size: var(--fs-xs); color: var(--text-muted); margin: 28px 0 0; padding: 0 19px; }
 .privacy-links { margin-top: 6px; }
 .privacy-links a { color: var(--text-muted); }
 .privacy-links a:hover { color: var(--text-secondary); }
@@ -13662,6 +13662,7 @@ window.tdView = { now: () => view, reload: loadView, render: renderAllTeams };
 /* Pinned by tests.html — see the openModal comment above for why the list of
    keyboard-raising types is a decision worth writing down. */
 window.tdRaisesKeyboard = raisesKeyboard;
+window.tdOpensOnFocus = opensOnFocus;
 /* Pure helpers tests.html pins. Grouped because they are one boundary:
    everything here decides what a copy arriving from outside this browser — a
    backup file, a share link — is allowed to turn into. */
@@ -21804,19 +21805,33 @@ const KEYBOARD_TYPES = new Set(['text', 'number', 'search', 'tel', 'url', 'email
 /* Which elements a phone answers with a keyboard — pure over {tagName, type},
    so the list is pinned by tests rather than rediscovered the next time a
    dialog opens on a field nobody thought about. A checkbox, a button and a
-   select all raise nothing, which is why the dialogs that open on one are left
-   exactly as they were. */
+   select raise no keyboard — though a select OPENS on focus, which is what
+   opensOnFocus() below adds. */
 function raisesKeyboard(el) {
   if (!el) return false;
   return el.tagName === 'TEXTAREA'
     || (el.tagName === 'INPUT' && KEYBOARD_TYPES.has(el.type));
+}
+
+/* Which controls OPEN something the moment they are focused, on a touch
+   screen: the keyboard's, plus a <select> and the date and time pickers.
+   iOS 26 opens a focused select's menu at once — Wine Cellar's Share and
+   Settings windows opened with their first dropdown already down (Charles,
+   iPhone, 2026-10-23) — so openModal() asks this, not raisesKeyboard(). */
+function opensOnFocus(el) {
+  if (!el) return false;
+  if (raisesKeyboard(el)) return true;
+  const tag = (el.tagName || '').toUpperCase();
+  if (tag === 'SELECT') return true;
+  return tag === 'INPUT' && ['date', 'time', 'datetime-local', 'month', 'week']
+    .indexOf((el.type || '').toLowerCase()) !== -1;
 }
 function openModal(dlg) {
   dlg.showModal();
   if (!window.matchMedia('(pointer: coarse)').matches) return;
   const el = document.activeElement;
   if (!el || !dlg.contains(el)) return;
-  if (!raisesKeyboard(el)) return;
+  if (!opensOnFocus(el)) return;
   dlg.tabIndex = -1;
   dlg.focus();
 }
