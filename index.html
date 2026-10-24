@@ -1792,6 +1792,12 @@ button.rowbtn { font: inherit; color: inherit; background: none; border: 0; padd
   cursor: pointer; text-align: left; text-decoration: underline;
   text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
 button.rowbtn:hover { text-decoration-color: var(--accent); color: var(--accent); }
+/* No underline where the WHOLE ROW is the target (Charles, 2026-10-24, family-wide
+   after Wine Cellar): the row hovers and opens as one, so the name needs no mark
+   of its own, and keyboard focus still draws the family's ring. Sprint
+   Predictability's rows never had one at rest. `button.team-open` keeps its
+   underline: an All Teams row is not clickable, so the name is the only target. */
+table.data tbody tr.clickable button.rowbtn { text-decoration: none; }
 
 /* A team with no data in this window still gets a row — it is a finding, not an
    omission — but its figures are dashes and should read as such. */

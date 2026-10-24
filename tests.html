@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4422;
+const EXPECTED = 4423;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -18683,6 +18683,8 @@ group('a card with no chart matches the one beside it');
     /* The item window: Save and Delete rebuild the row that opened it. */
     win.selectTab('data');
     const opener = kDoc.querySelector('button.rowbtn[data-item="1"]');
+    ok(opener.closest('tr.clickable') && win.getComputedStyle(opener).textDecorationLine === 'none',
+       'an item name carries no underline: the whole row is the target (2026-10-24)');
     press(opener);
     ok(kDoc.getElementById('itemDialog').open, 'keep focus: a row opens its item window');
     press(kDoc.getElementById('itemSave'));
