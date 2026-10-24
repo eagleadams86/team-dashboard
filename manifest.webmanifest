@@ -1,7 +1,7 @@
 {
   "id": "/team-dashboard/",
   "name": "Flow Metrics",
-  "short_name": "Flow",
+  "short_name": "Flow Metrics",
   "description": "Kanban flow metrics from a work-item export: throughput, cycle time, work in progress and a forecast, private to your own browser.",
   "start_url": "./",
   "scope": "./",

@@ -3493,7 +3493,7 @@ Removing items only removes items. The team itself survives, even if it ends up 
 
 The **Back up** button in the header opens a dialog (the same shape as the sibling app's)
 that writes one JSON file holding
-every team, their work items and your shared settings — `team-dashboard-YYYY-MM-DD.json`. It's
+every team, their work items and your shared settings — `flow-metrics-YYYY-MM-DD.json`. It's
 a copy you keep, independent of this browser. It is the only copy of your data that exists
 anywhere else, and the only way back from a cleared browser.
 
