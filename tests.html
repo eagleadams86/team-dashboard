@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4423;
+const EXPECTED = 4425;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -14594,6 +14594,15 @@ group('ARTs — the grouping, and the boundary it crosses');
   ok(!OF({ tagName: 'INPUT', type: 'checkbox' }), 'a checkbox opens nothing');
   ok(!OF({ tagName: 'BUTTON' }), 'nor a button');
   ok(!OF(null), 'nor nothing focused');
+
+  group('Tick boxes: every tick box is one size a flex row cannot squeeze (2026-10-27)');
+  {
+    const boxes = [...win.document.querySelectorAll('input[type="checkbox"], input[type="radio"]')];
+    ok(boxes.length > 0, 'found the tick boxes', String(boxes.length));
+    const bad = boxes.filter((i) => { const cs = win.getComputedStyle(i);
+      return cs.flexShrink !== '0' || cs.width !== '20px' || cs.height !== '20px'; });
+    is(bad.map((i) => i.id || i.name || i.value), [], 'every one is 20px, and none can shrink');
+  }
 
   group('Select-on-focus versus a number field’s spin arrows');
 
