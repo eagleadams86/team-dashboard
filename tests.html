@@ -7706,6 +7706,30 @@ group('ARTs — the grouping, and the boundary it crosses');
   ok(appDoc.getElementById('pasteBox').value.length > 0,
      'the paste is still in the box, so the split can simply be run again');
 
+  /* The warnings drawn while the paste sits in the box are a PREVIEW, and say
+     so: "Loaded, but worth a look" above a Load button nobody has pressed read
+     as if the press had already happened (Charles, 2026-10-28). Both routes —
+     one team and a split — share the report, so both are checked. */
+  const lateRaised = ['Issue key\tCreated\tIn Progress\tResolved\tIssue Type',
+    'KFR-1\t2015-01-20\t2015-01-14\t2015-01-21\tStory',
+    'KFR-2\t2015-01-02\t2015-01-14\t2015-01-26\tStory',
+    'KFR-3\t2015-01-02\t2015-01-15\t2015-01-27\tBug',
+    'KFR-4\t2015-01-02\t2015-01-16\t2015-01-28\tStory',
+    'KFR-5\tnot a date\t2015-01-16\tnot a date\tStory'];
+  for (const [what, text] of [
+    ['one team', lateRaised.join('\n')],
+    ['a split', lateRaised.concat('HRN-1\t2015-01-02\t2015-01-16\t2015-01-23\tStory').join('\n')]]) {
+    const before = multiPaste(text);
+    ok(/Worth a look before you load/.test(before),
+       'the preview of ' + what + ' heads its warnings as not loaded yet', before.slice(0, 200));
+    ok(!/Loaded, but/.test(before), 'and never claims it already loaded', before.slice(0, 200));
+    ok(/Will skip 1 row/.test(before) && !/Skipped/.test(before),
+       'a row it cannot use is one it WILL skip', before.slice(0, 200));
+    ok(/cycle time will be kept/.test(before), 'and says what it will keep, in the future tense');
+  }
+  is(win.tdGet().teams.map(t => t.rows.length), [0, 0, 0, 0], 'none of which wrote anything');
+  appDoc.getElementById('pasteBox').value = wholeTrain;
+
 
   /* The load itself. tdAdopt's confirm is stubbed by plant(); this one is the
      dialog's own, and it has to be answered for the replace to happen. */

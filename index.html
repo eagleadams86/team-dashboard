@@ -22334,34 +22334,41 @@ const parsePlural = (n) => n === 1 ? ' row' : ' rows';
 /* The rows the parser had something to say about: the ones it could not use at
    all, and the ones it kept minus a field. Returns the count as well as the
    HTML, because "nothing pasted" and "everything went wrong" are different
-   messages and the caller has to tell them apart. */
-function parseProblemsHtml(res) {
+   messages and the caller has to tell them apart.
+   `planned` is the preview drawn while the paste sits in the box: nothing has
+   been loaded yet, so it says what WILL happen — a report that opens "Loaded"
+   above a button still waiting to be pressed reads as if the press already
+   happened. Reported by Charles on 2026-10-28. */
+function parseProblemsHtml(res, planned) {
   const skipped = res.badCompleted;
+  const were = planned ? 'will be' : 'were';
   /* Problems that cost a field rather than the row. Each carries its own rows,
      so every one of them can be listed under the sentence that explains it —
      a count on its own tells you something is wrong without telling you where. */
   const kept = [
     { rows: res.badStarted,
-      what: 'a start date that could not be read, and were kept without one' },
+      what: 'a start date that could not be read, and ' + were + ' kept without one' },
     { rows: res.badCreated,
-      what: 'a created date that could not be read, and were kept without one' },
+      what: 'a created date that could not be read, and ' + were + ' kept without one' },
     { rows: res.startAfterDone,
       what: 'a start date later than the date they were resolved. Resolved is written by '
           + 'Jira and cannot be edited, so it is the start date that is wrong — the start '
-          + 'date was dropped, and those rows count as completed but contribute no cycle '
+          + 'date ' + (planned ? 'will be' : 'was') + ' dropped, and those rows '
+          + (planned ? 'will count' : 'count') + ' as completed but contribute no cycle '
           + 'time. Worth correcting at the source' },
     { rows: res.raisedAfterStart,
       what: 'work that began before the ticket existed, so the start date did not come from '
           + 'the usual Ready → In Progress transition — most often because the ticket was '
           + 'raised after work had truly started. '
-          + 'Their cycle time is kept, since the adjusted date is the better estimate of '
+          + 'Their cycle time ' + (planned ? 'will be' : 'is') + ' kept, since the adjusted date is the better estimate of '
           + 'when work began; their lead time is not, because there was no wait between the '
           + 'request and the work' }
   ].filter(g => g.rows.length);
 
   let html = '';
   if (skipped.length) {
-    html += '<div class="note err"><strong>Skipped ' + skipped.length + parsePlural(skipped.length) +
+    html += '<div class="note err"><strong>' + (planned ? 'Will skip ' : 'Skipped ') +
+      skipped.length + parsePlural(skipped.length) +
       ':</strong> the completion date could not be read, and every metric keys off one. ' +
       'Correct these at the source and paste again.' + parseListOf(skipped) + '</div>';
   }
@@ -22374,7 +22381,8 @@ function parseProblemsHtml(res) {
     const seen = res.rows.length + skipped.length;
     const mismapped = ooo && seen && (ooo / seen) > 0.2;
     html += '<div class="note caution" style="margin-top:var(--sp-4)">' +
-      '<strong>Loaded, but worth a look:</strong>' +
+      '<strong>' + (planned ? 'Worth a look before you load:' : 'Loaded, but worth a look:') +
+      '</strong>' +
       kept.map(g => '<div style="margin-top:var(--sp-5)">' + g.rows.length + parsePlural(g.rows.length) +
         ' had ' + g.what + '.' + parseListOf(g.rows) + '</div>').join('') +
       (mismapped ? '<div style="margin-top:var(--sp-5)">That is ' + Math.round(ooo / seen * 100)
@@ -22911,7 +22919,7 @@ function showMultiNote(res, route, mode, featureRoute) {
     el.innerHTML = '';
     return;
   }
-  const probs = parseProblemsHtml(res);
+  const probs = parseProblemsHtml(res, mode === 'check');
   /* Features count as something read, or an export of nothing but features is
      reported as holding nothing on the same press that loads it into three
      teams — the runMulti guard's own case, one report along. */
@@ -23369,7 +23377,7 @@ function pastePlan() {
     showMultiNote(res, route, 'check', featureRoute);
   } else {
     pasteNoteIsPlan = true;
-    const probs = parseProblemsHtml(res);
+    const probs = parseProblemsHtml(res, true);
     $('parseNote').innerHTML = (!res.rows.length && !res.features.length && !probs.problems)
       ? nothingLoadedHtml(res)
       : probs.html + singlePlanHtml(res, route, team);
