@@ -1219,7 +1219,9 @@ clamped at zero too; the code never did that.)
 
 **Get It Straight from Jira**, on the Your Data tab, gives you bookmarks that do the export for
 you, one per window: **Flow Metrics 3 Months**, **6 Months** and **1 Year**. Each fetches the
-work finished in that window plus everything still open, for the **projects set on your teams**
+Stories, Tasks, Spikes, Bugs and Features that were **started, raised or finished in that
+window**, plus **everything still in progress whatever its age** (so aged work is never
+dropped), for the **projects set on your teams**
 in Teams, ARTs & Stages (the DAE in DAE-1552). The section says which projects those are, and
 shows no bookmarks until at least one team has a project id. Drag the ones you want to your
 bookmarks bar. Then, whenever you want fresh data:
@@ -1230,8 +1232,11 @@ bookmarks bar. Then, whenever you want fresh data:
 4. Paste into Flow Metrics and press **Load Pasted Rows**.
 
 **A bookmark carries the projects it was dragged with.** Add a team or change a project id and
-drag the bookmarks again. Only finished work marked Done counts, so cancelled items never read as
-throughput.
+drag the bookmarks again. Cancelled items are left out, so they never read as throughput, and
+old backlog nobody has touched is left behind, which keeps the fetch small. Features land in the
+feature list, ready for feature forecasting. If Jira refuses the search (for example, a site with
+no Spike type), the bookmark shows Jira's own reason, and you can edit the search before
+pressing OK.
 
 It reads named fields only, the same set as the Power BI report: key, type, status, created,
 Actual Start Date, resolved, parent key, the three work fields, and the history of status

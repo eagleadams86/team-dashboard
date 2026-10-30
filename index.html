@@ -11901,13 +11901,26 @@ const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics - a bookmark that 
     ? Math.round(CONFIG.days) : 730;
   var LABEL = typeof CONFIG.label === 'string' && /^[A-Za-z0-9 ]{1,20}$/.test(CONFIG.label)
     ? CONFIG.label : '';
-  /* Finished work inside the window, plus everything still open (that is work in
-     progress, whatever its age). Only resolution Done counts as delivered, so
-     cancelled work never reads as throughput. */
-  var DEFAULT_JQL = (PROJECTS.length ? 'project in (' + PROJECTS.map(function (x) {
-    return '"' + x + '"'; }).join(', ') + ') AND ' : '') +
-    'issuetype in (Story, Task, Bug) AND ' +
-    '(resolution IS EMPTY OR (resolution = Done AND resolved >= -' + DAYS + 'd)) ORDER BY key';
+  /* The search, after Charles's own spreadsheet export (2026-10-30): the work
+     types a board carries, Cancelled left out (it carries a resolution date and
+     would read as delivered), and only items that did something inside the
+     window - started, raised or finished in it. One clause is added to his: work
+     still open in an in-progress status is kept whatever its age, because aged
+     work in progress is exactly the item the window would otherwise drop.
+     Untouched old backlog is what it leaves behind, which is most of the saving.
+     Built once the Actual Start Date field's id is known; without that field the
+     start clause is left out. */
+  function buildJql(startId) {
+    var since = '-' + DAYS + 'd';
+    var cf = /^customfield_(\d{1,10})$/.exec(String(startId || ''));
+    var when = [cf ? 'cf[' + cf[1] + '] >= ' + since : '', 'created >= ' + since,
+      'resolved >= ' + since, '(resolution IS EMPTY AND statusCategory = "In Progress")']
+      .filter(Boolean).join(' OR ');
+    return (PROJECTS.length ? 'project in (' + PROJECTS.map(function (x) {
+      return '"' + x + '"'; }).join(', ') + ') AND ' : '') +
+      'issuetype in (Story, Task, Spike, Bug, Feature) AND status != Cancelled AND (' +
+      when + ') ORDER BY key';
+  }
   /* Looked up by NAME, so another Jira site's field ids just work. A field the
      site doesn't have comes out as an empty column. */
   var FIELDS = [
@@ -12022,14 +12035,18 @@ const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics - a bookmark that 
     return { text: lines.join('\n'), count: rows.length, stages: stages };
   }
 
-  var api = { statusDays: statusDays, toTable: toTable, FIELDS: FIELDS, DEFAULT_JQL: DEFAULT_JQL, PROJECTS: PROJECTS, DAYS: DAYS };
+  var api = { statusDays: statusDays, toTable: toTable, FIELDS: FIELDS, buildJql: buildJql, PROJECTS: PROJECTS, DAYS: DAYS };
   if (window.FM_JIRA_BOOKMARK_TEST) { window.FM_JIRA_BOOKMARK = api; return; }
 
   /* -- Everything below talks to Jira, read-only, on this tab's own sign-in -- */
   function get(path) {
     return fetch(path, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
       .then(function (r) {
-        if (!r.ok) throw new Error('Jira answered ' + r.status + ' to ' + path.split('?')[0]);
+        if (!r.ok) return r.json().catch(function () { return {}; }).then(function (j) {
+          var why = j && Array.isArray(j.errorMessages) ? j.errorMessages.join(' ').slice(0, 300) : '';
+          throw new Error('Jira answered ' + r.status + ' to ' + path.split('?')[0] +
+            (why ? ' (' + why + ')' : ''));
+        });
         return r.json();
       });
   }
@@ -12071,9 +12088,7 @@ const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics - a bookmark that 
   function close() { box.remove(); }
   document.body.appendChild(box);
 
-  var jql = window.prompt('Copy for Flow Metrics' + (LABEL ? ' \u2014 ' + LABEL : '') +
-    '\n\nWhich work items? (Jira search, JQL)', DEFAULT_JQL);
-  if (!jql) { close(); return; }
+  var jql = '';
   say('Reading from Jira\u2026');
   var cancel = button('Cancel', function () { cancelled = true; close(); });
   var cancelled = false;
@@ -12131,6 +12146,9 @@ const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics - a bookmark that 
     doneNames = (statuses || []).filter(function (s) {
       return s && s.statusCategory && s.statusCategory.key === 'done';
     }).map(function (s) { return s.name; });
+    jql = window.prompt('Copy for Flow Metrics' + (LABEL ? ' \u2014 ' + LABEL : '') +
+      '\n\nWhich work items? (Jira search, JQL)', buildJql(ids.start));
+    if (!jql) { cancelled = true; close(); return; }
     return search(null);
   }).then(function () {
     if (cancelled) return;
