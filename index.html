@@ -20996,6 +20996,10 @@ function renderAll() {
   renderEmptyState();
   renderDashboard();
   renderScoped();
+  /* The Jira bookmarks name the teams' projects, so they redraw with the teams
+     (a paste can adopt a project id with the section open). A window flag, not a
+     `let`: renderAll runs at boot before the bookmark code is declared. */
+  if (window.tdJiraWired) drawJiraBookmarks();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -23802,6 +23806,7 @@ function wireJiraBookmark() {
     toast('Drag this button to your bookmarks bar, then click it on a Jira tab.');
   });
   $('jiraBookmarkCode').textContent = JIRA_BOOKMARK_SRC;
+  window.tdJiraWired = true;
   drawJiraBookmarks();
 }
 wireJiraBookmark();

@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4465;
+const EXPECTED = 4466;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -7206,6 +7206,8 @@ const stripComments = (src) => {
        'pressing a link draws it from the teams’ project ids as they are now');
     is(win.document.getElementById('jiraBookmarkLinks').hidden, !teamIds.length,
        'and the links are hidden while no team has a project id');
+    ok(/if \(window\.tdJiraWired\) drawJiraBookmarks\(\);\s*\}/.test(APP_SRC.slice(APP_SRC.indexOf('function renderAll() {'))),
+       'every full redraw redraws them too, so a project id adopted with the section open shows at once');
     ok(/connect-src 'none'/.test(cspMatch[1]), "the app's own CSP is untouched: still connect-src 'none'");
 
     window.FM_JIRA_BOOKMARK_TEST = true;
