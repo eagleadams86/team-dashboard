@@ -7184,8 +7184,9 @@ const stripComments = (src) => {
        'its CODE never names a summary or description field — only its comment does, to say so');
     ok(!/method\s*:\s*['"](POST|PUT|DELETE|PATCH)/i.test(SRC), 'and it only ever reads: no write method anywhere');
     const link = win.document.getElementById('jiraBookmarkLink');
-    ok(link && link.href.startsWith('javascript:') &&
-       decodeURIComponent(link.href.slice(11)) === SRC,
+    /* Compared WHOLE, not by its prefix: a prefix test reads to CodeQL as a
+       URL-scheme filter (js/incomplete-url-scheme-check), and whole is stricter. */
+    is(link && link.getAttribute('href'), 'javascript:' + encodeURIComponent(SRC),
        'the drag-to-bookmarks link IS the source, encoded, and nothing else');
     is(win.document.getElementById('jiraBookmarkCode').textContent, SRC,
        'and the code a reader can open is the same text');
