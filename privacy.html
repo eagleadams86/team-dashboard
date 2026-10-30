@@ -256,8 +256,11 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
     <li>It only reads, and only named fields: issue key, issue type, status, created, start
       and resolved dates, parent key, the three work fields and the history of status changes
       (to count days in each status). Summaries and descriptions are never fetched.</li>
-    <li>It puts the table on your clipboard and nowhere else. It remembers one thing, the last
-      search you ran, in your Jira site's own browser storage, so it can offer it next time.
+    <li>It asks Jira only for the projects whose ids you set on your teams, and only for work
+      finished in the window you chose (three months, six months or a year) plus work still
+      open. Those ids and that window are written into the bookmark when you drag it; nothing
+      is read from this app afterwards.</li>
+    <li>It puts the table on your clipboard and nowhere else, and stores nothing anywhere.
       What reaches this app is only what you paste, read by the same rules as any other paste.</li>
   </ul>
 

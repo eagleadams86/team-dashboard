@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4456;
+const EXPECTED = 4463;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -7184,13 +7184,28 @@ const stripComments = (src) => {
     ok(!/summary|description/i.test(SRC.replace(/\/\*[\s\S]*?\*\//g, '')),
        'its CODE never names a summary or description field — only its comment does, to say so');
     ok(!/method\s*:\s*['"](POST|PUT|DELETE|PATCH)/i.test(SRC), 'and it only ever reads: no write method anywhere');
-    const link = win.document.getElementById('jiraBookmarkLink');
-    /* Compared WHOLE, not by its prefix: a prefix test reads to CodeQL as a
-       URL-scheme filter (js/incomplete-url-scheme-check), and whole is stricter. */
-    is(link && link.getAttribute('href'), 'javascript:' + encodeURIComponent(SRC),
-       'the drag-to-bookmarks link IS the source, encoded, and nothing else');
     is(win.document.getElementById('jiraBookmarkCode').textContent, SRC,
-       'and the code a reader can open is the same text');
+       'the code a reader can open is the bookmark source');
+    is(SRC.split('var CONFIG = {"projects":[],"days":0,"label":""};').length, 2,
+       'the one line the app fills in appears exactly once in the source');
+    /* Compared WHOLE, not by a prefix: a prefix test reads to CodeQL as a URL-scheme
+       filter (js/incomplete-url-scheme-check), and whole is stricter. */
+    const cfgHref = TD.jiraBookmarkHref(['kfr', 'DAE', 'DAE', 'not ok!'], 90, '3 Months');
+    is(cfgHref, 'javascript:' + encodeURIComponent(SRC.replace(
+         'var CONFIG = {"projects":[],"days":0,"label":""};',
+         'var CONFIG = {"projects":["DAE","KFR"],"days":90,"label":"3 Months"};')),
+       'a link is the source with that one line filled in: project ids cleaned, de-duplicated and sorted, a bad one dropped');
+    const links = [...win.document.querySelectorAll('#jiraBookmarkLinks a[data-jira-days]')];
+    is(links.map(a => [a.dataset.jiraDays, a.textContent]),
+       [['90', 'Flow Metrics 3 Months'], ['180', 'Flow Metrics 6 Months'], ['365', 'Flow Metrics 1 Year']],
+       'three bookmarks: three months, six months and a year');
+    const teamIds = [...new Set(win.tdGet().teams.map(t => TD.cleanProjectId(t.projectId)).filter(Boolean))].sort();
+    win.document.getElementById('jiraBookmarkLinks').dispatchEvent(new win.Event('pointerdown'));
+    is(links.map(a => a.getAttribute('href')),
+       links.map(a => TD.jiraBookmarkHref(teamIds, Number(a.dataset.jiraDays), a.dataset.jiraLabel)),
+       'pressing a link draws it from the teams’ project ids as they are now');
+    is(win.document.getElementById('jiraBookmarkLinks').hidden, !teamIds.length,
+       'and the links are hidden while no team has a project id');
     ok(/connect-src 'none'/.test(cspMatch[1]), "the app's own CSP is untouched: still connect-src 'none'");
 
     window.FM_JIRA_BOOKMARK_TEST = true;
@@ -7200,6 +7215,17 @@ const stripComments = (src) => {
     s.remove();
     const B = window.FM_JIRA_BOOKMARK;
     ok(B && typeof B.toTable === 'function', 'under the test flag it hands over its pure half and fetches nothing');
+    is(B.PROJECTS, [], 'the source as carried names no project');
+    const s2 = document.createElement('script');
+    s2.textContent = decodeURIComponent(TD.jiraBookmarkHref(['DAE', 'KFR'], 180, '6 Months').slice(11));
+    document.body.appendChild(s2);
+    s2.remove();
+    const C = window.FM_JIRA_BOOKMARK;
+    is(C.PROJECTS, ['DAE', 'KFR'], 'a drawn link carries the teams’ projects');
+    is(C.DEFAULT_JQL, 'project in ("DAE", "KFR") AND issuetype in (Story, Task, Bug) AND '
+       + '(resolution IS EMPTY OR (resolution = Done AND resolved >= -180d)) ORDER BY key',
+       'and searches those projects: work finished in its window, plus everything still open');
+    window.FM_JIRA_BOOKMARK = B;
 
     const h = (at, from, to) => ({ created: at, items: [{ field: 'status', fromString: from, toString: to }] });
     const done = { key: 'KFR-101', fields: {

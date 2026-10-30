@@ -51,6 +51,18 @@ with headings `HEADER_PATTERNS` already reads. GET only.
   **the first real-Jira run is Charles's**, from his work machine, and whether M&T's managed
   Chrome allows bookmarklets at all is still unconfirmed.
 - **Sprint Predictability** gets a matching bookmark second, feeding `parseJiraSprintReport()`.
+- **Three windows, and the teams' projects (2026-10-30, Charles: "instead of hardcoding the
+  project to dae… a 3 month, 6 month, and 1 year bookmarklet").** The source carries ONE
+  `var CONFIG = {"projects":[],"days":0,"label":""};` line (pinned to appear exactly once), and
+  `jiraBookmarkHref(projects, days, label)` swaps it for the teams' `cleanProjectId`s (deduped,
+  sorted), 90/180/365 and a label, via a FUNCTION replacement so a `$` can never act as a
+  pattern. The bookmark re-checks every value (`PROJECT_RE`, 1-3650 days, label charset)
+  rather than trusting the line. `drawJiraBookmarks()` runs on the section's `toggle` and on
+  `pointerdown`/`focusin` over the links, so a drag always carries the teams as they are NOW;
+  no team with a project id hides the links. The JQL keeps every open item (WIP of any age) and
+  only `resolution = Done` within the window. **The bookmark no longer remembers the last
+  search** in Jira's localStorage: three bookmarks would overwrite each other's search, and the
+  stored one used to win over the default. Still no stored field and no schema change.
 
 ## One Paste Box Splits by Project Id (2026-10-13) — no schema change, DECIDED WITH CHARLES
 
