@@ -1217,13 +1217,21 @@ clamped at zero too; the code never did that.)
 
 ### Straight from Jira: The Copy for Flow Metrics Bookmark
 
-**Get It Straight from Jira**, on the Your Data tab, gives you a bookmark that does the export
-for you. Drag its button to your bookmarks bar once. Then, whenever you want fresh data:
+**Get It Straight from Jira**, on the Your Data tab, gives you bookmarks that do the export for
+you, one per window: **Flow Metrics 3 Months**, **6 Months** and **1 Year**. Each fetches the
+work finished in that window plus everything still open, for the **projects set on your teams**
+in Teams, ARTs & Stages (the DAE in DAE-1552). The section says which projects those are, and
+shows no bookmarks until at least one team has a project id. Drag the ones you want to your
+bookmarks bar. Then, whenever you want fresh data:
 
-1. Open your Jira site in a tab and click the bookmark.
-2. Check the search it offers (JQL; it remembers the last one) and press **OK**.
+1. Open your Jira site in a tab and click a bookmark.
+2. Check the search it offers (JQL; you can edit it before pressing **OK**).
 3. When it says the items are ready, press **Copy**.
 4. Paste into Flow Metrics and press **Load Pasted Rows**.
+
+**A bookmark carries the projects it was dragged with.** Add a team or change a project id and
+drag the bookmarks again. Only finished work marked Done counts, so cancelled items never read as
+throughput.
 
 It reads named fields only, the same set as the Power BI report: key, type, status, created,
 Actual Start Date, resolved, parent key, the three work fields, and the history of status
@@ -1244,7 +1252,7 @@ Code**.
 
 #### Removing the Jira Bookmark
 
-- **To stop using it:** delete the bookmark from your bookmarks bar. It stores nothing in this
+- **To stop using it:** delete the bookmarks from your bookmarks bar. It stores nothing in this
   app and writes nothing to Jira, so there is nothing else to undo.
 - **To take it out of the app:** the feature is one commit on `main`, and the commit before it
   is tagged `pre-jira-bookmark`. Run `git revert <that commit>` and push. It added no stored
