@@ -12,6 +12,46 @@ conventions the two apps share (chrome, themes, share links, testing); this
 file records what is specific to this repo and what must never regress.
 
 
+## The Jira Bookmark (2026-10-30) — no schema change, DECIDED WITH CHARLES
+
+Charles asked whether Jira could feed this app directly, and then whether a Wine Cellar-style
+`password` field for his Jira API token would do it. **It would not, for two independent reasons,
+and neither is a matter of taste:**
+- **Jira Cloud sends no CORS permission.** Measured 2026-10-30: a preflight from
+  `https://eagleadams86.github.io` to an `atlassian.net` REST path comes back with no
+  `Access-Control-Allow-Origin`. Power BI and his Python script work because they are not web
+  pages. Only OAuth 3LO via `api.atlassian.com` allows CORS, and Cloud 3LO needs a client
+  secret (no PKCE), which means a server: sync by another name.
+- **A Jira token on the shared origin is the shared-origin policy's worst case.** It reads (and
+  writes) ALL of work Jira, and every page on `eagleadams86.github.io` could read it.
+
+**So Jira comes to the app, by the clipboard.** `JIRA_BOOKMARK_SRC` is the source of a
+bookmarklet, kept as a `String.raw` constant (declared ABOVE `window.TD`, which exports it, for
+the TDZ reason). The app NEVER runs it: `wireJiraBookmark()` makes it the `href` of a draggable
+link and the text of a `<pre>`, and a click in the app only toasts. On a Jira tab it pages
+`rest/api/3/search/jql` (`nextPageToken`) with named fields and `expand=changelog`, refetches a
+truncated changelog from `issue/{key}/changelog`, finds custom fields BY NAME via
+`rest/api/3/field`, reads done-category statuses from `rest/api/3/status`, and writes a TSV
+with headings `HEADER_PATTERNS` already reads. GET only.
+- **No new stored field, no SCHEMA bump, no whitelist or CSP change** — that is what makes it
+  removable with one revert (tag `pre-jira-bookmark` marks the commit before). Keep it that way;
+  a change that needs storage is a different, bigger decision.
+- **Days in a status** run from creation to resolution (or now), seeded with the FIRST change's
+  `fromString` as the status the item was created into. The [CHART] Time in Status trap (see the
+  changelog-export memory) is exactly that missing first interval. Done-category statuses get no
+  column (the `Days in Done` open interval). Never visited = blank; passed through = real 0,
+  matching `cleanStageDays`.
+- **The source must hold no backtick, no `${`, no line comment and nothing that ends a script
+  block** — pinned. Every label is cut whole at 40/60 characters and keys go through the same
+  regex as `cleanIssueKey`, but the PASTE boundary is still the boundary: the bookmark is a
+  convenience, never a reason to trust a paste more.
+- Tests load the source into the TEST window under `FM_JIRA_BOOKMARK_TEST`, which hands over
+  `statusDays`/`toTable` and fetches nothing, then feed the output through `parsePastedRows`.
+  The network half was verified against a local mock Jira (two pages, a truncated changelog);
+  **the first real-Jira run is Charles's**, from his work machine, and whether M&T's managed
+  Chrome allows bookmarklets at all is still unconfirmed.
+- **Sprint Predictability** gets a matching bookmark second, feeding `parseJiraSprintReport()`.
+
 ## One Paste Box Splits by Project Id (2026-10-13) — no schema change, DECIDED WITH CHARLES
 
 Charles: *"i mostly paste several teams now. how might we simplify that experience so it doesn't

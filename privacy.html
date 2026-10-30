@@ -75,7 +75,7 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
        is why this closes before it and why .wrap stays an ordinary <div>. -->
   <main>
   <h1>Flow Metrics — Privacy Policy</h1>
-  <p class="meta">Effective September 15, 2026</p>
+  <p class="meta">Effective October 30, 2026</p>
 
 
   <p>Flow Metrics is built to work entirely in your browser. This page explains exactly what
@@ -246,6 +246,19 @@ footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
     <li>The page's Content-Security-Policy sets <code>connect-src 'none'</code>, so the
       browser itself refuses to let this page open a network connection — not to Google, not
       to the author, not anywhere.</li>
+  </ul>
+
+  <h2>The Jira Bookmark</h2>
+  <ul>
+    <li>The optional <strong>Copy for Flow Metrics</strong> bookmark runs in your own Jira tab,
+      not in this app, and uses the Jira sign-in that tab already has. No password or token is
+      ever asked for or kept, here or anywhere.</li>
+    <li>It only reads, and only named fields: issue key, issue type, status, created, start
+      and resolved dates, parent key, the three work fields and the history of status changes
+      (to count days in each status). Summaries and descriptions are never fetched.</li>
+    <li>It puts the table on your clipboard and nowhere else. It remembers one thing, the last
+      search you ran, in your Jira site's own browser storage, so it can offer it next time.
+      What reaches this app is only what you paste, read by the same rules as any other paste.</li>
   </ul>
 
   <h2>Deleting Your Data</h2>
