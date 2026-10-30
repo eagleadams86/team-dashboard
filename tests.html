@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4463;
+const EXPECTED = 4465;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -7222,9 +7222,16 @@ const stripComments = (src) => {
     s2.remove();
     const C = window.FM_JIRA_BOOKMARK;
     is(C.PROJECTS, ['DAE', 'KFR'], 'a drawn link carries the teams’ projects');
-    is(C.DEFAULT_JQL, 'project in ("DAE", "KFR") AND issuetype in (Story, Task, Bug) AND '
-       + '(resolution IS EMPTY OR (resolution = Done AND resolved >= -180d)) ORDER BY key',
-       'and searches those projects: work finished in its window, plus everything still open');
+    is(C.buildJql('customfield_11309'),
+       'project in ("DAE", "KFR") AND issuetype in (Story, Task, Spike, Bug, Feature) AND status != Cancelled AND '
+       + '(cf[11309] >= -180d OR created >= -180d OR resolved >= -180d OR '
+       + '(resolution IS EMPTY AND statusCategory = "In Progress")) ORDER BY key',
+       'its search: those projects, Cancelled left out, anything started, raised or finished in the window, '
+       + 'and every item still in progress whatever its age');
+    ok(!/cf\[/.test(C.buildJql(undefined)) && /created >= -180d/.test(C.buildJql(undefined)),
+       'a site with no Actual Start Date field just loses that one clause');
+    ok(!/cf\[/.test(C.buildJql('customfield_1) OR (1')),
+       'and a field id that is not the shape of one is never written into the search');
     window.FM_JIRA_BOOKMARK = B;
 
     const h = (at, from, to) => ({ created: at, items: [{ field: 'status', fromString: from, toString: to }] });

@@ -63,6 +63,15 @@ with headings `HEADER_PATTERNS` already reads. GET only.
   only `resolution = Done` within the window. **The bookmark no longer remembers the last
   search** in Jira's localStorage: three bookmarks would overwrite each other's search, and the
   stored one used to win over the default. Still no stored field and no schema change.
+- **The search is Charles's spreadsheet JQL, plus one clause (2026-10-30).** `buildJql(startId)`:
+  `issuetype in (Story, Task, Spike, Bug, Feature) AND status != Cancelled AND (cf[N] >= -Dd OR
+  created >= -Dd OR resolved >= -Dd OR (resolution IS EMPTY AND statusCategory = "In Progress"))`.
+  The last clause is OURS: his window alone drops an item started before it and still open, which
+  is exactly the aged WIP this app exists to show. `resolution = Done` was dropped in favour of
+  his `status != Cancelled`, the rule his exports already run on. The start clause uses
+  `cf[N]` from the field looked up BY NAME (so the prompt now comes after the field and status
+  lookups), shape-checked as `customfield_\d+` before it is written into a search. A refused
+  search shows Jira's own `errorMessages` (a JQL error, never data).
 
 ## One Paste Box Splits by Project Id (2026-10-13) — no schema change, DECIDED WITH CHARLES
 
