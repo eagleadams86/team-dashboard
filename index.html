@@ -1869,6 +1869,14 @@ html[data-welcome] .tabs,
 html[data-welcome] #viewControls,
 html[data-welcome] #artScope,
 html[data-welcome] .panel { display: none !important; }
+#jiraBookmark > summary { cursor: pointer; font-weight: 600; }
+#jiraBookmark details > summary { cursor: pointer; }
+/* `.note li` is monospace, for lists of pasted cells; these are steps. */
+#jiraBookmark li { font-family: inherit; margin-bottom: 4px; }
+.jira-code { margin: var(--sp-4) 0 0; max-height: 20em; overflow: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px 16px; font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--text-primary); white-space: pre; }
 .empty pre { display: inline-block; text-align: left; margin: 16px 0 0;
   background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 12px 16px; font-family: var(--font-mono); font-size: var(--fs-xs);
@@ -3051,6 +3059,44 @@ input:is([type="checkbox"], [type="radio"]) { flex: none; width: 1.25rem; height
         Items that are started but not finished belong here too: they count as work started.
         A <strong>created date</strong> is optional and adds lead time.
       </p>
+      <!-- ── THE JIRA BOOKMARK (2026-10-30, decided with Charles) ─────────────
+           Jira Cloud won't answer a page on another site (no CORS), and a Jira
+           token kept here would sit on the shared Pages origin where every page
+           could read it. So the app does not go to Jira — Jira comes here, by
+           the clipboard. The bookmark runs on Charles's own Jira tab, on the
+           sign-in it already has, and fills the clipboard with the table this
+           box already reads. Nothing in this app runs it or connects anywhere:
+           connect-src stays 'none'. Purely additive, so removing it is one
+           revert (see README, "Removing the Jira Bookmark"). -->
+      <details id="jiraBookmark" style="margin-top:var(--sp-5)">
+        <summary>Get It Straight from Jira</summary>
+        <div class="note info" style="margin-top:var(--sp-4)">
+          <p style="margin:0 0 var(--sp-4)">
+            <a class="btn" id="jiraBookmarkLink" href="#" draggable="true">Copy for Flow Metrics</a>
+          </p>
+          <ol style="margin:0;padding-left:1.4em">
+            <li><strong>Drag that button to your bookmarks bar.</strong> No bar? Press
+              <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> (<kbd>&#8984;</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> on a Mac) to show it.</li>
+            <li>Open your Jira site in another tab and click the bookmark.</li>
+            <li>Check the search it offers, press <strong>OK</strong>, then <strong>Copy</strong> when it says the items are ready.</li>
+            <li>Come back here, paste into the box below and press <strong>Load Pasted Rows</strong>.</li>
+          </ol>
+          <p style="margin:var(--sp-4) 0 0">
+            It runs inside your Jira tab on the sign-in you already have, so there is no
+            password or token to give it. It only reads, and only these: key, type, status,
+            dates, parent key, the three work fields and the days spent in each status.
+            Summaries and descriptions are never fetched. The table goes to your clipboard
+            and nowhere else. This app still connects to nothing.
+          </p>
+          <p style="margin:var(--sp-4) 0 0">
+            Don&rsquo;t want it any more? Delete the bookmark. Nothing else needs undoing.
+          </p>
+          <details style="margin-top:var(--sp-4)">
+            <summary>Show the Bookmark&rsquo;s Code</summary>
+            <pre class="jira-code" id="jiraBookmarkCode"></pre>
+          </details>
+        </div>
+      </details>
       <div style="margin-top:var(--sp-6)">
         <label for="pasteBox">Pasted rows</label>
         <textarea id="pasteBox" spellcheck="false" placeholder="Issue key&#9;Created&#9;In Progress&#9;Resolved&#9;Issue Type
@@ -11817,12 +11863,283 @@ function groupTeamsByArt(teams, arts) {
     .map(x => x.t);
 }
 
+/* ── THE JIRA BOOKMARK (2026-10-30) ─────────────────────────────────────────
+   The source of the "Copy for Flow Metrics" bookmark, as TEXT. This app never
+   runs it: it becomes the href of a link the reader drags to the bookmarks bar,
+   and only runs when clicked on a Jira tab. Kept here rather than in a file of
+   its own so the single-file copy carries it with nothing to fetch. Declared
+   ABOVE window.TD, which names it — below, it would be in the temporal dead
+   zone at boot and the app would throw.
+   String.raw, so its own escapes (\t, ’) reach the bookmark as written;
+   it must hold no backtick, no "${" and no line comment (a bookmark URL that
+   lost its line breaks would comment out the rest of it). Pinned in tests. */
+const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics - a bookmark that runs on YOUR Jira tab.
+   It reads (never writes) through the Jira sign-in that tab already has, so
+   there is no token anywhere. It asks Jira for named fields only: key, type,
+   status, dates, parent key and three work fields. Summaries and
+   descriptions are never requested. The table goes to your clipboard, and
+   nowhere else, for you to paste into Flow Metrics. */
+(function () {
+  'use strict';
+  var DEFAULT_JQL = 'project = DAE AND issuetype in (Story, Task, Bug) AND ' +
+    '(resolution IS EMPTY OR (resolution = Done AND resolved >= -730d)) ORDER BY key';
+  /* Looked up by NAME, so another Jira site's field ids just work. A field the
+     site doesn't have comes out as an empty column. */
+  var FIELDS = [
+    ['start', 'Actual Start Date'],
+    ['snType', 'ServiceNow Assignment Type'],
+    ['bugFound', 'Bug Type'],
+    ['workKind', 'Type of Work']
+  ];
+  var KEY_RE = /^[A-Za-z][A-Za-z0-9]{0,9}-[0-9]{1,6}$/;
+  var DAY_MS = 86400000;
+  var MAX_ISSUES = 20000;
+  var JQL_STORE = 'flow-metrics-bookmark-jql';
+
+  /* A label goes out whole or not at all; a cell that long is prose. */
+  function label(v, max) {
+    var s = String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ').trim();
+    return s.length > max ? '' : s;
+  }
+  function day(v) {
+    var m = /^(\d{4}-\d{2}-\d{2})/.exec(String(v == null ? '' : v));
+    return m ? m[1] : '';
+  }
+  function key(v) {
+    var s = String(v == null ? '' : v).trim();
+    return KEY_RE.test(s) ? s : '';
+  }
+  function option(v) {
+    if (Array.isArray(v)) v = v[0];
+    if (v && typeof v === 'object') v = v.value != null ? v.value : v.name;
+    return label(v, 40);
+  }
+  function str(v) { return typeof v === 'string' ? v : ''; }
+
+  /* Calendar days in each status, from the status changes in the history.
+     The clock runs from creation to resolution (or to now, for open work),
+     so the stages of a finished item add up to its created-to-resolved span.
+     A status never visited is absent - blank in the table - while a status
+     passed through within the hour is a real 0. */
+  function statusDays(created, resolved, currentStatus, histories, now) {
+    var start = Date.parse(created);
+    var end = resolved ? Date.parse(resolved) : now;
+    if (!isFinite(start) || !isFinite(end) || end < start) return {};
+    var changes = [];
+    (histories || []).forEach(function (h) {
+      var at = Date.parse(h && h.created);
+      if (!isFinite(at)) return;
+      ((h && h.items) || []).forEach(function (it) {
+        if (it && it.field === 'status')
+          changes.push({ at: at, from: str(it.fromString), to: str(it.toString) });
+      });
+    });
+    changes.sort(function (a, b) { return a.at - b.at; });
+    var ms = {};
+    var t = start;
+    var st = changes.length ? changes[0].from : currentStatus;
+    function add(name, until) {
+      var span = Math.min(until, end) - Math.max(t, start);
+      if (!name) return;
+      ms[name] = (ms[name] || 0) + Math.max(0, span);
+    }
+    changes.forEach(function (c) {
+      if (c.at <= end) add(st, c.at);
+      t = c.at;
+      st = c.to;
+    });
+    if (t < end) add(st, end);
+    var out = {};
+    Object.keys(ms).forEach(function (n) { out[n] = Math.round(ms[n] / DAY_MS * 100) / 100; });
+    return out;
+  }
+
+  /* The table Flow Metrics' paste box already reads. Headings are the ones its
+     column finder looks for; done-category statuses get no "Days in" column,
+     because time spent in Done is an open interval, not a stage. */
+  function toTable(issues, ids, doneNames, now) {
+    var done = {};
+    (doneNames || []).forEach(function (n) { done[String(n).toLowerCase()] = 1; });
+    var rows = [];
+    var stages = [];
+    var seen = {};
+    issues.forEach(function (iss) {
+      var f = (iss && iss.fields) || {};
+      var k = key(iss && iss.key);
+      if (!k) return;
+      var status = label(f.status && f.status.name, 60);
+      var days = statusDays(f.created, f.resolutiondate, status,
+        iss.changelog && iss.changelog.histories, now);
+      Object.keys(days).forEach(function (n) {
+        var name = label(n, 60);
+        if (!name || done[name.toLowerCase()] || seen[name]) return;
+        seen[name] = 1;
+        stages.push(name);
+      });
+      rows.push({
+        cells: [k, label(f.issuetype && f.issuetype.name, 40), status, day(f.created),
+          ids.start ? day(f[ids.start]) : '', day(f.resolutiondate),
+          key(f.parent && f.parent.key),
+          ids.snType ? option(f[ids.snType]) : '',
+          ids.bugFound ? option(f[ids.bugFound]) : '',
+          ids.workKind ? option(f[ids.workKind]) : ''],
+        days: days
+      });
+    });
+    var head = ['Issue key', 'Issue Type', 'Status', 'Created', 'Actual Start Date',
+      'Resolved', 'Parent key', 'ServiceNow Assignment Type', 'Bug Type', 'Type of Work']
+      .concat(stages.map(function (s) { return 'Days in ' + s; }));
+    var lines = [head.join('\t')];
+    rows.forEach(function (r) {
+      lines.push(r.cells.concat(stages.map(function (s) {
+        return Object.prototype.hasOwnProperty.call(r.days, s) ? String(r.days[s]) : '';
+      })).join('\t'));
+    });
+    return { text: lines.join('\n'), count: rows.length, stages: stages };
+  }
+
+  var api = { statusDays: statusDays, toTable: toTable, FIELDS: FIELDS, DEFAULT_JQL: DEFAULT_JQL };
+  if (window.FM_JIRA_BOOKMARK_TEST) { window.FM_JIRA_BOOKMARK = api; return; }
+
+  /* -- Everything below talks to Jira, read-only, on this tab's own sign-in -- */
+  function get(path) {
+    return fetch(path, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('Jira answered ' + r.status + ' to ' + path.split('?')[0]);
+        return r.json();
+      });
+  }
+
+  var box = document.createElement('div');
+  var msg = document.createElement('p');
+  var row = document.createElement('div');
+  function button(text, onClick) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    b.style.font = 'inherit';
+    b.style.padding = '6px 14px';
+    b.style.marginRight = '8px';
+    b.style.borderRadius = '6px';
+    b.style.border = '1px solid #8590a2';
+    b.style.background = '#fff';
+    b.style.color = '#172b4d';
+    b.style.cursor = 'pointer';
+    b.addEventListener('click', onClick);
+    row.appendChild(b);
+    return b;
+  }
+  box.style.position = 'fixed';
+  box.style.top = '16px';
+  box.style.right = '16px';
+  box.style.zIndex = '2147483647';
+  box.style.maxWidth = '380px';
+  box.style.padding = '16px';
+  box.style.background = '#fff';
+  box.style.color = '#172b4d';
+  box.style.border = '2px solid #0c66e4';
+  box.style.borderRadius = '10px';
+  box.style.font = '14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  msg.style.margin = '0 0 12px';
+  box.appendChild(msg);
+  box.appendChild(row);
+  function say(t) { msg.textContent = t; }
+  function close() { box.remove(); }
+  document.body.appendChild(box);
+
+  var stored = '';
+  try { stored = localStorage.getItem(JQL_STORE) || ''; } catch (e) { /* private window */ }
+  var jql = window.prompt('Copy for Flow Metrics\n\nWhich work items? (Jira search, JQL)',
+    stored || DEFAULT_JQL);
+  if (!jql) { close(); return; }
+  try { localStorage.setItem(JQL_STORE, jql); } catch (e) { /* not essential */ }
+  say('Reading from Jira\u2026');
+  var cancel = button('Cancel', function () { cancelled = true; close(); });
+  var cancelled = false;
+
+  var ids = {};
+  var doneNames = [];
+  var issues = [];
+
+  function more(iss) {
+    var cl = iss.changelog;
+    if (!cl || !(cl.total > (cl.histories || []).length)) return Promise.resolve();
+    var all = [];
+    function page(at) {
+      return get('/rest/api/3/issue/' + encodeURIComponent(iss.key) +
+        '/changelog?maxResults=100&startAt=' + at).then(function (p) {
+        all = all.concat(p.values || []);
+        if (cancelled || p.isLast !== false || !(p.values || []).length) return;
+        return page(at + p.values.length);
+      });
+    }
+    return page(0).then(function () { iss.changelog = { histories: all }; });
+  }
+
+  function search(token) {
+    if (cancelled) return Promise.resolve();
+    var fields = ['issuetype', 'status', 'created', 'resolutiondate', 'parent']
+      .concat(FIELDS.map(function (f) { return ids[f[0]]; }).filter(Boolean));
+    var q = '/rest/api/3/search/jql?jql=' + encodeURIComponent(jql) +
+      '&fields=' + encodeURIComponent(fields.join(',')) +
+      '&expand=changelog&maxResults=100' +
+      (token ? '&nextPageToken=' + encodeURIComponent(token) : '');
+    return get(q).then(function (p) {
+      var batch = p.issues || [];
+      return batch.reduce(function (chain, iss) {
+        return chain.then(function () { return cancelled ? null : more(iss); });
+      }, Promise.resolve()).then(function () {
+        issues = issues.concat(batch);
+        say('Reading from Jira\u2026 ' + issues.length + ' items so far.');
+        if (issues.length >= MAX_ISSUES) throw new Error('More than ' + MAX_ISSUES +
+          ' items \u2014 narrow the search and run it again.');
+        if (p.nextPageToken && batch.length) return search(p.nextPageToken);
+      });
+    });
+  }
+
+  get('/rest/api/3/field').then(function (list) {
+    FIELDS.forEach(function (f) {
+      var hit = (list || []).filter(function (x) {
+        return x && String(x.name).toLowerCase() === f[1].toLowerCase();
+      })[0];
+      if (hit && /^[A-Za-z0-9_]{1,40}$/.test(hit.id)) ids[f[0]] = hit.id;
+    });
+    return get('/rest/api/3/status');
+  }).then(function (statuses) {
+    doneNames = (statuses || []).filter(function (s) {
+      return s && s.statusCategory && s.statusCategory.key === 'done';
+    }).map(function (s) { return s.name; });
+    return search(null);
+  }).then(function () {
+    if (cancelled) return;
+    var t = toTable(issues, ids, doneNames, Date.now());
+    cancel.remove();
+    if (!t.count) { say('Jira found nothing for that search.'); button('Close', close); return; }
+    say(t.count + ' work items are ready, with days in ' + t.stages.length +
+      ' stages. Copy them, then paste into Flow Metrics\u2019 Paste Work Items box.');
+    var copy = button('Copy', function () {
+      navigator.clipboard.writeText(t.text).then(function () {
+        say('Copied ' + t.count + ' work items. Paste them into Flow Metrics.');
+        copy.remove();
+      }, function () { say('Your browser refused the clipboard. Try Copy again.'); });
+    });
+    button('Close', close);
+    copy.focus();
+  }).catch(function (e) {
+    if (cancelled) return;
+    say('Couldn\u2019t read from Jira: ' + (e && e.message ? e.message : e) +
+      '. Run this from a tab showing your Jira site.');
+    cancel.remove();
+    button('Close', close);
+  });
+})();`;
 /* Exposed for tests.html, which drives the real app in a hidden iframe. */
 window.TD = {
   weekdayNum, priorSunday, weekStartOn, weekNumber, weekKey, edate, workDaysBetween,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
-  cleanIssueKey, separatorOf,
+  cleanIssueKey, separatorOf, JIRA_BOOKMARK_SRC,
   /* The three work fields (2026-09-15). */
   WORK_FIELDS, SN_TYPES, SN_INCIDENT, BUG_FOUND, WORK_KINDS, readEnum, enumCode,
   countsAsDefect, teamFactsOf,
@@ -23404,6 +23721,19 @@ function pressPaste(mode) {
 window.tdPastePlan = pastePlan;
 $('btnLoad').addEventListener('click', () => pressPaste('replace'));
 $('btnAppend').addEventListener('click', () => pressPaste('append'));
+function wireJiraBookmark() {
+  const link = $('jiraBookmarkLink');
+  if (!link) return;
+  link.href = 'javascript:' + encodeURIComponent(JIRA_BOOKMARK_SRC);
+  /* Clicked HERE it would only fail against a site with no Jira on it (and
+     connect-src 'none' would stop it first), so a click explains instead. */
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    toast('Drag this button to your bookmarks bar, then click it on a Jira tab.');
+  });
+  $('jiraBookmarkCode').textContent = JIRA_BOOKMARK_SRC;
+}
+wireJiraBookmark();
 /* ── THE KEYBOARD'S PLACE, CARRIED ACROSS A REBUILD (2026-09-24) ──────────────
    Most handlers here end in renderAll(), which rebuilds every row, chip and heading
    from the board — so the control a key press landed on is detached and focus falls

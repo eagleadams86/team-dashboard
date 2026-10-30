@@ -1215,6 +1215,42 @@ it started, and the metrics treat 0 as "use the default", so without the floor t
 say 0 while the charts still read 14. (Until 2026-09-04 this paragraph said the threshold was
 clamped at zero too; the code never did that.)
 
+### Straight from Jira: The Copy for Flow Metrics Bookmark
+
+**Get It Straight from Jira**, on the Your Data tab, gives you a bookmark that does the export
+for you. Drag its button to your bookmarks bar once. Then, whenever you want fresh data:
+
+1. Open your Jira site in a tab and click the bookmark.
+2. Check the search it offers (JQL; it remembers the last one) and press **OK**.
+3. When it says the items are ready, press **Copy**.
+4. Paste into Flow Metrics and press **Load Pasted Rows**.
+
+It reads named fields only, the same set as the Power BI report: key, type, status, created,
+Actual Start Date, resolved, parent key, the three work fields, and the history of status
+changes. From that history it works out a **Days in** column for each status, so the separate
+time-in-status script isn't needed. Statuses in Jira's *Done* category get no column, because
+time spent in Done isn't a stage. A status an item never visited is blank; one it passed
+through in minutes is a real 0. Custom fields are found by **name**, so another Jira site works
+without editing anything.
+
+**Why a bookmark and not a button in the app.** Jira Cloud refuses requests from other
+websites (it sends no CORS permission), so this app could not reach Jira even with a token.
+Keeping a Jira token here would also be a bad trade: every page on this GitHub Pages site shares
+one storage area, and a token would give any of them full access to work Jira. The bookmark
+runs *inside* Jira on the sign-in you already have, so nothing needs a token, and the app still
+connects to nothing (`connect-src 'none'`). The online and single-file versions work the same,
+because the clipboard is the only way in. Its whole source is under **Show the Bookmark's
+Code**.
+
+#### Removing the Jira Bookmark
+
+- **To stop using it:** delete the bookmark from your bookmarks bar. It stores nothing in this
+  app and writes nothing to Jira, so there is nothing else to undo.
+- **To take it out of the app:** the feature is one commit on `main`, and the commit before it
+  is tagged `pre-jira-bookmark`. Run `git revert <that commit>` and push. It added no stored
+  field and changed no schema, so saved data, backups and share links are untouched either way.
+  The previous dated release stays downloadable as an offline copy without it.
+
 ### What Happens to Bad Data
 
 A bad *cell* costs you that field, not the whole row — with one exception, because every metric
