@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4455;
+const EXPECTED = 4456;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -7180,6 +7180,7 @@ const stripComments = (src) => {
     ok(!/`|\$\{/.test(SRC), 'it holds no backtick and no ${ — String.raw would cut or splice it');
     ok(!/^\s*\/\//m.test(SRC), 'and no line comment, which a bookmark URL without line breaks would turn into the rest of the script');
     ok(!/<\/script|<!--/i.test(SRC), 'and nothing that would end the app’s script block');
+    ok(/^[\x00-\x7f]*$/.test(SRC), 'and it is pure ASCII, so no page encoding can garble it — other characters are \\u escapes');
     ok(!/summary|description/i.test(SRC.replace(/\/\*[\s\S]*?\*\//g, '')),
        'its CODE never names a summary or description field — only its comment does, to say so');
     ok(!/method\s*:\s*['"](POST|PUT|DELETE|PATCH)/i.test(SRC), 'and it only ever reads: no write method anywhere');

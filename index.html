@@ -11873,7 +11873,7 @@ function groupTeamsByArt(teams, arts) {
    String.raw, so its own escapes (\t, ’) reach the bookmark as written;
    it must hold no backtick, no "${" and no line comment (a bookmark URL that
    lost its line breaks would comment out the rest of it). Pinned in tests. */
-const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics — a bookmark that runs on YOUR Jira tab.
+const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics - a bookmark that runs on YOUR Jira tab.
    It reads (never writes) through the Jira sign-in that tab already has, so
    there is no token anywhere. It asks Jira for named fields only: key, type,
    status, dates, parent key and three work fields. Summaries and
@@ -11919,7 +11919,7 @@ const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics — a bookmark tha
   /* Calendar days in each status, from the status changes in the history.
      The clock runs from creation to resolution (or to now, for open work),
      so the stages of a finished item add up to its created-to-resolved span.
-     A status never visited is absent — blank in the table — while a status
+     A status never visited is absent - blank in the table - while a status
      passed through within the hour is a real 0. */
   function statusDays(created, resolved, currentStatus, histories, now) {
     var start = Date.parse(created);
@@ -12001,7 +12001,7 @@ const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics — a bookmark tha
   var api = { statusDays: statusDays, toTable: toTable, FIELDS: FIELDS, DEFAULT_JQL: DEFAULT_JQL };
   if (window.FM_JIRA_BOOKMARK_TEST) { window.FM_JIRA_BOOKMARK = api; return; }
 
-  /* ── Everything below talks to Jira, read-only, on this tab's own sign-in ── */
+  /* -- Everything below talks to Jira, read-only, on this tab's own sign-in -- */
   function get(path) {
     return fetch(path, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
       .then(function (r) {
@@ -12053,7 +12053,7 @@ const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics — a bookmark tha
     stored || DEFAULT_JQL);
   if (!jql) { close(); return; }
   try { localStorage.setItem(JQL_STORE, jql); } catch (e) { /* not essential */ }
-  say('Reading from Jira…');
+  say('Reading from Jira\u2026');
   var cancel = button('Cancel', function () { cancelled = true; close(); });
   var cancelled = false;
 
@@ -12090,9 +12090,9 @@ const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics — a bookmark tha
         return chain.then(function () { return cancelled ? null : more(iss); });
       }, Promise.resolve()).then(function () {
         issues = issues.concat(batch);
-        say('Reading from Jira… ' + issues.length + ' items so far.');
+        say('Reading from Jira\u2026 ' + issues.length + ' items so far.');
         if (issues.length >= MAX_ISSUES) throw new Error('More than ' + MAX_ISSUES +
-          ' items — narrow the search and run it again.');
+          ' items \u2014 narrow the search and run it again.');
         if (p.nextPageToken && batch.length) return search(p.nextPageToken);
       });
     });
@@ -12117,7 +12117,7 @@ const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics — a bookmark tha
     cancel.remove();
     if (!t.count) { say('Jira found nothing for that search.'); button('Close', close); return; }
     say(t.count + ' work items are ready, with days in ' + t.stages.length +
-      ' stages. Copy them, then paste into Flow Metrics’ Paste Work Items box.');
+      ' stages. Copy them, then paste into Flow Metrics\u2019 Paste Work Items box.');
     var copy = button('Copy', function () {
       navigator.clipboard.writeText(t.text).then(function () {
         say('Copied ' + t.count + ' work items. Paste them into Flow Metrics.');
@@ -12128,7 +12128,7 @@ const JIRA_BOOKMARK_SRC = String.raw`/* Copy for Flow Metrics — a bookmark tha
     copy.focus();
   }).catch(function (e) {
     if (cancelled) return;
-    say('Couldn’t read from Jira: ' + (e && e.message ? e.message : e) +
+    say('Couldn\u2019t read from Jira: ' + (e && e.message ? e.message : e) +
       '. Run this from a tab showing your Jira site.');
     cancel.remove();
     button('Close', close);
