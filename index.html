@@ -1195,8 +1195,10 @@ select { cursor: pointer; }
    tiles above keep their spelled-out rule and their media queries: that row is
    always exactly four, and four is already gap-free at every width.
 
-   The thresholds are the 200px minimum tile and the 12px gap multiplied out:
-   2→412, 3→624, 4→836, 5→1048, 6→1260, 7→1472, 8→1684. Narrowest first, so the
+   The thresholds are the 200px minimum tile and the 12px gap multiplied out,
+   plus the row's own 18px padding and 1px rule on each side (38px — the row is
+   a card since 2026-10-31): 2→450, 3→662, 4→874, 5→1086, 6→1298, 7→1510,
+   8→1722. Narrowest first, so the
    widest rule that matches wins. Only counts that leave rows differing by at
    most one tile are offered, and never a row holding a single tile: five go 5,
    3 + 2, or one per line, never 2 + 2 + 1.
@@ -1210,7 +1212,7 @@ select { cursor: pointer; }
    otherwise carry its span into the wider layout. tests.html reads the 200 and the 12
    back out of this file and checks every threshold against them, so raising the
    minimum tile fails the suite instead of quietly making a row too tight. */
-@container tiles (min-width: 412px) {
+@container tiles (min-width: 450px) {
   .tiles.group:has(> :nth-child(2):last-child),
   .tiles.group:has(> :nth-child(4):last-child),
   .tiles.group:has(> :nth-child(6):last-child),
@@ -1221,7 +1223,7 @@ select { cursor: pointer; }
   .tiles.group:has(> :nth-child(7):last-child) {
     grid-template-columns: minmax(0, 1fr); }
 }
-@container tiles (min-width: 624px) {
+@container tiles (min-width: 662px) {
   .tiles.group:has(> :nth-child(3):last-child),
   .tiles.group:has(> :nth-child(6):last-child) {
     grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1238,7 +1240,7 @@ select { cursor: pointer; }
   .tiles.group:has(> :nth-child(8):last-child) > :nth-child(n+7) {
     grid-column: span 3; }
 }
-@container tiles (min-width: 836px) {
+@container tiles (min-width: 874px) {
   .tiles.group:has(> :nth-child(4):last-child) {
     grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .tiles.group:has(> :nth-child(7):last-child) {
@@ -1253,25 +1255,25 @@ select { cursor: pointer; }
   .tiles.group:has(> :nth-child(8):last-child) > :nth-child(n+7) {
     grid-column: auto; }
 }
-@container tiles (min-width: 1048px) {
+@container tiles (min-width: 1086px) {
   .tiles.group:has(> :nth-child(5):last-child) {
     grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .tiles.group:has(> :nth-child(5):last-child) > *,
   .tiles.group:has(> :nth-child(5):last-child) > :nth-child(n+4) {
     grid-column: auto; }
 }
-@container tiles (min-width: 1260px) {
+@container tiles (min-width: 1298px) {
   .tiles.group:has(> :nth-child(6):last-child) {
     grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
-@container tiles (min-width: 1472px) {
+@container tiles (min-width: 1510px) {
   .tiles.group:has(> :nth-child(7):last-child) {
     grid-template-columns: repeat(7, minmax(0, 1fr)); }
   .tiles.group:has(> :nth-child(7):last-child) > *,
   .tiles.group:has(> :nth-child(7):last-child) > :nth-child(n+5) {
     grid-column: auto; }
 }
-@container tiles (min-width: 1684px) {
+@container tiles (min-width: 1722px) {
   .tiles.group:has(> :nth-child(8):last-child) {
     grid-template-columns: repeat(8, minmax(0, 1fr)); }
 }
@@ -1280,27 +1282,34 @@ select { cursor: pointer; }
    elsewhere later cannot start answering them by accident; where no container is
    found the row keeps the auto-fit line above, which is what it always had. */
 :has(> .tiles.group) { container: tiles / inline-size; }
-/* `--surface`, the same ground the chart cards and the tables are drawn on, and
-   NOT the `--surface-alt` this shipped with. A tile and a chart card are the
-   same kind of thing — a figure in a box on the page — and giving them two
-   different backgrounds sorted the dashboard into two tones that mean nothing:
-   the four headline tiles read as a band of something else sitting above the
-   charts rather than as the summary of them. It is most obvious in Sepia, where
-   the two are a tan and a cream, which is where Charles reported it. What tells
-   a tile from the page is what tells a card from the page — its border, plus
-   the left edge below.
+/* ── A TILE ROW IS A CARD, AND A TILE IS A WELL (2026-10-31, theme pack rule 21) ─
+   This REVERSES "one page, one surface" (2026-08-21). That moved the tiles from
+   `--surface-alt` to `--surface` because, sitting straight on the page, the
+   four headline tiles read in Sepia as a tan band of something else above the
+   cream charts. The answer that keeps both halves is to put the row IN a card:
+   the row is now ruled and filled like a chart card (`--surface`, `--border`,
+   `--radius`, 18px), and the tiles inside it are wells (`--surface-alt`), so
+   they read as part of the card around them — which is what the 2026-08-21
+   decision wanted — and a tile, a table and a chart's plot area are one fill on
+   every tab. Charles approved the mock-up on 2026-10-31.
 
-   THAT EDGE IS 6px, not the 4px it shipped with, and the two changes are really
-   one change. The tile used to be told apart from the card beside it by its
-   FILL; now it is told apart by this edge, so the edge has to be able to carry
-   it. 4px was the right weight for a marker on a tile that was already a
-   different colour, and on a row of tiles that are not it reads as a slightly
-   heavy border rather than as a deliberate mark. Not past 6 — beyond that it
-   stops being an edge and starts being a column, and it eats into the 14px of
-   padding the label is set against. */
+   THE EDGE STAYS 6px. It was widened from 4px when the tile lost its own fill;
+   the tile has a fill again, but the edge is also the RAG mark on a graded tile
+   and the one thing that reads at a glance across a row, so it stays. Not past
+   6 — beyond that it stops being an edge and starts being a column, and it eats
+   into the 14px of padding the label is set against.
+
+   The 18px of padding and the 1px rule come out of the width the tiles get, so
+   the container queries above are measured on the PANEL and count them in:
+   every threshold is the tiles and gaps plus 38px. */
+.tiles { background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px; }
+/* A row with nothing in it yet was invisible when the row had no box; as a
+   card it would be an empty ruled frame, so it goes until it has a tile. */
+.tiles:empty { display: none; }
 .tile { display: grid; grid-row: span 3; grid-template-rows: subgrid; align-content: start;
   border: 1px solid var(--border); border-left-width: 6px;
-  border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface); }
+  border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface-alt); }
 .tile .label { font-size: var(--fs-xs); color: var(--text-secondary); text-transform: uppercase;
   letter-spacing: .04em; font-weight: 600;
   display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
@@ -1337,8 +1346,8 @@ select { cursor: pointer; }
    stranded-tile fault the `.tiles.group` block above exists to avoid, and there
    is no arrangement of three that splits evenly into two rows.
 
-   The cards are `.card` — the same one surface as a chart card, a table and a
-   tile, per the rule at the top of this stylesheet. They are NOT `.tile`: a tile
+   The cards are `.card` — the same `--surface` as a chart card and a tile ROW
+   (a tile itself is a well inside its row since 2026-10-31). They are NOT `.tile`: a tile
    is a figure with a caption, and these carry a band strip and a paragraph. */
 .scorecard { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch; margin-bottom: 18px; }
@@ -1429,11 +1438,20 @@ select { cursor: pointer; }
    a surface-coloured chip, so the text contrast is the page's own and never a
    question of which series colour it lands on; and the legend under it names
    both halves with their figures, so colour is never the only signal. */
-.sc-pie { display: block; width: 120px; height: 120px; margin: 10px auto 2px; }
+/* THE PIE SITS IN A WELL (rule 21, 2026-10-31), like every chart's plot area:
+   the same --surface-alt box the band strip and the legend under it already
+   are. So the wedge borders and the figure chips — painted in the card's colour
+   until then — read --surface-alt with it, or each would show as a patch on the
+   well. `content-box` keeps the pie 120px; the box is drawn outside it. On paper
+   the box does not print (a background is dropped) but an SVG fill does, so the
+   print block puts the borders and chips back on --surface. */
+.sc-pie { display: block; box-sizing: content-box; width: 120px; height: 120px;
+  margin: 10px auto 2px; padding: 6px;
+  background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .sc-pie .disc { fill: var(--series-1); }
 .sc-pie .nondisc { fill: var(--series-5); }
-.sc-pie path, .sc-pie circle { stroke: var(--surface); stroke-width: 2; }
-.sc-pie-chip { fill: var(--surface); }
+.sc-pie path, .sc-pie circle { stroke: var(--surface-alt); stroke-width: 2; }
+.sc-pie-chip { fill: var(--surface-alt); }
 .sc-pie-text { fill: var(--text-primary); font-size: var(--fs-xs); font-weight: 700; }
 .sc-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px;
   margin-top: 10px; break-inside: avoid; }
@@ -1466,14 +1484,19 @@ select { cursor: pointer; }
    anything, which is why the line's height is untouched; the margin keeps the
    circle off the last letter — flush against the word, it reads as part of it
    rather than as a control you can press.
-   The hover fills with `--surface-alt` and NOT with `--focus-border`, which is
-   what Money Map used to reach for: a hover that borrows the focus colour says
-   "focused" to anybody reading the two states side by side. `--surface-alt`
-   because every surface this button sits on is `--surface` — a tile, a chart
-   card's name row, an All Teams heading. It used to fill with `--surface`,
-   which was a visible hover on a tile and no fill at all on a chart card: the
-   one place the two backgrounds differing was doing any work, and it was doing
-   it backwards. A change to any of it belongs in all of them. */
+   The hover fills and does NOT borrow `--focus-border`, which is what Money
+   Map used to reach for: a hover that borrows the focus colour says "focused"
+   to anybody reading the two states side by side. THE FILL IS `--border-strong`
+   SINCE 2026-10-31, and that is a divergence from the family block, not a
+   tidy-up. It was `--surface-alt`, chosen when every surface this button sat
+   on was `--surface`; the tiles are wells now (rule 21), so on a tile that fill
+   was no fill at all — while the same dot on a chart card's name row and in a
+   table's heading band still sits on `--surface`. One hover has to show on
+   both, and `--border-strong` is the existing token that does: 1.50:1 or more
+   against surfaceAlt and 1.77 against surface in all four themes, with the
+   "i" in --text-primary on it at 6.7:1 or better. Not a new colour, so nothing
+   new to gate. Any app whose tiles became wells has the same vanishing hover
+   and should take the same line. */
 .tile-help { display: inline-flex; align-items: center; justify-content: center;
   position: relative; box-sizing: border-box; flex: none;
   width: 16px; height: 16px; min-height: 0; padding: 0; margin-left: 7px;
@@ -1481,7 +1504,7 @@ select { cursor: pointer; }
   background: transparent; color: var(--text-secondary);
   font-family: inherit; font-size: var(--fs-xs); font-weight: 700;
   line-height: 1; text-transform: none; cursor: pointer; vertical-align: 1px; }
-.tile-help:hover { background: var(--surface-alt); border-color: var(--text-secondary);
+.tile-help:hover { background: var(--border-strong); border-color: var(--text-secondary);
   color: var(--text-primary); }
 /* -5px, NOT -4: `inset` resolves against the PADDING box, and the circle is a
    16px BORDER box with a 1px border — so the padding box is 14px and -4px grew
@@ -1511,6 +1534,25 @@ select { cursor: pointer; }
 .chart-card .chart-title { font-size: var(--fs-sm); color: var(--text-secondary);
   margin-top: 2px; margin-bottom: 8px; }
 .chart-wrap { position: relative; height: 300px; }
+/* ── THE PLOT AREA IS A WELL TOO (theme pack rule 21, 2026-10-31) ──────────
+   The chart card keeps its name and subtitle on the card; the box the canvas
+   sits in is the well — --surface-alt, edged in --border at --radius-sm — so a
+   tile, a table and a chart are one fill on every tab, in every theme. Charles,
+   on the mock-up that boxed the tables and left the charts bare: "this makes
+   the charts a different color than the other major items". 10px of padding
+   keeps the axis labels off the edge. `content-box` because this sheet sizes
+   everything border-box: the 300px stays the PLOT's height (Chart.js measures
+   the wrap's content box), and the edge and padding are added outside it
+   rather than taken out of the chart. Every chart on every tab is a
+   `.chart-wrap`, including the train chart on All Teams and the full-screen
+   (⤢) view, which moves this same box into the overlay — so it keeps the well,
+   and the plates painted on it. Anything the chart PAINTS in the card's colour
+   moved with it: the reference-line chips read plateFill(), which is
+   --surface-alt on screen. Paper prints no tinted box: a background does not
+   print here (only a canvas asks to), and plateFill() goes back to --surface
+   for the length of a print. No new colour, no shadow (rule 14). */
+.chart-wrap { box-sizing: content-box; padding: 10px;
+  background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius-sm); }
 
 /* ── One chart, filling the window ───────────────────────────────────
    The button sits in the CARD's corner and not in the .chart-name row above it,
@@ -2569,6 +2611,11 @@ main:focus { outline: none; }
      keeps ROWS, images and canvases whole; these are the bigger units this app
      thinks in, and they are its own to name. */
   .chart-card, .card, .tile, table { break-inside: avoid; }
+  /* The Scorecard pie's well does not print — a background is dropped — but its
+     SVG fills do, so the wedge borders and chips go back to the paper-pale
+     --surface rather than printing as grey patches (rule 21, 2026-10-31). */
+  .sc-pie path, .sc-pie circle { stroke: var(--surface); }
+  .sc-pie-chip { fill: var(--surface); }
   /* Everything that is a control rather than a figure, in this app's own words.
      `.tabs` and the header's BUTTONS are the pack's now; `.subtabs` is a second
      tab strip it cannot know about, and `header select` stays deliberately —
@@ -14258,6 +14305,16 @@ function tint(hex, amount) {
   return 'rgb(' + mix.join(',') + ')';
 }
 
+/* THE COLOUR OF A PLATE PAINTED ON THE PLOT (theme pack rule 21, 2026-10-31).
+   The plot area is a well, so anything a chart paints to sit "on the ground" —
+   the reference-line chips below — is --surface-alt, the well's own fill, or it
+   shows as a patch of card colour on it. On PAPER the well is not printed (a
+   background is dropped; only the canvas asks to print), so for the length of
+   a print the plates go back to --surface, the pale card colour they always
+   printed in: beforePrint() sets the flag and redraws. */
+let printPlates = false;
+function plateFill() { return token(printPlates ? '--surface' : '--surface-alt'); }
+
 /* Draws each point's value next to the marker — Chart.js 4 has no data labels
    built in and vendoring the plugin for one chart isn't worth 12KB.
    Labels sit above the point, except at a local minimum where above is where
@@ -14315,7 +14372,8 @@ Chart.register(valueLabels);
      85th percentile of 13 is an ordinary board — the nudge below stacked the
      two labels into one six-line-tall smudge of text and dashes.
 
-   The chip fixes both: it is painted in the card's own surface colour, so it
+   The chip fixes both: it is painted in the colour of the ground it sits on —
+   the plot area's well, --surface-alt, since 2026-10-31 (plateFill()) — so it
    interrupts the line it sits on and separates one label from the next. It is
    centred ON its line rather than floated above it, which is what makes the
    interruption read as "this line is called this" instead of as a gap.
@@ -14344,7 +14402,7 @@ const refLabels = {
     ctx.save();
     ctx.font = '600 ' + FS + 'px ' + token('--font-sans');
     ctx.textBaseline = 'middle';
-    const surface = token('--surface');
+    const surface = plateFill();
     let last = -Infinity;
     lines.slice().sort((a, b) => b.value - a.value).forEach((l) => {
       let mid = y.getPixelForValue(l.value);
@@ -22650,7 +22708,9 @@ $('themeSel').value = (() => {
    The rest of the page needs none of this — the stylesheet has already handled
    it — which is why this function survived the move.
 
-   Sepia and Light are left alone: both are already ink on a pale ground.
+   Sepia and Light keep their palette: both are already ink on a pale ground.
+   They are still REDRAWN since 2026-10-31, because the plates a chart paints on
+   its plot follow plateFill(), which is --surface on paper (rule 21).
    Nothing is saved: the theme in localStorage is untouched, so the swap cannot
    outlive the print even if `afterprint` never fires. */
 let themeBeforePrint = null;
@@ -22658,15 +22718,20 @@ function beforePrint() {
   /* A chart filling the window is a fixed overlay with the page inert behind
      it — printed, it would be one chart on page one and a blank page two. */
   closeMaxi();
+  /* Every theme redraws now, Light and Sepia too: the plates painted on a plot
+     go back to the paper-pale --surface for a print (plateFill, rule 21). */
+  printPlates = true;
   const now = document.documentElement.getAttribute('data-theme');
-  if (now === 'light' || now === 'sepia') return;
-  themeBeforePrint = now;
-  document.documentElement.setAttribute('data-theme', 'light');
+  if (now !== 'light' && now !== 'sepia') {
+    themeBeforePrint = now;
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
   renderViews();                            /* charts re-read the CSS variables */
 }
 function afterPrint() {
-  if (!themeBeforePrint) return;
-  document.documentElement.setAttribute('data-theme', themeBeforePrint);
+  if (!printPlates && !themeBeforePrint) return;
+  printPlates = false;
+  if (themeBeforePrint) document.documentElement.setAttribute('data-theme', themeBeforePrint);
   themeBeforePrint = null;
   renderViews();
 }

@@ -185,12 +185,12 @@ you. See *Aged Share of WIP* below. There being exactly four in the
 headline row, they go four-across on a wide window and pair into a 2x2 on a narrower one — never
 three and a stray fourth; the group rows vary in count and are laid out by `auto-fit` instead.
 
-A tile is drawn on **the same surface as a chart card and a table** — one ground for everything
-on the page, with a border and a left edge to lift it off the background, exactly as a card has.
-It used to sit a shade apart, which in Sepia read as a tan band above cream charts and sorted the
-dashboard into two tones that meant nothing. That edge went from 4px to **6px** in the same
-change, and for the same reason: the tile used to be told apart by its fill, and now it is told
-apart by the edge, so the edge has to be able to carry it.
+**Every tile row is a card, and every tile is a shaded box inside it** — the same shade as a
+table's box and a chart's plot area, so a tile, a table and a chart read as one family of boxes
+set into their cards in all four themes. (Until 2026-10-31 the tiles sat straight on the page in
+the cards' own colour, because a row of shaded tiles on the bare page read in Sepia as a tan
+band above cream charts; inside a card they read as part of it.) The left edge is **6px** and
+carries a graded tile's colour.
 
 ### Typing Items In by Hand
 
@@ -340,18 +340,19 @@ This app shares its look and behaviour with
 sticky header, button tabs (with arrow-key navigation), summary tiles, ⓘ help dialogs,
 read-only share links, theme picker and footer. **Each app's footer carries a button link to
 the other**, at the right-hand end of the row that holds the **Privacy policy** and **How it
-works** links. If a chrome rule changes in one app, it should change in the other too — with two
-noted exceptions. **How many tile columns there are**: this app's headline row always has exactly
+works** links. If a chrome rule changes in one app, it should change in the other too — with one
+noted exception. **How many tile columns there are**: this app's headline row always has exactly
 four tiles and so states its column counts outright, while the sibling's tile groups vary in
-size and are still laid out by `auto-fit` — as this app's own per-group tile rows are. And **what
-a tile is drawn on**: this app puts tiles on the same surface as its cards (see above), where the
-sibling keeps them a shade apart so that its one *hero* tile can stand out from the rest by being
-the card surface. It has a tile this app does not; the difference follows from that.
+size and are still laid out by `auto-fit` — as this app's own per-group tile rows are. Tiles are
+shaded boxes inside a card in both apps now (the sibling's sit inside its view cards; here each
+tile row is its own card).
 
-**Every table sits in a shaded box inside its card** — All Teams, Time in Stage, Feature Progress,
-the forecast figures and schedule, and Loaded Data — with a lighter heading band, so a table reads
-as one thing set into the card in all four themes. Both apps do this; the only difference is
-where the box is drawn (here on the table's scroll box, there on the table itself).
+**Every table and every chart sits in a shaded box inside its card** — All Teams, Time in Stage,
+Feature Progress, the forecast figures and schedule, and Loaded Data, and the plot area of every
+chart (full screen too) — the same shade as the tiles, with a lighter heading band on a table, so
+a tile, a table and a chart read as one thing set into the card in all four themes. Printed, the
+boxes drop away and the charts sit on the paper. Both apps do this; the only difference is where
+a table's box is drawn (here on the table's scroll box, there on the table itself).
 
 ## Sprint Cadence: Grouping on Your Own Boundaries
 

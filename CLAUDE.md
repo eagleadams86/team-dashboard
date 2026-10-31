@@ -3195,6 +3195,14 @@ then one, reading as an afterthought rather than as the fifth answer.
 
 ## One Surface for the Whole Page (2026-08-21) — a divergence from the sibling
 
+> **SUPERSEDED 2026-10-31 (theme pack rule 21; Charles approved the mock-up that day).** The tile
+> ROWS are cards now (`.tiles`: `--surface`, `--border`, `--radius`, 18px) and the tiles inside
+> them are wells (`--surface-alt`). The Sepia complaint below is still answered — the tan band
+> was tiles sitting straight on the page; inside a card they read as part of it, which is what
+> this decision wanted. The 6px edge stays (it is also a graded tile's RAG mark), and the
+> `.tile-help:hover` fill moved again, to `--border-strong` — see "The Content Well" below. The
+> test now pins row = card and tile = well. Kept for the history; don't act on the bullets.
+
 `.tile` moved from `--surface-alt` to `--surface`, the ground the chart cards and the tables are
 already on. Reported by Charles looking at Sepia, where the two are a tan and a cream and the four
 headline tiles read as a band of something else sitting above the charts rather than as the
@@ -5321,9 +5329,42 @@ cannot clip it — this app's page tables never had ring room. **The tiles are N
 they sit on the page, not in a card, and keep `--surface` (One Surface, above) — so unlike the
 pack's other apps, a tile and a well are different colours in this app, and that is consistent
 with rule 21's "a box of content set inside a card". **Left bare:** every table in a `<dialog>`
-(Teams, ARTs, Stages, the work-type filters). No chart is a well. **Mirrored in Sprint
+(Teams, ARTs, Stages, the work-type filters). **Mirrored in Sprint
 Predictability with one difference**: there the TABLE is the well, because its `.tablewrap`'s
 4px padding / -4px margin is pinned ring room and the keyboard reveal's edge. Pinned by "the
 content well" group in `tests.html` (every card table, in four themes — an empty one gets a
 planted heading and rows for the check, and a Loaded Data box is planted if none is drawn).
 
+**Charts and tiles became wells the same day (2026-10-31, rule 21's "charts are wells too").**
+- **Every chart's plot area is a well**: `.chart-wrap` — all 18 in the markup (Flow: cycle time,
+  scatter, lead time, feature size; Delivery: throughput, net flow, CFD; Health: WIP, aged share,
+  aged work, item age; Mix: defect rate/source/found, work kind; Forecast: when, how many; All
+  Teams: the train throughput) — is `--surface-alt`, `--border`, `--radius-sm`, 10px padding,
+  **`box-sizing: content-box`** so the 300px stays the PLOT's (Chart.js measures the content box;
+  the global `* { border-box }` would have taken 22px out of every chart). The ⤢ view moves the
+  same card, so it keeps the well. No chart sits in a `<dialog>`. Same CSS as Sprint
+  Predictability's `.chartbox`.
+- **Painted plates read `plateFill()`**, never `token('--surface')`: the reference-line chips
+  (`refLabels` — "85% took under 23", "target 10", the aged-share band labels). `plateFill()` is
+  `--surface-alt` on screen and **`--surface` while printing** (`printPlates`), because the well is
+  a background and does not print while the canvas does. So `beforePrint()` now REDRAWS in Light
+  and Sepia too (they still keep their palette); `afterPrint()` redraws back. `tint()` still mixes
+  toward `--surface` — that is pack rule 3's bar fill, not a plate; on the well it is a hair off
+  the old mix and nothing shows as a patch.
+- **The Scorecard's Distribution pie is a well** (`.sc-pie`, content-box, 6px padding), and its
+  wedge borders and figure chips read `--surface-alt`; the print block puts both back on
+  `--surface` (SVG fills print, the box does not).
+- **Tile rows are cards, tiles are wells** (One Surface, above, is superseded). `.tiles:empty` is
+  hidden so a row with no tiles is not an empty frame. **The container-query thresholds grew by
+  38px** (2 × (18px padding + 1px rule)): 450 / 662 / 874 / 1086 / 1298 / 1510 / 1722 — the
+  queries measure the PANEL, and the padding comes out of the tiles' width. "The tile rows" test
+  reads the row's padding and rule back out and adds them to every threshold check.
+- **`.tile-help:hover` is `--border-strong`**, not the family's `--surface-alt`, which is no fill on
+  a well-coloured tile. ≥1.50:1 on surfaceAlt and 1.77 on surface in all four themes, "i" at ≥6.7:1
+  on it. **A divergence from the family dot block** — every app whose tiles are wells (Sprint
+  Predictability's always were; Wine Cellar's since 2026-10-31) has the same invisible hover.
+- Pinned by "one page, one surface" (row = card, tile = well, 4 themes), "the content well: every
+  chart's plot area…" (all 18 plot areas = tile fill in 4 themes, 1px rule, content-box 300px,
+  `plateFill()` = well on screen / `--surface` on paper in Sepia, the chips' source, the pie's
+  rules and print rules) and two checks in the ⤢ group (the chart up there keeps its well).
+  Proven red with the `.chart-wrap` fill removed (10 failures). EXPECTED 4495 → 4542.

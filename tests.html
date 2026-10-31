@@ -409,8 +409,10 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    The three work fields (2026-09-15) brought it to 4163, typing them in on an
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
-   Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4495;
+   Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254.
+   The plot areas as wells, the tile rows as cards (2026-10-31, theme pack rule
+   21) took it from 4495 to 4542. */
+const EXPECTED = 4542;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -6831,10 +6833,11 @@ const stripComments = (src) => {
   ok(/\.tile-help::after \{ content: ''; position: absolute; inset: -5px; \}/.test(APP_SRC),
      "a true 24px tap target: -5px, because `inset` grows from the PADDING box "
        + "and the 1px border made -4px a 22px target");
-  ok(/\.tile-help:hover \{ background: var\(--surface-alt\); border-color: var\(--text-secondary\);/
+  ok(/\.tile-help:hover \{ background: var\(--border-strong\); border-color: var\(--text-secondary\);/
      .test(APP_SRC),
      'and the hover fills rather than borrowing --focus-border, which would say '
-     + '"focused" to anybody reading the two states side by side');
+     + '"focused" to anybody reading the two states side by side — in --border-strong '
+     + 'since the tiles became wells (2026-10-31): --surface-alt would be no fill on a tile');
   {
     const dots = stripComments(APP_SRC).match(/<button[^>]*class="tile-help"[\s\S]*?<\/button>/g) || [];
     ok(/helpBtn\(key, label\)[\s\S]{0,240}>i<\/button>/.test(APP_SRC),
@@ -6856,6 +6859,11 @@ const stripComments = (src) => {
     const gp = CSS.match(/\.tiles \{ display: grid; gap: (\d+)px/);
     ok(fl && gp, 'the auto-fit fallback still states a smallest tile, and .tiles a gap');
     const MIN = fl ? +fl[1] : 0, GAP = gp ? +gp[1] : 0;
+    /* The row is a card since 2026-10-31: its padding and rule come out of the
+       width the container query measures, so they count against every threshold. */
+    const ins = CSS.match(/\.tiles \{ background: var\(--surface\); border: (\d+)px solid var\(--border\);\s*border-radius: var\(--radius\); padding: (\d+)px; \}/);
+    ok(!!ins, 'the tile row states its own rule and padding, as a card');
+    const INSET = ins ? 2 * (+ins[1] + +ins[2]) : 0;
     const blocks = [...CSS.matchAll(/@container tiles \(min-width: (\d+)px\) \{([\s\S]*?)\n\}/g)];
     ok(blocks.length >= 5, 'the container queries are there — ' + blocks.length + ' of them');
     const st = {};
@@ -6880,9 +6888,9 @@ const stripComments = (src) => {
         const n = +key, s = st[n], c = s.tracks / s.full;
         ok(Number.isInteger(c) && c >= 1,
            n + ' tiles: ' + s.tracks + ' tracks do not divide by a span of ' + s.full);
-        ok(c * MIN + (c - 1) * GAP <= at,
-           c + ' columns need ' + (c * MIN + (c - 1) * GAP) + 'px of tiles and gaps, and the '
-           + 'query lets them in at ' + at + 'px');
+        ok(c * MIN + (c - 1) * GAP + INSET <= at,
+           c + ' columns need ' + (c * MIN + (c - 1) * GAP + INSET) + 'px of tiles, gaps and the '
+           + 'row\u2019s own padding, and the query lets them in at ' + at + 'px');
         ok(n >= c, n + ' tiles can never fill ' + c + ' columns');
         ok(c === 1 || n % c !== 1,
            n + ' tiles across ' + c + ' columns leaves one tile alone on the last row');
@@ -15312,7 +15320,7 @@ group('a delete looks like a delete, everywhere');
   }
 
   /* ────────────────────────────────────────────────────────── */
-  group('one page, one surface — in all four themes');
+  group('one page, one surface — in all four themes (a tile row is a card, a tile a well)');
 
   /* Reported by Charles on 2026-08-21, looking at Sepia: the four headline tiles
      were a tan band sitting above cream charts. A tile and a chart card are the
@@ -15322,20 +15330,36 @@ group('a delete looks like a delete, everywhere');
      Pinned across every theme rather than on one, because the tokens are the
      shared theme pack's and a palette edit lands in all four at once. And pinned
      as "the same as each other" rather than as any particular colour: naming a
-     hex here would be this repo asserting a value the pack owns. */
+     hex here would be this repo asserting a value the pack owns.
+
+     SUPERSEDED IN SHAPE ON 2026-10-31 (theme pack rule 21, mock-up approved by
+     Charles): the tile ROW is now a card and the tiles inside it are wells. The
+     row is the same ground as a chart card and a card; a tile is the same fill
+     as a table's well and a chart's plot area. The Sepia complaint stays
+     answered — the tiles sit INSIDE a card, so they read as part of it. */
   {
     const tDoc = win.document, themeSel = tDoc.getElementById('themeSel');
     const was = themeSel.value;
     const bg = (sel) => win.getComputedStyle(tDoc.querySelector(sel)).backgroundColor;
+    const probe = tDoc.createElement('div'); tDoc.body.appendChild(probe);
+    const tok = (name) => { probe.style.background = 'var(' + name + ')'; return win.getComputedStyle(probe).backgroundColor; };
+    const plainTile = [...tDoc.querySelectorAll('.tile')].find(t => !/\b(green|yellow|red)\b/.test(t.className));
+    ok(!!plainTile, 'there is an ungraded tile to read the fill from');
     ['midnight', 'dark', 'light', 'sepia'].forEach(theme => {
       themeSel.value = theme;
       themeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
-      is(bg('.tile'), bg('.chart-card'), theme + ': a tile is on the same ground as a chart card');
-      is(bg('.tile'), bg('.card'), theme + ': and as the cards the tables sit in');
-      /* What tells any of them from the page is the border, not a second fill —
+      is(bg('.tiles'), bg('.chart-card'), theme + ': a tile ROW is on the same ground as a chart card');
+      is(bg('.tiles'), bg('.card'), theme + ': and as the cards the tables sit in');
+      ok(parseFloat(win.getComputedStyle(tDoc.querySelector('.tiles')).borderTopWidth) === 1,
+         theme + ': and is edged like one');
+      is(win.getComputedStyle(plainTile).backgroundColor, tok('--surface-alt'),
+         theme + ': a tile is a well — --surface-alt, the fill of a table\u2019s box and a chart\u2019s plot');
+      ok(win.getComputedStyle(plainTile).backgroundColor !== bg('.tiles'),
+         theme + ': so it stands apart from the card row around it');
+      /* What tells the row from the page is the border, not a second fill —
          so the one difference that has to survive is this one. */
-      ok(bg('.tile') !== win.getComputedStyle(tDoc.body).backgroundColor,
-         theme + ': and still stands off the page behind it', bg('.tile'));
+      ok(bg('.tiles') !== win.getComputedStyle(tDoc.body).backgroundColor,
+         theme + ': and the row still stands off the page behind it', bg('.tiles'));
       /* And the left edge is the mark, so it has to outweigh the other three.
          Pinned as a RELATIONSHIP rather than at 6px: the number is a judgement
          and may be tuned again, but an edge that stops being heavier than the
@@ -15345,6 +15369,7 @@ group('a delete looks like a delete, everywhere');
          theme + ': with a left edge that reads as a mark, not as a heavy border',
          edge.borderLeftWidth + ' against ' + edge.borderTopWidth);
     });
+    probe.remove();
     themeSel.value = was;
     themeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
   }
@@ -15423,6 +15448,82 @@ group('a delete looks like a delete, everywhere');
     ok(rules.some(r => r.selectorText && /table-cap/.test(r.selectorText) && /tbody tr:hover/.test(r.selectorText)
          && /var\(--surface\)/.test(r.style.background)),
        'a hovered row inside a well is --surface');
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the content well: every chart\u2019s plot area is one fill with the tiles, in all four themes');
+
+  /* Theme pack rule 21, "charts are wells too" (2026-10-31). Every chart's
+     plot area — the `.chart-wrap` its canvas sits in, on every tab — is a
+     ruled --surface-alt box, the same fill as a tile and a table's well. Read
+     off the markup, so a chart on a tab the sample never reaches is checked
+     too. The box is added OUTSIDE the plot (content-box), so the 300px stays
+     the chart's. And the one thing the chart code paints in a ground colour —
+     the reference-line chips — reads plateFill(), which must resolve to the
+     well's fill on screen and back to --surface on paper. Relationships only,
+     never a hex: the colours are the pack's. */
+  {
+    const tDoc = win.document, el = tDoc.documentElement, was = el.getAttribute('data-theme');
+    const wraps = [...tDoc.querySelectorAll('.chart-wrap')];
+    ok(wraps.length >= 18, 'every chart in the markup is found — ' + wraps.length + ' plot areas');
+    is(tDoc.querySelectorAll('dialog .chart-wrap').length, 0, 'none of them sits in a window');
+    const probe = tDoc.createElement('div'); tDoc.body.appendChild(probe);
+    const tok = (name) => { probe.style.background = 'var(' + name + ')'; return win.getComputedStyle(probe).backgroundColor; };
+    const asRgb = (c) => { probe.style.background = c; return win.getComputedStyle(probe).backgroundColor; };
+    const bg = (e) => win.getComputedStyle(e).backgroundColor;
+    const plainTile = [...tDoc.querySelectorAll('.tile')].find(t => !/\b(green|yellow|red)\b/.test(t.className));
+    try {
+      ['midnight', 'dark', 'light', 'sepia'].forEach(theme => {
+        el.setAttribute('data-theme', theme);
+        const alt = tok('--surface-alt'), surf = tok('--surface');
+        is(wraps.map(bg).filter(c => c !== alt).length, 0,
+           theme + ': every plot area is --surface-alt — ' + [...new Set(wraps.map(bg))].join(' / '));
+        ok(!!plainTile && bg(plainTile) === wraps.map(bg)[0],
+           theme + ': the same fill as a tile', plainTile && bg(plainTile));
+        ok(wraps.every(w => bg(w.closest('.chart-card')) === surf),
+           theme + ': and the card around it keeps --surface, so the box shows');
+        ok(wraps.every(w => parseFloat(win.getComputedStyle(w).borderTopWidth) === 1
+             && parseFloat(win.getComputedStyle(w).paddingTop) > 0),
+           theme + ': every plot area is edged in a 1px rule, padded off its labels');
+        is(asRgb(win.plateFill()), alt,
+           theme + ': a chip painted on the plot (plateFill) is the well’s own fill, never a card-coloured patch');
+      });
+      const cs = win.getComputedStyle(wraps[0]);
+      is(cs.boxSizing, 'content-box', 'the box is drawn outside the plot (content-box) ...');
+      is(cs.height, '300px', '... so the plot keeps its full 300px');
+      /* Paper: the well is a background and does not print, so the chips go
+         back to the paper-pale --surface for the length of a print — in Sepia
+         and Light too, which keep their palette. */
+      const themeSel = tDoc.getElementById('themeSel'), selWas = themeSel.value;
+      themeSel.value = 'sepia'; themeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+      win.dispatchEvent(new win.Event('beforeprint'));
+      is(asRgb(win.plateFill()), tok('--surface'), 'on paper the chips go back to --surface');
+      is(el.getAttribute('data-theme'), 'sepia', 'and Sepia still keeps its own palette for print');
+      win.dispatchEvent(new win.Event('afterprint'));
+      is(asRgb(win.plateFill()), tok('--surface-alt'), 'and come back to the well’s fill afterwards');
+      themeSel.value = selWas; themeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    } finally {
+      el.setAttribute('data-theme', was || 'auto');
+      probe.remove();
+    }
+    /* The chips read plateFill(), never the card colour; and the Scorecard's
+       pie is a well too, with its wedge borders and chips on the well's fill
+       (and back on --surface in the print block). Read off the rules. */
+    const src = [...tDoc.scripts].map(x => x.textContent).join('\n');
+    const ref = src.slice(src.indexOf('const refLabels = {'), src.indexOf('Chart.register(refLabels)'));
+    ok(ref.length > 0 && /plateFill\(\)/.test(ref) && !/token\('--surface'\)/.test(ref),
+       'the reference-line chips are painted in plateFill(), not --surface');
+    const rules = [], media = [];
+    for (const sh of tDoc.styleSheets) { try { for (const r of sh.cssRules) { rules.push(r); if (r.media && /print/.test(r.media.mediaText)) media.push(...r.cssRules); } } catch (e) { /* none cross-origin */ } }
+    const rule = (list, sel) => list.find(r => r.selectorText === sel);
+    const pie = rule(rules, '.sc-pie'), chip = rule(rules, '.sc-pie-chip'), edge = rule(rules, '.sc-pie path, .sc-pie circle');
+    ok(pie && /var\(--surface-alt\)/.test(pie.style.background) && pie.style.boxSizing === 'content-box',
+       'the Scorecard pie sits in a --surface-alt well, drawn outside its 120px');
+    ok(chip && /var\(--surface-alt\)/.test(chip.style.fill) && edge && /var\(--surface-alt\)/.test(edge.style.stroke),
+       'and its chips and wedge borders are the well’s fill, not the card’s');
+    const pChip = rule(media, '.sc-pie-chip'), pEdge = rule(media, '.sc-pie path, .sc-pie circle');
+    ok(pChip && /var\(--surface\)/.test(pChip.style.fill) && pEdge && /var\(--surface\)/.test(pEdge.style.stroke),
+       'and on paper, where the well does not print, they go back to --surface');
   }
 
   /* ────────────────────────────────────────────────────────── */
@@ -17311,6 +17412,19 @@ group('a card with no chart matches the one beside it');
      'and it still owns the canvas that is now on screen');
   ok(overlay.classList.contains('open'), 'the overlay is showing');
   ok(mDoc.querySelector('.shell').inert, 'the page underneath is out of the tab order');
+  {
+    /* Rule 21: the full-screen view is the same chart with the same chips, so
+       it keeps the well — the dialog exemption is for tables in windows. */
+    const el = mDoc.documentElement, was = el.getAttribute('data-theme');
+    const probe = mDoc.createElement('div'); mDoc.body.appendChild(probe);
+    probe.style.background = 'var(--surface-alt)';
+    ['midnight', 'sepia'].forEach(t => {
+      el.setAttribute('data-theme', t);
+      is(win.getComputedStyle(flowCard.querySelector('.chart-wrap')).backgroundColor,
+         win.getComputedStyle(probe).backgroundColor, t + ': the chart up here keeps its well');
+    });
+    probe.remove(); el.setAttribute('data-theme', was || 'auto');
+  }
   ok(mDoc.body.classList.contains('maxi-open'), 'and it is not scrolling behind the chart');
   is(win.getComputedStyle(mDoc.documentElement).getPropertyValue('--maxi-top').trim(),
      Math.round(mDoc.querySelector('header').getBoundingClientRect().height) + 'px',
