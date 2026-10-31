@@ -410,7 +410,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    item to 4173, a support team's incidents switch to 4194, the Work Mix
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254. */
-const EXPECTED = 4466;
+const EXPECTED = 4495;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -15347,6 +15347,82 @@ group('a delete looks like a delete, everywhere');
     });
     themeSel.value = was;
     themeSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('the content well: every table on a card is one fill, in all four themes');
+
+  /* Theme pack rule 21 (2026-10-31). Every table set on a card or chart card,
+     on every tab — All Teams, Health's Time in Stage and Feature Progress,
+     Forecast's figures and schedule, Your Data's Loaded Data — sits in a ruled
+     --surface-alt box; heading band and a selected row are --surface. The five
+     card tables are markup, so they are checked whether or not the sample
+     reaches them; any that is empty right now gets a planted heading and two
+     rows (a selected one, then a last one) for the length of the check and is
+     put back after. Loaded Data is drawn by the script, so a box of the same
+     shape is planted if none is on the page. Pinned as RELATIONSHIPS, never a
+     hex: the colours are the pack's. */
+  {
+    const tDoc = win.document, el = tDoc.documentElement, was = el.getAttribute('data-theme');
+    const WELL = ':is(.card, .chart-card) > .table-scroll, .table-cap';
+    const ids = ['allTeamsTable', 'stageTimeTable', 'featureProgressTable', 'forecastFiguresTable', 'scheduleTable'];
+    const kept = [];
+    const plant = (tbl) => {
+      kept.push([tbl, tbl.innerHTML]);
+      tbl.innerHTML = '<thead><tr><th>A</th><th>B</th></tr></thead><tbody>'
+        + '<tr class="is-current"><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></tbody>';
+    };
+    const tables = ids.map(id => tDoc.getElementById(id));
+    ok(tables.every(Boolean), 'all five card tables are in the markup', ids.filter((id, i) => !tables[i]).join(','));
+    tables.filter(Boolean).forEach(t => { if (!t.querySelector('thead th') || !t.querySelector('tbody tr')) plant(t); });
+    let cap = tDoc.querySelector('.table-cap'), scratch = null;
+    if (!cap) {
+      scratch = tDoc.createElement('div');
+      scratch.innerHTML = '<div class="table-cap"><div class="table-scroll"><table class="data"></table></div></div>';
+      tDoc.getElementById('dataTable').appendChild(scratch);
+      cap = scratch.firstChild; plant(cap.querySelector('table'));
+    }
+    const wells = [...tables.filter(Boolean).map(t => t.parentElement), cap];
+    ok(wells.every(w => w.matches(WELL)), 'each table’s box is a well',
+       wells.filter(w => !w.matches(WELL)).map(w => w.className).join(','));
+    is(cap.querySelector('.table-scroll').matches(WELL), false,
+       'the Loaded Data box is ONE well, not a well inside a well');
+    const dialogWells = [...tDoc.querySelectorAll('dialog .table-scroll, dialog .table-cap')].filter(w => w.matches(WELL));
+    is(dialogWells.length, 0, 'a table inside a window stays bare');
+    const probe = tDoc.createElement('div'); tDoc.body.appendChild(probe);
+    const tok = (name) => { probe.style.background = 'var(' + name + ')'; return win.getComputedStyle(probe).backgroundColor; };
+    const bg = (e) => win.getComputedStyle(e).backgroundColor;
+    try {
+      ['midnight', 'dark', 'light', 'sepia'].forEach(theme => {
+        el.setAttribute('data-theme', theme);
+        const alt = tok('--surface-alt'), surf = tok('--surface');
+        ok(alt !== surf, theme + ': --surface-alt and --surface differ, so the test can tell them apart');
+        is(wells.map(bg).filter(c => c !== alt).length, 0,
+           theme + ': every well is --surface-alt — ' + wells.map(bg).join(' / '));
+        is(wells.map(w => bg(w.querySelector('thead th'))).filter(c => c !== surf).length, 0,
+           theme + ': every heading band is --surface, standing apart from its well');
+        const cur = wells.map(w => w.querySelector('tr.is-current td')).filter(Boolean);
+        ok(cur.length > 0 && cur.every(td => bg(td) === surf),
+           theme + ': a selected row is --surface, never the well colour', cur.map(bg).join(' / '));
+        const last = wells.map(w => w.querySelector('tbody tr:last-child td'));
+        is(last.filter(td => parseFloat(win.getComputedStyle(td).borderBottomWidth) !== 0).length, 0,
+           theme + ': the last row drops its rule, the well’s own edge closes the box');
+        ok(wells.every(w => parseFloat(win.getComputedStyle(w).borderTopWidth) === 1),
+           theme + ': every well is edged in a 1px rule');
+      });
+    } finally {
+      el.setAttribute('data-theme', was || 'auto');
+      probe.remove();
+      kept.forEach(([t, h]) => { t.innerHTML = h; });
+      if (scratch) scratch.remove();
+    }
+    /* Hover cannot be computed, so the rule itself is read: inside a well a
+       hovered row is --surface, not the global --surface-alt it would vanish into. */
+    const rules = [];
+    for (const s of tDoc.styleSheets) { try { rules.push(...s.cssRules); } catch (e) { /* cross-origin: none here */ } }
+    ok(rules.some(r => r.selectorText && /table-cap/.test(r.selectorText) && /tbody tr:hover/.test(r.selectorText)
+         && /var\(--surface\)/.test(r.style.background)),
+       'a hovered row inside a well is --surface');
   }
 
   /* ────────────────────────────────────────────────────────── */

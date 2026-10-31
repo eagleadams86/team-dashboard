@@ -348,6 +348,11 @@ a tile is drawn on**: this app puts tiles on the same surface as its cards (see 
 sibling keeps them a shade apart so that its one *hero* tile can stand out from the rest by being
 the card surface. It has a tile this app does not; the difference follows from that.
 
+**Every table sits in a shaded box inside its card** — All Teams, Time in Stage, Feature Progress,
+the forecast figures and schedule, and Loaded Data — with a lighter heading band, so a table reads
+as one thing set into the card in all four themes. Both apps do this; the only difference is
+where the box is drawn (here on the table's scroll box, there on the table itself).
+
 ## Sprint Cadence: Grouping on Your Own Boundaries
 
 Set **Our Sprint Cadence** in Settings — how long a sprint is in **calendar days**, and the date

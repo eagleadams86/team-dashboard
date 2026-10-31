@@ -1769,6 +1769,30 @@ table.data tr.is-current td { background: var(--surface-alt); }
    summary and stays put if the rows above are ever made scrollable. */
 table.data tfoot td { border-top: 2px solid var(--border-strong); border-bottom: 0;
   font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* ── THE CONTENT WELL (theme pack rule 21, 2026-10-31) ───────────────────────
+   Every table set on a card sits in a ruled box filled with --surface-alt, the
+   fill the tab, button and chip faces already wear, so every box of content
+   inside a card is one colour in every theme. Never --bg and never a bare
+   --surface: the pack's surfaces climb bg < surface < surfaceAlt in Midnight
+   and Dark but sit surfaceAlt ≈ bg < surface in Light and Sepia, so either one
+   matches in one pair of themes and is the odd one out in the other. Inside a
+   well the heading band, row hover and a selected row are --surface — the old
+   hover colour IS the well now — so in the dark themes a hovered row goes a
+   shade darker. Never --accent-bg behind these rows: muted text on it is
+   3.43:1 in Dark. Nothing new to gate: the pack holds every text and status
+   colour at 4.5:1 on surfaceAlt. No shadow (rule 14). A sort button fills its
+   cell, so inside the box its focus ring is drawn inset, where the well's edge
+   cannot clip it. A table inside a window (<dialog>) stays bare.
+   Here: the tables on a card or chart card, and the Loaded Data box
+   (`.table-cap`, already ruled; its inner scroller is not a second well). The
+   tiles are NOT wells in this app — they sit on the page, not in a card, and
+   share the cards' --surface (see "one page, one surface"). */
+:is(:is(.card, .chart-card) > .table-scroll, .table-cap) {
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-alt); }
+:is(:is(.card, .chart-card) > .table-scroll, .table-cap) thead th { background: var(--surface); }
+:is(:is(.card, .chart-card) > .table-scroll, .table-cap) :is(tbody tr:hover > *, tr.is-current td) { background: var(--surface); }
+:is(:is(.card, .chart-card) > .table-scroll, .table-cap) tbody tr:last-child :is(th, td) { border-bottom: 0; }
+:is(:is(.card, .chart-card) > .table-scroll, .table-cap) th.sortable button:not(.tile-help):focus-visible { outline-offset: -2px; }
 /* A team name opens that team's dashboard, so it is a button. Styled as a link
    rather than as a control: a row of eight buttons would read as eight things
    to press, where what is wanted is eight names one of which happens to be

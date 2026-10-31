@@ -5307,3 +5307,23 @@ EXPECTED 4325 → 4371 over the eight commits.
   (Settings open → closed, focus on Reload, a late toast refused).
 - **Theme pack rule 19 (forced colours) is taken** — `theme.css` copied from the pack; no app-level
   `forced-colors` block, and the pack's `check_consumers.py` flags one that restyles selected states.
+
+## The Content Well (2026-10-31) — theme pack rule 21, no schema change
+
+Every table on a card is a ruled `--surface-alt` box (`--border`, `--radius-sm`); inside it the
+heading band, row hover and the `is-current` row are `--surface`, and the last row drops its rule.
+One `:is(:is(.card, .chart-card) > .table-scroll, .table-cap)` selector names the wells: All Teams,
+Time in Stage, Feature Progress, Forecast figures, the feature schedule, and Loaded Data's
+`.table-cap` (its inner `.table-scroll` is deliberately NOT a second well). Hover is written on the
+cells (`tbody tr:hover > *`) so it out-ranks the global `tbody tr:hover` without fighting it.
+A sort button's focus ring is inset inside a well (`outline-offset: -2px`), where the box's edge
+cannot clip it — this app's page tables never had ring room. **The tiles are NOT wells here**:
+they sit on the page, not in a card, and keep `--surface` (One Surface, above) — so unlike the
+pack's other apps, a tile and a well are different colours in this app, and that is consistent
+with rule 21's "a box of content set inside a card". **Left bare:** every table in a `<dialog>`
+(Teams, ARTs, Stages, the work-type filters). No chart is a well. **Mirrored in Sprint
+Predictability with one difference**: there the TABLE is the well, because its `.tablewrap`'s
+4px padding / -4px margin is pinned ring room and the keyboard reveal's edge. Pinned by "the
+content well" group in `tests.html` (every card table, in four themes — an empty one gets a
+planted heading and rows for the check, and a Loaded Data box is planted if none is drawn).
+
