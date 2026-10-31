@@ -627,7 +627,7 @@ select, textarea,
 input[type="text"], input[type="number"], input[type="date"], input[type="month"],
 input[type="search"], input[type="tel"], input[type="url"], input[type="email"],
 input[type="password"] {
-  background: var(--surface); color: var(--text-primary);
+  background: var(--surface-alt); color: var(--text-primary);
   border: 1px solid var(--input-border); border-radius: var(--radius-sm);
   padding: 7px 9px; width: 100%;
   /* MIN-HEIGHT, and it is not cosmetic. An `<input type="date">` with NO VALUE
@@ -2127,7 +2127,7 @@ table.filters th.act, table.filters td.act { text-align: right; }
    this dims a field without inventing a value the theme pack has never seen.
    Written against the ATTRIBUTE rather than against this one table, because the
    share-link box is read-only for the same reason and had the same problem. */
-input[readonly] { background: var(--surface-alt); color: var(--text-muted); }
+input[readonly] { background: var(--surface); color: var(--text-muted); }
 /* The cursor is NOT on the rule above, and the share-link box is why: it is
    read-only too, and clicking into it to select the link is the entire point of
    it. `not-allowed` belongs only where there is nothing to do with the text
@@ -2349,7 +2349,7 @@ dialog { background: var(--surface); color: var(--text-primary);
    field over a full-width list reads as two columns that do not line up. */
 #searchBox { width: 100%; max-width: 100%; box-sizing: border-box; margin-top: 4px;
   padding: 7px 9px; font-family: inherit; font-size: var(--fs-base);
-  color: var(--text-primary); background: var(--surface);
+  color: var(--text-primary); background: var(--surface-alt);
   border: 1px solid var(--input-border); border-radius: var(--radius-sm); }
 /* No ::placeholder rule here, on purpose: the grey hint in an empty box is theme pack
    rule 16 (`--text-hint`, opacity 1, 2026-09-05) and arrives with theme.css. A local copy
