@@ -5368,3 +5368,26 @@ planted heading and rows for the check, and a Loaded Data box is planted if none
   `plateFill()` = well on screen / `--surface` on paper in Sepia, the chips' source, the pie's
   rules and print rules) and two checks in the ⤢ group (the chart up there keeps its well).
   Proven red with the `.chart-wrap` fill removed (10 failures). EXPECTED 4495 → 4542.
+
+## Every Card Folds (2026-11-03) — no schema change
+
+Charles asked Sprint Predictability for "all of the sections collapsable like wine cellar and
+money map", then for the same here. Same look as Sprint Predictability's (band, ▶ by CSS
+`::before`, `--bg-card-alt` / `--accent-bg`), built differently because this page's cards are
+REAL MARKUP:
+- **`wireBoxes()` runs ONCE at boot**, just above the BOOT section's share-link branch, not after
+  every render. It MOVES each heading — a `.card`'s first-child `h2` or `.row` holding one, a
+  `.chart-card`'s `.chart-name` — into a new `.boxhead` band with a chevron-only `.box-toggle`
+  before it. **The toggle holds no words**, because `.chart-name`'s innerHTML is rewritten on every
+  render (the reason `.chart-max` lives in the card's corner): a title inside the button would be
+  thrown away. `nameFoldToggles()` names it ("Fold Cycle Time", from the heading minus its
+  buttons and `.hint`) and is called from `syncMaxiButtons()`, which every drawing render reaches.
+- A folded card hides every child past the band (`@media screen`, so it prints open), and
+  `.chart-card.boxshut` takes `align-self: start` — the grid's stretch would otherwise leave a
+  tall empty box beside its neighbour. `maxiReady()` refuses a folded card.
+- **Per device**: `td-folded`, a `|`-joined list beside `td-pin`, shape-checked by `cleanFolds()`;
+  never in `state`, a backup or a share link; listed in `privacy.html`. A card's key is its id,
+  else its heading's id, else `<panel>-<heading words>`. Stored SHUT, so a new card opens.
+- Skipped: `.empty`, `.welcome`, the Scorecard's `.sc-card`s (figures, built per render).
+- Pinned in tests.html (`2026-11-03: every card with a heading folds…`).
+

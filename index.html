@@ -1516,6 +1516,42 @@ select { cursor: pointer; }
    so there the margin would only be dead space. */
 .tile .label .tile-help { margin-left: 0; }
 
+/* ── Folding a card (2026-11-03) ─────────────────────────────────────────────
+   Every card with a heading folds up to it — Sprint Predictability's block,
+   asked for the same day ("like wine cellar and money map"). wireBoxes() wraps
+   the heading (a card's h2 or its `.row` holding one; a chart card's
+   `.chart-name`) in a `.boxhead` BAND with a chevron button in front of it, and a
+   folded card hides every child past the band. The heading ELEMENT is moved into
+   the band, never rebuilt, so the renders that rewrite a `.chart-name`'s
+   innerHTML on every redraw still find it by id. The band is pulled out to the
+   card's edges with negative margins (both cards pad by 18px). No new colour:
+   --bg-card-alt is the pack's, and the hover is the pack's --accent on
+   --accent-bg, with an underline because in Dark and Sepia those two barely
+   differ from the text. Open or shut is the chevron's ANGLE, never a hue. */
+:is(.card, .chart-card) > .boxhead {
+  display: flex; align-items: center; gap: 8px;
+  margin: -18px -18px 12px; padding: 12px 18px;
+  background: var(--bg-card-alt); border-bottom: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+  transition: background-color .12s ease; }
+.boxhead > :not(.box-toggle) { flex: 1 1 auto; min-width: 0; margin: 0; }
+:is(.card, .chart-card).boxshut > .boxhead { margin-bottom: -18px; border-bottom: 0;
+  border-radius: calc(var(--radius) - 1px); }
+/* Folded, a chart card no longer stands as tall as the chart beside it: the
+   stretch that keeps a row even (see .no-chart) would leave a tall empty box. */
+.chart-card.boxshut { align-self: start; }
+@media screen { :is(.card, .chart-card).boxshut > :not(.boxhead) { display: none !important; } }
+.box-toggle { flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; min-height: 0; margin: 0; padding: 0; border: 0;
+  background: none; color: var(--text-secondary); cursor: pointer; border-radius: var(--radius-sm); }
+.box-toggle:focus-visible { outline: 2px solid var(--focus-border); outline-offset: 2px; }
+:is(.card, .chart-card) > .boxhead:hover { background: var(--accent-bg); }
+:is(.card, .chart-card) > .boxhead:hover :is(h2, .chart-name > span:first-child) { text-decoration: underline; }
+:is(.card, .chart-card) > .boxhead:hover :is(.box-toggle, h2) { color: var(--accent); }
+.chev { font-size: var(--fs-xs); line-height: 1; transform: rotate(90deg); transition: transform .15s ease; }
+.chev::before { content: '\25B6'; }
+.boxshut .chev { transform: rotate(0deg); }
 /* chart cards */
 .chart-card { background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 18px; min-width: 0;
@@ -21466,7 +21502,8 @@ function chartIn(card) {
    destroyed because nothing plots. */
 function maxiReady(card) {
   const wrap = card.querySelector('.chart-wrap');
-  return !!wrap && !wrap.hidden && !card.hidden && !!chartIn(card);
+  return !!wrap && !wrap.hidden && !card.hidden && !card.classList.contains('boxshut')
+    && !!chartIn(card);
 }
 
 /* The chart's name, without the ⓘ that shares the line with it. */
@@ -21501,9 +21538,108 @@ function syncMaxiButtons() {
     dressMaxiBtn(card);
   });
   if (maxiCard) $('chartMaxi').setAttribute('aria-label', maxiName(maxiCard) + ', full screen');
+  /* The fold toggles are named from the same headings, which a render rewrites. */
+  nameFoldToggles();
   /* A render can take a chart away from the screen behind, or give it one back,
      so the arrows are re-read with the buttons rather than only on the way up. */
   dressStepBtns();
+}
+
+/* ── Folding a card (2026-11-03) ─────────────────────────────────────────────
+   Charles: "make all of the sections collapsable like wine cellar and money
+   map" — asked of Sprint Predictability, then here. The cards are real markup,
+   so this runs ONCE at boot rather than after every render. Each heading moves
+   into a `.boxhead` band with a chevron button in front of it; a folded card
+   hides everything past the band (CSS), and nothing else in the card moves.
+
+   Left alone: `.empty` states and the welcome card (a folded "No Data Yet"
+   explains nothing), and the scorecard's own small cards, which are figures.
+
+   PER DEVICE — `td-folded`, beside `td-pin`, never in `state`, a backup or a
+   share link, and no schema to bump. Stored SHUT, so a card added later opens.
+   A card's key is its id, else its heading's id, else its panel and its words. */
+const FOLD_STORE = 'td-folded';
+const FOLD_KEY_OK = /^[A-Za-z0-9_-]{1,80}$/;
+function cleanFolds(list) {
+  return [...new Set((Array.isArray(list) ? list : [])
+    .filter(x => typeof x === 'string' && FOLD_KEY_OK.test(x)))].sort();
+}
+function savedFolds() {
+  try { return cleanFolds(String(localStorage.getItem(FOLD_STORE) || '').split('|')); }
+  catch (e) { return []; }
+}
+let foldedBoxes = savedFolds();
+
+function boxHeadOf(card) {
+  if (card.classList.contains('chart-card')) return card.querySelector(':scope > .chart-name');
+  const first = card.firstElementChild;
+  if (!first) return null;
+  if (first.matches('h2')) return first;
+  return first.matches('.row') && first.querySelector(':scope > h2') ? first : null;
+}
+
+function wireBoxes() {
+  for (const card of document.querySelectorAll('main .card, main .chart-card')) {
+    if (card.matches('.empty, .welcome, .sc-card') || card.dataset.boxkey) continue;
+    const head = boxHeadOf(card);
+    if (!head) continue;
+    const h = head.matches('h2, .chart-name') ? head : head.querySelector(':scope > h2');
+    const panel = card.closest('.panel');
+    const words = h.textContent.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-+|-+$/g, '');
+    const key = (card.id || h.id || ((panel ? panel.id : 'box') + '-' + words)).slice(0, 80);
+    if (!FOLD_KEY_OK.test(key)) continue;
+
+    const band = document.createElement('div');
+    band.className = 'boxhead';
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'box-toggle';
+    toggle.innerHTML = '<span class="chev" aria-hidden="true"></span>';
+    card.insertBefore(band, head);
+    band.appendChild(toggle);
+    band.appendChild(head);
+    card.dataset.boxkey = key;
+    const shut = foldedBoxes.includes(key);
+    card.classList.toggle('boxshut', shut);
+    toggle.setAttribute('aria-expanded', shut ? 'false' : 'true');
+    toggle.onclick = () => setBoxShut(card, !card.classList.contains('boxshut'));
+    /* The whole band is the hit area; a press on a control in it (an ⓘ, an
+       export button) is left alone. */
+    band.onclick = (e) => {
+      if (e.target.closest('button, a, input, select, label')) return;
+      setBoxShut(card, !card.classList.contains('boxshut'));
+    };
+  }
+  nameFoldToggles();
+}
+
+/* "Fold Cycle Time" — the heading's words without its ⓘ or an export button,
+   re-read whenever the names are, because a render rewrites them. */
+function nameFoldToggles() {
+  for (const card of document.querySelectorAll('main [data-boxkey]')) {
+    const band = card.querySelector(':scope > .boxhead');
+    const t = band && band.querySelector(':scope > .box-toggle');
+    if (!t) continue;
+    const h = band.querySelector('h2, .chart-name');
+    const words = [...h.childNodes].filter(n => !(n.nodeType === 1 && n.matches('button, a, .hint')))
+      .map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim() || 'this card';
+    t.setAttribute('aria-label', (card.classList.contains('boxshut') ? 'Open ' : 'Fold ') + words);
+  }
+}
+
+function setBoxShut(card, shut) {
+  card.classList.toggle('boxshut', shut);
+  const t = card.querySelector(':scope > .boxhead > .box-toggle');
+  if (t) t.setAttribute('aria-expanded', shut ? 'false' : 'true');
+  const key = card.dataset.boxkey;
+  foldedBoxes = cleanFolds(shut ? foldedBoxes.concat(key) : foldedBoxes.filter(k => k !== key));
+  try { localStorage.setItem(FOLD_STORE, foldedBoxes.join('|')); } catch (e) {}
+  /* No full-screen button on a folded chart, and the labels say open or fold. */
+  syncMaxiButtons();
+  if (shut) return;
+  /* A chart drawn while its card was folded sized itself to nothing. */
+  const ch = chartIn(card);
+  if (ch) ch.resize();
 }
 
 /* The header wraps to two or three rows on a phone, and its height is the one
@@ -27520,6 +27656,10 @@ function loadSample() {
 /* ═══════════════════════════════════════════════════════════════════════════
    10. BOOT
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Before anything renders: the headings move into their bands once, and every
+   render after that writes into the same elements. */
+wireBoxes();
 
 /* Pasting a share link into a tab that already has the app open changes only
    the fragment, which browsers handle without reloading — the page would sit

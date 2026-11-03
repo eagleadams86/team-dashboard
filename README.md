@@ -92,6 +92,14 @@ is bought with vertical space and only you can make that trade; press it again t
 scroll away, and it is remembered for next time. Nothing else moves when you pin — the page is
 exactly the height it was.
 
+**Fold any card away.** Every card and chart with a heading folds up to that heading (since
+2026-11-03, as in Sprint Predictability, Money Map and Wine Cellar). Press the heading bar — or
+Tab to its ▶ and press Enter or Space — and press it again to open the card. The ▶ points right
+when folded and down when open, so the state never rests on colour. Folds are remembered **on this
+device only**, beside the pin, and never travel in your data, a backup or a share link. A folded
+chart has no full-screen button until it is opened, and a folded card prints open. Empty states
+and the welcome card never fold, and nor do the Scorecard's small figure cards.
+
 **Tabbing never leaves a control behind the header.** The header stays at the top of the
 window as you scroll, pinned or not, so when the keyboard moves to a control above the window
 — Shift+Tab back up the dashboard, above all — the page scrolls it into view just *below* the

@@ -412,7 +412,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254.
    The plot areas as wells, the tile rows as cards (2026-10-31, theme pack rule
    21) took it from 4495 to 4542. */
-const EXPECTED = 4542;
+const EXPECTED = 4552;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -19153,6 +19153,42 @@ group('a card with no chart matches the one beside it');
        'selected state: every tab and sub-tab states aria-selected');
     win.selectTab('dashboard');
     plant({ teams: [], settings: {} });
+  }
+
+  group('2026-11-03: every card with a heading folds, and the fold is remembered per device');
+  {
+    const had = win.localStorage.getItem('td-folded');
+    const fDoc = win.document;
+    is(win.cleanFolds(['nameCycleTime', 'bad key', 7, '<b>', 'nameCycleTime']), ['nameCycleTime'],
+       'fold: the stored list is shape-checked');
+    const bands = [...fDoc.querySelectorAll('main [data-boxkey] > .boxhead')];
+    ok(bands.length >= 20, 'fold: the cards and chart cards are wired', bands.length);
+    ok([...fDoc.querySelectorAll('main .card.empty, main .card.welcome')].every(c => !c.dataset.boxkey),
+       'fold: an empty state and the welcome card are left alone');
+    ok(fDoc.getElementById('nameCycleTime').parentElement.matches('.boxhead'),
+       'fold: a chart name is MOVED into its band, so the renders still write into it by id');
+    plant({ teams: [{ id: 'fd1', name: 'Fold', rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' },
+      { c: '2015-02-03', s: '2015-01-28', t: 'Bug' }] }], settings: {} });
+    win.renderAll();
+    win.selectTab('dashboard');
+    const card = fDoc.getElementById('nameCycleTime').closest('.chart-card');
+    const toggle = card.querySelector(':scope > .boxhead > .box-toggle');
+    is(toggle.getAttribute('aria-label'), 'Fold ' + fDoc.querySelector('#nameCycleTime span').textContent.trim(),
+       'fold: the toggle is named from the heading, without its ⓘ');
+    toggle.click();
+    ok(card.classList.contains('boxshut'), 'fold: pressing it folds the card');
+    is(toggle.getAttribute('aria-expanded'), 'false', 'fold: and says so');
+    ok(String(win.localStorage.getItem('td-folded')).split('|').includes(card.dataset.boxkey),
+       'fold: remembered under its own key');
+    ok(!/folded|boxshut/.test(win.localStorage.getItem('td-state') || ''), 'fold: never in the saved board');
+    win.renderAll();
+    ok(card.classList.contains('boxshut') && fDoc.getElementById('nameCycleTime').textContent.trim() !== '',
+       'fold: a render rewrites the name and the card stays folded');
+    is(win.maxiReady(card), false, 'fold: a folded chart offers no full screen');
+    card.querySelector(':scope > .boxhead').click();
+    ok(!card.classList.contains('boxshut'), 'fold: a press on the band opens it again');
+    plant({ teams: [], settings: {} });
+    if (had === null) win.localStorage.removeItem('td-folded'); else win.localStorage.setItem('td-folded', had);
   }
 
   /* ────────────────────────────────────────────────────────── */
