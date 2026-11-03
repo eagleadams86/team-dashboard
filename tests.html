@@ -412,7 +412,7 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254.
    The plot areas as wells, the tile rows as cards (2026-10-31, theme pack rule
    21) took it from 4495 to 4542. */
-const EXPECTED = 4552;
+const EXPECTED = 4555;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -19165,6 +19165,8 @@ group('a card with no chart matches the one beside it');
     ok(bands.length >= 20, 'fold: the cards and chart cards are wired', bands.length);
     ok([...fDoc.querySelectorAll('main .card.empty, main .card.welcome')].every(c => !c.dataset.boxkey),
        'fold: an empty state and the welcome card are left alone');
+    ok(!fDoc.getElementById('scorecardHeading').closest('[data-boxkey]'),
+       'fold: an intro card — a heading and paragraphs, nothing else — does not fold');
     ok(fDoc.getElementById('nameCycleTime').parentElement.matches('.boxhead'),
        'fold: a chart name is MOVED into its band, so the renders still write into it by id');
     plant({ teams: [{ id: 'fd1', name: 'Fold', rows: [{ c: '2015-01-21', s: '2015-01-19', t: 'Story' },

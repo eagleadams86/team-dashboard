@@ -21583,6 +21583,10 @@ function wireBoxes() {
     if (card.matches('.empty, .welcome, .sc-card') || card.dataset.boxkey) continue;
     const head = boxHeadOf(card);
     if (!head) continue;
+    /* An INTRO is not a section: a card holding nothing but its heading and
+       paragraphs (the Scorecard's title card) folds away one sentence and leaves
+       the page it introduces standing under it. Charles, 2026-11-03. */
+    if ([...card.children].filter(el => el !== head).every(el => el.matches('p'))) continue;
     const h = head.matches('h2, .chart-name') ? head : head.querySelector(':scope > h2');
     const panel = card.closest('.panel');
     const words = h.textContent.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-+|-+$/g, '');

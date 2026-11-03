@@ -5389,5 +5389,9 @@ REAL MARKUP:
   never in `state`, a backup or a share link; listed in `privacy.html`. A card's key is its id,
   else its heading's id, else `<panel>-<heading words>`. Stored SHUT, so a new card opens.
 - Skipped: `.empty`, `.welcome`, the Scorecard's `.sc-card`s (figures, built per render).
+  **And any INTRO card** — one whose children past the heading are all `<p>` (the Scorecard's
+  title card): folding it hid one sentence and left the page it introduces standing
+  (Charles, 2026-11-03). Moving that text into the ART picker card was weighed and not done:
+  `#artScope` is absent until an ART exists, so the intro would vanish with it.
 - Pinned in tests.html (`2026-11-03: every card with a heading folds…`).
 
