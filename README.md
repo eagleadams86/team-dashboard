@@ -1232,7 +1232,16 @@ clamped at zero too; the code never did that.)
 ### Straight from Jira: The Copy for Flow Metrics Bookmark
 
 **Get It Straight from Jira**, on the Your Data tab, gives you bookmarks that do the export for
-you, one per window: **Flow Metrics 3 Months**, **6 Months** and **1 Year**. Each fetches the
+you, in two sets of three windows (3 months, 6 months and 1 year):
+
+- **For the team picked in the header**, named with its project id: **Flow Metrics DAE 3 Months**,
+  **DAE 6 Months** and **DAE 1 Year** fetch that team's project alone. Pick another team and the
+  set changes with it; a team with no project id has no set of its own.
+- **For all teams**: **Flow Metrics All Teams 3 Months**, **6 Months** and **1 Year** fetch every
+  team's project at once, and the paste is split by project as it lands.
+
+The name also shows in the bookmark's own prompt on the Jira tab, so you can tell which one you
+clicked. Each fetches the
 Stories, Tasks, Spikes, Bugs and Features that were **started, raised or finished in that
 window**, plus **everything still in progress whatever its age** (so aged work is never
 dropped), for the **projects set on your teams**
@@ -1246,7 +1255,7 @@ bookmarks bar. Then, whenever you want fresh data:
 4. Paste into Flow Metrics and press **Load Pasted Rows**.
 
 **A bookmark carries the projects it was dragged with.** Add a team or change a project id and
-drag the bookmarks again. Cancelled items are left out, so they never read as throughput, and
+drag the bookmarks again (a team's own set: pick the team first). Cancelled items are left out, so they never read as throughput, and
 old backlog nobody has touched is left behind, which keeps the fetch small. Features land in the
 feature list, ready for feature forecasting. If Jira refuses the search (for example, a site with
 no Spike type), the bookmark shows Jira's own reason, and you can edit the search before

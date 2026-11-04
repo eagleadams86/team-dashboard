@@ -7204,16 +7204,56 @@ const stripComments = (src) => {
          'var CONFIG = {"projects":["DAE","KFR"],"days":90,"label":"3 Months"};')),
        'a link is the source with that one line filled in: project ids cleaned, de-duplicated and sorted, a bad one dropped');
     const links = [...win.document.querySelectorAll('#jiraBookmarkLinks a[data-jira-days]')];
-    is(links.map(a => [a.dataset.jiraDays, a.textContent]),
-       [['90', 'Flow Metrics 3 Months'], ['180', 'Flow Metrics 6 Months'], ['365', 'Flow Metrics 1 Year']],
-       'three bookmarks: three months, six months and a year');
     const teamIds = [...new Set(win.tdGet().teams.map(t => TD.cleanProjectId(t.projectId)).filter(Boolean))].sort();
     win.document.getElementById('jiraBookmarkLinks').dispatchEvent(new win.Event('pointerdown'));
+    const mine = TD.jiraTeamProject();
+    is(links.map(a => [a.dataset.jiraScope, a.dataset.jiraDays]),
+       [['team', '90'], ['team', '180'], ['team', '365'], ['all', '90'], ['all', '180'], ['all', '365']],
+       'six bookmarks: three months, six months and a year, for the picked team and for all teams');
+    is(links.filter(a => a.dataset.jiraScope === 'all').map(a => a.textContent),
+       ['Flow Metrics All Teams 3 Months', 'Flow Metrics All Teams 6 Months', 'Flow Metrics All Teams 1 Year'],
+       'the all-teams set says so in its name');
+    if (mine) is(links.filter(a => a.dataset.jiraScope === 'team').map(a => a.textContent),
+       ['3 Months', '6 Months', '1 Year'].map(w => 'Flow Metrics ' + mine + ' ' + w),
+       'the team set is named with the picked team’s project id');
+    is(win.document.getElementById('jiraTeamGroup').hidden, !mine,
+       'and the team set is hidden while the picked team has no project id');
     is(links.map(a => a.getAttribute('href')),
-       links.map(a => TD.jiraBookmarkHref(teamIds, Number(a.dataset.jiraDays), a.dataset.jiraLabel)),
-       'pressing a link draws it from the teams’ project ids as they are now');
+       links.map(a => a.dataset.jiraScope === 'team'
+         ? (!mine ? '#' : TD.jiraBookmarkHref([mine], Number(a.dataset.jiraDays), mine + ' ' + a.dataset.jiraLabel))
+         : TD.jiraBookmarkHref(teamIds, Number(a.dataset.jiraDays), 'All Teams ' + a.dataset.jiraLabel)),
+       'pressing a link draws it from the project ids as they are now: the picked team’s alone, or every team’s — and a team with none gets an inert link');
     is(win.document.getElementById('jiraBookmarkLinks').hidden, !teamIds.length,
        'and the links are hidden while no team has a project id');
+    /* THE PICKED TEAM'S OWN SET (2026-11-04), planted so the naming is tested
+       whatever state the suite reached here: a team with an id gets a set named
+       with it and fetching it alone; a team with none gets no set of its own. */
+    plant({ arts: [], teams: [
+      { id: 'jb1', name: 'Kingfisher', projectId: 'KFR', rows: [] },
+      { id: 'jb2', name: 'Heron', projectId: 'HRN', rows: [] },
+      { id: 'jb3', name: 'Wagtail', rows: [] }], settings: {} });
+    const pick = (id) => { const sel = win.document.getElementById('teamSel');
+      sel.value = id; sel.dispatchEvent(new win.Event('change', { bubbles: true })); };
+    const cfgOf = a => JSON.parse(decodeURIComponent(a.getAttribute('href')).match(/var CONFIG = (\{[^;]*\});/)[1]);
+    pick('jb2');
+    const teamLinks = () => links.filter(a => a.dataset.jiraScope === 'team');
+    const allLinks = () => links.filter(a => a.dataset.jiraScope === 'all');
+    is(teamLinks().map(a => a.textContent), ['Flow Metrics HRN 3 Months', 'Flow Metrics HRN 6 Months', 'Flow Metrics HRN 1 Year'],
+       'picking Heron names its set with its project id');
+    is(teamLinks().map(cfgOf), [90, 180, 365].map((d, i) => ({ projects: ['HRN'], days: d,
+       label: 'HRN ' + ['3 Months', '6 Months', '1 Year'][i] })),
+       'and that set fetches Heron’s project alone, its label carried into the bookmark');
+    is(allLinks().map(cfgOf).map(c => [c.projects, c.label]),
+       [[['HRN', 'KFR'], 'All Teams 3 Months'], [['HRN', 'KFR'], 'All Teams 6 Months'], [['HRN', 'KFR'], 'All Teams 1 Year']],
+       'while the All Teams set fetches every team’s');
+    is(win.document.getElementById('jiraTeamGroup').hidden, false, 'Heron’s set is shown');
+    pick('jb1');
+    is(teamLinks()[0].textContent, 'Flow Metrics KFR 3 Months', 'switching team redraws the set for the new one');
+    pick('jb3');
+    is(win.document.getElementById('jiraTeamGroup').hidden, true, 'a team with no project id gets no set of its own');
+    ok(/Wagtail has no project id/.test(win.document.getElementById('jiraBookmarkScope').textContent),
+       'and the section says why');
+    is(win.document.getElementById('jiraBookmarkLinks').hidden, false, 'while the All Teams set stays');
     ok(/if \(window\.tdJiraWired\) drawJiraBookmarks\(\);\s*\}/.test(APP_SRC.slice(APP_SRC.indexOf('function renderAll() {'))),
        'every full redraw redraws them too, so a project id adopted with the section open shows at once');
     ok(/connect-src 'none'/.test(cspMatch[1]), "the app's own CSP is untouched: still connect-src 'none'");

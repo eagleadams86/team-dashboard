@@ -3196,12 +3196,29 @@ input:is([type="checkbox"], [type="radio"]) { flex: none; width: 1.25rem; height
           <!-- Three windows, asked for by Charles 2026-10-30. Each link is built from
                the project ids on the teams at the moment it is drawn, so the
                bookmark asks Jira for exactly the projects this app splits by. -->
-          <p id="jiraBookmarkScope" style="margin:0 0 var(--sp-4)"></p>
-          <div class="btn-row" id="jiraBookmarkLinks" style="margin:0 0 var(--sp-4)">
-            <a class="btn" data-jira-days="90" data-jira-label="3 Months" href="#" draggable="true">Flow Metrics 3 Months</a>
-            <a class="btn" data-jira-days="180" data-jira-label="6 Months" href="#" draggable="true">Flow Metrics 6 Months</a>
-            <a class="btn" data-jira-days="365" data-jira-label="1 Year" href="#" draggable="true">Flow Metrics 1 Year</a>
+          <!-- Two sets, asked for by Charles 2026-11-04: one for the team picked in the
+               header, named with its project id, and one for every team, named All Teams.
+               Each link's name and label are written by drawJiraBookmarks(); the label
+               rides into the bookmark, so its Jira prompt says which set it is. -->
+          <div id="jiraBookmarkLinks" style="margin:0 0 var(--sp-4)">
+            <div id="jiraTeamGroup" style="margin:0 0 var(--sp-4)">
+              <p id="jiraTeamScope" style="margin:0 0 var(--sp-3)"></p>
+              <div class="btn-row">
+                <a class="btn" data-jira-scope="team" data-jira-days="90" data-jira-label="3 Months" href="#" draggable="true">Flow Metrics 3 Months</a>
+                <a class="btn" data-jira-scope="team" data-jira-days="180" data-jira-label="6 Months" href="#" draggable="true">Flow Metrics 6 Months</a>
+                <a class="btn" data-jira-scope="team" data-jira-days="365" data-jira-label="1 Year" href="#" draggable="true">Flow Metrics 1 Year</a>
+              </div>
+            </div>
+            <div id="jiraAllGroup">
+              <p id="jiraBookmarkScope" style="margin:0 0 var(--sp-3)"></p>
+              <div class="btn-row">
+                <a class="btn" data-jira-scope="all" data-jira-days="90" data-jira-label="3 Months" href="#" draggable="true">Flow Metrics All Teams 3 Months</a>
+                <a class="btn" data-jira-scope="all" data-jira-days="180" data-jira-label="6 Months" href="#" draggable="true">Flow Metrics All Teams 6 Months</a>
+                <a class="btn" data-jira-scope="all" data-jira-days="365" data-jira-label="1 Year" href="#" draggable="true">Flow Metrics All Teams 1 Year</a>
+              </div>
+            </div>
           </div>
+          <p id="jiraBookmarkNone" style="margin:0 0 var(--sp-4)" hidden></p>
           <ol style="margin:0;padding-left:1.4em">
             <li><strong>Drag the ones you want to your bookmarks bar.</strong> Each fetches the
               work finished in that window, plus everything still open. No bar? Press
@@ -12300,7 +12317,7 @@ window.TD = {
   weekdayNum, priorSunday, weekStartOn, weekNumber, weekKey, edate, workDaysBetween,
   bucketStart, nextBucket, bucketEnd, bucketKey, bucketLabel, FORTNIGHT_EPOCH,
   parseDate, detectDateOrder, parsePastedRows, detectColumns, columnStats, cleanWorkType,
-  cleanIssueKey, separatorOf, JIRA_BOOKMARK_SRC, jiraBookmarkHref,
+  cleanIssueKey, separatorOf, JIRA_BOOKMARK_SRC, jiraBookmarkHref, jiraTeamProject,
   /* The three work fields (2026-09-15). */
   WORK_FIELDS, SN_TYPES, SN_INCIDENT, BUG_FOUND, WORK_KINDS, readEnum, enumCode,
   countsAsDefect, teamFactsOf,
@@ -24020,18 +24037,36 @@ function jiraBookmarkHref(projects, days, label) {
 function jiraProjects() {
   return [...new Set(state.teams.map(t => cleanProjectId(t.projectId)).filter(Boolean))].sort();
 }
+/* The team picked in the header, as a project id the bookmark can carry — or ''
+   when it has none, and then its row is hidden rather than drawn empty. */
+function jiraTeamProject() {
+  const t = activeTeam();
+  return t ? cleanProjectId(t.projectId) : '';
+}
 function drawJiraBookmarks() {
   const ids = jiraProjects();
   const links = $('jiraBookmarkLinks');
   if (!links) return;
+  const team = activeTeam();
+  const mine = jiraTeamProject();
   links.hidden = !ids.length;
-  $('jiraBookmarkScope').textContent = ids.length
-    ? 'They fetch ' + (ids.length === 1 ? 'project ' : 'projects ') + ids.join(', ')
-      + ' — the project ids set on your teams in Teams, ARTs & Stages.'
-    : 'No team has a project id yet. Set each team’s project id in Teams, ARTs & Stages '
-      + '(DAE for DAE-1552), and the bookmarks will appear here, set to fetch those projects.';
+  $('jiraTeamGroup').hidden = !mine;
+  $('jiraBookmarkNone').hidden = !!ids.length;
+  $('jiraBookmarkNone').textContent = 'No team has a project id yet. Set each team’s project id in '
+    + 'Teams, ARTs & Stages (DAE for DAE-1552), and the bookmarks will appear here, set to fetch those projects.';
+  $('jiraTeamScope').textContent = mine
+    ? 'For ' + (team ? team.name : 'this team') + ' only: these fetch project ' + mine + '.'
+    : '';
+  $('jiraBookmarkScope').textContent = (mine ? 'For all teams: these fetch ' : 'These fetch ')
+    + (ids.length === 1 ? 'project ' : 'projects ') + ids.join(', ')
+    + ' — the project ids set on your teams in Teams, ARTs & Stages.'
+    + (mine ? '' : ' ' + (team ? team.name : 'This team') + ' has no project id, so it has no bookmarks of its own.');
   links.querySelectorAll('a[data-jira-days]').forEach((a) => {
-    a.href = jiraBookmarkHref(ids, Number(a.dataset.jiraDays), a.dataset.jiraLabel);
+    const forTeam = a.dataset.jiraScope === 'team';
+    if (forTeam && !mine) { a.textContent = 'Flow Metrics ' + a.dataset.jiraLabel; a.href = '#'; return; }
+    const label = (forTeam ? mine : 'All Teams') + ' ' + a.dataset.jiraLabel;
+    a.textContent = 'Flow Metrics ' + label;
+    a.href = jiraBookmarkHref(forTeam ? [mine] : ids, Number(a.dataset.jiraDays), label);
   });
 }
 function wireJiraBookmark() {

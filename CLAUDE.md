@@ -33,6 +33,11 @@ link and the text of a `<pre>`, and a click in the app only toasts. On a Jira ta
 truncated changelog from `issue/{key}/changelog`, finds custom fields BY NAME via
 `rest/api/3/field`, reads done-category statuses from `rest/api/3/status`, and writes a TSV
 with headings `HEADER_PATTERNS` already reads. GET only.
+- **Two sets (2026-11-04, Charles):** `data-jira-scope="team"` links fetch `jiraTeamProject()` (the
+  header's picked team) alone and are named with its project id; `"all"` links fetch `jiraProjects()`
+  and say All Teams. The name is also the CONFIG `label` (bookmark regex `[A-Za-z0-9 ]{1,20}` — a
+  10-char id + " 6 Months" fits). A team with no id hides its set and its hrefs go to `#`.
+  Redrawn by `renderAll()`, so a team switch redraws them.
 - **No new stored field, no SCHEMA bump, no whitelist or CSP change** — that is what makes it
   removable with one revert (tag `pre-jira-bookmark` marks the commit before). Keep it that way;
   a change that needs storage is a different, bigger decision.
