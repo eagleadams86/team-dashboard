@@ -14,6 +14,12 @@ once what a sprint is here, then tick the teams that run them.
 runs, with no server, no install and no internet.
 [What differs from the website](#a-single-file-you-can-send-someone).
 
+**Which version am I on?** The bottom-right corner of the page, under the link to the
+Sprint Predictability, reads *Version* and a date such as `2026.11.05` — the day the app was last changed.
+It is the same date as the [release](https://github.com/eagleadams86/team-dashboard/releases) a
+downloaded copy came from (release `2026-11-05` says `2026.11.05`), so you can tell at a
+glance whether an open tab or a saved file is behind the website.
+
 The app is called **Flow Metrics** on screen. The repo, the Pages path and the
 `app: 'team-dashboard'` marker inside a backup file all still say *team-dashboard* — renaming
 any of those would break existing links and backups, so the rename is deliberately a

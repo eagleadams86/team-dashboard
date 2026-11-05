@@ -2212,6 +2212,12 @@ table.filters input[readonly] { cursor: not-allowed; }
 footer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
 .footnotes { flex: 1 1 320px; min-width: 0; }
 footer .applink { margin: 0 19px 0 auto; }
+/* The version line: its own full-width row under the sibling-app button,
+   right-aligned to the same 19px inset so it sits at the footer's bottom-right
+   corner. The number is the date of the last change to this file, the same
+   shape as the release tags (tag 2026-11-05 = version 2026.11.05). Bump it in
+   any commit that changes index.html — see CLAUDE.md. */
+footer .app-version { flex: 1 1 100%; margin: 0 19px 0 0; text-align: right; }
 
 /* share dialog furniture — the sibling app's, unchanged */
 fieldset.formpanel { border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -4080,6 +4086,10 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        app carries the mirror image of this link. -->
   <a class="btn small applink" href="https://eagleadams86.github.io/sprint-velocity/"
     title="Sprint Predictability — the sibling app: commitment completion, break-in, carryover and velocity">↗ Sprint&nbsp;Predictability</a>
+  <!-- The version: today's date in any commit that changes this file (see
+       CLAUDE.md). Plain text, so it adds nothing to the tab order. Mirrored in
+       the sibling app. -->
+  <p class="privacy app-version">Version <span id="appVersion">2026.11.05</span></p>
   </footer>
 
 </div>
