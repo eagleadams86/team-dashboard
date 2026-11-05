@@ -20,7 +20,10 @@ single file carries it — never put a version in `index.html`.** A first attemp
 live site, bumped by hand; Charles reverted that the same day: the website is always the latest,
 and the number belongs to the release. The build takes `--version <release tag>` (defaults to
 today, which is the tag on a normal release day), writes the tag's dashes as dots, and refuses
-anything not shaped `YYYY-MM-DD`. When refreshing an earlier day's release, pass its tag. It is
+anything not shaped `YYYY-MM-DD`. After the date comes ` · ` and the 7-character commit id
+(`Version 2026.11.05 · b13db9e`) — Charles's pick, because a same-day refresh replaces the
+day's tag and the date alone would name two different files. So the build **refuses a dirty
+tree** (tracked files only): commit first, or the id names code the file does not contain. When refreshing an earlier day's release, pass its tag. It is
 NOT `SCHEMA`, which counts the saved-data shape. Mirrored in the sibling app's build.
 
 ## The Jira Bookmark (2026-10-30) — no schema change, DECIDED WITH CHARLES

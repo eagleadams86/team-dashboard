@@ -4026,11 +4026,13 @@ python3 build-single.py --version 2026-11-05  # dated for that release instead
 ```
 
 **Which version is this file?** The bottom-right corner of the downloaded copy reads
-*Version* and a date, such as `2026.11.05` — the date of the
+*Version*, a date and a short code, such as `2026.11.05 · b13db9e`. The date is that of the
 [release](https://github.com/eagleadams86/team-dashboard/releases) it came from (release `2026-11-05`
-says `2026.11.05`). It is stamped in when the file is built for a release, so the website
-itself carries no version: it is always the latest. Compare that corner with the newest
-release to see whether a copy you were sent is behind.
+says `2026.11.05`). The code is the commit the file was built from, so two files from the
+same day still differ — a release refreshed later that day keeps its date but gets a new
+code. It is stamped in when the file is built, so the website itself carries no version: it
+is always the latest. Compare that corner with the newest release to see whether a copy you
+were sent is behind.
 
 The output is not committed — it is generated from `index.html`, which stays the only file
 that is written and tested, and it is rebuilt whenever the app changes. It needs the

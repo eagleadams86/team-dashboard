@@ -43,6 +43,7 @@ the app does not already carry, and the output stays free of third-party script.
 import html
 import os
 import re
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -482,9 +483,13 @@ def build(version):
     # the release tag (the date) written with dots, so release 2026-11-05 reads
     # "Version 2026.11.05". Same right inset as the button it replaces, and
     # plain text, so nothing joins the tab order.
+    # The short commit id follows it — "Version 2026.11.05 · b13db9e" — because
+    # the date alone cannot tell two builds apart: a second release on the same
+    # day REPLACES that day's tag, so the morning and afternoon files would
+    # otherwise read the same. See commit_id() for why a dirty tree is refused.
     doc.sub('  </footer>',
-            '  <p class="privacy app-version">Version %s</p>\n  </footer>'
-            % version.replace('-', '.'), 1, 'add release version')
+            '  <p class="privacy app-version">Version %s &middot; %s</p>\n  </footer>'
+            % (version.replace('-', '.'), commit_id()), 1, 'add release version')
     doc.sub('</head>', '<style>footer .app-version { margin: 0 19px 0 auto; '
             'text-align: right; }</style>\n</head>', 1, 'version line style')
 
@@ -559,6 +564,22 @@ def build(version):
     for line in doc.edits:
         print('   ' + line)
     print('   README sections dropped: %s' % ', '.join(dropped))
+
+
+def commit_id():
+    """The 7-character id of the commit this file is built from. Refuses to
+    build from uncommitted changes: the id would then name code that is NOT
+    what the file contains, which is worse than no id at all."""
+    def git(*args):
+        try:
+            return subprocess.run(('git', '-C', HERE) + args, check=True,
+                                  capture_output=True, text=True).stdout.strip()
+        except (OSError, subprocess.CalledProcessError) as e:
+            fail('git is needed for the version line: %s' % e)
+    if git('status', '--porcelain', '--untracked-files=no'):
+        fail('uncommitted changes — commit first, so the version line names '
+             'the code this file was built from')
+    return git('rev-parse', '--short=7', 'HEAD')
 
 
 def parse_version(argv):
