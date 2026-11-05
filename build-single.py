@@ -2,6 +2,7 @@
 """Build the single-file, offline copy of the app.
 
     python3 build-single.py            -> dist/flow-metrics.html
+    python3 build-single.py --version 2026-11-05   (the release tag; default today)
 
 WHY THIS EXISTS
 The hosted app is four files (index.html, chart.min.js, theme.css, sw.js) plus a
@@ -25,6 +26,7 @@ WHAT CHANGES, AND WHY EACH ONE
   3. The service-worker registration is dropped.   — a downloaded file IS the cache
   4. Share is dropped.                             — see the note above the cut
   5. The sibling-app link is dropped.              — it needs the network
+     and the release version takes its corner.    — see VERSION below
   6. Privacy, How it works, NOTICE and LICENCE
      become in-page dialogs.                       — the files aren't there to link to
   7. The CSP is tightened to inline-only.          — see the note above it
@@ -383,7 +385,7 @@ __TEMPLATES__
 """
 
 
-def build():
+def build(version):
     doc = Doc(read('index.html'))
 
     # ── 1. Everything the page loads, folded in ─────────────────────────────
@@ -474,6 +476,18 @@ def build():
     doc.cut_between('<!-- A real <a>, not a button that navigates', '</a>',
                     'drop sibling-app link', include_end=True)
 
+    # ── 4b. The version, in the corner the link left ────────────────────────
+    # Only this copy carries one: the website is always the latest, but a file
+    # someone was sent can be months old, and this line is how they tell. It is
+    # the release tag (the date) written with dots, so release 2026-11-05 reads
+    # "Version 2026.11.05". Same right inset as the button it replaces, and
+    # plain text, so nothing joins the tab order.
+    doc.sub('  </footer>',
+            '  <p class="privacy app-version">Version %s</p>\n  </footer>'
+            % version.replace('-', '.'), 1, 'add release version')
+    doc.sub('</head>', '<style>footer .app-version { margin: 0 19px 0 auto; '
+            'text-align: right; }</style>\n</head>', 1, 'version line style')
+
     # ── 5. The footer links become dialogs ──────────────────────────────────
     doc.sub('<p class="privacy privacy-links"><a href="privacy.html">Privacy policy</a> '
             '&middot;\n    <a href="https://github.com/eagleadams86/%s" '
@@ -547,5 +561,20 @@ def build():
     print('   README sections dropped: %s' % ', '.join(dropped))
 
 
+def parse_version(argv):
+    """The release this file is for. The tag is the ISO date, one release a
+    day, so the default is today; pass --version when building for a tag that
+    is not today's (refreshing an earlier release, say)."""
+    import datetime
+    version = datetime.date.today().isoformat()
+    if argv[:1] == ['--version'] and len(argv) == 2:
+        version = argv[1]
+    elif argv:
+        fail('usage: build-single.py [--version YYYY-MM-DD]')
+    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', version):
+        fail('--version must be the release tag, YYYY-MM-DD, not %r' % version)
+    return version
+
+
 if __name__ == '__main__':
-    build()
+    build(parse_version(sys.argv[1:]))

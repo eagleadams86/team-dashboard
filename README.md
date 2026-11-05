@@ -14,12 +14,6 @@ once what a sprint is here, then tick the teams that run them.
 runs, with no server, no install and no internet.
 [What differs from the website](#a-single-file-you-can-send-someone).
 
-**Which version am I on?** The bottom-right corner of the page, under the link to the
-Sprint Predictability, reads *Version* and a date such as `2026.11.05` — the day the app was last changed.
-It is the same date as the [release](https://github.com/eagleadams86/team-dashboard/releases) a
-downloaded copy came from (release `2026-11-05` says `2026.11.05`), so you can tell at a
-glance whether an open tab or a saved file is behind the website.
-
 The app is called **Flow Metrics** on screen. The repo, the Pages path and the
 `app: 'team-dashboard'` marker inside a backup file all still say *team-dashboard* — renaming
 any of those would break existing links and backups, so the rename is deliberately a
@@ -4027,8 +4021,16 @@ itself — come back to that page when you want a newer one.
 server, no internet, no install, nothing to put anywhere:
 
 ```
-python3 build-single.py        # writes dist/flow-metrics.html
+python3 build-single.py                       # writes dist/flow-metrics.html, dated today
+python3 build-single.py --version 2026-11-05  # dated for that release instead
 ```
+
+**Which version is this file?** The bottom-right corner of the downloaded copy reads
+*Version* and a date, such as `2026.11.05` — the date of the
+[release](https://github.com/eagleadams86/team-dashboard/releases) it came from (release `2026-11-05`
+says `2026.11.05`). It is stamped in when the file is built for a release, so the website
+itself carries no version: it is always the latest. Compare that corner with the newest
+release to see whether a copy you were sent is behind.
 
 The output is not committed — it is generated from `index.html`, which stays the only file
 that is written and tested, and it is rebuilt whenever the app changes. It needs the
@@ -4044,7 +4046,7 @@ the handful of things that only mean something on a website:
 |---|---|
 | **Share links** | Gone. A link is built from the page's own address, and from a file on your disk that address is a path on *your* machine — a link that looks real and works for nobody. Both the button and the window are removed, and a `#share=` link opened in this copy is ignored. |
 | **Privacy policy, How it works, NOTICE, licence** | Now windows inside the page, opened from the same words in the footer. The files they used to link to are not in the download. |
-| **The link to the sibling app** | Gone. It points at the hosted site, so it is a dead end with no internet. |
+| **The link to the sibling app** | Gone. It points at the hosted site, so it is a dead end with no internet. Its corner of the footer shows the release version instead. |
 | **Install as an app, offline caching** | Gone. A downloaded file *is* the offline copy, so the worker and the manifest have nothing left to do. |
 | **The security policy** | Tightened. Nothing is fetched any more, so the page is allowed to fetch nothing at all — not even from its own folder. |
 | **Everything else** | Unchanged: the calculations, all four themes, the charts and their full-screen view, Find, Back Up & Restore, CSV and Copy, printing, the sample data. |
