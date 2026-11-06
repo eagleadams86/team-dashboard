@@ -237,8 +237,10 @@ belongs in both.
 - **Null when no team is on a train**, and the plain list stays: one "No ART" heading over every
   team divides nothing. A dangling `artId` lands under No ART rather than dropping out of the
   list, even though the boundary prunes it.
-- **The 24px indent is MEASURED**: the UA gives a checkbox 4px before and 3px after, so a team's
-  box lines up under the heading's NAME at 24px, not the 21 that box + gap sums to.
+- **The indent is MEASURED, and is `calc(1.25rem + 11px)` since 2026-11-06**: the UA gives a
+  checkbox 4px before and 3px after, so a team's box lines up under the heading's NAME at the box
+  width + 11px. It was a plain 24px, measured against the old 13px box; the 20px tick-box rule
+  left every team's box half under the train's until Sprint Predictability's review caught it.
 - **Clean Up Old Data's list took the same grouping the same day, at Charles's word** (it was
   left flat at first because nobody had asked). It reuses `artTeamGroups()`; `cleanupTeamsPicked()`,
   `renderCleanupTeams()` and `openCleanup()` read `input[data-clean-team]` only, for the reason

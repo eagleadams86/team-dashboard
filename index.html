@@ -2242,13 +2242,16 @@ label.checkline { display: flex; gap: 8px; align-items: center; font-size: var(-
 .checkline input { flex: none; }
 /* The share window's list grouped by ART: a heading line per train, its teams
    indented so each team's box sits under the train's NAME rather than under the
-   train's own box. 24px is measured, not summed from the box alone: the browser
-   gives a checkbox 4px of margin before it and 3px after, so the heading's name
-   starts 4 + 13 + 3 + 8 = 28px in and a team's box at 24 + 4. The space above a
-   heading (not the first) is where one train visibly ends. Mirrored in Sprint
+   train's own box. The browser gives a checkbox 4px of margin before it and 3px
+   after, so the heading's name starts 4 + box + 3 + 8 (the gap) in and a team's
+   box at the indent + 4: the indent is the box plus 11px. Written off the box's
+   own 1.25rem (the tick-box rule at the end of the sheet) since 2026-11-06 — a
+   plain 24px was measured against the old 13px box and left every team's box
+   half under the train's once the box grew to 20px. The space above a heading
+   (not the first) is where one train visibly ends. Mirrored in Sprint
    Velocity. */
 .checklist .art-head:not(:first-child) { margin-top: 8px; }
-.checklist .checkline.in-art { padding-left: 24px; }
+.checklist .checkline.in-art { padding-left: calc(1.25rem + 11px); }
 #shareLink { width: 100%; font-family: var(--font-mono); font-size: var(--fs-xs);
   color: var(--text-secondary); }
 .warn { color: var(--err); font-size: var(--fs-xs); margin-top: 10px; }
