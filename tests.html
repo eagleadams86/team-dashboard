@@ -7330,6 +7330,34 @@ const stripComments = (src) => {
     is(r0.stages, { jb: 2, jp: 7.52, js: 0.48 }, 'and the stage days land against the reader’s own stages');
     is(r0.snType, TD.SN_INCIDENT, 'the ServiceNow type arrives as its code');
     ok(r0.workKind > 0, 'and so does the Type of Work');
+
+    /* 2026-11-06 review. */
+    is(B.statusDays('2026-01-01T00:00:00.000Z', '2026-01-10T23:59:59.995Z', 'Done', [
+        h('2026-01-03T00:00:00.000Z', 'To Do', 'In Progress'),
+        h('2026-01-11T00:00:00.000Z', 'In Progress', 'Done')], NOW),
+       { 'To Do': 2, 'In Progress': 8 },
+       'a Done move stamped a moment AFTER the resolution still closes the stage before it');
+    is(B.statusDays('2026-01-05T00:00:00.000Z', '2026-01-10T00:00:00.000Z', 'Done', [
+        h('2026-01-01T00:00:00.000Z', 'Backlog', 'To Do'),
+        h('2026-01-10T00:00:00.000Z', 'To Do', 'Done')], NOW),
+       { 'To Do': 5 },
+       'and a move stamped before creation (a moved issue) records no false 0 for the status before it');
+    const t0 = B.toTable([done, { key: 'KFR-103', fields: { issuetype: { name: 'Story' },
+      status: { name: 'In Progress' }, created: '2026-01-02T00:00:00.000+0000' },
+      changelog: { histories: [h('2026-01-04T00:00:00.000+0000', 'Backlog', 'In Progress')] } }],
+      {}, ['Done'], NOW);
+    const res0 = TD.parsePastedRows(t0.text, 'auto', STG);
+    is(res0.rows.map(r => r.key).sort(), ['KFR-101', 'KFR-103'],
+       'a site with no Actual Start Date field keeps its work in flight — the Days in In Progress column is never the start');
+    const r1 = res0.rows.find(r => r.key === 'KFR-101');
+    is([iso(r1 && r1.started), r1 && r1.stages && r1.stages.jp],
+       ['2026-01-01', 7.52], 'Created stands in as the start, and the In Progress days stay a stage');
+    const q = (k, ty) => ({ key: k, fields: { issuetype: { name: ty }, status: { name: 'Done' },
+      created: '2026-01-01T00:00:00.000+0000', resolutiondate: '2026-01-05T00:00:00.000+0000' } });
+    const tq = B.toTable([q('DAE-1', '"Spike'), q('DAE-2', 'Story'), q('DAE-3', 'Bug"'), q('DAE-4', 'Story')],
+      {}, ['Done'], NOW);
+    is(TD.parsePastedRows(tq.text, 'auto', STG).rows.length, 4,
+       'a Jira value with a stray double quote cannot swallow the rows after it');
     delete window.FM_JIRA_BOOKMARK_TEST;
     delete window.FM_JIRA_BOOKMARK;
   }
