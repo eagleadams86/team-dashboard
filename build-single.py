@@ -246,6 +246,18 @@ def render_privacy():
         fail('privacy.html: no <h1> to fold into the window title')
     if '<main' in inner or '</footer>' in inner:
         fail('privacy.html: lifted more than the policy')
+    # The DROP_README_SECTIONS rule, for the policy: this file has no Share
+    # button and no offline cache, so the passages describing them come out
+    # (2026-11-06 review). Counted, so a reworded policy fails the build
+    # rather than shipping the old claims.
+    inner, n = re.subn(r'\s*<h2>Share Links</h2>.*?(?=<h2>)', '\n\n  ', inner,
+                       count=1, flags=re.S)
+    if n != 1:
+        fail('privacy.html: no Share Links section to drop')
+    inner, n = re.subn(r'\s*<p><strong>A copy of the app itself, so it opens offline\.'
+                       r'</strong>.*?</p>', '', inner, count=1, flags=re.S)
+    if n != 1:
+        fail('privacy.html: no offline-copy paragraph to drop')
     return inner.strip()
 
 
@@ -457,6 +469,18 @@ def build(version):
                     '/* ══════════════════════════════════════════════════════'
                     '═════════════════════\n   9b. CLEAN UP OLD DATA',
                     'drop Share wiring')
+    # The newer-schema halt card blames an offline cache and says to go online,
+    # neither of which a file on disk has. What happens here is an older
+    # release opened after a newer one saved: every file:// page in Chrome
+    # shares one storage (2026-11-06 review). Reload still works once the
+    # newer copy is saved over this one, so the button stays.
+    doc.sub("    + 'after an update, and this one is still running the older version from '\n"
+            "    + 'its offline cache.';",
+            "    + 'after an update \\u2014 or a newer copy of this file saved it, and this '\n"
+            "    + 'one is an older release.';", 1, 'halt card: why, for a file')
+    doc.sub("p3.textContent = 'Connect to the internet and reload to get the current version.';",
+            "p3.textContent = 'Open the newest copy of the Flow Metrics file instead, or save '\n"
+            "    + 'it over this one and press Reload.';", 1, 'halt card: what to do, for a file')
     doc.sub("['manageBtn', 'dataBtn', 'shareBtn', 'settingsBtn']",
             "['manageBtn', 'dataBtn', 'settingsBtn']", 1, 'drop Share from viewOnly')
     # The inbound half. A prefix that cannot begin a fragment makes shareToken
@@ -594,6 +618,10 @@ def parse_version(argv):
         fail('usage: build-single.py [--version YYYY-MM-DD]')
     if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', version):
         fail('--version must be the release tag, YYYY-MM-DD, not %r' % version)
+    try:
+        datetime.date.fromisoformat(version)
+    except ValueError:
+        fail('--version is not a real date: %r' % version)
     return version
 
 
