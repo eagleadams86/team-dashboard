@@ -5416,3 +5416,52 @@ REAL MARKUP:
   `#artScope` is absent until an ART exists, so the intro would vanish with it.
 - Pinned in tests.html (`2026-11-03: every card with a heading folds…`).
 
+
+## Fixes From the 2026-11-06 Review — no schema change
+
+Four parallel reviewers (Jira bookmark + paste, UI driven, build/offline/security, figures by
+pasting a realistic export in four timezones). Each fix has a check proven red on the old code.
+Security came back clean: no XSS (31 stored/share fields fuzzed), CSP intact, 0 CodeQL alerts.
+- **A "Days in …" heading is never a start date.** `startAt`'s last pass takes any filled column,
+  and `/in.?progress/` matched `Days in In Progress` — so the bookmark's EMPTY Actual Start Date
+  column (a site without the field) put a day count in the start role, dropped every item in
+  flight and emptied cycle times. `stageHeadingBare()` headings are skipped in every pass.
+- **`statusDays` gates on where the interval STARTS** (`t < end`), not on the change time: a Done
+  move stamped ms after `resolutiondate` dropped the whole last stage. A move stamped before
+  creation counts nothing rather than a false 0.
+- **The bookmark's `label()` strips `"`** — a value opening with one became a multi-line quoted
+  cell in `splitRecords` and swallowed the rows after it, unreported.
+- **The share banner's label is rebuilt from the sanitised team names** (`shareLabelOf`), never
+  read off the link: it was uncapped, so a hand-made link put a paragraph of anyone's prose in the
+  chrome on the shared origin. A non-numeric `sharedAt` is dropped, not printed "Invalid Date".
+- **Single file:** its Privacy window drops the Share Links section and the offline-copy paragraph
+  (counted `re.subn`s in `render_privacy`, the `DROP_README_SECTIONS` rule); the newer-data halt
+  card says "an older release of this file", not "go online" (every `file://` page in Chrome
+  shares one storage, so opening last month's file after this month's really halts);
+  `--version` refuses an impossible date.
+- **The dashboard's feature view passes `asOf: lastArrivedDate(team.rows)`** — the Scorecard's
+  pinning rule, which the dashboard never got. Features rarely get new dates, so ages, the aged
+  count and the forecast's "counted from" were read as of the last feature event (June, on a
+  November export). `asOf` only moves a date later; a features-only team is unchanged.
+- **Folded cards print drawn:** `beforePrint` sets `data-printing` on `<html>`, which lifts the
+  screen fold rule (and the folded band's −18px margin) so charts render at full size; `afterPrint`
+  removes it. Before, a folded chart printed as an empty well.
+- **Keyboard:** folding the card that fills the window keeps focus on its toggle (closeMaxi aims at
+  the ⤢, which a folded card hides); Create Team in the paste plan focuses the next Create button,
+  else `#btnLoad`, when the redraw lost focus.
+- **Wording:** the paste preview's column report says "will save"/"will take" (`planned` flag
+  into `columnsReadHtml`/`featuresReadHtml`; 3ee535a fixed only the headline); the undated count
+  says "no start or finish date", since those rows often carry a Created date; the bookmark help
+  says it fetches what started, was raised or finished in the window plus what is in progress.
+
+**Raised with Charles, NOT changed** (each changes a figure or needs storage):
+- With a work-type filter, `derive`'s `endDate` is the FILTERED type's last event, so Defects on a
+  team whose last bug was a month ago reads window, WIP, ages and forecast a month early. Pinned
+  deliberately by "while every figure beside it still honours the filter" — a decision, not a slip.
+- *Features Still Open* counts only children that loaded; To Do children are dropped at parse as
+  backlog, so Left is low and % done high. Fixing it means storing a per-parent backlog count.
+
+Left alone: "Work Feature Age" (the 2026-08-27 unit-noun rule); the default JQL names Spike,
+Feature and Cancelled, which another Jira site may not have; a plain `Parent` heading is not read
+as the parent key (anchored on purpose — confirm against a real export first).
+

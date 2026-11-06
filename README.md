@@ -2727,6 +2727,12 @@ narrow a population, and none of them means anything to a raw list.
 
 **And one thing is replaced rather than dropped:** the ageing threshold. See below.
 
+**The feature view is read as of where the team's work items end**, not where its features do.
+Features rarely get a new date, so a feature list read as of its own last date would age every
+open feature, and start the forecast, from the day the last feature moved — months early on a
+quiet board. The Scorecard follows the same rule. A team with no work items is read as of its
+features.
+
 #### The Ageing Threshold Is per Unit
 
 The item threshold defaults to 14 days. Read against features that is not merely less useful,
@@ -3700,7 +3706,8 @@ along regardless of how old their start is. The line under the link reads `219 o
 from 18 Nov 2023` so the cost of a longer window is visible before you send it; a window that
 would leave nothing at all says so.
 
-The recipient sees a standing "Read-only view" bar, the dashboard only (no Your Data tab, and
+The recipient sees a standing "Read-only view" bar naming the link's teams (rebuilt from the
+team names it carries, never taken from free text in the link), the dashboard only (no Your Data tab, and
 none of the header buttons that write — Teams & Stages, Back up, Share or Settings), and a link
 back to their own data. Nothing they do is saved, and nothing
 already in their browser is touched — `save()`, `persist()` and `saveView()` are all
