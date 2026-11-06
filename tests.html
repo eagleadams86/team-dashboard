@@ -7617,6 +7617,19 @@ const stripComments = (src) => {
      win.TDShare.SHARE_PAYLOAD_V,
      'and the builder stamps the version the decoder checks for');
 
+  /* 2026-11-06 review: the banner's words come from the sanitised teams. */
+  {
+    const fn = APP_SRC.slice(APP_SRC.indexOf('async function openSharedView()'));
+    const body = fn.slice(0, fn.indexOf('\n}\n'));
+    ok(!/p\.label/.test(body) && /label: shareLabelOf\(state\.teams\)/.test(body),
+       'a link’s own label never reaches the banner — it is rebuilt from the sanitised team names');
+    ok(/typeof p\.sharedAt === 'number'/.test(body),
+       'and its date must be a real timestamp, or the banner leaves it out');
+    is(typeof win.shareLabelOf === 'function'
+         ? win.shareLabelOf([{ name: 'Kestrel' }, { name: '' }, null, { name: 'Osprey' }]) : null,
+       'Kestrel, Osprey', 'the label is the names joined, exactly as the sender writes it');
+  }
+
   /* ────────────────────────────────────────────────────────── */
 group('ARTs — the grouping, and the boundary it crosses');
 

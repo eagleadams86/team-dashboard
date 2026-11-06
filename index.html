@@ -26309,17 +26309,30 @@ window.TDShare = { encodeShare, decodeShare, buildSharePayload, SHARE_PAYLOAD_V 
 
 /* ── Opening a shared link ──────────────────────────────────────────────── */
 
+/* What the banner names: the sanitised teams, exactly as the sender joins them. */
+function shareLabelOf(teams) {
+  return (teams || []).map(t => t && t.name).filter(n => typeof n === 'string' && n).join(', ');
+}
+
 /* Deliberately never falls back to the viewer's own data on failure: showing
    their numbers under a "shared view" banner would be worse than an error. */
 async function openSharedView() {
   try {
     const p = await decodeShare(shareToken);
-    shareMeta = { sharedAt: p.sharedAt, label: p.label, from: p.from };
     /* A link is the least trusted input the app has — it arrives from someone
        else by definition. hydrateState() is the same sanitising boundary a
        backup file crosses: hostile ids are replaced, settings normalised. */
     state = hydrateState(p);
     if (!state.teams.length) throw new Error('empty payload');
+    /* The banner's label is REBUILT from the sanitised team names, never read
+       off the link (2026-11-06 review): the sender only ever writes the names
+       joined, so a link's own label could only differ by being hand-made, and
+       an uncapped one put a paragraph of anyone's prose in the app's chrome on
+       the shared origin. The date must be a real timestamp, or it is left out
+       rather than printed as "Invalid Date". */
+    const at = typeof p.sharedAt === 'number' && isFinite(p.sharedAt)
+      && !isNaN(new Date(p.sharedAt)) ? p.sharedAt : null;
+    shareMeta = { sharedAt: at, label: shareLabelOf(state.teams), from: p.from };
     view.activeTeamId = state.teams[0].id;
     /* The sender's forecast, so the recipient sees the answer that was sent
        rather than the app's defaults over the sender's data. Everything here is
