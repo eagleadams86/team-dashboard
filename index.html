@@ -14160,6 +14160,20 @@ const helpUnits = () => helpUnit() + 's';
    head has to fit on one line — the suite pins that shape — and this is the one
    title that has to say a word out of Settings. */
 const helpDefectWord = () => (state.settings.unplannedLabel || 'Defect');
+/* The newest start or completion that has already happened — the same scan as
+   derive()'s `dataEnd`, for a caller that needs another list's end as `asOf`. */
+function lastArrivedDate(rows) {
+  const today = new Date(todayLocalISO() + 'T00:00:00Z');
+  let end = null;
+  for (const r of rows || []) {
+    for (const v of [r && r.completed, r && r.started]) {
+      if (!v) continue;
+      const dt = new Date(v);
+      if (!isNaN(dt) && dt <= today && (!end || dt > end)) end = dt;
+    }
+  }
+  return end;
+}
 const unitRowsOf = (team) => !team ? []
   : (featureUnit() ? (team.features || []) : (team.rows || []));
 
@@ -17576,6 +17590,14 @@ function renderDashboard() {
          dashboard that forgot it would count incidents its own All Teams row
          does not. */
       teamFacts: teamFactsOf(team ? [team] : []),
+      /* THE FEATURE VIEW IS READ AS OF WHERE THE ITEMS END (2026-11-06 review),
+         the Scorecard's rule on the dashboard. Features rarely get a new date,
+         so a feature list hung off its OWN last date read every age, the aged
+         count and the forecast's "counted from" months early: on a board whose
+         last feature finished in June, an open feature 336 days old read 211.
+         `asOf` only ever moves an end date later, so a list that ends later
+         than its items is left exactly as it was. */
+      asOf: featureUnit() && team ? lastArrivedDate(team.rows) : null,
       /* The forecast's other two answers. This object is a LITERAL rather than
          the view itself — derive() takes a question, not the app's state — which
          means a field added to `view` and not added here silently never arrives.

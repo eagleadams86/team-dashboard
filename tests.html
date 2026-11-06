@@ -7630,6 +7630,30 @@ const stripComments = (src) => {
        'Kestrel, Osprey', 'the label is the names joined, exactly as the sender writes it');
   }
 
+  group('the feature view is read as of where the items end');
+  {
+    const dash = APP_SRC.slice(APP_SRC.indexOf('function renderDashboard() {'));
+    ok(/asOf: featureUnit\(\) && team \? lastArrivedDate\(team\.rows\) : null/
+         .test(dash.slice(0, dash.indexOf('\n}\n'))),
+       'the dashboard hands the feature derive its items’ end, as the Scorecard does');
+    const lad = typeof win.lastArrivedDate === 'function' ? win.lastArrivedDate : null;
+    const iso10 = d => d ? new Date(d).toISOString().slice(0, 10) : null;
+    is(lad ? iso10(lad([
+         { started: new Date('2026-01-02T00:00:00Z'), completed: new Date('2026-03-01T00:00:00Z') },
+         { started: new Date('2026-04-10T00:00:00Z'), completed: null },
+         { started: new Date('2999-01-01T00:00:00Z'), completed: null }])) : 'missing',
+       '2026-04-10', 'the items’ end is their newest start or completion that has happened');
+    is(lad ? lad([]) : 'missing', null, 'and a team with no items imposes nothing');
+    const feats = [
+      { key: 'F-1', started: new Date('2026-01-01T00:00:00Z'), completed: new Date('2026-02-01T00:00:00Z'), type: 'Feature' },
+      { key: 'F-2', started: new Date('2026-01-15T00:00:00Z'), completed: null, type: 'Feature' }];
+    const own = TD.derive(feats, SAMPLE_SETTINGS, { filterValue: '', months: 'all' });
+    const pinned = TD.derive(feats, SAMPLE_SETTINGS,
+      { filterValue: '', months: 'all', asOf: new win.Date('2026-04-10T00:00:00Z') });
+    is([iso10(own.endDate), iso10(pinned.endDate)], ['2026-02-01', '2026-04-10'],
+       'so an open feature ages to the items’ end, not to the last date a feature moved');
+  }
+
   /* ────────────────────────────────────────────────────────── */
 group('ARTs — the grouping, and the boundary it crosses');
 
