@@ -1536,12 +1536,12 @@ select { cursor: pointer; }
   cursor: pointer; user-select: none; -webkit-user-select: none;
   transition: background-color .12s ease; }
 .boxhead > :not(.box-toggle) { flex: 1 1 auto; min-width: 0; margin: 0; }
-:is(.card, .chart-card).boxshut > .boxhead { margin-bottom: -18px; border-bottom: 0;
-  border-radius: calc(var(--radius) - 1px); }
+@media screen { :root:not([data-printing]) :is(.card, .chart-card).boxshut > .boxhead {
+  margin-bottom: -18px; border-bottom: 0; border-radius: calc(var(--radius) - 1px); } }
 /* Folded, a chart card no longer stands as tall as the chart beside it: the
    stretch that keeps a row even (see .no-chart) would leave a tall empty box. */
 .chart-card.boxshut { align-self: start; }
-@media screen { :is(.card, .chart-card).boxshut > :not(.boxhead) { display: none !important; } }
+@media screen { :root:not([data-printing]) :is(.card, .chart-card).boxshut > :not(.boxhead) { display: none !important; } }
 .box-toggle { flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; min-height: 0; margin: 0; padding: 0; border: 0;
   background: none; color: var(--text-secondary); cursor: pointer; border-radius: var(--radius-sm); }
@@ -21693,8 +21693,17 @@ function setBoxShut(card, shut) {
   const key = card.dataset.boxkey;
   foldedBoxes = cleanFolds(shut ? foldedBoxes.concat(key) : foldedBoxes.filter(k => k !== key));
   try { localStorage.setItem(FOLD_STORE, foldedBoxes.join('|')); } catch (e) {}
+  /* Folding the card that fills the window closes the window (syncMaxiButtons
+     below), and closeMaxi hands focus to the card's ⤢, which a folded card
+     hides — so a keyboard fold landed on <body> (2026-11-06 review). The fold's
+     own toggle is where the press happened, so focus goes back to it. */
+  const wasMaxi = shut && card === maxiCard;
   /* No full-screen button on a folded chart, and the labels say open or fold. */
   syncMaxiButtons();
+  if (wasMaxi) {
+    nameFoldToggles();
+    if (t && document.activeElement !== t) t.focus({ preventScroll: false });
+  }
   if (shut) return;
   /* A chart drawn while its card was folded sized itself to nothing. */
   const ch = chartIn(card);
@@ -22936,9 +22945,15 @@ function beforePrint() {
     themeBeforePrint = now;
     document.documentElement.setAttribute('data-theme', 'light');
   }
+  /* A folded card prints open, and its chart must be DRAWN open: rendered
+     while the screen rule still hid it, a folded chart sized itself to nothing
+     and printed as an empty well (2026-11-06 review). `data-printing` lifts
+     the fold rule for the length of the print; nothing is saved. */
+  document.documentElement.setAttribute('data-printing', '');
   renderViews();                            /* charts re-read the CSS variables */
 }
 function afterPrint() {
+  document.documentElement.removeAttribute('data-printing');
   if (!printPlates && !themeBeforePrint) return;
   printPlates = false;
   if (themeBeforePrint) document.documentElement.setAttribute('data-theme', themeBeforePrint);
@@ -23062,14 +23077,18 @@ function parseProblemsHtml(res, planned) {
    left to be inferred from a row count that changed. Silent when the reader has
    set no feature types up: a report about a switched-off feature is noise on
    every paste anybody makes. */
-function featuresReadHtml(res) {
+/* `planned` is the paste preview, where nothing has been saved yet: the same
+   report in the future tense (2026-11-06 review — 3ee535a fixed the headline
+   and left these sentences saying "saved"). */
+function featuresReadHtml(res, planned) {
   const on = (state.settings.featureTypes || []).length;
   const parentCol = res.columns.parent;
   if (!on && parentCol < 0) return '';
   const colName = i => (i < 0 ? 'none' : 'column ' + (i + 1));
   let html = '';
   if (parentCol >= 0) {
-    html += '<br>Read <strong>' + colName(parentCol) + '</strong> as the parent key, and saved it '
+    html += '<br>Read <strong>' + colName(parentCol) + '</strong> as the parent key, and '
+      + (planned ? 'will save it ' : 'saved it ')
       + 'with each item — it is what joins an item to the feature it belongs to. Held to the '
       + 'same shape as the issue key: letters, a dash and digits, and nothing else. '
       + '<strong>A <em>Parent summary</em> column is never read</strong> — it is typed by hand, '
@@ -23081,15 +23100,17 @@ function featuresReadHtml(res) {
   if (on) {
     const n = res.features.length;
     html += '<br>' + (n
-      ? 'Took <strong>' + n + ' row' + (n === 1 ? '' : 's') + '</strong> out as features, '
+      ? (planned ? 'Will take <strong>' : 'Took <strong>') + n + ' row' + (n === 1 ? '' : 's') + '</strong> out as features, '
         + 'kept separately from your work items so none of them reaches a single '
         + 'item-level figure.'
-      : 'No row in this paste matched a feature type, so nothing was taken out as a feature. '
+      : 'No row in this paste matched a feature type, so nothing '
+        + (planned ? 'will be' : 'was') + ' taken out as a feature. '
         + 'The work types found are listed above — copy the one that means a feature into '
         + 'Settings.');
     if (res.featuresNoKey) {
       html += ' <strong>' + res.featuresNoKey + ' feature row'
-        + (res.featuresNoKey === 1 ? ' was' : 's were') + ' dropped for having no key</strong> — '
+        + (planned ? (res.featuresNoKey === 1 ? ' will be' : 's will be')
+          : (res.featuresNoKey === 1 ? ' was' : 's were')) + ' dropped for having no key</strong> — '
         + 'a feature is named by its key, so one without a key can never be joined to anything.';
     }
   }
@@ -23127,7 +23148,7 @@ function workFieldsReadHtml(res) {
   return html;
 }
 
-function columnsReadHtml(res) {
+function columnsReadHtml(res, planned) {
   const colName = i => (i < 0 ? 'none' : 'column ' + (i + 1));
   return '<br>Read <strong>' + colName(res.columns.completed) + '</strong> as the completed date, ' +
     '<strong>' + colName(res.columns.started) + '</strong> as the start date' +
@@ -23155,7 +23176,8 @@ function columnsReadHtml(res) {
        are: this is the one field that is an identifier out of a work system, so
        whether it was saved is not something to leave anyone guessing at. */
     (res.columns.key >= 0
-      ? '<br>Read <strong>' + colName(res.columns.key) + '</strong> as the issue key, and saved it '
+      ? '<br>Read <strong>' + colName(res.columns.key) + '</strong> as the issue key, and '
+        + (planned ? 'will save it ' : 'saved it ')
         + 'with each item — it names the dots on the charts, and its project id is what a '
         + 'multi-team paste is split by. Only that shape is kept: '
         + 'letters, a dash and digits. Anything else in that column is dropped.'
@@ -23166,7 +23188,7 @@ function columnsReadHtml(res) {
        not a thing to leave anybody guessing at. The sentence also states what
        was NOT read from that part of the export, because the column next to
        this one is the one people worry about. */
-    featuresReadHtml(res) +
+    featuresReadHtml(res, planned) +
     workFieldsReadHtml(res) +
     /* The two-column case: Created is standing in as the start date, which is
        what this app has always done with it. Lead time then equals cycle time,
@@ -23597,7 +23619,7 @@ function showMultiNote(res, route, mode, featureRoute) {
       + '<strong>No issue key column in this paste.</strong> A split is made from the project id '
       + 'at the front of each key — the <em>DAE</em> in DAE-1552 — so there is nothing here to '
       + 'split by. Export a <em>Key</em> column alongside the dates.'
-      + columnsReadHtml(res).replace(/^<br>/, '<br><br>') + '</div>';
+      + columnsReadHtml(res, mode === 'check').replace(/^<br>/, '<br><br>') + '</div>';
     el.innerHTML = html;
     return;
   }
@@ -23724,7 +23746,7 @@ function showMultiNote(res, route, mode, featureRoute) {
         + (route.noKey === 1 ? ' had' : 's had') + ' no readable issue key, so '
         + (route.noKey === 1 ? 'it' : 'they') + ' could not be sent anywhere and '
         + (route.noKey === 1 ? 'was' : 'were') + ' left out.' : '')
-    + columnsReadHtml(res)
+    + columnsReadHtml(res, mode === 'check')
     + '</div>';
 
   el.innerHTML = html;
@@ -23901,6 +23923,16 @@ $('parseNote').addEventListener('click', e => {
      loaded outright: pressing "create" is agreeing to the team, not to a
      replace of everything else the paste names. */
   pastePlan();
+  /* The plan redraw destroyed the pressed button, and a keyboard user was left
+     on <body> with the rest of the plan below them (2026-11-06 review). Focus
+     goes to the next Create button if one is left, else to the button that
+     loads the paste. Only when focus was actually lost. */
+  const lost = !document.activeElement || document.activeElement === document.body
+    || !document.activeElement.isConnected;
+  if (lost) {
+    const next = $('parseNote').querySelector('[data-create-team]') || $('btnLoad');
+    if (next && !next.hidden && !next.disabled) next.focus();
+  }
 });
 
 /* Which team answers to what, in the closed disclosure over the paste buttons —

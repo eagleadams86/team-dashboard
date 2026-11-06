@@ -19294,6 +19294,37 @@ group('a card with no chart matches the one beside it');
     is(win.maxiReady(card), false, 'fold: a folded chart offers no full screen');
     card.querySelector(':scope > .boxhead').click();
     ok(!card.classList.contains('boxshut'), 'fold: a press on the band opens it again');
+
+    /* 2026-11-06 review. */
+    toggle.click();
+    win.beforePrint();
+    const pc = win.chartIn(card);
+    ok(!!pc && pc.width > 0 && fDoc.documentElement.hasAttribute('data-printing'),
+       'fold: a folded chart is DRAWN open for a print, not as an empty well', pc && pc.width);
+    win.afterPrint();
+    ok(!fDoc.documentElement.hasAttribute('data-printing') && card.classList.contains('boxshut'),
+       'fold: and after the print it is folded again, nothing saved');
+    card.querySelector(':scope > .boxhead > .box-toggle').click();
+    win.openMaxi(card);
+    const mt = card.querySelector(':scope > .boxhead > .box-toggle');
+    mt.focus();
+    mt.click();
+    ok(card.classList.contains('boxshut') && fDoc.activeElement === mt,
+       'fold: folding the card that fills the window keeps focus on its toggle, not <body>',
+       fDoc.activeElement && fDoc.activeElement.tagName);
+    is(mt.getAttribute('aria-label').slice(0, 5), 'Open ', 'fold: and the toggle now says it opens');
+    mt.click();
+    const plan = win.columnsReadHtml({ columns: { key: 0, parent: -1 }, features: [] }, true);
+    ok(/will save it/.test(plan) && !/saved it/.test(plan),
+       'the paste preview says the key WILL be saved — nothing has been loaded yet');
+    ok(/saved it/.test(win.columnsReadHtml({ columns: { key: 0, parent: -1 }, features: [] }, false)),
+       'and the report after a load says it was');
+    {
+      const at = APP_SRC.indexOf("$('parseNote').addEventListener('click'");
+      const h = APP_SRC.slice(at, APP_SRC.indexOf('\n});', at));
+      ok(/pastePlan\(\);[\s\S]*querySelector\('\[data-create-team\]'\) \|\| \$\('btnLoad'\)/.test(h),
+         'Create Team hands focus to the next Create button, or Load, once the plan redraws');
+    }
     plant({ teams: [], settings: {} });
     if (had === null) win.localStorage.removeItem('td-folded'); else win.localStorage.setItem('td-folded', had);
   }
