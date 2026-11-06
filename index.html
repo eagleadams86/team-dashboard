@@ -23432,7 +23432,7 @@ function showParseNote(res, mode, team, adopted) {
     (res.unfinished ? ', ' + res.unfinished + ' of them still in progress' : '') +
     (res.skippedHeader ? ' (header row skipped)' : '') + '.' +
     (res.undated ? ' <strong>' + res.undated + '</strong> row' + (res.undated === 1 ? ' had' : 's had') +
-      ' no dates at all and ' + (res.undated === 1 ? 'was' : 'were') + ' ignored — nothing started, ' +
+      ' no start or finish date and ' + (res.undated === 1 ? 'was' : 'were') + ' ignored — nothing started, ' +
       'nothing finished, so nothing to plot.' : '') +
     columnsReadHtml(res) +
     (adopted
@@ -23716,7 +23716,7 @@ function showMultiNote(res, route, mode, featureRoute) {
     + (res.unfinished ? ', ' + res.unfinished + ' of them still in progress' : '')
     + (res.skippedHeader ? ' (header row skipped)' : '') + '.'
     + (res.undated ? ' <strong>' + res.undated + '</strong> row' + (res.undated === 1 ? ' had' : 's had')
-        + ' no dates at all and ' + (res.undated === 1 ? 'was' : 'were') + ' ignored.' : '')
+        + ' no start or finish date and ' + (res.undated === 1 ? 'was' : 'were') + ' ignored.' : '')
     /* A row with no key cannot be routed at all. Counted here rather than in a
        bucket of its own above: the fix is a column in the export, which is the
        same fix the missing-key sentence below already asks for. */
