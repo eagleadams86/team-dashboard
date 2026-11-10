@@ -411,8 +411,9 @@ function ok(cond, name, msg) { record(!!cond, name, msg); }
    section to 4225, the All Teams non-discretionary column to 4230, and Team
    Support Desk in the demo to 4242, and the Scorecard's Distribution card to 4254.
    The plot areas as wells, the tile rows as cards (2026-10-31, theme pack rule
-   21) took it from 4495 to 4542. */
-const EXPECTED = 4580;
+   21) took it from 4495 to 4542. The 2026-11-10 review (figures, boundaries, on
+   screen, keyboard) took it from 4584 to 4659. */
+const EXPECTED = 4650;
 
 /* HTML comments explain things by naming them — including the very elements
    these assertions look for, and one of those notes lives in a <style> block a
@@ -19641,6 +19642,57 @@ group('a card with no chart matches the one beside it');
          'wording: nothing says statuses are not kept or shared — they are');
     } finally { win.confirm = real; }
     plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('2026-11-10 review: keyboard and screen reader');
+  {
+    const names = [...appDoc.querySelectorAll('.chart-name')];
+    ok(names.length >= 22 && names.every(n => n.getAttribute('role') === 'heading' && n.getAttribute('aria-level') === '2'),
+       'headings: every card name is a level-2 heading, so the charts can be stepped through', names.length);
+    const heads = [...appDoc.querySelectorAll('.manage-head')];
+    ok(heads.length >= 17 && heads.every(n => n.getAttribute('role') === 'heading' && n.getAttribute('aria-level') === '3'),
+       'and every ruled section in a settings window is a level-3 heading under its title', heads.length);
+    {
+      const at = APP_SRC.indexOf("$('welcomeFreshBtn').addEventListener('click'");
+      ok(/focusView\(true\)/.test(APP_SRC.slice(at, APP_SRC.indexOf('});', at))),
+         'focus: Start Fresh hands the keyboard to the view it opens');
+      const ls = APP_SRC.slice(APP_SRC.indexOf('function loadSample()'));
+      ok(/!held\.getClientRects\(\)\.length\) focusView\(true\)/.test(ls.slice(0, ls.indexOf('\n}\n'))),
+         'and so does Load Sample Data, when its button has gone');
+      const sr = APP_SRC.slice(APP_SRC.indexOf("$('scReset').addEventListener('click'"));
+      ok(/focusMark\(\)[\s\S]*focusReturn\(mark, \$\('fcScenarioToggle'\)\)/.test(sr.slice(0, sr.indexOf('\n});'))),
+         'a reset that disables its own button passes the keyboard on');
+      const cr = APP_SRC.slice(APP_SRC.indexOf("$('cleanupRunBtn').addEventListener('click'"));
+      ok(/focusReturn\(mark, \$\('cleanupCancelBtn'\)\)/.test(cr.slice(0, cr.indexOf('\n});'))),
+         'and so does a clean-up that leaves nothing to remove');
+    }
+    {
+      const v = win.tdView.now(), was = v.months;
+      const from = appDoc.getElementById('customFrom'), to = appDoc.getElementById('customTo');
+      is(from.getAttribute('aria-describedby'), 'windowNote', 'custom dates: the From box is described by the note that explains it');
+      is(to.getAttribute('aria-describedby'), 'windowNote', 'and the To box');
+      v.months = 'custom';
+      win.customNote({ customUsed: false });
+      ok(from.getAttribute('aria-invalid') === 'true' && to.getAttribute('aria-invalid') === 'true',
+         'a window that cannot be used marks both boxes invalid');
+      win.customNote({ customUsed: true });
+      ok(!from.hasAttribute('aria-invalid') && !to.hasAttribute('aria-invalid'), 'and a usable one clears it');
+      v.months = was;
+      win.customNote({ customUsed: true });
+    }
+    ok(/Ctrl/.test(appDoc.querySelector('#searchDialog p').textContent),
+       'Find says its own shortcut on screen, not only in a tooltip');
+    {
+      const pre = appDoc.getElementById('jiraBookmarkCode');
+      ok(pre.tabIndex === 0 && pre.getAttribute('role') === 'region' && !!pre.getAttribute('aria-label'),
+         'Jira bookmark: the code box can be reached and scrolled from the keyboard');
+      const at = APP_SRC.indexOf("links.addEventListener('click'");
+      ok(/copyText\(href\)/.test(APP_SRC.slice(at, at + 1600)),
+         'and pressing a bookmark copies its address — dragging is not the only way to install one');
+      ok(/copy\s+its address/.test(appDoc.getElementById('jiraBookmark').textContent),
+         'which the first step says');
+    }
   }
 
   /* ────────────────────────────────────────────────────────── */

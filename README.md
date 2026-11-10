@@ -147,7 +147,9 @@ Sepia and Dark the palette makes the accent the *body-text ink*, so a throughput
 same colour as the writing around it and the dashboard read as black and grey. Trend and reference
 lines stay muted grey on purpose — they are annotation over the data, not data.
 
-Each chart carries a dashed linear trend line, and four **summary tiles** above the tabs state
+Each chart carries a dashed linear trend line — on a chart of counts it is fitted through whole
+periods only and stops short of an unfinished last one, so a week two days old never reads as a
+fall — and four **summary tiles** above the tabs state
 the window-wide figures — one for each dimension a kanban team can act on:
 
 | Tile | Question it answers |
@@ -1260,7 +1262,8 @@ window**, plus **everything still in progress whatever its age** (so aged work i
 dropped), for the **projects set on your teams**
 in Teams, ARTs & Stages (the DAE in DAE-1552). The section says which projects those are, and
 shows no bookmarks until at least one team has a project id. Drag the ones you want to your
-bookmarks bar. Then, whenever you want fresh data:
+bookmarks bar — or press one, which copies its address for you to paste into a new bookmark, so
+the keyboard can install it too. Then, whenever you want fresh data:
 
 1. Open your Jira site in a tab and click a bookmark.
 2. Check the search it offers (JQL; you can edit it before pressing **OK**).
@@ -1673,7 +1676,9 @@ feature could do, so the aged-work figures are pinned untouched by a test.
   because cycle times are strongly right-skewed — most work finishes quickly and a thin tail runs
   long — and a 1.5 fence would eat a good slice of a perfectly legitimate tail, quietly reshaping
   the 85th percentile you forecast with. It needs **at least 12 finished items** before it will
-  offer an opinion, because quartiles off a handful are noise.
+  offer an opinion, because quartiles off a handful are noise — and it offers none when the
+  middle half of them took exactly the same time, where the fence would sit on the commonest
+  value and ignore everything longer.
 - **Anything over a number I set** — your own cutoff in days. No twelve-item floor: a typed fence
   isn't derived from the data, so a small sample can't make it wrong.
 
@@ -2295,7 +2300,9 @@ A Status column is a short repeated label — which is exactly what the app's wo
 hunts for, and *Ready for Code Review* is short enough to pass as a work type. Before the app
 knew what a Status column was, an export without clear headings could quietly file its statuses
 as work types. Naming the column takes it out of that guess, whether or not any stage matches
-what's in it.
+what's in it. Since 10 Nov 2026 the guess is for columns with **no heading at all**: a column
+headed *Assignee* or *Epic Name* is never read as the work type, however much it repeats, so an
+export with no Issue Type column loads with no type rather than saving names as types.
 
 Only work **still in flight** gets a stage. Every export says *Done* against everything it has
 ever closed, and a finished item's current status says nothing about flow — so those are
@@ -3963,7 +3970,7 @@ Cleanup gets the same treatment, since it's the one action with no undo: `outsid
 pinned on both sides of the cutoff (the cutoff day itself is kept), on work in progress with
 and without the box ticked, and on the case that would hurt most — an old start date with a
 recent completion, which must stay. `historyAnchor()` is pinned to the newest date in the data
-rather than today, and `windowCutoff()` on each shape of answer — including a half-typed custom
+that has happened — a planned date after today never moves it — rather than today, and `windowCutoff()` on each shape of answer — including a half-typed custom
 date, which must yield no cutoff rather than a guess. These three are shared with the share
 dialog, so both dialogs sit on one set of tests. One end-to-end check runs the whole reference
 sample past a 3-month cutoff and asserts every item is either kept or removed, never both.

@@ -5465,3 +5465,75 @@ Left alone: "Work Feature Age" (the 2026-08-27 unit-noun rule); the default JQL 
 Feature and Cancelled, which another Jira site may not have; a plain `Parent` heading is not read
 as the parent key (anchored on purpose — confirm against a real export first).
 
+## Fixes From the 2026-11-10 Review — no schema change
+
+Five parallel reviewers (figures, security, UI driven, WCAG, README accuracy), four days after the
+last review and with no commits between: everything here was missed on 2026-11-06. Each fix has a
+check in one of four `2026-11-10 review:` groups at the end of tests.html; suite 4584 → 4659,
+floor 4650. axe was clean and no XSS was found (181 planted payloads).
+
+**Figures**
+- **`deriveTeams` reads the feature view as of where the items end** — the 11-06 dashboard fix,
+  which neither of its callers got. All Teams showed Mar–Jun beside a dashboard showing Aug–Nov and
+  the pooled forecast promised a date in the past. The pre-scan raises each team's `dataEnd` the
+  same way, or every team reads as months stale and the forecast is trimmed back to June.
+- **`historyAnchor` ignores dates after today** (derive's `arrived()` fence). One planned start a
+  year out made "keep 3 months" offer every finished item for deletion.
+- **`outlierCutoffOf` returns null on a zero IQR.** The fence sat ON Q3 and ignored everything
+  above the commonest value (16 same-day tickets + 4 longer = all 4 ignored, p85 0.5).
+- **`throughputTrend` and the throughput charts' dashed line fit whole periods only**
+  (`trendDataset(values, partial)`). Only for COUNTS; rates and WIP are levels and keep every point.
+- **`roleAt` skips `stageHeadingBare` headings for all three date roles** — 11-06 did `startAt`
+  only. "Days in Done" took the completed role from Resolved and dated a row 1903.
+- **"Untouched My team" tests both lists** (Create Team and `loadSample`); **`doLoad` keeps
+  `team.features` when a replace paste carried none**; **Time in Stage adds what was open at the
+  window's END** (the `inFlight` rule), not open today.
+
+**Boundaries**
+- **A HEADED column is never guessed into the work type.** The fewest-distinct guess ran whenever
+  no heading said "type" and stored assignee names and epic titles as types — the storage rule
+  broken at the paste. Only a column with a BLANK heading is a candidate now. This supersedes the
+  prose-guard comparison test, which had pinned `Parent detail` being taken.
+- **`parseDate` and `dateEvidence` refuse a cell over `DATE_TEXT_MAX` (64).** `TIME_SUFFIX`
+  backtracks quadratically: one 32,000-character cell froze the tab ~2 s per parse.
+- **Own-key lookups** in `bucketFor`, `selectChartTab` and `CYCLE_LABEL_RECASE`: `constructor`
+  in `td-view` bricked the page for good, and in a share link made `cycleTimeLabel` a function.
+  **Any lookup keyed by a stored or shared word needs `hasOwnProperty`.**
+- **`decodeShare` caps a payload at `SHARE_MAX_TEAMS` 200 / `SHARE_MAX_ROWS` 200,000** before
+  sanitising (300,000 deflated rows fit a 130k link and took 24 s); `shareLabelOf` names eight
+  teams then counts. `build-single.py` fails on README HTML that could run or load anything, and
+  on a `</style` in theme.css.
+
+**On screen**
+- `chipStack()` places every reference-line chip before any is painted (the clamp undid the
+  nudge on the demo's default chart). `.subtabs` is nowrap + scroll — the fifth tab had wrapped
+  it on a phone; its 4px padding/negative margin is ring room, as on `.tabs`.
+- A split paste with NO team to take it disables Load and Append and heads the card "Your Teams".
+- The three filter-list handlers call `renderViews()`, not `renderDashboard()`.
+- `renderStageTime`'s empty state reads `unitRowsOf(team)` and drops the "pick another type" clause
+  when the filter is All. Custom dates prefill from the TEAM's last date on the dashboard.
+- `tdCounts` carries `features`; `tdCountsText()` writes the one sentence four places share.
+- `stagesReadHtml(res, planned)` — future tense in the preview. Two sentences no longer say
+  statuses are not kept. A blank name box takes its fallback on `change`; `cleanName` trims.
+
+**Keyboard and screen reader**
+- `.chart-name` is `role="heading" aria-level="2"`, `.manage-head` level 3 (static attributes).
+- `loadSample`, Start Fresh, `#scReset` and `#cleanupRunBtn` hand focus on. **A hidden button is
+  still `document.activeElement` until the next frame — test `getClientRects().length`, not
+  `=== document.body`.**
+- The custom date boxes are `aria-describedby="windowNote"`; `customNote()` sets `aria-invalid`.
+- Pressing a Jira bookmark COPIES its address (drag was the only way to install one); the code
+  `<pre>` is a focusable region; Find's intro states ⌘K / Ctrl+K.
+
+**README/NOTICE/privacy:** 37 statements corrected (f390c9f). NOTICE had said issue keys are
+never stored.
+
+**Raised with Charles, NOT changed:**
+- Per-period chart values exist only on mouse hover (WCAG 1.1.1): each chart needs a figures
+  table like the forecast's, or a Copy/CSV — a design decision.
+- Team Long Tail's p85 at the default window flips between 8 and 23 by the day the demo is loaded
+  (the suite pins it only at `months: 'all'`); README softened, demo data untouched.
+- Average cycle time holds 0 for an empty period and its line runs through it; `hydrateRow` rolls
+  an impossible date (Feb 31) forward on a hand-edited backup; the Scorecard's prior window can
+  cover a different number of days. All unproven or possibly deliberate.
+- Workflow actions are pinned by tag, not SHA.

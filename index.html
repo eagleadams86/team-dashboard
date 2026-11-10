@@ -2985,11 +2985,11 @@ input:is([type="checkbox"], [type="radio"]) { flex: none; width: 1.25rem; height
          everybody who never touches this. -->
     <div class="field" id="customRange" hidden>
       <label for="customFrom">From</label>
-      <input type="date" id="customFrom">
+      <input type="date" id="customFrom" aria-describedby="windowNote">
     </div>
     <div class="field" id="customRangeTo" hidden>
       <label for="customTo">To</label>
-      <input type="date" id="customTo">
+      <input type="date" id="customTo" aria-describedby="windowNote">
     </div>
     <div class="field" id="bucketField">
       <label for="bucketSel">Group by</label>
@@ -3113,7 +3113,7 @@ input:is([type="checkbox"], [type="radio"]) { flex: none; width: 1.25rem; height
          column carries a sparkline per team, which is the shape a per-team
          comparison actually wants. -->
     <div class="chart-card" id="cardTrainThroughput" style="margin-bottom:18px">
-      <div class="chart-name" id="nameTrainThroughput"></div>
+      <div class="chart-name" role="heading" aria-level="2" id="nameTrainThroughput"></div>
       <div class="chart-title" id="titleTrainThroughput"></div>
       <div class="chart-wrap"><canvas id="chartTrainThroughput"></canvas></div>
     </div>
@@ -3230,7 +3230,8 @@ input:is([type="checkbox"], [type="radio"]) { flex: none; width: 1.25rem; height
           </div>
           <p id="jiraBookmarkNone" style="margin:0 0 var(--sp-4)" hidden></p>
           <ol style="margin:0;padding-left:1.4em">
-            <li><strong>Drag the ones you want to your bookmarks bar.</strong> Each fetches the
+            <li><strong>Drag the ones you want to your bookmarks bar</strong> — or press one to copy
+              its address, then add a new bookmark and paste that as the address. Each fetches the
               work started, raised or finished in that window, plus everything still in progress. No bar? Press
               <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> (<kbd>&#8984;</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> on a Mac) to show it.</li>
             <li>Open your Jira site in another tab and click the bookmark.</li>
@@ -3251,7 +3252,7 @@ input:is([type="checkbox"], [type="radio"]) { flex: none; width: 1.25rem; height
           </p>
           <details style="margin-top:var(--sp-4)">
             <summary>Show the Bookmark&rsquo;s Code</summary>
-            <pre class="jira-code" id="jiraBookmarkCode"></pre>
+            <pre class="jira-code" id="jiraBookmarkCode" tabindex="0" role="region" aria-label="The bookmark’s code"></pre>
           </details>
         </div>
       </details>
@@ -3481,7 +3482,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <div class="grid charts" id="spanel-flow" role="tabpanel" aria-labelledby="stab-flow">
         <div class="tiles group" id="tilesFlow"></div>
         <div class="chart-card">
-          <div class="chart-name" id="nameCycleTime"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameCycleTime"></div>
           <div class="chart-title" id="titleCycleTime"></div>
           <div class="chart-wrap"><canvas id="chartCycleTime"></canvas></div>
         </div>
@@ -3492,7 +3493,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              visible. Every item, not a per-period average — this is the one
              chart in the app where a single outlier is a thing you can point at. -->
         <div class="chart-card" id="cardCycleScatter">
-          <div class="chart-name" id="nameCycleScatter"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameCycleScatter"></div>
           <div class="chart-title" id="titleCycleScatter"></div>
           <div class="chart-wrap"><canvas id="chartCycleScatter"></canvas></div>
           <div class="note info" id="cycleScatterNone" hidden></div>
@@ -3506,7 +3507,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              single column's width and sits centred rather than stretching across
              the row, which would read as the more important chart. -->
         <div class="chart-card solo" id="cardLeadTime">
-          <div class="chart-name" id="nameLeadTime"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameLeadTime"></div>
           <div class="chart-title" id="titleLeadTime"></div>
           <div class="chart-wrap"><canvas id="chartLeadTime"></canvas></div>
           <div class="note info needs-created" hidden>
@@ -3531,7 +3532,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              `hidden` in the markup and revealed by the renderer, so an item view
              is byte-for-byte the layout it always was. -->
         <div class="chart-card" id="cardFeatureSize" hidden>
-          <div class="chart-name" id="nameFeatureSize"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameFeatureSize"></div>
           <div class="chart-title" id="titleFeatureSize"></div>
           <div class="chart-wrap"><canvas id="chartFeatureSize"></canvas></div>
           <div class="note info" id="featureSizeNone" hidden></div>
@@ -3542,13 +3543,13 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
       <div class="grid charts" id="spanel-delivery" role="tabpanel" aria-labelledby="stab-delivery" hidden>
         <div class="tiles group" id="tilesDelivery"></div>
         <div class="chart-card">
-          <div class="chart-name" id="nameThroughput"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameThroughput"></div>
           <div class="chart-title" id="titleThroughput"></div>
           <div class="chart-wrap"><canvas id="chartThroughput"></canvas></div>
         </div>
 
         <div class="chart-card">
-          <div class="chart-name" id="nameNetFlow"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameNetFlow"></div>
           <div class="chart-title" id="titleNetFlow"></div>
           <div class="chart-wrap"><canvas id="chartNetFlow"></canvas></div>
         </div>
@@ -3565,7 +3566,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              important one. The maximise button is there for anybody who wants it
              big, which is what that button is for. -->
         <div class="chart-card solo">
-          <div class="chart-name" id="nameCfd"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameCfd"></div>
           <div class="chart-title" id="titleCfd"></div>
           <div class="chart-wrap"><canvas id="chartCfd"></canvas></div>
         </div>
@@ -3575,7 +3576,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         <div class="tiles group" id="tilesHealth"></div>
 
         <div class="chart-card">
-          <div class="chart-name" id="nameWip"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameWip"></div>
           <div class="chart-title" id="titleWip"></div>
           <div class="chart-wrap"><canvas id="chartWip"></canvas></div>
         </div>
@@ -3590,7 +3591,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              the line itself is never graded. Same empty face as the card below
              for the same reason: no threshold, no numerator, nothing to plot. -->
         <div class="chart-card" id="cardAgedShare">
-          <div class="chart-name" id="nameAgedShare"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameAgedShare"></div>
           <div class="chart-title" id="titleAgedShare"></div>
           <div class="chart-wrap"><canvas id="chartAgedShare"></canvas></div>
           <div class="note info" id="agedShareNone" hidden></div>
@@ -3605,7 +3606,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              than vanishing is the rule the defect rate and lead time cards
              already follow. -->
         <div class="chart-card" id="cardAgedWork">
-          <div class="chart-name" id="nameAgedWork"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameAgedWork"></div>
           <div class="chart-title" id="titleAgedWork"></div>
           <div class="chart-wrap"><canvas id="chartAgedWork"></canvas></div>
           <div class="note info" id="agedWorkNone" hidden></div>
@@ -3618,7 +3619,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              team with nothing in flight is a real and unremarkable state, not
              a missing chart. -->
         <div class="chart-card" id="cardItemAge">
-          <div class="chart-name" id="nameItemAge"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameItemAge"></div>
           <div class="chart-title" id="titleItemAge"></div>
           <div class="chart-wrap"><canvas id="chartItemAge"></canvas></div>
           <div class="note info" id="itemAgeNone" hidden></div>
@@ -3632,7 +3633,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              laptop, which is exactly the orphaned-control problem the layout
              rules exist to stop. -->
         <div class="chart-card wide" id="cardStageTime">
-          <div class="chart-name" id="nameStageTime"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameStageTime"></div>
           <div class="chart-title" id="titleStageTime"></div>
           <div class="row spread" style="margin-bottom:var(--sp-4)">
             <span></span>
@@ -3656,7 +3657,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              It is also the ONLY place in the app a feature is listed by name,
              which matters until features can be typed in by hand. -->
         <div class="chart-card wide" id="cardFeatureProgress" hidden>
-          <div class="chart-name" id="nameFeatureProgress"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameFeatureProgress"></div>
           <div class="chart-title" id="titleFeatureProgress"></div>
           <div class="row spread" style="margin-bottom:var(--sp-4)">
             <span></span>
@@ -3692,28 +3693,28 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              card already follows: the answer to "where did the defect rate go?"
              belongs on screen. -->
         <div class="chart-card" id="cardDefectRate">
-          <div class="chart-name" id="nameDefectRate"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameDefectRate"></div>
           <div class="chart-title" id="titleDefectRate"></div>
           <div class="chart-wrap"><canvas id="chartDefectRate"></canvas></div>
           <div class="note info" id="defectRateNone" hidden></div>
         </div>
 
         <div class="chart-card" id="cardDefectSource">
-          <div class="chart-name" id="nameDefectSource"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameDefectSource"></div>
           <div class="chart-title" id="titleDefectSource"></div>
           <div class="chart-wrap"><canvas id="chartDefectSource"></canvas></div>
           <div class="note info" id="defectSourceNone" hidden></div>
         </div>
 
         <div class="chart-card" id="cardDefectFound">
-          <div class="chart-name" id="nameDefectFound"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameDefectFound"></div>
           <div class="chart-title" id="titleDefectFound"></div>
           <div class="chart-wrap"><canvas id="chartDefectFound"></canvas></div>
           <div class="note info" id="defectFoundNone" hidden></div>
         </div>
 
         <div class="chart-card" id="cardWorkKind">
-          <div class="chart-name" id="nameWorkKind"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameWorkKind"></div>
           <div class="chart-title" id="titleWorkKind"></div>
           <div class="chart-wrap"><canvas id="chartWorkKind"></canvas></div>
           <div class="note info" id="workKindNone" hidden></div>
@@ -3983,7 +3984,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              the same colour their part of the distribution is drawn in, so the
              shading needs no legend of its own. -->
         <div class="chart-card" id="cardForecastWhen">
-          <div class="chart-name" id="nameForecastWhen"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameForecastWhen"></div>
           <div class="chart-title" id="titleForecastWhen"></div>
           <div class="chart-wrap"><canvas id="chartForecastWhen"></canvas></div>
           <div class="forecast-rows" id="rowsForecastWhen"></div>
@@ -3991,7 +3992,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
         </div>
 
         <div class="chart-card" id="cardForecastHowMany">
-          <div class="chart-name" id="nameForecastHowMany"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameForecastHowMany"></div>
           <div class="chart-title" id="titleForecastHowMany"></div>
           <div class="chart-wrap"><canvas id="chartForecastHowMany"></canvas></div>
           <div class="forecast-rows" id="rowsForecastHowMany"></div>
@@ -4010,7 +4011,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              is a number nobody can check, and a fortnight later nobody can
              remember either. -->
         <div class="chart-card wide" id="cardForecastFigures">
-          <div class="chart-name" id="nameForecastFigures"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameForecastFigures"></div>
           <div class="chart-title" id="titleForecastFigures"></div>
           <div class="row spread" style="margin-bottom:var(--sp-4)">
             <span></span>
@@ -4028,7 +4029,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
              the answer is one date per feature and a chart of six dates says
              less than the six dates do. Wide, like the stage-time card. -->
         <div class="chart-card wide" id="cardSchedule" hidden>
-          <div class="chart-name" id="nameSchedule"></div>
+          <div class="chart-name" role="heading" aria-level="2" id="nameSchedule"></div>
           <div class="chart-title" id="titleSchedule"></div>
           <div class="row spread" style="margin-bottom:var(--sp-4)">
             <span></span>
@@ -4110,7 +4111,8 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <h3 id="searchDialogTitle">Find</h3>
   <p>Your teams, the trains they are on, your workflow stages and the aliases
     they match — and any work item, by its issue key or its type. An item opens straight
-    into its editor.</p>
+    into its editor. Press <kbd>&#8984;K</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd> anywhere to open
+    this window.</p>
   <label class="sr-only" for="searchBox">Search</label>
   <input type="text" id="searchBox" autocomplete="off" spellcheck="false"
     placeholder="At least two characters…">
@@ -4125,7 +4127,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Teams</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Teams</strong>
       <button class="btn small" id="btnAddTeam" type="button">+ Add a Team</button>
     </div>
     <p class="manage-note">Each team keeps its own work items. The picker in the header chooses
@@ -4168,7 +4170,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Agile Release Trains</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Agile Release Trains</strong>
       <button class="btn small" id="btnAddArt" type="button">+ Add an ART</button>
     </div>
     <p class="manage-note">An Agile Release Train groups teams together. It is a
@@ -4203,7 +4205,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        is the app showing its working, and the only control on it is delete. -->
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Statuses</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Statuses</strong>
     </div>
     <p class="manage-note">Every status this app has read out of your exports, and the only
       words from a work system it keeps. Delete any you do not want; the items in it keep their
@@ -4213,7 +4215,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Workflow Stages</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Workflow Stages</strong>
       <button class="btn small" id="btnAddStage" type="button">+ Add a Stage</button>
     </div>
     <p class="manage-note">A stage is a part of your workflow you want to measure the wait in —
@@ -4310,7 +4312,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        drift per dialog again. -->
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Labels &amp; Work Types</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Labels &amp; Work Types</strong>
     </div>
     <p class="manage-note">The words on the charts, and what counts as a defect.</p>
     <div class="grid two pairs" style="margin-top:var(--sp-5)">
@@ -4369,7 +4371,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        though the two labels wrap to different heights on a narrow window. -->
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Aged Work</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Aged Work</strong>
     </div>
     <p class="manage-note">How long something can sit unfinished before the app flags it.</p>
     <div class="grid two pairs" style="margin-top:var(--sp-5)">
@@ -4416,7 +4418,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        the one arithmetic mistake this whole block exists to avoid. -->
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Grading</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Grading</strong>
     </div>
     <p class="manage-note">The lines you draw, and the only place in this app that puts a colour
       on a figure. All six boxes are empty until you fill them in.</p>
@@ -4500,7 +4502,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        oddity. Consistency of the shape beats economy of the sentence. -->
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Features</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Features</strong>
     </div>
     <p class="manage-note">Which rows are features rather than work items.</p>
     <div class="grid two pairs" style="margin-top:var(--sp-5)">
@@ -4529,7 +4531,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        `.grid.two.pairs > :last-child:nth-child(odd)`. -->
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Your Week</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Your Week</strong>
     </div>
     <p class="manage-note">Which day a week starts on &mdash; and so which day every weekly
       figure is read at the end of.</p>
@@ -4562,7 +4564,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        time, in their own editor; this says what a sprint IS. -->
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Our Sprint Cadence</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Our Sprint Cadence</strong>
     </div>
     <p class="manage-note">How long a sprint is here, and the date one of them started &mdash;
       any one will do, and the app counts the rest off it. It measures nothing on its own: it
@@ -4593,7 +4595,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Working Days</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Working Days</strong>
     </div>
     <p class="manage-note">Whether weekends count towards every figure measured in days.</p>
     <div style="margin-top:var(--sp-5)">
@@ -4616,7 +4618,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
        aged-days pair above already avoids. -->
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Unusually Long Items</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Unusually Long Items</strong>
     </div>
     <p class="manage-note">Whether one very long item is allowed to move your cycle time.</p>
     <div class="grid two pairs" style="margin-top:var(--sp-5)">
@@ -4666,7 +4668,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
   <section class="manage-sec">
     <div class="row spread">
-      <strong class="manage-head">Work Type Filter List</strong>
+      <strong class="manage-head" role="heading" aria-level="3">Work Type Filter List</strong>
       <button class="btn small" id="btnAddFilter" type="button">+ Add a Type</button>
     </div>
     <p class="manage-note">
@@ -4790,7 +4792,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   <p class="hint" id="teamDialogIntro"></p>
 
   <section class="manage-sec">
-    <div class="row spread"><strong class="manage-head">Targets</strong></div>
+    <div class="row spread"><strong class="manage-head" role="heading" aria-level="3">Targets</strong></div>
     <p class="manage-note"><strong>WIP &le;</strong> is how much work this team means to have
       open at once, and <strong>85% &le;</strong> how long it means an item to take &mdash; the
       promise the 85th percentile is read against. Both are drawn as a line on the charts and
@@ -4820,7 +4822,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   </section>
 
   <section class="manage-sec">
-    <div class="row spread"><strong class="manage-head">Sprints</strong></div>
+    <div class="row spread"><strong class="manage-head" role="heading" aria-level="3">Sprints</strong></div>
     <p class="manage-note">Whether this team runs sprints, and on whose cadence. It changes no
       measurement &mdash; only where each period begins and ends, and whether
       <strong>Group by &rarr; Sprint</strong> is offered at all. A length here is in
@@ -4852,7 +4854,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   </section>
 
   <section class="manage-sec">
-    <div class="row spread"><strong class="manage-head">The Train&rsquo;s Aged Share</strong></div>
+    <div class="row spread"><strong class="manage-head" role="heading" aria-level="3">The Train&rsquo;s Aged Share</strong></div>
     <p class="manage-note">Whether this team&rsquo;s items count towards the
       <strong>Predictability</strong> figure on the Scorecard &mdash; every team is in unless you
       untick it. Untick one that measures its predictability another way, such as a Scrum team
@@ -4868,7 +4870,7 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
   </section>
 
   <section class="manage-sec">
-    <div class="row spread"><strong class="manage-head">ServiceNow Incidents</strong></div>
+    <div class="row spread"><strong class="manage-head" role="heading" aria-level="3">ServiceNow Incidents</strong></div>
     <p class="manage-note">Whether this team&rsquo;s ServiceNow <strong>Incidents</strong> count as
       defects &mdash; every team&rsquo;s do unless you untick it. Untick it for a support team,
       whose incidents are mostly problems it solves for other teams: those items then leave its
@@ -16183,6 +16185,15 @@ function printHead(what, d) {
 }
 
 function customNote(d) {
+  /* The two boxes SAY they are wrong, not only the note beside them
+     (2026-11-10 review): both are described by #windowNote in the markup, and
+     carry aria-invalid for exactly as long as this sentence is on screen. */
+  const bad = view.months === 'custom' && !d.customUsed;
+  ['customFrom', 'customTo'].forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    if (bad) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid');
+  });
   if (view.months !== 'custom' || d.customUsed) return '';
   return '<br>Both dates are needed, and From must come before To.';
 }
@@ -24112,6 +24123,9 @@ $('welcomeFreshBtn').addEventListener('click', () => {
   welcomeStarted = true;
   renderEmptyState();
   selectTab('data');
+  /* The card this button sat on has just gone (2026-11-10 review): without
+     this the keyboard was left on <body>, as it was after Load Sample Data. */
+  focusView(true);
 });
 $('welcomeSampleBtn').addEventListener('click', loadSample);
 $('welcomeRestoreBtn').addEventListener('click', () => openModal($('dataDialog')));
@@ -24295,7 +24309,20 @@ function wireJiraBookmark() {
   links.addEventListener('click', (e) => {
     if (!e.target.closest('a[data-jira-days]')) return;
     e.preventDefault();
-    toast('Drag this button to your bookmarks bar, then click it on a Jira tab.');
+    /* A PRESS COPIES THE BOOKMARK'S ADDRESS (2026-11-10 review). Dragging was
+       the only way to install one, which the keyboard cannot do: Enter said
+       "drag this button" and stopped. The address goes on the clipboard —
+       it is this page's own code, with nothing of the reader's in it but
+       project ids — to be pasted as a new bookmark's address. */
+    const a = e.target.closest('a[data-jira-days]');
+    const href = a.getAttribute('href') || '';
+    if (!/^javascript:/.test(href)) {
+      toast('Drag this button to your bookmarks bar, then click it on a Jira tab.');
+      return;
+    }
+    copyText(href).then(ok => toast(ok
+      ? 'Bookmark address copied — add a new bookmark and paste it as the address. Or drag this button to your bookmarks bar.'
+      : 'Drag this button to your bookmarks bar, then click it on a Jira tab.', 7000));
   });
   $('jiraBookmarkCode').textContent = JIRA_BOOKMARK_SRC;
   window.tdJiraWired = true;
@@ -25226,6 +25253,9 @@ $('fcScenarioToggle').addEventListener('click', () => {
 });
 
 $('scReset').addEventListener('click', () => {
+  /* The render below DISABLES this button — there is nothing left to reset —
+     and a disabled button cannot hold focus (2026-11-10 review). */
+  const mark = focusMark();
   view.scenario = null;
   /* THE NUMBERS GO WITH THE TICK. This shipped keeping them, on the reasoning
      that re-ticking should not cost a retype — which was wrong twice over, and
@@ -25240,6 +25270,7 @@ $('scReset').addEventListener('click', () => {
   view.planSizeHi = 0;
   saveView();
   renderDashboard();
+  focusReturn(mark, $('fcScenarioToggle'));
   window.toast('Scenario reset \u2014 this is the plain forecast again');
 });
 
@@ -27084,12 +27115,16 @@ $('cleanupRunBtn').addEventListener('click', () => {
                (wip ? ', plus unfinished items started before it' : '') +
                '?\n\nThis cannot be undone.')) return;
 
+  /* With nothing left to remove the preview disables the button just pressed
+     (2026-11-10 review); the keyboard goes to the one beside it. */
+  const mark = focusMark();
   teams.forEach(t => { t.rows = t.rows.filter(r => !outsideWindow(r, cutoff, wip)); });
   save();
   $('parseNote').innerHTML = '';
   renderAll();
   renderCleanupTeams();             /* the dialog stays open — refresh its counts too */
   refreshCleanupPreview();
+  focusReturn(mark, $('cleanupCancelBtn'));
   window.toast('Removed ' + plural(going, 'old item') + ' from ' + scope);
 });
 
@@ -27970,6 +28005,14 @@ function loadSample() {
      lives — so without this the demo loads three teams of charts behind a tab the
      reader is not looking at, and appears to have done nothing. */
   selectTab('dashboard');
+  /* Whichever button was pressed is hidden or redrawn by now (2026-11-10
+     review); only when the keyboard has nowhere to be, so a press from a
+     window that is still open keeps its place. */
+  /* "Has gone" is asked of the BOX, not of activeElement being <body>: the
+     browser drops focus from a hidden button a frame later, so here it still
+     names the button that is no longer drawn. */
+  const held = document.activeElement;
+  if (!held || held === document.body || !held.getClientRects().length) focusView(true);
   window.toast('Demo loaded — four teams, each named for what it shows', 6000);
 }
 
