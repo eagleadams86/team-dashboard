@@ -4903,9 +4903,15 @@ async function run(TD, win) {
     const rows = [];
     for (let i = 0; i < 40; i++) rows.push(['DAE-' + (200 + i), 'DAE-1', 'Login redesign', '2026-01-05']);
     const guarded = TD.detectColumns(rows, ['Key', 'Parent key', 'Parent summary', 'Created'], 'auto', []);
-    const unguarded = TD.detectColumns(rows, ['Key', 'Parent key', 'Parent detail', 'Created'], 'auto', []);
+    /* 2026-11-10 review: the comparison is against a column with NO heading now.
+       It used to be one headed "Parent detail", which the guess took — the same
+       prose reaching storage under a heading the prose list did not name. Any
+       heading that is there and is not a type heading is out of the guess. */
+    const unguarded = TD.detectColumns(rows, ['Key', 'Parent key', '', 'Created'], 'auto', []);
     is(guarded.type, -1, 'a prose column is never taken as the work type');
-    is(unguarded.type, 2, 'and the identical column IS taken when its heading is not prose');
+    is(unguarded.type, 2, 'and the identical column IS taken when it has no heading at all');
+    is(TD.detectColumns(rows, ['Key', 'Parent key', 'Parent detail', 'Created'], 'auto', []).type, -1,
+       'while a heading the prose list does not name keeps it out just the same');
 
     /* Every role, not only the type — the rule is "no role at all". */
     const dateish = [['2026-01-05', '2026-01-09'], ['2026-01-06', '2026-01-10']];
@@ -19473,6 +19479,77 @@ group('a card with no chart matches the one beside it');
       } finally { win.confirm = real; }
       plant({ teams: [], settings: {} });
     }
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('2026-11-10 review: the boundaries');
+  {
+    const TD = win.TD;
+    /* A HEADED column is never guessed into the work type. The guess is for a
+       paste with no headings; with them, the fewest-distinct column was
+       whichever repeated — Assignee, Epic Name — and people's names were saved
+       as work types. */
+    {
+      const names = ['Priya Raman', 'Tom Okafor', 'Li Wei', 'Ana Souza'];
+      const lines = ['Issue key\tAssignee\tCreated\tResolved'];
+      for (let i = 0; i < 24; i++) lines.push('AB-' + (i + 1) + '\t' + names[i % 4] + '\t2026-01-0' + (1 + i % 5) + '\t2026-02-1' + (i % 9));
+      const r = TD.parsePastedRows(lines.join('\n'), 'auto', [], [], []);
+      is(r.columns.type, -1, 'type guess: a column headed Assignee is not the work type');
+      is(r.rows.length, 24, 'the rows still load');
+      ok(r.rows.every(x => x.type === ''), 'and none of them carries a name as its type',
+         r.rows[0] && r.rows[0].type);
+      const blank = lines.slice();
+      blank[0] = 'Issue key\t\tCreated\tResolved';
+      for (let i = 1; i < blank.length; i++) blank[i] = blank[i].replace(/\t[^\t]+\t/, '\t' + ['Story', 'Bug'][i % 2] + '\t');
+      is(TD.parsePastedRows(blank.join('\n'), 'auto', [], [], []).columns.type, 1,
+         'a column with NO heading is still guessed, as in a paste with no headings at all');
+    }
+    /* No date is long, and the time-suffix pattern is quadratic on a long cell. */
+    {
+      const cell = 'see log at 2026-10-01T1:00' + ' '.repeat(32000) + 'x';
+      const t0 = performance.now();
+      const got = TD.parseDate(cell, 'mdy');
+      const took = performance.now() - t0;
+      is(got, null, 'parseDate: a description-sized cell is not a date');
+      ok(took < 100, 'and is refused on its length, not after seconds of matching', Math.round(took) + 'ms');
+      const t1 = performance.now();
+      win.dateEvidence([[cell, cell], [cell]]);
+      ok(performance.now() - t1 < 100, 'the day-or-month vote skips it the same way');
+      is(iso(TD.parseDate('2015-01-21T03:04:05.000+0000', 'mdy')) !== null, true,
+         'while a full Jira timestamp is well inside the limit');
+    }
+    /* A lookup in a plain object answers for "constructor" too. */
+    {
+      plant({ teams: [{ id: 'cl', name: 'CL', rows: [] }], settings: { cycleTimeLabel: 'constructor' } });
+      is(typeof win.tdGet().settings.cycleTimeLabel, 'string',
+         'settings: cycleTimeLabel is a string whatever word a link puts in it');
+      is(win.bucketFor('constructor', null), 'week', 'view: a bucket that names no bucket is a week');
+      is(win.bucketFor('toString', null), 'week', 'whichever inherited word it is');
+      const was = win.tdView.now().chartTab;
+      let threw = '';
+      try { win.selectChartTab('constructor'); } catch (e) { threw = String(e); }
+      is(threw, '', 'and a chart tab that names no tab does not throw');
+      ok(win.tdView.now().chartTab !== 'constructor', 'it falls back to a real one', win.tdView.now().chartTab);
+      win.selectChartTab(was);
+    }
+    /* A link is capped before it is sanitised. */
+    {
+      const S = win.TDShare;
+      const big = { v: S.SHARE_PAYLOAD_V, teams: [{ id: 't1', name: 'T',
+        rows: new Array(S.SHARE_MAX_ROWS + 1).fill({ c: '2026-01-09', s: '2026-01-06', t: 'Story' }) }], settings: {} };
+      let err = '';
+      try { await S.decodeShare(await S.encodeShare(big)); } catch (e) { err = String(e.message || e); }
+      ok(/too large/.test(err), 'share link: more rows than any real board holds is refused, not sanitised', err);
+      const many = { v: S.SHARE_PAYLOAD_V, settings: {},
+        teams: new Array(S.SHARE_MAX_TEAMS + 1).fill(0).map((_, i) => ({ id: 't' + i, name: 'T' + i, rows: [] })) };
+      err = '';
+      try { await S.decodeShare(await S.encodeShare(many)); } catch (e) { err = String(e.message || e); }
+      ok(/too large/.test(err), 'and so is more teams than any train', err);
+      const names = new Array(12).fill(0).map((_, i) => ({ name: 'Team ' + (i + 1) }));
+      ok(/Team 8, and 4 more$/.test(win.shareLabelOf(names)),
+         'the banner names the first eight teams and counts the rest', win.shareLabelOf(names));
+    }
+    plant({ teams: [], settings: {} });
   }
 
   /* ────────────────────────────────────────────────────────── */

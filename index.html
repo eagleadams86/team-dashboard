@@ -5482,7 +5482,9 @@ function sharedCadence(teams, settings) {
    ten-day sprint, and quietly serving one for the other is the exact swap this
    feature was built to stop. */
 function bucketFor(want, cad) {
-  const b = BUCKET_NOUNS[want] ? want : 'week';
+  /* An OWN key (2026-11-10 review): `BUCKET_NOUNS['constructor']` is truthy,
+     and that word in td-view threw in derive on every load, for ever. */
+  const b = Object.prototype.hasOwnProperty.call(BUCKET_NOUNS, want) ? want : 'week';
   return (b === 'sprint' && !cad) ? 'week' : b;
 }
 
@@ -5610,8 +5612,15 @@ const TIME_SUFFIX = /[T\s]+\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?\s*(?:[ap]\.?m\.?)?
 function withoutTime(s) { return s.replace(TIME_SUFFIX, '').trim(); }
 
 /* order: 'dmy' | 'mdy'. Returns a Date, or null if the text isn't a date. */
+/* NO DATE IS LONG (2026-11-10 review). TIME_SUFFIX is unanchored at the front
+   and backtracks quadratically over a run of spaces: one description-sized cell
+   — 32,000 characters, which anyone who can edit a ticket can write — held the
+   tab for two seconds per parse, and the paste plan parses on every keystroke.
+   The longest stamp this reads is under 40 characters. */
+const DATE_TEXT_MAX = 64;
 function parseDate(text, order) {
   if (text == null) return null;
+  if (String(text).trim().length > DATE_TEXT_MAX) return null;
   /* AN INSTANT IS READ ON THE READER'S CALENDAR (2026-09-15 review). A stamp that
      says which zone it was written in — `Z`, or `-05:00` — names a moment, and
      dropping its clock took the date in THAT zone: a 9pm New York completion
@@ -5683,6 +5692,7 @@ function dateEvidence(rawRows, only) {
   const pick = Array.isArray(only) ? (cells) => only.map(i => cells[i]) : (cells) => cells;
   for (const row of rawRows) {
     for (const cell of pick(row)) {
+      if (String(cell || '').trim().length > DATE_TEXT_MAX) continue;
       const m = withoutTime(String(cell || '').trim()).match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
       if (!m) continue;
       if (+m[1] > 12) dayFirst++;
@@ -6375,7 +6385,16 @@ function detectColumns(rows, header, order, stages, statuses) {
       const vals = rows.map(r => r[c]).filter(v => String(v == null ? '' : v).trim());
       return vals.length > 0 && WORK_FIELDS.some(f => vals.every(v => readEnum(v, f.list).code));
     };
-    const all = stats.filter(s =>
+    /* A HEADED COLUMN IS NEVER GUESSED (2026-11-10 review). This guess is for a
+       paste with no headings. With a heading row it still ran whenever no
+       heading said "type", and took whichever column repeated least — Assignee,
+       Epic Name, Sprint — so people's names and epic titles were SAVED as work
+       types and drawn on screen, which is exactly what the storage rule
+       forbids. A heading that is there and is not a type heading is the export
+       saying what the column is. A blank heading says nothing, so that column
+       is still a candidate. No type column is an ordinary state. */
+    const unheaded = (i) => !header || !String(header[i] == null ? '' : header[i]).trim();
+    const all = stats.filter(s => unheaded(s.index) &&
       s.filled && s.dateRate < 0.6 && !taken().has(s.index) && s.distinct <= 20 &&
       /* Rejected only on positive evidence of being an identifier: every value
          distinct, over enough rows to mean something. Two rows of one type each
@@ -13422,7 +13441,10 @@ function normalizeSettings(raw) {
      select showing blank, so carry the old spellings across. Anything the user
      typed themselves is left exactly as it is. */
   const CYCLE_LABEL_RECASE = { 'Cycle time': 'Cycle Time', 'In process time': 'In Process Time' };
-  if (CYCLE_LABEL_RECASE[s.cycleTimeLabel]) s.cycleTimeLabel = CYCLE_LABEL_RECASE[s.cycleTimeLabel];
+  /* An own key, and a string (2026-11-10 review): `constructor` in a share
+     link came out of this lookup as a FUNCTION and the link could not render. */
+  if (typeof s.cycleTimeLabel === 'string' && Object.prototype.hasOwnProperty.call(CYCLE_LABEL_RECASE, s.cycleTimeLabel))
+    s.cycleTimeLabel = CYCLE_LABEL_RECASE[s.cycleTimeLabel];
   const n = Number(s.sameDayValue);
   s.sameDayValue = Number.isFinite(n) && n >= 0 ? n : DEFAULT_SETTINGS.sameDayValue;
   /* Must be positive: a threshold of 0 would call everything open aged, and a
@@ -21512,7 +21534,7 @@ const CHART_GROUPS = {
 const CHART_TABS = Object.keys(CHART_GROUPS);
 
 function selectChartTab(name) {
-  if (!CHART_GROUPS[name]) name = CHART_TABS[0];
+  if (!Object.prototype.hasOwnProperty.call(CHART_GROUPS, name)) name = CHART_TABS[0];
   view.chartTab = name;
   CHART_TABS.forEach(t => {
     const sel = t === name;
@@ -26389,6 +26411,9 @@ async function encodeShare(payload) {
   return SHARE_FORMAT + '.' + b64urlEncode(packed);
 }
 
+const SHARE_MAX_TEAMS = 200;
+const SHARE_MAX_ROWS = 200000;
+const SHARE_LABEL_TEAMS = 8;
 async function decodeShare(token) {
   const dot = token.indexOf('.');
   if (dot < 1) throw new Error('no format marker');
@@ -26405,6 +26430,16 @@ async function decodeShare(token) {
   }
   const p = JSON.parse(json);
   if (!p || !Array.isArray(p.teams) || !p.teams.length) throw new Error('not a share payload');
+  /* CAPPED BEFORE IT IS SANITISED (2026-11-10 review). Deflate makes repeated
+     rows nearly free, so a 130,000-character link carried 300,000 rows and held
+     the tab for 24 seconds on the way through hydrateState. Far above any real
+     board; the reader gets the ordinary "couldn't be opened" card. */
+  let held = 0;
+  for (const t of p.teams) {
+    held += (t && Array.isArray(t.rows) ? t.rows.length : 0)
+      + (t && Array.isArray(t.features) ? t.features.length : 0);
+  }
+  if (p.teams.length > SHARE_MAX_TEAMS || held > SHARE_MAX_ROWS) throw new Error('share payload too large');
   /* Made by a newer build than this one. Marked, so the error card can say the
      link is fine and this copy is behind — "it looks incomplete" would send the
      reader chasing a link that arrived perfectly intact. */
@@ -26421,13 +26456,20 @@ async function decodeShare(token) {
 /* SHARE_PAYLOAD_V rides here rather than on TDState beside SCHEMA, and has to:
    TDState is built a thousand lines above this, and a `const` read before its
    declaration is a temporal-dead-zone error that takes the whole app down. */
-window.TDShare = { encodeShare, decodeShare, buildSharePayload, SHARE_PAYLOAD_V };
+window.TDShare = { encodeShare, decodeShare, buildSharePayload, SHARE_PAYLOAD_V,
+  SHARE_MAX_TEAMS, SHARE_MAX_ROWS };
 
 /* ── Opening a shared link ──────────────────────────────────────────────── */
 
 /* What the banner names: the sanitised teams, exactly as the sender joins them. */
 function shareLabelOf(teams) {
-  return (teams || []).map(t => t && t.name).filter(n => typeof n === 'string' && n).join(', ');
+  /* The first eight, then a count (2026-11-10 review): each name is capped but
+     the number of teams was not, so a link of hundreds still wrote a paragraph
+     of its author's words into the chrome. */
+  const names = (teams || []).map(t => t && t.name).filter(n => typeof n === 'string' && n);
+  return names.length > SHARE_LABEL_TEAMS
+    ? names.slice(0, SHARE_LABEL_TEAMS).join(', ') + ', and ' + (names.length - SHARE_LABEL_TEAMS) + ' more'
+    : names.join(', ');
 }
 
 /* Deliberately never falls back to the viewer's own data on failure: showing

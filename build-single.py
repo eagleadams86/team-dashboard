@@ -160,6 +160,17 @@ def render_readme():
 
     body = markdown.markdown(md, extensions=['tables', 'fenced_code', 'sane_lists'])
 
+    # The README is cloned into a page whose CSP allows inline script, and
+    # Markdown passes raw HTML straight through — so a tag that runs or loads
+    # anything, an inline handler, or a script: link must stop the build here
+    # rather than ship (2026-11-10 review). Code spans are escaped by now, so
+    # prose ABOUT a <script> tag does not trip this.
+    bad = re.search(r'<\s*(script|iframe|object|embed|style|link|meta|base|form)\b'
+                    r'|<[^>]*\son\w+\s*='
+                    r'|(href|src)\s*=\s*["\']?\s*(javascript|vbscript|data)\s*:', body, re.I)
+    if bad:
+        fail('README.md renders to HTML that could run or load something: %r' % bad.group(0))
+
     # Heading ids, prefixed so they cannot collide with an element in the app.
     seen = {}
     slugs = {}
@@ -406,6 +417,8 @@ def build(version):
     js = read('chart.min.js')
     if '</script' in js.lower():
         fail('chart.min.js contains a closing script tag and cannot be inlined')
+    if '</style' in css.lower():
+        fail('theme.css contains a closing style tag and cannot be inlined')
     doc.sub('<link rel="stylesheet" href="theme.css">',
             '<style>\n/* theme.css, inlined by build-single.py — edit the file, '
             'not this copy. */\n' + css + '\n</style>', 1, 'inline theme.css')
