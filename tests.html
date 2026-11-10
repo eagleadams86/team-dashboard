@@ -19553,6 +19553,97 @@ group('a card with no chart matches the one beside it');
   }
 
   /* ────────────────────────────────────────────────────────── */
+  group('2026-11-10 review: on screen');
+  {
+    /* Chips never overlap, however near the floor their lines are. */
+    {
+      const mids = win.chipStack([180, 188, 196], 10, 200, 15, 2);
+      ok(mids[1] - mids[0] >= 17 && mids[2] - mids[1] >= 17, 'chips: three lines at the floor get three separate chips', mids.join());
+      ok(mids[2] + 7.5 <= 200, 'and the lowest stays inside the plot');
+      is(win.chipStack([20, 100, 150], 10, 200, 15, 2), [20, 100, 150], 'chips with room are left where their lines are');
+    }
+    /* The Dashboard's section tabs are one line that scrolls. */
+    {
+      const st = win.getComputedStyle(appDoc.querySelector('.subtabs'));
+      is(st.flexWrap, 'nowrap', 'sub-tabs: one line');
+      ok(/auto|scroll/.test(st.overflowX), 'that scrolls rather than wraps');
+    }
+    const real = win.confirm;
+    win.confirm = () => true;
+    try {
+      /* A paste no team can take offers no "0 Teams". */
+      win.tdAdopt({ teams: [{ id: 'q1', name: 'Quay', projectId: 'QQ', rows: [] },
+                            { id: 'q2', name: 'Pier', projectId: 'PP', rows: [] }], settings: {} });
+      appDoc.getElementById('pasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+        'ABC-1\t2015-01-14\t2015-01-21\tStory', 'XYZ-9\t2015-01-15\t2015-01-22\tStory'].join('\n');
+      win.tdPastePlan();
+      ok(!/\b0 Team/.test(appDoc.getElementById('pasteTeamName').textContent + appDoc.getElementById('btnLoad').textContent),
+         'paste plan: nothing on screen says "0 Teams"',
+         appDoc.getElementById('pasteTeamName').textContent + ' / ' + appDoc.getElementById('btnLoad').textContent);
+      ok(appDoc.getElementById('btnLoad').disabled && appDoc.getElementById('btnAppend').disabled,
+         'and the two load buttons wait for a team to be created');
+      /* The status report is in the future tense until Load is pressed. */
+      appDoc.getElementById('pasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type\tStatus',
+        'QQ-1\t2015-01-14\t2015-01-21\tStory\tDone', 'QQ-2\t2015-01-15\t\tStory\tIn Review',
+        'QQ-3\t2015-01-15\t\tStory\tIn Review', 'PP-1\t2015-01-15\t\tStory\tIn Review'].join('\n');
+      win.tdPastePlan();
+      ok(!appDoc.getElementById('btnLoad').disabled, 'a paste with somewhere to go enables them again');
+      const note = appDoc.getElementById('parseNote').textContent;
+      ok(!/(was|were) added to your list/.test(note), 'paste preview: no status "was added" before anything is written',
+         (note.match(/.{0,30}added to your list/) || [''])[0]);
+      appDoc.getElementById('pasteBox').value = '';
+      win.tdPastePlan();
+
+      /* Counts name both of a team's lists. */
+      const c = win.tdCounts({ teams: [{ rows: [1, 2], features: [1] }, { rows: [], features: [1, 2] }] });
+      is(c.features, 3, 'counts: features are counted');
+      is(win.tdCountsText(c), '2 teams, 2 items and 3 features', 'and named beside the items');
+      is(win.tdCountsText({ teams: 1, items: 1, features: 0 }), '1 team and 1 item', 'a board with none reads as it did');
+
+      /* A filter edited in Settings redraws every view. */
+      {
+        const src = APP_SRC.slice(APP_SRC.indexOf("$('filterRows').addEventListener('input'"));
+        const two = src.slice(0, src.indexOf('function onAddFilter'));
+        ok(!/renderDashboard\(\)/.test(two) && (two.match(/renderViews\(\)/g) || []).length === 2,
+           'filter list: an edit or a delete redraws All Teams and the Scorecard too');
+        const mv = APP_SRC.slice(APP_SRC.indexOf('function moveFilter('));
+        ok(/renderViews\(\)/.test(mv.slice(0, mv.indexOf('\n}\n'))), 'and so does a move');
+      }
+
+      /* Names: spaces are not a name, and a box is never left blank. */
+      is(win.TDState.sanitizeTeams([{ id: 'a', name: '   ', rows: [] }])[0].name, 'Untitled team',
+         'names: a name of spaces is the fallback on the way in');
+      win.tdAdopt({ teams: [{ id: 'nm', name: 'Named', rows: [] }], settings: {} });
+      win.renderTeamRows();
+      const box = appDoc.querySelector('#teamRows input[data-team="nm"]');
+      box.value = '  ';
+      box.dispatchEvent(new win.Event('input', { bubbles: true }));
+      box.dispatchEvent(new win.Event('change', { bubbles: true }));
+      is(win.tdGet().teams[0].name, 'Untitled team', 'and a box cleared and left takes it at once');
+      is(box.value, 'Untitled team', 'shown in the box it was cleared from');
+
+      /* Time in Stage answers for the list being counted. */
+      {
+        const src = APP_SRC.slice(APP_SRC.indexOf('function renderStageTime('));
+        const body = src.slice(0, src.indexOf('\n}\n'));
+        ok(/const counted = team \? unitRowsOf\(team\) : \[\]/.test(body) && !/team\.rows\.some/.test(body),
+           'stage times: the empty state reads the list on screen, features included');
+      }
+      /* Custom dates start from the window on screen. */
+      {
+        const src = APP_SRC.slice(APP_SRC.indexOf("$('monthsSel').addEventListener('change'"));
+        ok(/activeTab === 'dashboard' && activeTeam\(\)[\s\S]{0,200}lastArrivedDate/.test(src.slice(0, 2500)),
+           'custom dates: on the dashboard the boxes start from the team’s own last date');
+      }
+      /* Two sentences that said statuses are not kept. */
+      ok(!/no\s+summaries, no statuses, no names/.test(stripHtmlComments(APP_SRC))
+         && !/no summary, no status, no names/.test(APP_SRC),
+         'wording: nothing says statuses are not kept or shared — they are');
+    } finally { win.confirm = real; }
+    plant({ teams: [], settings: {} });
+  }
+
+  /* ────────────────────────────────────────────────────────── */
   /* A completeness floor. This suite has no per-test isolation, so "everything
      that ran passed" is only half an answer — an early `return` added to run()
      would end it quietly with a green summary over a fraction of the checks.

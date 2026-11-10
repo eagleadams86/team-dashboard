@@ -558,8 +558,15 @@ header *, html[data-pin] .tabrow * { scroll-margin-top: calc(0px - var(--pin-cle
    row reads as subordinate by construction, so two tablists on one screen can't
    be mistaken for one. Same manners as .tab otherwise — roving tabindex, arrow
    keys, aria-selected. */
-.subtabs { display: flex; gap: 4px; flex-wrap: wrap;
-  border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+/* ONE LINE THAT SCROLLS (2026-11-10 review), the family rule the main tabs
+   follow. This wrapped: four tabs fitted a phone, and the fifth — Work Mix —
+   put Forecast on a line of its own with its underline adrift of the rule. The
+   4px of padding is room for the focus ring, which a scroll box would clip. */
+.subtabs { display: flex; gap: 4px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+  padding: 4px 4px 0; margin: -4px -4px 14px;
+  border-bottom: 1px solid var(--border); }
+.subtabs::-webkit-scrollbar { display: none; }
+.subtabs > .subtab { flex: 0 0 auto; white-space: nowrap; }
 .subtab { background: transparent; border: 0; border-bottom: 2px solid transparent;
   border-radius: 0; margin-bottom: -1px; padding: 7px 12px; cursor: pointer;
   font: inherit; font-size: var(--fs-base); font-weight: var(--fw-medium);
@@ -5143,8 +5150,9 @@ HRN-88&#9;2015-01-11&#9;2015-01-21&#9;&#9;Story"></textarea>
 
   <p class="hint" style="margin-top:14px">If your paste had an issue key column, those keys
     travel in the link — they are what names the items on the charts, and a link without them
-    would show a different picture from yours. Nothing else out of your work system does: no
-    summaries, no statuses, no names.</p>
+    would show a different picture from yours. So do the names of your workflow statuses, which
+    the age chart groups by. Nothing else out of your work system does: no summaries and no
+    names of people.</p>
 
   <p class="hint" style="margin-top:14px">This is a <strong>snapshot</strong>, frozen as it
     looks right now — later edits won't appear, so send a fresh link when the numbers move.
@@ -13049,7 +13057,9 @@ const PROTO_KEY = '__proto__';
 function cleanName(v, fallback) {
   const s = typeof v === 'string' ? v
     : (typeof v === 'number' && Number.isFinite(v)) ? String(v) : '';
-  return (s || fallback).slice(0, 120);
+  /* Spaces are not a name (2026-11-10 review): a name of only spaces came back
+     from a reload still blank, where an empty one became the fallback. */
+  return (s.trim() ? s : fallback).slice(0, 120);
 }
 
 function sanitizeArts(arts) {
@@ -14287,8 +14297,18 @@ window.tdTeamColumns = teamColumns;
 window.tdCharts = () => charts;
 window.tdCounts = (d) => ({
   teams: (d && d.teams) ? d.teams.length : 0,
-  items: (d && d.teams) ? d.teams.reduce((n, t) => n + ((t.rows && t.rows.length) || 0), 0) : 0
+  items: (d && d.teams) ? d.teams.reduce((n, t) => n + ((t.rows && t.rows.length) || 0), 0) : 0,
+  /* BOTH LISTS (2026-11-10 review): Delete All, Back Up and Restore named teams
+     and items and never the features going with them. */
+  features: (d && d.teams) ? d.teams.reduce((n, t) => n + ((t.features && t.features.length) || 0), 0) : 0
 });
+/* "4 teams, 568 items and 49 features" — features only when there are some. */
+window.tdCountsText = (c) => {
+  const pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+  return c.features
+    ? pl(c.teams, 'team') + ', ' + pl(c.items, 'item') + ' and ' + pl(c.features, 'feature')
+    : pl(c.teams, 'team') + ' and ' + pl(c.items, 'item');
+};
 
 /* Replace everything in this browser with a copy from outside it.
 
@@ -14550,6 +14570,21 @@ Chart.register(valueLabels);
    Drawn top down, and a label that would land on the one above it is pushed
    clear rather than dropped: silently losing one is worse than moving it, and
    the chip's colour still says which line it belongs to. */
+/* Where each chip's middle goes, top to bottom. Down the list each is pushed
+   clear of the one above and kept inside the plot; back up the list each is
+   lifted clear of the one below, which is what the clamp at the floor needs.
+   With more chips than the plot has room for the top ones leave it — none is
+   dropped and none overlaps. Pure, so the suite can pin it. */
+function chipStack(wanted, top, bottom, chip, gap) {
+  const mids = [];
+  wanted.forEach((m, i) => {
+    let mid = Math.min(bottom - chip / 2, Math.max(top + chip / 2, m));
+    if (i && mid < mids[i - 1] + chip + gap) mid = mids[i - 1] + chip + gap;
+    mids.push(Math.min(bottom - chip / 2, mid));
+  });
+  for (let i = mids.length - 2; i >= 0; i--) mids[i] = Math.min(mids[i], mids[i + 1] - chip - gap);
+  return mids;
+}
 const refLabels = {
   id: 'refLabels',
   afterDatasetsDraw(chart, args, opts) {
@@ -14567,10 +14602,15 @@ const refLabels = {
     ctx.font = '600 ' + FS + 'px ' + token('--font-sans');
     ctx.textBaseline = 'middle';
     const surface = plateFill();
-    let last = -Infinity;
-    lines.slice().sort((a, b) => b.value - a.value).forEach((l) => {
-      let mid = y.getPixelForValue(l.value);
-      if (mid - CHIP / 2 < last + GAP) mid = last + GAP + CHIP / 2;
+    /* PLACED FIRST, PAINTED SECOND (2026-11-10 review). Nudging and clamping
+       one chip at a time let the clamp undo the nudge: with three lines near
+       the floor the last was pushed below the plot, pulled back up to the
+       bottom edge, and painted over the one above it — on the demo's default
+       chart. chipStack settles all of them before anything is drawn. */
+    const sorted = lines.slice().sort((a, b) => b.value - a.value);
+    const mids = chipStack(sorted.map(l => y.getPixelForValue(l.value)), area.top, area.bottom, CHIP, GAP);
+    sorted.forEach((l, li) => {
+      let mid = mids[li];
       /* WHICH END (2026-09-04, from the evening audit). The chips sat at the
          right end of every chart, and on a time series the right end is the
          NEWEST data — the weeks the tile beside the chart is stating. On the
@@ -14584,7 +14624,6 @@ const refLabels = {
       /* Clamped rather than skipped: the line datasets extend the axis to
          include their own values, so a line is always in range and a label that
          has been nudged to the floor should still be read. */
-      mid = Math.min(area.bottom - CHIP / 2, Math.max(area.top + CHIP / 2, mid));
       const w = ctx.measureText(l.text).width;
       const left = atLeft ? area.left : Math.max(area.left, area.right - w - PAD * 2);
       const right = atLeft ? Math.min(area.right, area.left + w + PAD * 2) : area.right;
@@ -14592,7 +14631,6 @@ const refLabels = {
       ctx.fillRect(left, mid - CHIP / 2, right - left, CHIP);
       ctx.fillStyle = l.colour;
       ctx.fillText(l.text, atLeft ? area.left + PAD : area.right - PAD, mid);
-      last = mid + CHIP / 2;
     });
     ctx.restore();
   }
@@ -16312,7 +16350,8 @@ function renderTitle() {
   const t = activeTeam();
   const name = t ? t.name.trim() : '';
   $('pasteTeamName').textContent = pastePlanned === 'split'
-    ? pasteSplitTeams + ' Team' + (pasteSplitTeams === 1 ? '' : 's')
+    ? (pasteSplitTeams === 0 ? 'Your Teams'
+      : pasteSplitTeams + ' Team' + (pasteSplitTeams === 1 ? '' : 's'))
     : (name || 'This Team');
   renderMultiTeamIds();
 }
@@ -16890,8 +16929,8 @@ const METRIC_HELP = {
       + 'and scoping the strip to Defects asks where defects get stuck.'],
     ['Point at a dot and it names the item: its issue key if your paste had a Key column, and '
       + 'otherwise its work type and start date, which is what finds it again in the export '
-      + 'you pasted. ', b('The key is the only thing out of your work system this app keeps'),
-      ' — no summary, no status, no names — and it is checked against the shape of a key '
+      + 'you pasted. ', b('The key and the names of your workflow statuses are all this app keeps out of your work system'),
+      ' — no summary, no names of people — and the key is checked against the shape of a key '
       + 'rather than trimmed to fit, so a mismapped column stores nothing at all.'],
   ] },
   forecastWhen: { title: 'Time to Finish', body: [
@@ -18659,14 +18698,21 @@ function renderStageTime(d) {
        so asking it would tell somebody who has just filtered to Spikes that
        their export never carried stage times at all. */
     const team = activeTeam();
-    const teamHasStages = !!(team && team.rows.some(r => r.stages));
+    /* THE LIST BEING COUNTED (2026-11-10 review). Both flags read `team.rows`
+       while the card counted features, so the feature view said "this team has
+       some, just not here … pick another type — or All" with All already
+       picked and no feature carrying a stage time anywhere. */
+    const counted = team ? unitRowsOf(team) : [];
+    const teamHasStages = counted.some(r => r.stages);
     /* The case this app was actually built for, and the one worth telling apart
        from "no stage data at all": an ordinary Jira export has a Status column
        saying where each item IS, and no durations anywhere. That team's stages
        are working — they are grouping the age chart — so a card saying it has
        none would be simply wrong, and would send somebody to check a set-up
        that is already right. Point them at what they DO have instead. */
-    const teamHasCurrent = !!(team && team.rows.some(r => stageOf(r, state.stages)));
+    const teamHasCurrent = counted.some(r => stageOf(r, state.stages));
+    const ft = filterTypes(currentFilterValue());
+    const allTypes = !ft || !ft.length;
     /* Every one of these names BOTH doors, and that is the point of them since
        2026-08-22: this card was the only one in the app a reader could not fill
        without a Jira report, and a message sending them back to an export they
@@ -18677,9 +18723,10 @@ function renderStageTime(d) {
         + 'one. Then either paste an export with a Status column or a Time in Status one, or '
         + 'type the days in yourself: every stage you add gets a box on each work item.'
       : teamHasStages
-        ? 'No item in this window carries stage times under the ' + view.filterDisplay
-          + ' work type filter — this team has some, just not here. Widen '
-          + '\u201cShow data for most recent\u201d, or pick another type — or All — above.'
+        ? 'No ' + d.unitOne + ' in this window carries stage times'
+          + (allTypes ? '' : ' under the ' + view.filterDisplay + ' work type filter')
+          + ' — this team has some, just not here. Widen \u201cShow data for most recent\u201d'
+          + (allTypes ? '.' : ', or pick another type — or All — above.')
         : teamHasCurrent
           /* IT SAYS WHAT IS MISSING, NOT WHY (2026-09-01). This used to open
              "your export says where each item IS, but not how long it has been
@@ -20929,7 +20976,7 @@ function moveFilter(i, dir) {
   save();
   renderFilterRows();
   renderFilterSelect();
-  renderDashboard();
+  renderViews();
   const pick = (d) => $('settingsDialog')
     .querySelector('[data-movefilter="' + j + '"][data-dir="' + d + '"]');
   const want = pick(dir);
@@ -23277,7 +23324,7 @@ function columnsReadHtml(res, planned) {
       ? '<br>No created date in this paste — lead time needs one. Add a '
         + '<em>Created</em> column and paste again to see it.'
       : '') +
-    stagesReadHtml(res);
+    stagesReadHtml(res, planned);
 }
 
 /* What the paste did with the stage columns — and, when it did nothing, why.
@@ -23288,7 +23335,7 @@ function columnsReadHtml(res, planned) {
    deliberate: this report has never echoed a pasted cell, and a heading is a
    pasted cell. Somebody matching up a column reads the heading off the export
    they still have open. */
-function stagesReadHtml(res) {
+function stagesReadHtml(res, planned) {
   const cols = (res.columns && res.columns.stages) || [];
   const clash = (res.columns && res.columns.stageClash) || [];
   const nameOf = (id) => {
@@ -23322,20 +23369,27 @@ function stagesReadHtml(res) {
          reader is entitled to see what the app has just decided to keep. A cell
          that was REFUSED is still never printed — that is the distinction, and
          it is the whole of it. */
-      html += (res.statusesNew.length === 1 ? 'One new status was added to your list: '
-        : res.statusesNew.length + ' new statuses were added to your list: ')
+      /* Future tense in the preview (2026-11-10 review), the `planned` flag the
+         two reports beside this one got on 2026-11-06: nothing is in the list
+         until Load is pressed, and on a paste that cannot load it never is. */
+      html += (res.statusesNew.length === 1
+          ? 'One new status ' + (planned ? 'will be' : 'was') + ' added to your list: '
+          : res.statusesNew.length + ' new statuses ' + (planned ? 'will be' : 'were') + ' added to your list: ')
         + res.statusesNew.map(x => '<strong>' + escapeHtml(x.label) + '</strong>').join(', ')
         + '. ';
     }
     html += state.stages.length
       ? 'Group them under Teams &amp; Stages to change what the work item age chart’s columns '
         + 'are.'
-      : 'The work item age chart groups by status now. You can group those statuses into stages '
+      : 'The work item age chart ' + (planned ? 'will group by status once this is loaded'
+          : 'groups by status now') + '. You can group those statuses into stages '
         + 'of your own under Teams &amp; Stages, but you do not have to.';
     if (res.unmatchedStatus && state.stages.length) {
       html += '<br><strong>' + res.unmatchedStatus + ' item'
-        + (res.unmatchedStatus === 1 ? '' : 's') + ' had a status that is in no stage</strong>, '
-        + 'so ' + (res.unmatchedStatus === 1 ? 'it sits' : 'they sit') + ' in the chart’s '
+        + (res.unmatchedStatus === 1 ? (planned ? ' has' : ' had') : (planned ? 's have' : 's had'))
+        + ' a status that is in no stage</strong>, '
+        + 'so ' + (res.unmatchedStatus === 1 ? (planned ? 'it will sit' : 'it sits')
+          : (planned ? 'they will sit' : 'they sit')) + ' in the chart’s '
         + '“' + AGE_NO_STAGE + '” column. Tick the statuses you want under each stage '
         + 'in Teams &amp; Stages.';
     }
@@ -24104,6 +24158,14 @@ function dressPasteButtons() {
     : 'Load Pasted Rows';
   $('btnAppend').textContent = split ? 'Append to Each Team' : 'Append to Existing';
   $('btnAppend').hidden = !split && !activeRows().length;
+  /* NO TEAM TO SPLIT INTO YET (2026-11-10 review): a whole-train first paste,
+     where no team answers to any key. The heading read "for 0 Teams" over a
+     live "Split into 0 Teams" that wrote nothing. The Create Team buttons in
+     the plan are the only press that does anything, so these two wait. */
+  const nowhere = split && pasteSplitTeams === 0;
+  if (nowhere) $('btnLoad').textContent = 'Split into Teams';
+  $('btnLoad').disabled = nowhere;
+  $('btnAppend').disabled = nowhere;
   renderTitle();
 }
 
@@ -24388,6 +24450,21 @@ function onAddArt() {
 }
 $('btnAddArt').addEventListener('click', onAddArt);
 $('btnAddArtFoot').addEventListener('click', onAddArt);
+
+/* A NAME BOX IS NEVER LEFT BLANK (2026-11-10 review). Clearing one and tabbing
+   away left an empty option in the header picker, "Delete  and its 190 items?"
+   in the confirm and "This team" on a print, until a reload put the fallback
+   in. On `change` — leaving the box — so a name being retyped is not fought
+   with; the `input` it raises is what saves and redraws, as for any edit. */
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (!t || t.tagName !== 'INPUT' || t.type !== 'text' || t.value.trim()) return;
+  const d = t.dataset || {};
+  const fallback = d.team ? 'Untitled team' : d.art ? 'Untitled ART' : d.stage ? 'Untitled stage' : '';
+  if (!fallback) return;
+  t.value = fallback;
+  t.dispatchEvent(new Event('input', { bubbles: true }));
+});
 
 $('artRows').addEventListener('input', e => {
   const id = e.target.dataset && e.target.dataset.art;
@@ -24952,7 +25029,17 @@ $('monthsSel').addEventListener('change', e => {
      reader edits a window rather than building one from nothing. Only when both
      boxes are empty: a pair typed earlier is theirs and is not overwritten. */
   if (view.months === 'custom' && !view.customFrom && !view.customTo) {
-    const anchor = historyAnchor(state.teams);
+    /* THE WINDOW ON SCREEN, which on the dashboard is the TEAM'S (2026-11-10
+       review). This took the newest date across every team, so on a team whose
+       data ends a day before another's the boxes filled a day late and the
+       85th percentile went from 8 to 23 at the moment of switching — the one
+       thing the prefill exists to prevent. Other tabs read every team as of
+       one date, and keep the shared anchor. */
+    const own = activeTab === 'dashboard' && activeTeam()
+      ? [lastArrivedDate(activeTeam().rows), lastArrivedDate(unitRowsOf(activeTeam()))]
+          .filter(Boolean).sort((a, b) => b - a)[0]
+      : null;
+    const anchor = own || historyAnchor(state.teams);
     if (anchor) {
       view.customTo = isoOf(anchor);
       view.customFrom = isoOf(edate(anchor, -Number(DEFAULT_VIEW.months)));
@@ -25389,7 +25476,10 @@ $('filterRows').addEventListener('input', e => {
   state.settings.filters[+t.dataset.i][t.dataset.k] = t.value.slice(0, cap);
   save();
   renderFilterSelect();
-  renderDashboard();
+  /* Every view, not only the dashboard (2026-11-10 review): All Teams and the
+     Scorecard honour the same filter and stood on the old match until a tab
+     change. The fault fixed for working days on 2026-09-10, in three more places. */
+  renderViews();
 });
 $('filterRows').addEventListener('click', e => {
   /* `closest`, not `e.target.dataset`, and the arrows are why. A press on an
@@ -25409,7 +25499,7 @@ $('filterRows').addEventListener('click', e => {
   save();
   renderFilterRows();
   renderFilterSelect();
-  renderDashboard();
+  renderViews();
   focusReturn(mark, $('btnAddFilter'));
 });
 function onAddFilter() {
@@ -25702,7 +25792,7 @@ function downloadBackup() {
      is the worst outcome available here, so give it a turn of the event loop. */
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   const c = window.tdCounts(payload);
-  window.toast(`Backup downloaded — ${c.teams} team${c.teams === 1 ? '' : 's'}, ${c.items} item${c.items === 1 ? '' : 's'}`);
+  window.toast('Backup downloaded — ' + window.tdCountsText(c));
 }
 
 $('btnExport').addEventListener('click', downloadBackup);
@@ -25734,8 +25824,8 @@ $('importFile').addEventListener('change', (e) => {
     const now = window.tdCounts(serializeState());
     const inc = window.tdCounts(parsed);
     const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-    const msg = `Restore ${plural(inc.teams, 'team')} and ${plural(inc.items, 'item')} from this file?\n\n`
-      + `This replaces the ${plural(now.teams, 'team')} and ${plural(now.items, 'item')} in this browser. `
+    const msg = `Restore ${window.tdCountsText(inc)} from this file?\n\n`
+      + `This replaces the ${window.tdCountsText(now)} in this browser. `
       + `There is no undo.`;
     if (!confirm(msg)) { e.target.value = ''; return; }
     /* tdAdopt can DECLINE — it asks before letting a file that has lost its
@@ -25756,7 +25846,7 @@ $('importFile').addEventListener('change', (e) => {
        purpose: a refusal is read where the file was chosen. The header's ⇩
        is the same window, so it gets the same rule for free. */
     $('dataDialog').close();
-    window.toast(`Backup restored — ${plural(inc.teams, 'team')}, ${plural(inc.items, 'item')}`);
+    window.toast('Backup restored — ' + window.tdCountsText(inc));
     e.target.value = '';
   };
   reader.onerror = () => {
@@ -25811,7 +25901,7 @@ $('clearBtn').addEventListener('click', () => {
     ? also.slice(0, -1).join(', ') + ' and ' + also[also.length - 1]
     : also.join('');
   $('clearBody').textContent =
-    `This deletes ${plural(c.teams, 'team')} and ${plural(c.items, 'item')}`
+    `This deletes ${window.tdCountsText(c)}`
     + (also.length ? `, along with ${listed}` : '')
     + `. Your settings and your theme are kept. There is no undo — a downloaded backup is `
     + `the only way to get any of it back.`;
