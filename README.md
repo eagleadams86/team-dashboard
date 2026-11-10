@@ -115,28 +115,29 @@ right only because a hidden box measures 0 tall. The answer is now asked of whet
 on the page at all, which also covers a phone, where the sticky thing is the tab row inside the
 hidden band.)
 
-**On a phone it pins the tab row only.** The band there is the tab row plus a control strip
-whose four pickers stack, which comes to 537px against a header of 173 — seven hundred pixels
-of an 812px screen before a figure appears. The tab row alone is 42, and buys the thing a
-phone reader actually wants, which is changing tab without scrolling back up. You still scroll
-to the top to change the window or the grouping there. Money Map makes the same trade for the
-same reason.
+**On a phone it pins the tab row only.** The band there is the tab row plus a control strip whose
+four pickers stack. When this was built that came to 537px against a header that was then 173 —
+seven hundred pixels of an 812px screen before a figure appeared; the header has since become one
+scrolling line, and the band is still most of a screen. The tab row alone is 42, and buys the thing
+a phone reader actually wants, which is changing tab without scrolling back up. You still scroll to
+the top to change the window or the grouping there. Money Map makes the same trade for the same
+reason.
 
-**And on a phone the tab row is one line that scrolls sideways**, rather than two that wrap:
-three tabs and the 📌 come to about 370px, which is just past a 375px screen once the page's
-own padding is off. The tab you choose is nudged into view if it would sit off an end — with room for its focus ring — and
-the 📌 stays put beside them rather than scrolling away. Sprint Predictability and Money Map
-draw their tabs the same way. The scroller keeps 4px of room on every side for the keyboard
-focus ring, so a tab you Tab onto shows its whole outline — until 2026-09-04 the top and the
-outer edges were sliced off by the scrolling box, which clips at its own edge.
-**The header's controls and the tab bar are each one line that scrolls sideways, at any
-width** (since 14 September 2026). When the window is too narrow for them, the controls keep their
-place beside the name and scroll there instead of stacking two or three deep — only an upright
-phone, where the name leaves too little room, puts them on a line of their own under it. Tabbing
-onto a control that is half past the edge scrolls it fully into view, and **‹ ›** arrows
-appear beside any row with more off an end — press one to slide the row along. On a touch
-screen the arrows stay away and you swipe the row instead. A window wide enough for everything
-looks exactly as it did. Sprint Predictability and Money Map work the same way.
+**And on a phone the tab row is one line that scrolls sideways**, rather than two that wrap: four
+tabs and the 📌 are wider than a 375px screen has room for once the page's own padding is off. The
+tab you choose is nudged into view if it would sit off an end — with room for its focus ring — and
+the 📌 stays put beside them rather than scrolling away. Sprint Predictability and Money Map draw
+their tabs the same way. The scroller keeps 4px of room on every side for the keyboard focus ring,
+so a tab you Tab onto shows its whole outline — until 2026-09-04 the top and the outer edges were
+sliced off by the scrolling box, which clips at its own edge. **The header's controls and the tab
+bar are each one line that scrolls sideways, at any width** (since 14 September 2026). When the
+window is too narrow for them, the controls keep their place beside the name and scroll there
+instead of stacking two or three deep — only an upright phone, where the name leaves too little
+room, puts them on a line of their own under it. Tabbing onto a control that is half past the edge
+scrolls it fully into view, and **‹ ›** arrows appear beside any row with more off an end — press
+one to slide the row along. On a touch screen the arrows stay away and you swipe the row instead. A
+window wide enough for everything looks exactly as it did. Sprint Predictability and Money Map work
+the same way.
 
 
 Charts draw their data in the shared theme pack's **categorical colours** — `--series-1`, a blue,
@@ -174,10 +175,13 @@ Each group then adds a small tile row of its own, stating what its charts can't:
 - **Delivery** — **steady delivery**, the band most whole periods land in (15th to 85th
   percentile of the per-period counts); total **net flow**; and **started vs completed**, the two
   counts net flow is the difference of.
-- **Health** — the ratio of work in progress to a month's throughput, the **aged share of WIP**,
-  the age of the **oldest item still in progress**, and the defect rate.
-- **Forecast** — the 85%-confident answer to each of its two questions, and the number of whole
-  periods both were dealt from.
+- **Health** — the ratio of work in progress to a month's throughput, the **aged share of WIP**
+  and the age of the **oldest item still in progress**.
+- **[Work Mix](#work-mix-what-kind-of-work-finished)** — the defect rate, **From ServiceNow**,
+  **Found in production** and **Non-discretionary**.
+- **Forecast** — the 85%-confident answer to each of its two questions, the pace needed (or in
+  hand) when the forecast has both a scope and a date to work from, and what the answers were
+  drawn from — normally the number of whole periods.
 
 Net flow and the defect rate sit with their charts rather than in the headline row because both
 are readings on the period just gone, and neither says what to pick up this morning. Net flow in
@@ -202,10 +206,10 @@ carries a graded tile's colour.
 
 ### Typing Items In by Hand
 
-Not everyone has a Jira, or knows how to get a report out of one. **Add an item** sits beside the
-paste box on a first run, and **+ Add item** on the Loaded Data card once you have rows: one short
-form — started, completed, work type, and optionally a created date, an item name, the stage it
-is sitting in, and **how many days it spent in each of your stages**.
+Not everyone has a Jira, or knows how to get a report out of one. **Add an Item…** sits beside the
+paste box on a first run, and **+ Add Item** on the Loaded Data card once you have rows: one short
+form — started, completed, work type, and optionally a created date, an item name, the stage it is
+sitting in, and **how many days it spent in each of your stages**.
 
 **Everything on the dashboard can be filled in from that form.** There is no chart, tile or table
 here that needs an export — the stage day counts were the last thing that did, until 2026-08-22.
@@ -214,7 +218,7 @@ It also closes a gap the paste box never could: **press any row in Loaded Data t
 delete it.** Before this the card said "read-only — to correct a row, fix it in your source and
 paste again", which is no answer at all when the source is your own memory.
 
-Two things worth knowing:
+Five things worth knowing:
 
 - **The dates are date pickers, so there is nothing to guess at.** The ambiguous
   day-first/month-first question a pasted `1/3/26` raises does not arise here at all.
@@ -394,7 +398,7 @@ the note under the charts says which of the three reasons it is: some teams have
 or they are not aligned. The Scorecard is unaffected — it aligns to whole weeks whatever *Group
 by* says, for [its own reasons](#the-scorecard-the-train-in-four-figures).
 
-Both the company cadence and a team's answer travel in a [share link](#share-a-read-only-link),
+Both the company cadence and a team's answer travel in a [share link](#sharing-a-read-only-link),
 because between them they decide where the bars are: a link that dropped either would show the
 reader a different set of numbers under the same headings.
 
@@ -571,9 +575,10 @@ throughput column, drawn from the same function so the two can never disagree ab
 divided by throughput, so a board filling while the pace stays flat is a cycle time rise that
 has not landed in the percentile column yet — work is arriving faster than it leaves. A board
 rising *alongside* throughput is a team taking on more and finishing more, which is a different
-thing entirely. In the demo, Team Long Tail reads 4.2 per week with a trend of −0.9 and a board
-that has filled by +6.3: delivery slowing while the board grows, and its 23.0 cycle time and 38%
-average aged share are what that has already cost.
+thing entirely. In the demo, Team Long Tail reads about four per week with a falling trend and a
+board that is filling: delivery slowing while the board grows, and its long percentile cycle time
+and its average aged share — the highest on the page — are what that has already cost. (The demo
+is dated from the day you load it, so the exact figures move a little from day to day.)
 
 **Only two columns on this table draw a trace, and that is a judgement rather than a limit of
 the data.** A per-period series exists for the cycle time percentile, the lead time percentile
@@ -607,7 +612,7 @@ A reload puts you back on **whichever tab you were last using** — all four of 
 tab that is no longer on offer (All Teams and the Scorecard both disappear below two teams) falls
 back to the dashboard, as does anything unrecognisable in a hand-edited copy.
 
-The page also **holds still while it loads**. This app is one 560KB HTML file that the browser
+The page also **holds still while it loads**. This app is one 1.6MB HTML file that the browser
 paints as it parses, with the script that fills it at the foot — so for about a tenth of a second
 you used to watch an empty skeleton assemble and then everything pop in at once, and a reload on
 Your Data painted the whole dashboard first and then swapped it out. The header shows
@@ -639,7 +644,7 @@ the focus fell to the top of the document and Tabbing carried on from nowhere. F
 thing with the result you open, for the same reason.
 
 The [Scorecard](#the-scorecard-the-train-in-four-figures) is the same scope read the other way:
-this table is who to go and see, that page is the three figures you report about the lot of them.
+this table is who to go and see, that page is the four figures you report about the lot of them.
 
 If your teams are [grouped into ARTs](#grouping-teams-into-arts), a **train picker** appears
 above the tiles and everything on the page follows it — including the summary row, which becomes
@@ -658,9 +663,9 @@ everything else on the page.
 
 It plots **one series and one colour on purpose**. A line per team would need a palette of
 distinguishable colours that the shared theme pack doesn't have, and inventing one here would put
-this app's charts out of step with its siblings. The aggregate needs only the accent — and it
-answers the question the tiles can't: *is the whole train's delivery steady?* Which team moved is
-the table underneath.
+this app's charts out of step with its siblings. The aggregate needs only the first colour of the
+theme pack's series ramp (`--series-1`) — and it answers the question the tiles can't: *is the whole
+train's delivery steady?* Which team moved is the table underneath.
 
 One thing to watch: a dip can be **one team stopping** rather than the train slowing down. Check
 the **Data to** column before concluding anything — a team whose export is stale looks exactly like
@@ -692,12 +697,12 @@ not**: the 85th percentile of eight teams is not the average of their eight perc
 summary row built that way would be quietly wrong in its most-read column. It is worked out over
 every item any team completed, exactly as if the teams were one team.
 
-That has a consequence worth knowing. Because it pools *items* rather than *teams*, the train
-figure is weighted by how much each team delivers — so a large fast team holds it down while a
-small team with a long tail sits well above it. On the demo the train reads 7 days while Team
-Long Tail reads 23. Both are true. **Read the tile for a promise about work you haven't assigned
-yet; read the column to find who needs help.** The tile cannot tell you a team is struggling,
-and it isn't meant to.
+That has a consequence worth knowing. Because it pools *items* rather than *teams*, the train figure
+is weighted by how much each team delivers — so a large fast team holds it down while a small team
+with a long tail sits well above it. On the demo, at the 12-month window, the train reads about a
+week while Team Long Tail reads more than three. Both are true. **Read the tile for a promise about
+work you haven't assigned yet; read the column to find who needs help.** The tile cannot tell you a
+team is struggling, and it isn't meant to.
 
 ### Teams With Nothing to Say
 
@@ -729,10 +734,10 @@ Means** line saying which way it has moved since the window before this one.
 **None of it is new arithmetic.** Every figure is one field off the same `derive()` the
 dashboard reads, pooled across the teams in scope exactly as the All Teams train row is pooled —
 so a card here and a tile there cannot disagree. What is new is the comparison, the bands, and
-putting the three side by side.
+putting the four side by side.
 
 The tab appears once you have a **second team**, the same rule All Teams follows: a roll-up of
-one team is that team's own dashboard with three of its tiles on it.
+one team is that team's own dashboard with four of its tiles on it.
 
 ### The Distribution Card
 
@@ -771,7 +776,7 @@ team out is a decision worth making deliberately rather than a default.
 **Only this card.** Quality is a defect rate and Flow is a feature cycle time; neither asks
 anything about how a team plans, so neither loses a team. When anyone is held out, the
 Predictability card says **"across 5 of 8 teams"** under its heading and the sentence above the
-three cards says how many are out and where to change it — a figure that moved because five teams
+four cards says how many are out and where to change it — a figure that moved because five teams
 are behind it instead of eight, with nothing on screen saying so, is the one thing this page will
 not do. Hold every team out and the card says exactly that, rather than the "nothing has
 completed yet" it would otherwise reach for.
@@ -800,21 +805,21 @@ finding. The days figure moves in days.
 Three things it will not do:
 
 - **"All" has no window before it**, so nothing is compared and the page says so once, above the
-  cards, rather than three times down them.
+  cards, rather than four times down them.
 - **Data that does not reach back far enough** is said as exactly that — not as a movement of
   nought.
 - **A window with the figure missing** (nothing finished, no feature closed) says which, per
-  card. Three figures fail in three different ways, and one shared dash would report a quality
+  card. Four figures fail in four different ways, and one shared dash would report a quality
   problem where there is only an absence.
 
 ### One Window, Read Over Two Lists
 
-Two of the cards are derived over work items and one over features, and a rolling window is
+Three of the cards are derived over work items and one over features, and a rolling window is
 counted back from the end of the data it is derived over — so **the two would drift apart on
 their own**. A board whose features stopped being updated in June would give the Flow card a
 window ending in June while the note above it named September, and nothing on screen would say
 so. The two are pinned to the **later** of the two end dates, exactly as All Teams pins every
-team to one shared date, so *the last month* means the same month in all three cards.
+team to one shared date, so *the last month* means the same month in all four cards.
 
 The Flow card's empty state then tells you **which** of five things is going on, because they are
 five different findings and only one of them is about this month's delivery:
@@ -909,9 +914,10 @@ team's issue keys, `DAE` for `DAE-1552` — which is what lets [one export cover
 teams](#pasting-several-teams-at-once) be pasted in one go and split between them. It is
 optional, it changes no figure, and a team without one simply takes nothing from a split.
 
-Each row also holds the two figures the team **sets** rather than measures: **WIP ≤**, how much
-work it means to have open at once, and **85% ≤**, how long it means an item to take. Both are
-covered under [your own limit and your own target](#your-own-limit-and-your-own-target) below.
+Behind **Edit** on each team's row, in the **Team Settings** window, are the two figures the team
+**sets** rather than measures: **WIP ≤**, how much work it means to have open at once, and **85%
+≤**, how long it means an item to take. Both are covered under [your own limit and your own
+target](#your-own-limit-and-your-own-target) below.
 
 The
 order matters: it is the order teams appear in that picker and down
@@ -924,8 +930,8 @@ shared by every team — one place to say what a "defect" is.
 
 The picker only appears once there are **two or more** teams: with one team it is not a
 choice. It is part of a wider rule — nothing shows until there is something behind it, so a
-first run is the [welcome card](#the-first-thing-you-see) and nothing else. The **Loaded data** card,
-the **Clean up old data** card and the **Append to existing** / **Clear this team's data**
+first run is the [welcome card](#the-first-thing-you-see) and nothing else. The **Loaded Data**
+card, the **Clean Up Old Data** card and the **Append to Existing** / **Clear This Team's Data**
 buttons all appear the moment rows exist (`renderEmptyState()`).
 
 **The Dashboard tab follows the same rule**: it isn't there until something has data, and a
@@ -977,12 +983,13 @@ sync and no account, so it says so outright.
 
 ## The Demo — Trying It Without Pasting Anything
 
-**Load sample data** isn't filler to fill the screen: it's this app's demo, and the rule is
+**Load Sample Data** isn't filler to fill the screen: it's this app's demo, and the rule is
 that **every feature has to be reachable from it**. Four teams, about nine months of
-made-up work items ending today, and one of them deliberately short of a column.
+made-up work items ending within the last day or two, and one of them deliberately short of a
+column.
 
 The button is on the [welcome card](#the-first-thing-you-see) a first run opens on, and again
-beside *Load pasted rows* on the Your Data tab you reach from it — and, since the Dashboard tab
+beside *Load Pasted Rows* on the Your Data tab you reach from it — and, since the Dashboard tab
 is [hidden until something has data](#teams), those are the two places it can be met. Pressing it switches you to the dashboard. It
 disappears once anything holds data, and so does the copy of it on the empty-dashboard card,
 which from a working app would be a mis-click that quietly adds four teams.
@@ -997,7 +1004,7 @@ page rather than a list of names you'd have to open one by one:
 | Team | What it's there to show |
 |---|---|
 | **Team Healthy Flow** | The healthy board. Carries issue keys (`KFR-…`), as Team Long Tail does (`HRN-…`), so the charts have something to name their dots with — and the matching project id, so a multi-team paste has somewhere to route them. Short cycle times (p85 ≈ 6 days against a median of 4), four items in flight, none aged, a defect rate around 11%. Its export carries **stage times too**, and they read the healthy way round: about 62% of its measured time is spent building. It sets a **WIP limit of 6 and a 10-day target** and is comfortably inside both. Its work is broken down into **29 features** of a fairly even size — most take between 4 and 14 items — which is the comparison Team Long Tail's are read against. **None of its features is aged** against the demo's 30-day feature threshold either — the same clean reading its items give. It runs on the demo's **14-day company sprint cadence**, as Team Long Tail does, so *Group by* offers **Sprint**. Its export also carries the three [work fields](#work-mix-what-kind-of-work-finished): mostly blank for ServiceNow with the odd incident, so **Where Defects Came From** has both halves, and mostly Discretionary work. The baseline the others read against. |
-| **Team Long Tail** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Team Healthy Flow's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. It sets **the same limit of 6 and the same 10-day target Team Healthy Flow does** and keeps neither — which is the point of the pair carrying identical figures. Its **20 features are bigger and far more varied** than Team Healthy Flow's, from 3 items to 26, and take about two and a half times as long end to end — the same finding as its cycle times, said about features. **One of its three in-flight features is past the 30-day feature threshold** the demo sets, so the aged reading holds at both levels while Team Healthy Flow's stays clean. Its export has **no ServiceNow column** — so Where Defects Came From shows its empty face — some bugs with **no Bug Type**, and more **Non-Discretionary** work than Team Healthy Flow. |
+| **Team Long Tail** | The board the metrics exist to catch. A long tail, so **p85 lands around 23 to 25 days against a median of 5** — the app's whole argument for reading p85 rather than the average, on one screen. (The demo is dated from the day you load it: the tail shows at the 12-month and All windows on every day, and at the default 3-month window on most days.) Nine items in flight, **six of them past the 14-day ageing threshold** and its oldest well above its own 85% line on the work item age chart, and a defect rate about two and a half times Team Healthy Flow's. Its [stage times](#where-the-time-goes-time-in-stage) then say *why*: **more of its time goes on waiting to be reviewed and tested than on building it**, which no cycle time figure can tell you. Its export has both a *Ready for Code Review* and a *Code Review* column, so it also shows two statuses adding into one stage. It sets **the same limit of 6 and the same 10-day target Team Healthy Flow does** and, wherever its tail shows, keeps neither — which is the point of the pair carrying identical figures. Its **20 features are bigger and far more varied** than Team Healthy Flow's, from 3 items to 26, and take about two and a half times as long end to end — the same finding as its cycle times, said about features. **One of its three in-flight features is past the 30-day feature threshold** the demo sets, so the aged reading holds at both levels while Team Healthy Flow's stays clean. Its export has **no ServiceNow column** — so Where Defects Came From shows its empty face — some bugs with **no Bug Type**, and more **Non-Discretionary** work than Team Healthy Flow. |
 | **Team Bare Export** | A newer team: four months of history, **no created dates, no issue keys, no Status column, no stage times and no features at all**, so the lead-time chart's "add a Created column" face is reachable, the parse report's "no issue key in this paste" note is too, the charts' type-named tooltips have a team that shows them, and the date window has a team it visibly runs past. Its export also **stops nine days before the others**, which is what gives the All Teams view's *Data to* column something to show — it reads slower there than on its own dashboard, and the date is the only thing that says why. It sets **no limit and no target**, which is how every browser starts and the only way the no-line, no-verdict face of those two is reachable. With no keys it has no parent keys either, so it is also the team the feature layer's empty face is reachable from. It runs no sprints, and it is **held out of the aged share**, so the Scorecard's Predictability card reads *across 3 of 4 teams* — the opt-out's face on the demo. It carries none of the three work fields. Also proves each team's data stands on its own. |
 | **Team Support Desk** | The team the [incidents switch](#a-support-teams-incidents) is for. Most of its bugs are **ServiceNow incidents it works for other teams**, and its settings count them as support work — so its defect rate is its own bugs, and the **From ServiceNow** tile states the rest, about two thirds of what it finishes. Short cycle times, a bug-heavy mix, mostly **Non-Discretionary** work, and no train, sprints or stages. On the Scorecard the Quality card says *incidents are support work on 1 of 4 teams*. |
 
@@ -1018,7 +1025,7 @@ boards*, which is the whole argument for shipping none — and the confirmation 
 anything is loaded. Clear the box in Settings to see the not-set face the app actually starts in.
 
 The demo also arrives with **four workflow stages set up** — Build, Review, Test and Deploy —
-because a status is only ever read when a stage already lists it, so the demo has
+because a `Days in …` column is only read when a stage already claims it, so the demo has
 to set them up before it pastes, exactly as you would. Team Healthy Flow and Team Long Tail
 carry the columns and Team Bare Export carries none, so both faces of the
 [Time in stage](#where-the-time-goes-time-in-stage) card are reachable, and both axes of the
@@ -1034,12 +1041,12 @@ status the demo's stages deliberately **don't** list — so it lands in the **No
 and the parse report says one item's status matched nothing. That is the demo showing you a real
 part of a workflow you haven't set up yet, which is exactly what it will do on your own board.
 
-The demo also puts **Team Healthy Flow and Team Long Tail on one train (Delivery ART) and
-leaves Team Bare Export on none** — the smallest arrangement where every part of
-[ARTs](#grouping-teams-into-arts) does something. The picker gets *All trains*, *Delivery ART*
-and *No ART*; both groups have somebody in them; and scoping to the train visibly changes the
-figures at the foot of the table. A train per
-team would make grouping look pointless, and putting all three on one would leave *No ART* absent.
+The demo also puts **Team Healthy Flow and Team Long Tail on one train (Delivery ART) and leaves
+Team Bare Export and Team Support Desk on none** — the smallest arrangement where every part of
+[ARTs](#grouping-teams-into-arts) does something. The picker gets *All trains*, *Delivery ART* and
+*No ART*; both groups have somebody in them; and scoping to the train visibly changes the figures at
+the foot of the table. A train per team would make grouping look pointless, and putting all four on
+one would leave *No ART* absent.
 
 On **All Teams** the four read as an estate with one obvious problem: Team Long Tail's 85th
 percentile is several times everyone else's, it holds most of the aged work, and its defect
@@ -1047,17 +1054,18 @@ rate is the highest — while Team Bare Export's *Data to* column quietly explai
 delivery rate looks worse there than on its own page.
 
 The two traces on that row say how it got there, which is what they are in the demo for: Team
-Long Tail's throughput is falling (−0.9) while its board fills (+6.3). Its cycle time is not a
-team that is slow at the work, it is a team taking on more than it finishes.
+Long Tail's throughput is falling while its board fills. Its cycle time is not a team that is
+slow at the work, it is a team taking on more than it finishes.
 
-The demo also **seeds the two aged-share boundaries**, at 20% and 40%, and that is the only way
-to see the grading without setting it up: three of its teams land on **0%, 33% and 67%** — one on
-each of green, amber and red — so the tile, its symbol and the chart's bands all have a face to
-show. They are only written if you have not answered either box yourself, and your own browser
-starts with both empty and nothing graded. The dialog says which of those is true of your
-browser: with one box already filled it tells you nothing will be graded until the other is,
-with both filled it tells you your own pair is kept, and if your ageing threshold is not the
-default 14 calendar days it says the figures on your screen will differ from the ones it quotes.
+The demo also **seeds the two aged-share boundaries**, at 1% and 20%, and that is the only way to
+see the grading without setting it up: Team Healthy Flow, Team Bare Export and Team Long Tail land
+on target, in the middle and off target — one on each of green, amber and red — so the tile, its
+symbol and the chart's bands all have a face to show. They are only written if you have not answered
+either box yourself, and your own browser starts with both empty and nothing graded. The dialog says
+which of those is true of your browser: with one box already filled it tells you nothing will be
+graded until the other is, with both filled it tells you your own pair is kept, and if your ageing
+threshold is not the default 14 calendar days it says the figures on your screen will differ from
+the ones it quotes.
 
 The **work item age** chart reads differently on each team, which is what makes it worth
 looking at from the demo: Team Healthy Flow has nothing past the threshold and every dot below
@@ -1095,7 +1103,7 @@ showing a red note.
 It asks before it loads and adds alongside anything you already have, with one exception:
 the empty `My team` the app creates on a first run is dropped, but only if it's untouched —
 still the only team, still empty, still under that name. To get rid of the demo afterwards,
-use **Teams & Stages** to delete the three, or *Start again* in the Back up dialog.
+use **Teams & Stages** to delete the four, or *Start Again* in the Back Up & Restore window.
 
 The demo group in `tests.html` pins every finding in that table. **Adding a feature means
 adding the data that demonstrates it, a row in this table, and a test** — a feature the demo
@@ -1119,12 +1127,11 @@ DAE-1491   7/28/2026   8/5/2026                  Story
 The **Created** column is optional and unlocks lead time. Without it everything else works
 exactly as before, and that chart says so on its face rather than disappearing.
 
-A **Status** column is read too, once you have set up the
-[workflow stages](#where-the-time-goes-time-in-stage) that name your statuses: each in-flight
-item is filed under the stage it's sitting in, which is what puts stage on the work item age
-chart's axis. Extra columns holding a **number of days per status** are read on the same
-set-up. A column whose heading — or a cell whose value — matches nothing you've set up is
-simply ignored, and always was.
+A **Status** column is read with no set-up: its statuses join your list and the work item age
+chart groups by them; grouping them into [workflow stages](#where-the-time-goes-time-in-stage)
+is optional. Extra columns holding a **number of days per status** still need a stage that
+claims them. A day-count column that matches nothing you've set up is simply ignored, and always
+was.
 
 Three Jira custom fields are read when your export carries them — **ServiceNow Assignment Type**,
 **Bug Type** and **Type of Work** — under their `Custom field (…)` headings or their bare names.
@@ -1179,10 +1186,13 @@ an error — it's work you've begun, and it counts on the net flow chart as work
 Rows with *no* dates at all — untouched backlog — are ignored, and the count is reported so a
 paste of 260 rows that becomes 170 items explains itself.
 
-**Only dates, a short type label, two keys and a status are ever saved.** The paste is read
-for those on the spot and everything else is discarded — summaries, assignees, comments and the
-rest of the export are never stored. Three guards do that work, and they are different on
-purpose:
+**Only dates, a short type label, two keys, a status, a number of days per stage and three codes
+from fixed lists are ever saved.** The paste is read for those on the spot and everything else is
+discarded — summaries, assignees, comments and the rest of the export are never stored. The dates
+and day counts are read as numbers, and the three [work
+fields](#work-mix-what-kind-of-work-finished) are kept as the number of an entry in a closed list,
+never as the cell's text. Four guards do the work for the fields that arrive as words, and they are
+different on purpose:
 
 - The **work type** is held to a short category label ("Story", "Bug", "Tech Debt"). A cell
   longer than a label — a summary that landed in the wrong column, say — is dropped whole
@@ -1198,13 +1208,13 @@ purpose:
   same shape check as the issue key, at the same two doors. It is the same kind of value, so
   it gets the same guard rather than a new one.
 
-- The **status** cannot be guarded that way at all, because a status has no shape, and it is
-  the one field here guarded by looking at the **column** instead of the value. It is read only
-  from a column headed exactly *Status*, and only if that column **repeats itself** the way a
-  workflow does — a column with a different value on nearly every row is a column of summaries,
-  and nothing at all is taken from it. What is then stored on a row is a *pointer* into a
-  capped list of statuses you can see and delete; the words themselves live in that one list.
-  See [Your Statuses, and Grouping Them Into Stages](#your-statuses-and-grouping-them-into-stages).
+- The **status** cannot be guarded that way at all, because a status has no shape, and it is the one
+  field here guarded by looking at the **column** instead of the value. It is read only from a
+  column headed exactly *Status* or *Current status*, and only if that column **repeats itself** the
+  way a workflow does — a column with a different value on nearly every row is a column of
+  summaries, and nothing at all is taken from it. What is then stored on a row is a *pointer* into a
+  capped list of statuses you can see and delete; the words themselves live in that one list. See
+  [Your Statuses, and Grouping Them Into Stages](#your-statuses-and-grouping-them-into-stages).
 
 Every guard runs again whenever a saved copy, backup or share link is read back in. There are
 deliberately no free-text or comment fields anywhere in the app — there is nowhere you can type
@@ -1218,11 +1228,14 @@ fewer repeated non-date values — and a 200-row export covering eight features 
 distinct parent summaries, which passes that test. The 40-character cap would catch most
 summaries and not a short one. So `Parent summary` is refused by name rather than by luck.
 
-**The few labels you do type are capped at 120 characters where they're written**, not just
-on the next load — team names, the defect and cycle-time words, and both columns of the work
-type filter. `maxlength` stops ordinary typing past the cap but not a paste, and the object
-you type into is the one that goes to `localStorage` and the cloud, so the cap is applied at
-the keystroke as well as in `normalizeSettings()`. Typed numbers are bounded the same way, at
+**The few labels you do type are capped where they're written**, not just on the next load.
+Team, ART and stage names, the defect word and a filter's Display name are capped at 120
+characters where they are typed; the defect work type is held to a 40-character label; and a
+filter's Value is up to eight work types of 40 characters each, rebuilt entry by entry whenever
+a saved copy, backup or share link is read back. (The word for cycle time is picked from a list
+of four, so there is nothing to cap.) `maxlength` stops ordinary typing past the cap but not a
+paste, and the object you type into is the one that goes to `localStorage`, so the cap is applied
+at the keystroke as well as in `normalizeSettings()`. Typed numbers are bounded the same way, at
 the keystroke and on the way back in: the same-day value is clamped at zero, and **the ageing
 threshold floors at 1 day** — a threshold of 0 would count every open item as aged the moment
 it started, and the metrics treat 0 as "use the default", so without the floor the box could
@@ -1282,9 +1295,10 @@ Code**.
 
 - **To stop using it:** delete the bookmarks from your bookmarks bar. It stores nothing in this
   app and writes nothing to Jira, so there is nothing else to undo.
-- **To take it out of the app:** the feature is one commit on `main`, and the commit before it
-  is tagged `pre-jira-bookmark`. Run `git revert <that commit>` and push. It added no stored
-  field and changed no schema, so saved data, backups and share links are untouched either way.
+- **To take it out of the app:** the feature is a handful of commits on `main` after the tag
+  `pre-jira-bookmark`; revert each commit whose subject names the Jira bookmark and push. It
+  added no stored field and changed no schema, so saved data, backups and share links are
+  untouched either way.
   The previous dated release stays downloadable as an offline copy without it.
 
 ### What Happens to Bad Data
@@ -1352,7 +1366,8 @@ A handful of those is ordinary. A large share is either a mismapped column or a 
 routinely raises tickets after starting the work — different problems, both worth knowing, and
 the app says so rather than calling it a few odd rows.
 
-There's no inline row editing — to fix something, correct it at the source and paste again.
+To fix one row, press it in Loaded Data and edit it; to fix many, correct the export and paste
+again.
 
 ## Pasting Several Teams at Once
 
@@ -1414,18 +1429,18 @@ project at the front anyway.
 
 ## Settings
 
-**A window off the header**, behind the ⚙ button at the right-hand end — beside Teams & Stages,
-Back up and Share, and laid out the same way. It was the fourth tab until 22 Aug 2026, which put
-a page you visit twice a year in a strip whose other entries are ways of *reading* your numbers.
-Settings is a thing you go and set, like teams and backups, and all three of those were already
-buttons.
+**A window off the header**, behind the ⚙ button — between Teams & Stages and Back Up, with Share
+after them and the theme picker last — and laid out the same way as those windows. It was the fourth
+tab until 22 Aug 2026, which put a page you visit twice a year in a strip whose other entries are
+ways of *reading* your numbers. Settings is a thing you go and set, like teams and backups, and all
+three of those were already buttons.
 
 Because it opens over the dashboard rather than replacing it, a change lands on the charts behind
 it — rename the defect word and the chart titles follow while the window is still open.
 
-**Eight sections, each ruled off from the one above it** — *Labels & Work Types*, *Aged Work*,
-*Grading*, *Features*, *Your Week*, *Working Days*, *Unusually Long Items* and *Work Type Filter
-List*. Until
+**Nine sections, each ruled off from the one above it** — *Labels & Work Types*, *Aged Work*,
+*Grading*, *Features*, *Your Week*, *Our Sprint Cadence*, *Working Days*, *Unusually Long Items*
+and *Work Type Filter List*. Until
 2 Sep 2026 the window had two headings covering six unrelated things, so everything from the
 ageing thresholds down read as one long column of prose with no way to see where a setting
 ended; the Teams & Stages window beside it is ruled off the same way. *Grading* was cut out of
@@ -1512,7 +1527,7 @@ Everything the charts depend on, shared by all your teams:
 - **Work type filter list** — the Display → Value pairs behind the dashboard's filter. Out of the
   box just two: `All`, which is the locked no-filter row, and `Defects → Bug`, which is paired
   with the defect type above so the filter and the defect rate agree without being told to.
-  **Add the types your own board uses** with *Add a type* — the parse report names the work types
+  **Add the types your own board uses** with *+ Add a Type* — the parse report names the work types
   it found in your paste, so you can copy them straight across. It used to ship Spikes, Stories and
   Tasks as well; they were guesses at somebody else's board, and on a team whose types read
   Feature, Chore and Incident they were three filters matching nothing, which reads as broken data
@@ -1545,12 +1560,12 @@ Both are **whole numbers** — whole items, and whole days. Type a fraction and 
 what it means; the box shows the figure that was kept as soon as you leave it, and the arrows on
 the box move a whole item or a whole day at a time.
 
-They live in **Teams & Stages**, on the team's own row, and **not** in the Settings window
-beside it — which is the one design decision here worth stating. Every setting in this app is shared by every team, and
-can be, because each describes how a *figure is worked out*: what counts as a defect, what a
-same-day item is worth. These two describe a team's own board. A limit of eight means something
-different to a team of three and a team of twelve, and a promise is made by the people who have
-to keep it.
+They live in **Teams & Stages**, behind **Edit** on the team's row, and **not** in the Settings
+window beside it — which is the one design decision here worth stating. Every setting in this app is
+shared by every team, and can be, because each describes how a *figure is worked out*: what counts
+as a defect, what a same-day item is worth. These two describe a team's own board. A limit of eight
+means something different to a team of three and a team of twelve, and a promise is made by the
+people who have to keep it.
 
 What they do:
 
@@ -1568,10 +1583,10 @@ leaving both blank costs nothing: the app states the numbers and does not judge 
 it did before these existed. That is also why nothing is set by default — a limit the app picked
 would draw a line across your chart claiming you had agreed to it.
 
-**Nothing turns a colour.** The verdict is a sentence on the tile, and the bars over a limit are
-the same colour as the bars under it. This app states figures rather than grading them, its
-palette has nothing on the red-green axis to grade with, and a period over a limit is something
-to look at rather than a failure to mark.
+**Neither of these turns a colour.** The verdict is a sentence on the tile, and the bars over a
+limit are the same colour as the bars under it. The only graded figures are the ones you set
+boundaries for under *Grading*, and a period over a limit is something to look at rather than a
+failure to mark.
 
 Both **travel in a share link**, so the person you send it to sees the same lines you do. Both are
 **per team**, so the All Teams table — which compares teams against each other rather than against
@@ -1579,10 +1594,10 @@ their own promises — deliberately doesn't carry them.
 
 ### Where the Ageing Threshold Lives
 
-It is in **Settings**, on its own line under the labels — not in the grid with them, because its
-explanation runs to four lines and a paragraph that long inside a grid cell pushes the fields
-beside it into empty space. Settings that need more than a label sit on their own line for that
-reason, with the explanation in the space next to the box rather than under it.
+It is in **Settings**, in a section of its own — *Aged Work* — where it shares a two-box grid
+with the feature ageing threshold. The grid holds only the two labelled boxes; the explanations
+run full width underneath the pair, because a paragraph inside a grid cell pushes the field
+beside it into empty space and sends the reading order across the window instead of down it.
 
 ### The Target Is Not the Ageing Threshold
 
@@ -1703,7 +1718,6 @@ ignored between them.
 
 The setting is part of Settings, so it rides into a [share link](#sharing-a-read-only-link) and a
 backup with everything else — a recipient sees the figures you saw, under the same note saying
-
 what was ignored.
 
 ## What Isn't Here, and Why
@@ -1722,7 +1736,7 @@ counted off one anchor. A train that skipped a sprint two years ago has its olde
 one length. Fixing that means storing a list of real sprint start dates, which is a different
 feature with a different shape, and it is deliberately out.
 
-**Per-team anything else** — the four settings behind **Edit** are the whole list. Everything
+**Per-team anything else** — the five settings behind **Edit** are the whole list. Everything
 else in Settings is shared by every team on purpose: an ageing threshold or a set of grading
 bands that differed per team would make the All Teams table and the Scorecard comparisons
 between figures measured differently, which is the fault the shared end date exists to prevent
@@ -1767,7 +1781,7 @@ are not comparable.
 
 Defaults only fill in what isn't saved. A browser that has used the app before keeps whatever
 was set there, so a changed default doesn't reach it — **the values above show up on a fresh
-browser, or after "Reset settings to defaults"**, and nowhere else. That is why the defaults can
+browser, or after "Reset Settings to Defaults"**, and nowhere else. That is why the defaults can
 be changed freely: they are the starting point for a new browser, not a setting pushed onto an
 existing one.
 
@@ -1790,7 +1804,10 @@ the issue key to `6`, the per-team project id to `7`, workflow stages to `8`, th
 current stage to `9`, the per-team [limit and target](#your-own-limit-and-your-own-target)
 to `10`, [ignoring outliers](#ignoring-major-outliers) to `11`, the
 [feature layer](#features-the-unit-above-a-work-item) to `12`, the feature ageing threshold to
-`13`, and the [status list](#your-statuses-and-grouping-them-into-stages) to `14`). A row without
+`13`, the [status list](#your-statuses-and-grouping-them-into-stages) to `14`, the aged-share
+grading boundaries to `15`, the Scorecard's other two grading pairs to `16`, the day a week starts
+on to `17`, a per-team sprint cadence and the aged-share opt-out to `18`, the company-wide cadence
+with each team's stored sprint answer to `19`, and the three work fields to `20`). A row without
 one is left exactly as it was
  — no `k` key is written —
 so a team that has never pasted a created date saves byte-identically to before. **The issue key
@@ -1833,11 +1850,12 @@ one is older.
 `derive()` in [index.html](index.html) is the only place any figure is computed. The parts
 worth knowing:
 
-- **Weeks start on Sunday.** Week keys are `YEAR-WW`, where the week containing 1 January is
-  week 1 **of the new year** — the week straddling New Year is `2026-01`, never the old year's
-  `53`, so the numbering never runs 52, 53, 02 (which it did until 2026-09-01: keyed off its Sunday,
-  the straddling week took the old year and week 01 never appeared). A year with 53 Sundays still
-  gets a 53. Written out by hand, because JavaScript has no week-number function.
+- **Weeks start on Sunday unless you change *Weeks start on*.** Week keys are `YEAR-WW`, where the
+  week containing 1 January is week 1 **of the new year** — the week straddling New Year is
+  `2026-01`, never the old year's `53`, so the numbering never runs 52, 53, 02 (which it did until
+  2026-09-01: keyed off its Sunday, the straddling week took the old year and week 01 never
+  appeared). A year with 53 Sundays still gets a 53. Written out by hand, because JavaScript has no
+  week-number function.
 - **Fortnights are anchored to a fixed date** — the first Sunday of 1970 — not to whatever
   window is on screen. Which fortnight a date falls in is therefore a property of the calendar,
   and switching from 3 months to 12 doesn't slide every bar one week sideways. Months are
@@ -1853,12 +1871,12 @@ worth knowing:
   per-period figures that would be distorted by it — the completed-per-period average and the
   steady delivery band — and counted everywhere else; see
   [Whole Periods](#whole-periods-and-which-figures-use-them) for why the line falls there.
-- **Throughput is conserved when you regroup; net flow is not.** Regrouping can't lose a
-  completion, because the axis starts at the earliest completed period by definition. It can
-  change the *started* tally, because a coarser period reaches further back — a month begins
-  on the 1st where a week begins on a Sunday — and sweeps up starts the weekly axis never
-  saw. Net flow moving when you change the grouping is the metric behaving correctly, not a
-  bug.
+- **Throughput is conserved when you regroup; net flow is not.** Regrouping can't lose a completion,
+  because the axis starts at the earliest completed period by definition. It can change the
+  *started* tally, because a coarser period reaches further back — a month begins on the 1st where a
+  week begins on a Sunday, or whichever day *Weeks start on* names — and sweeps up starts the weekly
+  axis never saw. Net flow moving when you change the grouping is the metric behaving correctly, not
+  a bug.
 - **The date window trims the axis, not the data.** "Show data for most recent 3 months" moves
   where the chart starts; every item still counts toward the weeks that remain. That's
   deliberate. The axis also never starts before the team's first completed period — a window
@@ -1949,9 +1967,9 @@ worth knowing:
   says exactly that** — "Nothing finished yet", not a complaint about the filter. The filter
   message only appears when a filter really is what's excluding everything.
 
-Net-flow bars use the theme's accent for positive and `--serious` for negative — deliberately
-not the red/green pair, because the coaching goal is "keep around zero", so neither sign is
-good or bad.
+Net-flow bars use `--series-1` for positive and `--series-5` for negative, the two ends of the theme
+pack's series ramp — deliberately not the red/green pair, because the coaching goal is "keep around
+zero", so neither sign is good or bad.
 
 ## Raised, Started, Finished: the Cumulative Flow Diagram
 
@@ -2408,7 +2426,7 @@ item](#every-finished-item-the-spread-not-the-average) — from one piece of cod
 can never behave differently. It works in a [shared link](#sharing-a-read-only-link) too: it
 writes nothing and reads only what is already drawn on the recipient's screen.
 
-If you are working by keyboard or with a screen reader, the same keys are in the **Loaded data**
+If you are working by keyboard or with a screen reader, the same keys are in the **Loaded Data**
 table on the Your Data tab, which has its own **Copy** button — that table is where every
 chart's text description already points.
 
@@ -2658,7 +2676,7 @@ Empty is still off, and empty means the whole layer is off: no row is diverted, 
 stored, and every figure is the figure it was. A feature type that matches nothing costs nothing
 either — it diverts no rows, moves no figure, and the feature view says it has no features rather
 than showing you a wrong one. Changing this default reaches only a new browser and **Reset
-settings to defaults**; a dashboard that already has the box empty keeps it empty.
+Settings to Defaults**; a dashboard that already has the box empty keeps it empty.
 
 ### A Feature Is Kept Apart, Not Flagged
 
@@ -2753,10 +2771,10 @@ So **features are aged against a threshold of their own**, set in Settings, and 
 Neither threshold ever reaches the other's view, in either direction, and both are pinned that
 way by a test. The item view is byte-for-byte what it always was.
 
-**No default ships** for the same reason the feature work-type list ships empty: a guess at
-somebody else's board is worse than a missing setting, because a filter or a threshold that
-silently matches the wrong thing reads as broken data rather than as a setting nobody set.
-Loading the demo does set one — 30 days — because it is a number chosen for those two
+**No default ships** for the same reason Spikes, Stories and Tasks were taken out of the work type
+filter list: a guess at somebody else's board is worse than a missing setting, because a filter or a
+threshold that silently matches the wrong thing reads as broken data rather than as a setting nobody
+set. Loading the demo does set one — 30 days — because it is a number chosen for those two
 particular boards, and it says so in the confirmation.
 
 The switch **disappears entirely** when no team has features. A control with one usable position
@@ -3027,7 +3045,7 @@ it in words for anyone who would rather not read colour at all.
 ### Adjusting for What You Know
 
 Every forecast above assumes the next few periods look like the last few. **Adjust for what you
-know** is where you say how they will not — seven controls, behind a fold, **each defaulting to
+know** is where you say how they will not — eight controls, behind a fold, **each defaulting to
 doing exactly nothing**.
 
 That default is not a formality. When nothing is set, the app runs the *same sampler it always
@@ -3055,7 +3073,7 @@ stack. Every count divides evenly at every step, so a row is never left with a f
 a hole.
 
 **And each box is the size of what goes in it** — see [A box is as wide as what goes in
-it](#a-box-is-as-wide-as-what-goes-in-it).
+it](#a-box-is-as-wide-as-what-goes-in-it-2026-08-27).
 
 **The block explains itself.** It carries an ⓘ of its own — for a long time it was the only set of
 controls in the app with none — and the window behind it says what each knob does to the answer
@@ -3088,9 +3106,10 @@ placement inside a `<details>` worked, because anything but the summary disappea
 exactly when somebody wants to know what is behind it. The cost is that a browser's find-in-page
 no longer opens the block on a match inside it.
 
-**Four of the seven are about features, and they do not exist on the item lens.** Everything
-below scope growth in that table — features discovered later, how well understood they are, how
-many are worked at once — is read only by the feature forecast. Counting **Work items**, those
+**Four of the eight are about features, and they do not exist on the item lens.** Three of the
+rows below scope growth in that table — features discovered later, how well understood they are,
+how many are worked at once — and the typed feature size at its foot are read only by the
+feature forecast. Counting **Work items**, those
 controls hide *and their settings stop being claimed*: the summary count, the scope-multiplier
 line and the list under the tiles all describe only the knobs that moved the number in front
 of you. The values are kept, not cleared, so switching the lens back gives you your scenario
@@ -3372,7 +3391,7 @@ so Tab and Esc carry on from the chart you are looking at, not from the top of t
 2026-09-04 a key step dropped the focus onto the page underneath, because the button that had
 it went back down with the old card.)
 
-**The menu stays put.** The header — the team picker, the theme, Teams & Stages, Back up and
+**The menu stays put.** The header — the team picker, the theme, Teams & Stages, Back Up and
 Share — is still there above the chart and still works, so you can flick a chart between two
 teams without leaving it. That is why this isn't the browser's own full-screen mode: that one
 takes the header, the tabs and the address bar with it, and you would have to come back out to
@@ -3394,7 +3413,7 @@ A few details:
 - It works in a [shared link](#sharing-a-read-only-link) too. Like everything else on a chart it
   writes nothing: which chart is enlarged isn't saved anywhere, so a reload brings back the
   dashboard as it was.
-- On a phone it is worth more, not less: the header takes two or three rows and the chart gets
+- On a phone it is worth more, not less: the header is one or two lines and the chart gets
   everything under it, which is roughly twice the height a card gives it.
 
 ## Find (⌘K)
@@ -3447,9 +3466,10 @@ boundaries already let in.
 
 ## Taking a Table off the Page
 
-All three tables of figures — **All Teams**, the **Loaded Data** list on Your Data, and
-**[Time in stage](#where-the-time-goes-time-in-stage)** on the Health tab — carry
-**Copy** and **⬇ CSV** in their heading.
+Every table of figures — **All Teams**, the **Loaded Data** list on Your Data,
+**[Time in stage](#where-the-time-goes-time-in-stage)** and **Features still open** on the Health
+tab, and the Forecast tab's **The forecast, as figures** and **When each feature lands** — carries
+**Copy** and **⬇ CSV** in its heading.
 
 | Button | What it does |
 |---|---|
@@ -3537,7 +3557,7 @@ For figures somebody needs to *use* rather than read, the
 ## Cleaning Up Old Data
 
 Years of history make every paste and backup heavier without telling you anything new.
-**Your Data → Clean up old data → Remove old items** drops the items older than a cutoff you
+**Your Data → Clean Up Old Data → Remove Old Items…** drops the items older than a cutoff you
 choose. It is *not* the way to shorten a share link — the share dialog has its own history
 window for that, and it deletes nothing:
 
@@ -3559,17 +3579,17 @@ same anchor the dashboard's own date window uses. It matters: without it, loadin
 export and picking "the last 12 months" would leave you one press from deleting all of it.
 Whichever option you pick, the exact cutoff date is named before you commit.
 
-Nothing happens until you press **Remove items**. Until then a running summary says how many
+Nothing happens until you press **Remove Items**. Until then a running summary says how many
 items would go and how many would stay, broken down per team when you've picked more than one,
 and it calls out by name any team the cutoff would empty completely. The button stays disabled
 while there's nothing to remove. There's no undo, so the dialog offers the same JSON download
-as the Back up button — one press away from a deletion is exactly when a backup is worth having.
+as the Back Up button — one press away from a deletion is exactly when a backup is worth having.
 
 Removing items only removes items. The team itself survives, even if it ends up empty.
 
 ## Back Up & Restore
 
-The **Back up** button in the header opens a dialog (the same shape as the sibling app's)
+The **Back Up** button in the header opens a dialog (the same shape as the sibling app's)
 that writes one JSON file holding
 every team, their work items and your shared settings — `flow-metrics-YYYY-MM-DD.json`. It's
 a copy you keep, independent of this browser. It is the only copy of your data that exists
@@ -3618,9 +3638,9 @@ at. Both are positions on this device rather than data.
 
 ### Starting Again
 
-Folded away at the foot of the same dialog, under **Start again**, is **Delete all data** —
-the whole-board version of Clean up old data. It's behind a fold on purpose: the one
-irreversible action in the app shouldn't sit a mis-click away from Download backup.
+Folded away at the foot of the same dialog, under **Start Again**, is **Delete All Data** —
+the whole-board version of Clean Up Old Data. It's behind a fold on purpose: the one
+irreversible action in the app shouldn't sit a mis-click away from Download Backup (JSON).
 
 Pressing it opens a confirmation of its own that **lists exactly what is going** — "This deletes
 2 teams and 3 items, along with 1 ART, 4 workflow stages and 7 statuses" — and offers the same
@@ -3654,11 +3674,13 @@ Metrics needs a dismissal flag at all only because *Start Fresh* creates nothing
 
 ## Sharing a Read-Only Link
 
-The **Share** button in the header builds a link that shows someone the teams you pick,
-read-only — no sign-in, no way to change anything, and (ported from the sibling app) the
-data travels **inside the link itself**: everything after the `#` never leaves the browser,
-so the figures reach the recipient without GitHub Pages or anyone else seeing them. The payload is a trimmed copy — the chosen teams plus the shared settings, because
-those drive every number on the charts.
+The **Share** button in the header builds a link that shows someone the teams you pick, read-only —
+no sign-in, no way to change anything, and (ported from the sibling app) the data travels **inside
+the link itself**: everything after the `#` never leaves the browser, so the figures reach the
+recipient without GitHub Pages or anyone else seeing them. The payload is a trimmed copy — the
+chosen teams, the settings, the trains, stages and statuses those teams use, and the forecast's
+question and scenario (the count, the date, the unit and any adjustments you set) — because those
+drive every number on the page. No theme and no other view state travels.
 
 **Once any team is on a train, the team list is grouped by train** — each ART's name heads its
 own teams, in the order the Teams window lists them, with teams on no train last under
@@ -3689,12 +3711,11 @@ publish the shape of a workflow that team has nothing to do with. **The list of 
 you typed does not travel at all** — it is a matching rule for a paste box the recipient does
 not have, and it is the one field in the app typed to mirror a work system's own words.
 
-This dialog carries more than any other, so on a screen 760px or wider it opens **820px wide
-with its two choices side by side**, matched in height, rather than stacked. That is the point of the extra width —
-widening a single column only makes the lines longer. It takes the dialog from 764px tall to
-621px, which is the difference between opening already scrolled on a laptop and not. Below that
-it stacks and behaves as before, and no other dialog changes: the ⓘ help window is a paragraph
-of prose, and a wider measure makes prose harder to read, not easier.
+This dialog carries more than any other, so on a screen 760px or wider it opens **1100px wide**
+— the family's share-window width — **with its two choices side by side**, matched in height,
+rather than stacked. That is the point of the extra width — widening a single column only makes
+the lines longer. Below that it stacks and behaves as before, and no other dialog changes: the ⓘ
+help window is a paragraph of prose, and a wider measure makes prose harder to read, not easier.
 
 **How much history** decides how far back the link reaches, in the same words the clean-up
 dialog uses: everything, the last 3, 6 or 12 months, the last 2 or 3 years, or everything from
@@ -3708,7 +3729,7 @@ would leave nothing at all says so.
 
 The recipient sees a standing "Read-only view" bar naming the link's teams (rebuilt from the
 team names it carries, never taken from free text in the link), the dashboard only (no Your Data tab, and
-none of the header buttons that write — Teams & Stages, Back up, Share or Settings), and a link
+none of the header buttons that write — Teams & Stages, Back Up, Share or Settings), and a link
 back to their own data. Nothing they do is saved, and nothing
 already in their browser is touched — `save()`, `persist()` and `saveView()` are all
 no-ops in a shared view, and no service worker is installed. A link that arrives truncated (mail
@@ -3751,10 +3772,10 @@ were always local, so once the page loads **everything** works: pasting, the cha
 export, share links, backup and restore. There is no longer any part of the app that needs the
 network — sync was the one exception, and it is gone.
 
-What's kept is only the app's own public files — the page, the stylesheet, the chart
-library, the icons and the install manifest, the same files anyone can read on GitHub. **Nothing of yours is ever
-put there**, which matters more than it sounds: every one of these apps shares a single
-browser origin, so that cache is not private to this app.
+What's kept is only the app's own public files — the page, its privacy policy, the stylesheet, the
+chart library, the icons and the install manifest, the same files anyone can read on GitHub.
+**Nothing of yours is ever put there**, which matters more than it sounds: every one of these apps
+shares a single browser origin, so that cache is not private to this app.
 
 The network is always tried **first**, and the stored copy is used only when it genuinely
 doesn't answer (or takes more than five seconds). So you can't be left running an old
@@ -3780,7 +3801,7 @@ reconciliation dialog, an empty-copy-never-wins rule, a server-clock ordering sc
 whole class of failure ("looks fine, has not pushed for weeks") that had to be surfaced in the
 UI because it could not be prevented. Removing it deleted all of that at once.
 
-**What replaces it.** **Back up** downloads a JSON file; **Restore** reads one back. That is
+**What replaces it.** **Back Up** downloads a JSON file; **Restore** reads one back. That is
 how you move data between devices now, and it has the property sync never had: you can see
 exactly what moved, and it goes nowhere you did not put it.
 
@@ -3862,13 +3883,16 @@ publishes every file in the repo, so `tests.html` is also live at
 two-item test data. A gate at the bottom of the script checks `location.hostname` against
 `localhost` / `127.0.0.1` / `[::1]` and, anywhere else, refuses: it never creates the iframe,
 explains why, and says how to run the suite properly. Nothing above that gate touches storage
-on its own, so opening the published copy is now harmless.
+on its own, so opening the published copy is now harmless. Instead of running, the published copy
+makes one unauthenticated read of `api.github.com` to show how the latest CI run went — which
+makes `tests.html` the only page in the repo whose Content-Security-Policy names an external
+origin.
 
 (The alternative was keeping `tests.html` off the published site, via a Jekyll exclude or a
 move into a subfolder. The guard was chosen instead because it is self-documenting and travels
 with the file — a fork, a local copy, or a future host can't lose it.)
 
-The suite also runs on every push:
+The suite also runs on every push to `main` and on every pull request:
 [`.github/workflows/tests.yml`](.github/workflows/tests.yml) serves the folder, opens
 `tests.html` in headless Chromium and fails the build if the summary goes red or the page
 throws — so a suite that only ever ran when someone remembered to open it can't silently rot.
@@ -3876,23 +3900,21 @@ CI reaches it at `http://localhost:8013`, so the localhost gate lets it through;
 changed, the run would time out waiting for a summary and fail loudly rather than skip.
 
 Beyond the metrics it covers `detectColumns()` (a leading key column read as the key, the dates
-either way round, header names beating position, a free-text summary mistaken for neither the
-type nor the key, and the real Jira headings a loose pattern would swallow — *Issue id*,
-*Parent key*, *Key changed date*), the issue-key guard from both directions (every rejection
-listed one by one, including a summary, markup and a spreadsheet formula),
-work-in-progress handling — including the net-flow miscount stated as a test, and a WIP row
-whose *empty completed cell comes first*, which a line-trim once shifted into a completed row —
-the week straddling New Year (whose cycle times once vanished from the chart and tile), quoted
-CSV fields, the share-link codec round trip on both wire formats, that [sync really is
-gone](#cross-device-sync-was-removed-2026-08-20) (a CSP naming no host at all, a word-list
-tripwire over the app's code, and the leftover keys actually being deleted at boot), and the
-outside-copy boundary: `sanitizeTeams()` (ids arriving in a share link end up in `data-` attributes and
-`<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is replaced, names are capped, types
-coerced to strings), `normalizeSettings()`
-(including the `defectType` → `unplannedType` carry-over, and junk filter entries or a junk
-same-day value being coerced rather than trusted), `hasData()`, the predicate the
-"empty never beats data" rule rests on, and `isBackup()`, the guard that stops the wrong JSON
-file being restored over real data.
+either way round, header names beating position, a free-text summary mistaken for neither the type
+nor the key, and the real Jira headings a loose pattern would swallow — *Issue id*, *Parent key*,
+*Key changed date*), the issue-key guard from both directions (every rejection listed one by one,
+including a summary, markup and a spreadsheet formula), work-in-progress handling — including the
+net-flow miscount stated as a test, and a WIP row whose *empty completed cell comes first*, which a
+line-trim once shifted into a completed row — the week straddling New Year (whose cycle times once
+vanished from the chart and tile), quoted CSV fields, the share-link codec round trip on both wire
+formats, that [sync really is gone](#cross-device-sync-was-removed-2026-08-20) (a CSP naming no host
+at all, a word-list tripwire over the app's code, and the leftover keys actually being deleted at
+boot), and the outside-copy boundary: `sanitizeTeams()` (ids arriving in a share link end up in
+`data-` attributes and `<option value>`, so anything not `[A-Za-z0-9_-]{1,64}` is replaced, names
+are capped, types coerced to strings), `normalizeSettings()` (including the `defectType` →
+`unplannedType` carry-over, and junk filter entries or a junk same-day value being coerced rather
+than trusted), and `isBackup()`, the guard that stops the wrong JSON file being restored over real
+data.
 
 **Statuses and workflow stages get the longest guard group in the suite** — because they are the
 one field whose source is a Jira status, and the safety does not come from a check on the value.
@@ -3927,8 +3949,9 @@ columns in the reader's order with counts on the ticks, work type ranked busiest
 item in flight carries a stage.
 
 Two promises get pinned end to end rather than function by function:
-`buildSharePayload()` — a share link holds **only the chosen teams** plus the shared settings,
-and nothing else (no theme, no view state) — and `migrate()`, the v1 upgrade,
+`buildSharePayload()` — a share link holds **only the chosen teams**, the settings, the trains,
+stages and statuses those teams use, and the forecast's question and scenario, with no theme and
+no other view state — and `migrate()`, the v1 upgrade,
 exercised the way it really runs: the old `td-rows`/`td-settings` keys are planted, a second
 hidden copy of the app boots, and the suite checks the single team it folds them into.
 
@@ -3946,8 +3969,8 @@ dialog, so both dialogs sit on one set of tests. One end-to-end check runs the w
 sample past a 3-month cutoff and asserts every item is either kept or removed, never both.
 
 The expectations are pinned to a fixed 141-item sample, right down to the weekly throughput
-series, `10.2857…` days average cycle time in week 1, `−5` net flow in week 1, and the 19.92%
-average bug rate in the defect rate chart title. Change the maths and the suite says so.
+series, `10.2857…` days average cycle time in week 1, `−5` net flow in week 1, and the pooled
+20.16% defect share in the defect rate chart title. Change the maths and the suite says so.
 
 **Why there is a `package.json` in a repo with no build step.** It is not a package and it
 installs nothing — it exists so Dependabot has a manifest to scan. Its only entry is the
@@ -3963,13 +3986,13 @@ right instruction — update the file too, in all four repos that carry it.
 |---|---|
 | `index.html` | The whole app — inline CSS and JS |
 | `chart.min.js` | Chart.js 4.4.1, vendored (no CDN) |
-| `theme.css` | Copy of the palette from [claude-theme-pack](https://github.com/eagleadams86/claude-theme-pack); **linked** by `index.html`, `privacy.html` and `tests.html` — since 2026-08-18 it is not also inlined, so the palette lives in one place and a pack change reaches the app |
+| `theme.css` | Copy of the palette from `claude-theme-pack` (a private repo); **linked** by `index.html`, `privacy.html` and `tests.html` — since 2026-08-18 it is not also inlined, so the palette lives in one place and a pack change reaches the app |
 | `sw.js` | Service worker: keeps the app's own public files on your device so it opens offline |
 | `sw-kill.js` | The escape hatch — copy it over `sw.js` and push to uninstall every installed worker |
 | `tests.html` | The test suite — the pure functions, and the live app driven in a hidden frame. Runs on `localhost` only, in Chromium, as CI does |
 | `privacy.html` | Privacy policy — what the app stores and where it does (and doesn't) go |
-| `.github/workflows/tests.yml` | Runs `tests.html` headless on every push |
-| `.github/workflows/codeql.yml` | GitHub's code scanning, on every push |
+| `.github/workflows/tests.yml` | Runs `tests.html` headless on every push to `main` and every pull request |
+| `.github/workflows/codeql.yml` | GitHub's code scanning, on every push to `main`, every pull request and once a week |
 | `package.json` | Names the vendored Chart.js so Dependabot can watch it — installs nothing |
 | `build-single.py` | Builds `dist/flow-metrics.html`, the app as one self-contained file (the `dist/` folder is not committed) |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are, so no Markdown file is published as a page without a Content-Security-Policy |
@@ -4109,7 +4132,7 @@ unchanged.
 
 Every page in this repo passes axe-core at WCAG 2.1 A and AA, the 2.2 AA additions and its
 best-practice rules, in all four themes, with data loaded, on every tab and in every window
-(last run 2026-09-05). The things axe cannot see are checked by hand the same day: a Tab
+(last run 2026-09-24). The things axe cannot see are checked by hand the same day: a Tab
 through every view reading the focus ring, every window opened from the keyboard and closed
 with Esc, hover colours, a 320px-wide window, widened text spacing and reduced motion.
 

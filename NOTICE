@@ -14,11 +14,13 @@ independent personal project:
   * No employer equipment, funding, source code or libraries were used.
   * No employer confidential or proprietary information is present in this
     repository or in the application. This is enforced by the design, not
-    only by convention: the app stores nothing but numbers, dates and short
-    fixed labels drawn from a whitelist. It has no free-text field anywhere.
-    Text pasted into it is parsed in the browser and discarded on the spot —
-    ticket keys, summaries and comments are never stored, transmitted or
-    committed. README.md documents the whitelist that enforces this.
+    only by convention: the app stores only numbers, dates, short capped
+    labels, shape-checked issue keys and a capped list of workflow status
+    names, each admitted through a whitelist. It has no free-text field
+    anywhere. Text pasted into it is parsed in the browser and discarded on
+    the spot. Summaries, descriptions, comments and names of people are never
+    stored, transmitted or committed. README.md documents the whitelist that
+    enforces this.
   * There is no account to sign in to and no server to sync with. What the app
     holds stays in the one browser it was entered into, and goes nowhere else
     unless the reader exports it themselves.
