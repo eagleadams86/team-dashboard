@@ -19460,7 +19460,6 @@ group('a card with no chart matches the one beside it');
         win.tdPastePlan();
 
         win.tdAdopt({ teams: [{ id: 'mt', name: 'My team', rows: [], features: feats }], settings: {} });
-        const kept = {}; ['renderAll', 'toast'].forEach(k => { kept[k] = win[k]; });
         win.loadSample();
         ok(win.tdGet().teams.some(t => t.name === 'My team' && t.features.length === 2),
            'and so does the sample data, which says it is added alongside');

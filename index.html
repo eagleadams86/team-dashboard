@@ -25854,7 +25854,6 @@ $('importFile').addEventListener('change', (e) => {
     }
     const now = window.tdCounts(serializeState());
     const inc = window.tdCounts(parsed);
-    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
     const msg = `Restore ${window.tdCountsText(inc)} from this file?\n\n`
       + `This replaces the ${window.tdCountsText(now)} in this browser. `
       + `There is no undo.`;
