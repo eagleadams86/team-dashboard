@@ -6067,14 +6067,29 @@ function detectColumns(rows, header, order, stages, statuses) {
     for (const i of workSkip) out.add(i);
     return out;
   };
+  /* A "DAYS IN …" HEADING IS NEVER A DATE (2026-11-10 review) — the rule
+     `startAt` got on 2026-11-06, for the other two date roles. "Days in Done"
+     matches the completed pattern and "Days in Submitted" the created one, and
+     a single cell of 1000 or more reads as a spreadsheet serial, which made the
+     column "hold dates": it took the role from the real Resolved column to its
+     right and dated a row 1903. Out of all three passes, for date roles only. */
+  const dayCount = new Set();
+  (header || []).forEach((h, i) => { if (stageHeadingBare(h)) dayCount.add(i); });
   const roleAt = (field) => {
-    if (DATE_ROLE[field]) {
-      const filled = matchHeader(header, field, skipWith(stageSkip), dateyFilled);
+    const dateRole = !!DATE_ROLE[field];
+    const skip = (set) => {
+      const out = skipWith(set);
+      if (!dateRole || !dayCount.size) return out;
+      const both = new Set(out);
+      for (const i of dayCount) both.add(i);
+      return both;
+    };
+    if (dateRole) {
+      const filled = matchHeader(header, field, skip(stageSkip), dateyFilled);
       if (filled >= 0) return filled;
     }
-    const clear = matchHeader(header, field, skipWith(stageSkip),
-      DATE_ROLE[field] ? datey : null);
-    return clear >= 0 ? clear : matchHeader(header, field, skipWith(new Set()));
+    const clear = matchHeader(header, field, skip(stageSkip), dateRole ? datey : null);
+    return clear >= 0 ? clear : matchHeader(header, field, skip(new Set()));
   };
   /* Only the strict start patterns — "In Progress"/"Start"/"Begin" — so that a
      Created column can be recognised as created first, and then fall back into
@@ -8265,9 +8280,12 @@ function outlierCutoffOf(values, mode, typedDays) {
   const q3 = percentileOf(values, 75);
   if (q1 == null || q3 == null) return null;
   const iqr = q3 - q1;
-  /* Every item the same length is a team with no spread, not a team whose every
-     item is an outlier: a zero IQR puts the fence on Q3 itself, which would
-     exclude nothing above it and is the honest answer. */
+  /* NO SPREAD, NO OPINION (2026-11-10 review). A zero IQR puts the fence ON Q3,
+     and this said that "would exclude nothing above it" — true only when nothing
+     IS above it. A support team closing sixteen tickets the same day and four
+     over 2 to 6 days had all four ignored, and an 85th percentile of 0.5. The
+     middle half being one value says nothing about how long the tail may run. */
+  if (iqr === 0) return null;
   return q3 + OUTLIER_IQR_MULTIPLIER * iqr;
 }
 
@@ -11255,8 +11273,13 @@ function derive(rows, settings, view, stages, statuses) {
      ignored the item that sat there for eight months would be two answers to one
      question. Only the FINISHED half can be excluded: nothing still in flight
      has a cycle time, so nothing still in flight is ever in the set. */
+  /* OPEN AT THE WINDOW'S END, not open today (2026-11-10 review) — the
+     `inFlight` rule the age chart and WIP on this same derive use. Under a typed
+     window ending in August this counted an item started in October and left
+     out one that was in flight on the 31st and finished in September. */
   const stageWindow = windowItems.filter(r => !excluded.has(r))
-    .concat(items.filter(r => !r.completed));
+    .concat(items.filter(r => r.started && r.started <= endDate
+      && (!r.completed || r.completed > endDate)));
 
 
   /* Computed before the wording below, which states how many items it covers.
@@ -11839,6 +11862,24 @@ function deriveTeams(teams, settings, view, stages, statuses) {
        membership is by row identity, so a team's own rows find themselves in it. */
     teamFacts: teamFactsOf(list)
   });
+  /* THE FEATURE VIEW IS READ AS OF WHERE THE ITEMS END, HERE TOO (2026-11-10
+     review). The dashboard got this on 2026-11-06 and both callers of this
+     function did not, so on a November export whose last feature closed in
+     June the All Teams row showed March to June beside a dashboard showing
+     August to November, and the pooled forecast promised a date in July. The
+     newest item date across the teams in scope, which `asOf` can only use to
+     move an end LATER. A team's own end is raised the same way below, or every
+     team would count as months behind and the forecast be trimmed to June. */
+  const featureView = !!(view && view.unit === 'features');
+  const itemsEndOf = (t) => featureView ? lastArrivedDate(t.rows) : null;
+  if (featureView) {
+    let itemsEnd = view.asOf instanceof Date && !isNaN(view.asOf) ? view.asOf : null;
+    for (const t of list) {
+      const e = itemsEndOf(t);
+      if (e && (!itemsEnd || e > itemsEnd)) itemsEnd = e;
+    }
+    if (itemsEnd) view = Object.assign({}, view, { asOf: itemsEnd });
+  }
   const listOf = (t) => teamListOf(t, view);
   const everything = trainRowsOf(list, view);
   /* Derived twice when a forecast is wanted, and only then. The first pass is
@@ -11870,9 +11911,12 @@ function deriveTeams(teams, settings, view, stages, statuses) {
      of that view's render time. */
   const wantForecast = !(view && view.forecastMode === 'off');
   const preScan = wantForecast
-    ? list.map(t => ({ t,
-        d: derive(listOf(t), settings, Object.assign({}, view, { forecastMode: 'off' }), stages,
-          statuses) }))
+    ? list.map(t => {
+        const d = derive(listOf(t), settings, Object.assign({}, view, { forecastMode: 'off' }), stages,
+          statuses);
+        const ie = d.dataEnd ? itemsEndOf(t) : null;
+        return { t, d: ie && ie > d.dataEnd ? Object.assign({}, d, { dataEnd: ie }) : d };
+      })
     : [];
   const ends = preScan.map(x => x.d.dataEnd).filter(Boolean);
   const earliestEnd = ends.length ? new Date(Math.min(...ends.map(d => d.getTime()))) : null;
@@ -14714,9 +14758,15 @@ function seriesTrend(series) {
   return { series, change: fit[fit.length - 1] - fit[0] };
 }
 
+/* FITTED THROUGH WHOLE PERIODS ONLY (2026-11-10 review). A count for a period
+   two days old is not a low count, and fitting through it made every team read
+   as falling on any export taken early in a week — thirteen weeks of 10 and a
+   Monday of 2 gave −3.0 beside an average of 10. The average has always left the
+   part-period out; this is the same rule. The trace still draws every period. */
 function throughputTrend(d) {
-  if (!d || d.empty) return null;
-  return seriesTrend(d.throughput);
+  if (!d || d.empty || !Array.isArray(d.throughput)) return null;
+  const t = seriesTrend(d.partial ? d.throughput.slice(0, -1) : d.throughput);
+  return t ? { series: d.throughput, change: t.change } : null;
 }
 
 /* Work in progress, added 2026-09-10 — the second and, on the width arithmetic
@@ -14852,10 +14902,13 @@ function wipCell(d, countHtml) {
     + '<span class="spark-delta">' + trendFigure(t) + '</span></td>';
 }
 
-function trendDataset(values) {
+/* `partial` is passed only for a series of COUNTS (throughput), where an
+   unfinished last period reads low for no reason but the date: the line is
+   fitted through the whole periods and stops short of that one. */
+function trendDataset(values, partial) {
   return {
     label: 'Trend',
-    data: linearTrend(values),
+    data: partial ? linearTrend(values.slice(0, -1)).concat([null]) : linearTrend(values),
     type: 'line',
     borderColor: token('--text-muted'),
     borderWidth: 1.5,
@@ -15332,7 +15385,7 @@ function drawCharts(d) {
         borderColor: seriesMain,
         backgroundColor: seriesMain,
         borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false, order: 1
-      }, trendDataset(d.throughput)]
+      }, trendDataset(d.throughput, d.partial)]
     },
     options: prodOpts
   });
@@ -19529,7 +19582,7 @@ function drawTrainThroughput(train, scopePhrase) {
         borderColor: seriesMain,
         backgroundColor: seriesMain,
         borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 5, tension: 0, fill: false, order: 1
-      }, trendDataset(train.throughput)]
+      }, trendDataset(train.throughput, train.partial)]
     },
     options: opts
   });
@@ -23531,7 +23584,12 @@ function doLoad(mode) {
   /* Only when feature types are set up. With none, `res.features` is empty by
      construction — so replacing unconditionally would let an ordinary paste
      silently delete a feature list the reader built with the setting on. */
-  if ((state.settings.featureTypes || []).length) {
+  /* AND ONLY WHEN THE PASTE CARRIED SOME (2026-11-10 review). An items-only
+     export replaced into a team emptied its feature list under a plan that
+     named only the items and a report saying "nothing was taken out as a
+     feature". A paste replaces the lists it has rows for, as `res.rows` does
+     one line up. */
+  if ((state.settings.featureTypes || []).length && (mode === 'append' || res.features.length)) {
     team.features = mode === 'append'
       ? mergeFeatures(team.features, res.features)
       : res.features;
@@ -23899,7 +23957,8 @@ $('parseNote').addEventListener('click', e => {
      team, still empty, still named what the app named it. A team someone has
      renamed or pasted into is theirs. */
   if (ids.filter(Boolean).length && state.teams.length === 1
-      && !state.teams[0].rows.length && state.teams[0].name === 'My team'
+      && !state.teams[0].rows.length && !(state.teams[0].features || []).length
+      && state.teams[0].name === 'My team'
       && !state.teams[0].projectId) state.teams = [];
   ids.filter(Boolean).forEach(id => {
     if (state.teams.some(t => cleanProjectId(t.projectId) === id)) return;
@@ -26047,12 +26106,15 @@ $('clearConfirm').addEventListener('click', () => {
    from today. Same anchor as derive()'s date window, and for the same reason:
    someone pasting a stale export should not find that "the last 12 months"
    means "nothing at all". */
+/* THE NEWEST DATE THAT HAS HAPPENED (2026-11-10 review) — derive()'s `arrived()`
+   fence, which this scan never got. One planned start a year out (a paste takes
+   it) moved "the last 3 months" a year forward: the clean-up offered to delete
+   every finished item, and a 3-month share link carried none. */
 function historyAnchor(teams) {
+  const today = new Date(todayLocalISO() + 'T00:00:00Z');
   let newest = null;
-  teams.forEach(t => t.rows.forEach(r => {
-    if (r.completed && (!newest || r.completed > newest)) newest = r.completed;
-    if (r.started   && (!newest || r.started   > newest)) newest = r.started;
-  }));
+  const see = (dt) => { if (dt && dt <= today && (!newest || dt > newest)) newest = dt; };
+  teams.forEach(t => t.rows.forEach(r => { see(r.completed); see(r.started); }));
   return newest;
 }
 
@@ -27595,7 +27657,11 @@ function loadSample() {
      — but ONLY when it is untouched: still the only team, still empty, still
      named what the app named it. A team someone has renamed or put data in is
      theirs, and the demo adds alongside rather than replacing, as it says. */
-  if (state.teams.length === 1 && !state.teams[0].rows.length && state.teams[0].name === 'My team')
+  /* EMPTY MEANS BOTH LISTS (2026-11-10 review): a "My team" holding only
+     features — a features-only paste, or Add a Feature — was deleted here and
+     by Create Team, with no prompt, under a confirm that says "added alongside". */
+  if (state.teams.length === 1 && !state.teams[0].rows.length
+      && !(state.teams[0].features || []).length && state.teams[0].name === 'My team')
     state.teams = [];
 
   /* One train holding two teams, and one team on none. That is the smallest

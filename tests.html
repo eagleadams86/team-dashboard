@@ -3239,8 +3239,8 @@ async function run(TD, win) {
     is(TD.OUTLIER_MIN_SAMPLE, 12, 'and it wants twelve finished items before it will have an opinion');
     is(TD.outlierCutoffOf(twelve.slice(0, 11), 'auto', null), null,
        'eleven is not enough — quartiles off a handful are noise');
-    is(TD.outlierCutoffOf(new Array(12).fill(5), 'auto', null), 5,
-       'every item the same length is a team with no spread, not a team of outliers');
+    is(TD.outlierCutoffOf(new Array(12).fill(5), 'auto', null), null,
+       'every item the same length is a team with no spread, not a team of outliers — no fence');
     is(TD.outlierCutoffOf([], 'days', 42), 42, 'a typed cutoff is the number, with no sample at all');
     is(TD.outlierCutoffOf([1, 2], 'days', 30), 30,
        'and no floor — a typed fence is not derived from the data, so a small sample cannot make it wrong');
@@ -19327,6 +19327,152 @@ group('a card with no chart matches the one beside it');
     }
     plant({ teams: [], settings: {} });
     if (had === null) win.localStorage.removeItem('td-folded'); else win.localStorage.setItem('td-folded', had);
+  }
+
+  /* ────────────────────────────────────────────────────────── */
+  group('2026-11-10 review: figures');
+  {
+    const TD = win.TD, C = win.TDCleanup;
+    const today = new Date(TD.todayLocalISO() + 'T00:00:00Z');
+    const day = (n) => new Date(today.getTime() + n * 86400000);
+    const S10 = { sameDayValue: 0.5, unplannedType: 'Bug', unplannedLabel: 'Defect',
+      cycleTimeLabel: 'Cycle Time', agedDays: 14, workingDays: false,
+      outlierMode: 'off', outlierDays: null, filters: [{ display: 'All', value: 'All' }] };
+
+    /* One: All Teams and the pooled forecast read the feature view as of where
+       the ITEMS end, as the dashboard has since 2026-11-06. */
+    {
+      const rows = [];
+      for (let n = 2; n < 120; n += 3) rows.push({ c: iso(day(-n)), s: iso(day(-n - 4)), t: 'Story' });
+      const feats = [{ c: iso(day(-150)), s: iso(day(-190)), t: 'Feature', i: 'FA-1' },
+                     { c: iso(day(-160)), s: iso(day(-200)), t: 'Feature', i: 'FA-2' },
+                     { c: '', s: iso(day(-200)), t: 'Feature', i: 'FA-3' }];
+      const teams = win.TDState.sanitizeTeams([{ id: 'fa', name: 'FA', rows, features: feats }]);
+      const v = { months: 3, bucket: 'week', unit: 'features', forecastMode: 'off' };
+      const dash = TD.derive(teams[0].features, S10,
+        Object.assign({}, v, { asOf: win.lastArrivedDate(teams[0].rows) }), []);
+      const all = TD.deriveTeams(teams, S10, v, []);
+      is(iso(all.train.endDate), iso(dash.endDate),
+         'feature view: the pooled train ends where the items end, as the dashboard does');
+      is(iso(all.asOf), iso(day(-2)), 'and the date every row shares is the newest item date');
+      const noFeat = TD.deriveTeams(teams, S10, { months: 3, bucket: 'week', forecastMode: 'off' }, []);
+      is(iso(noFeat.asOf), iso(day(-2)), 'the item view is where it always was');
+    }
+
+    /* Two: "the last N months" counts back from the newest date that has
+       HAPPENED. One planned start a year out made "keep 3 months" offer to
+       delete every finished item. */
+    {
+      const teams = [{ rows: [
+        { completed: day(-40), started: day(-45) },
+        { completed: day(-5), started: day(-9) },
+        { completed: null, started: day(360) }] }];
+      is(iso(C.historyAnchor(teams)), iso(day(-5)),
+         'history anchor: a start dated after today is not the newest date');
+      is(C.outsideWindow(teams[0].rows[1], C.windowCutoff(teams, '3', ''), false), false,
+         'so last week’s completion is inside "the last 3 months"');
+      is(C.historyAnchor([{ rows: [{ completed: null, started: day(30) }] }]), null,
+         'and a board of nothing but planned dates has no anchor at all');
+    }
+
+    /* Three: no spread is no opinion. The fence sat ON Q3 when the middle half
+       was one value, which ignored every item above the commonest. */
+    {
+      const sameDay = new Array(16).fill(0.5).concat([2, 3, 4, 6]);
+      is(TD.outlierCutoffOf(sameDay, 'auto', null), null,
+         'outliers: a team closing most work the same day has no automatic fence');
+      const rows = sameDay.map((ct, i) => ({ completed: D(2015, 3, 2 + (i % 20)),
+        started: ct < 1 ? D(2015, 3, 2 + (i % 20)) : D(2015, 3, 2 + (i % 20) - ct),
+        created: null, type: 'Story', key: '', stages: {}, stage: '' }));
+      const d = TD.derive(rows, Object.assign({}, S10, { outlierMode: 'auto' }), { months: 'all', bucket: 'week' }, []);
+      is(d.summary.p85CycleTime, 2, 'so its 85th percentile is still read over all twenty items');
+    }
+
+    /* Four: the trend is fitted through whole periods only. */
+    {
+      const part = { daysCovered: 2, daysInBucket: 7 };
+      const flat = [10, 10, 10, 10, 2];
+      is(win.throughputTrend({ throughput: flat, partial: part }).change, 0,
+         'trend: a steady team is not "falling" because this week has only begun');
+      is(win.throughputTrend({ throughput: flat, partial: part }).series.length, 5,
+         'the trace still draws every period');
+      ok(win.throughputTrend({ throughput: flat }).change < 0, 'a whole last period still counts');
+      is(win.throughputTrend({ throughput: [10, 2], partial: part }), null,
+         'and one whole period is no trend');
+      const ds = win.trendDataset(flat, part).data;
+      is(ds.length, 5, 'the dashed line keeps the chart’s length');
+      is(ds[4], null, 'and stops short of the unfinished period');
+      is(ds[0], 10, 'having been fitted through the whole ones');
+    }
+
+    /* Five: a "Days in …" heading is not a completed or created date either. */
+    {
+      const txt = ['Key\tType\tDays in Done\tCreated\tResolved',
+        'A-1\tStory\t1200\t2023-01-01\t2023-02-01',
+        'A-2\tStory\t12.5\t2026-10-01\t2026-10-20',
+        'A-3\tStory\t3\t2026-10-05\t2026-10-25'].join('\n');
+      const r = TD.parsePastedRows(txt, 'auto', [], [], []);
+      is(r.columns.completed, 4, 'columns: Resolved is the completed date, not "Days in Done"');
+      is(r.rows.length, 3, 'so all three rows load');
+      const txt2 = ['Key\tType\tDays in Submitted\tCreated\tResolved',
+        'A-1\tStory\t1200\t2023-01-01\t2023-02-01',
+        'A-2\tStory\t12.5\t2026-10-01\t2026-10-20'].join('\n');
+      is(TD.parsePastedRows(txt2, 'auto', [], [], []).columns.created, 3,
+         'and Created is the created date, not "Days in Submitted"');
+    }
+
+    /* Eight: under a typed window, Time in Stage adds what was open when the
+       window ENDED, the rule the age chart and WIP beside it use. */
+    {
+      const mk = (c, s, n) => ({ completed: c, started: s, created: null, type: 'Story',
+        key: '', stages: { sb: n }, stage: '' });
+      const rows = [mk(D(2015, 8, 10), D(2015, 8, 5), 5), mk(D(2015, 9, 20), D(2015, 8, 5), 40),
+                    mk(null, D(2015, 10, 15), 90), mk(null, D(2015, 8, 20), 7)];
+      const d = TD.derive(rows, SAMPLE_SETTINGS,
+        { filterValue: '', months: 'custom', customFrom: '2015-08-01', customTo: '2015-08-31' });
+      is(d.stageTimes.measured, 3, 'stage times: three items were finished in or open at the end of August');
+      is(d.stageTimes.byStage[0].p85, 40,
+         'the one in flight then is in, and the one started in October is not');
+    }
+
+    /* Six and seven: a team's FEATURES are its data too. */
+    {
+      const feats = [{ c: '2026-01-16', s: '2026-01-06', t: 'Feature', i: 'MT-1' },
+                     { c: '', s: '2026-01-08', t: 'Feature', i: 'MT-2' }];
+      const real = win.confirm;
+      win.confirm = () => true;
+      try {
+        win.tdAdopt({ teams: [{ id: 'mt', name: 'My team', rows: [], features: feats }], settings: {} });
+        appDoc.getElementById('pasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+          'BB-1\t2015-01-14\t2015-01-21\tStory', 'CC-1\t2015-01-15\t2015-01-22\tStory'].join('\n');
+        win.tdPastePlan();
+        appDoc.querySelector('#parseNote [data-create-team="*"]').click();
+        ok(win.tdGet().teams.some(t => t.name === 'My team' && t.features.length === 2),
+           'Create Team keeps a "My team" that holds features', win.tdGet().teams.map(t => t.name).join());
+        appDoc.getElementById('pasteBox').value = '';
+        win.tdPastePlan();
+
+        win.tdAdopt({ teams: [{ id: 'mt', name: 'My team', rows: [], features: feats }], settings: {} });
+        const kept = {}; ['renderAll', 'toast'].forEach(k => { kept[k] = win[k]; });
+        win.loadSample();
+        ok(win.tdGet().teams.some(t => t.name === 'My team' && t.features.length === 2),
+           'and so does the sample data, which says it is added alongside');
+
+        win.tdAdopt({ teams: [{ id: 'al', name: 'Alpha', projectId: 'AA',
+          rows: [{ c: '2026-01-09', s: '2026-01-06', t: 'Story', i: 'AA-9' }], features: feats }],
+          settings: { featureTypes: ['Feature'] } });
+        appDoc.getElementById('pasteBox').value = ['Issue key\tIn Progress\tResolved\tIssue Type',
+          'AA-1\t2015-01-14\t2015-01-21\tStory', 'AA-2\t2015-01-15\t2015-01-22\tStory'].join('\n');
+        win.tdPastePlan();
+        appDoc.getElementById('btnLoad').click();
+        is(win.tdGet().teams[0].rows.length, 2, 'an items-only paste replaces the items');
+        is(win.tdGet().teams[0].features.length, 2,
+           'and leaves the team’s features alone — it carried none to replace them with');
+        appDoc.getElementById('pasteBox').value = '';
+        win.tdPastePlan();
+      } finally { win.confirm = real; }
+      plant({ teams: [], settings: {} });
+    }
   }
 
   /* ────────────────────────────────────────────────────────── */
